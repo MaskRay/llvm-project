@@ -424,14 +424,13 @@ LLVM_DUMP_METHOD void MCFragment::dump() const {
   }
   case MCFragment::FT_BoundaryAlign: {
     const auto *BF = cast<MCBoundaryAlignFragment>(this);
-    if (BF->canEmitNops())
-      OS << " (can emit nops to align";
-    if (BF->isFused())
-      OS << " fused branch)";
-    else
-      OS << " unfused branch)";
+    if (BF->hasEmitNops())
+      OS << " (emit nops)";
     OS << "\n       ";
+    if (BF->hasValue())
+      OS << " Value:" << hexdigit(BF->getValue());
     OS << " BoundarySize:" << BF->getAlignment().value()
+       << " MaxBytesToEmit:" << BF->getMaxBytesToEmit()
        << " Size:" << BF->getSize();
     break;
   }
