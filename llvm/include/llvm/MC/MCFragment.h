@@ -517,37 +517,54 @@ public:
   }
 };
 
-/// Represents required padding such that a particular other set of fragments
-/// does not cross a particular power-of-two boundary. The other fragments must
-/// follow this one within the same section.
+/// This is a placeholder fragment used to emit NOP or values to align a set of
+/// fragments within specific boundary. If we call the nearest backward
+/// MCBoundaryAlignFragment of LastFragment as NBBF, then the set of fragments
+/// to be aligned is (NBBF, LastFragment]. The fragments to be aligned should be
+/// in the same section with this fragment, and each non-BF fragment on the path
+/// from this fragment to the fragments to be aligned must have a fixed size
+/// after finite times of relaxation.
 class MCBoundaryAlignFragment : public MCFragment {
+  /// Flag to indicate that (optimal) NOPs should be emitted instead
+  /// of using the provided value.
+  bool EmitNops = false;
   /// The alignment requirement of the branch to be aligned.
   Align AlignBoundary;
-  /// Flag to indicate whether the branch is fused.  Use in determining the
-  /// region of fragments being aligned.
-  bool Fused : 1;
-  /// Flag to indicate whether NOPs should be emitted.
-  bool EmitNops : 1;
   /// The size of the fragment.  The size is lazily set during relaxation, and
   /// is not meaningful before that.
   uint64_t Size = 0;
+  /// Value to use for filling padding bytes if existing.
+  Optional<uint8_t> Value;
+  /// The maximum number of bytes to emit; if the Flag EmitNops is true,
+  /// then this constraint is ignored.
+  uint64_t MaxBytesToEmit = 0;
+  /// The fragment to be aligned.
+  const MCFragment *LastFragment = nullptr;
 
 public:
-  MCBoundaryAlignFragment(Align AlignBoundary, bool Fused = false,
-                          bool EmitNops = false, MCSection *Sec = nullptr)
-      : MCFragment(FT_BoundaryAlign, false, Sec), AlignBoundary(AlignBoundary),
-        Fused(Fused), EmitNops(EmitNops) {}
+  MCBoundaryAlignFragment(MCSection *Sec = nullptr)
+      : MCFragment(FT_BoundaryAlign, false, Sec) {}
 
   uint64_t getSize() const { return Size; }
-  void setSize(uint64_t Value) { Size = Value; }
+  void setSize(uint64_t V) { Size = V; }
 
   Align getAlignment() const { return AlignBoundary; }
+  void setAlignment(Align V) { AlignBoundary = V; }
 
-  bool isFused() const { return Fused; }
-  void setFused(bool Value) { Fused = Value; }
+  bool hasValue() const { return Value.hasValue(); }
+  uint8_t getValue() const { return Value.getValue(); }
+  void setValue(uint8_t V) { Value = V; }
 
-  bool canEmitNops() const { return EmitNops; }
-  void setEmitNops(bool Value) { EmitNops = Value; }
+  bool hasEmitNops() const { return EmitNops; }
+  void setEmitNops(bool V) { EmitNops = V; }
+
+  bool hasEmitNopsOrValue() const { return EmitNops || Value.hasValue(); }
+
+  uint8_t getMaxBytesToEmit() const { return MaxBytesToEmit; }
+  void setMaxBytesToEmit(uint64_t V) { MaxBytesToEmit = V; }
+
+  const MCFragment *getFragment() const { return LastFragment; }
+  void setFragment(const MCFragment *F) { LastFragment = F; }
 
   static bool classof(const MCFragment *F) {
     return F->getKind() == MCFragment::FT_BoundaryAlign;
