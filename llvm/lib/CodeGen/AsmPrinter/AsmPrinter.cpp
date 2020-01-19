@@ -667,7 +667,7 @@ void AsmPrinter::EmitFunctionHeader() {
   OutStreamer->SwitchSection(getObjFileLowering().SectionForGlobal(&F, TM));
   EmitVisibility(CurrentFnSym, F.getVisibility());
 
-  if (MAI->needsFunctionDescriptors() &&
+  if (TM.getTargetTriple().isOSAIX() &&
       F.getLinkage() != GlobalValue::InternalLinkage)
     EmitLinkage(&F, CurrentFnDescSym);
 
@@ -705,11 +705,6 @@ void AsmPrinter::EmitFunctionHeader() {
       EmitGlobalConstant(F.getParent()->getDataLayout(), F.getPrefixData());
     }
   }
-
-  // Emit the function descriptor. This is a virtual function to allow targets
-  // to emit their specific function descriptor.
-  if (MAI->needsFunctionDescriptors())
-    EmitFunctionDescriptor();
 
   // Emit the CurrentFnSym. This is a virtual function to allow targets to do
   // their wild and crazy things as required.
@@ -1665,9 +1660,7 @@ void AsmPrinter::SetupMachineFunction(MachineFunction &MF) {
   const Function &F = MF.getFunction();
 
   // Get the function symbol.
-  if (MAI->needsFunctionDescriptors()) {
-    assert(TM.getTargetTriple().isOSAIX() && "Function descriptor is only"
-                                             " supported on AIX.");
+  if (TM.getTargetTriple().isOSAIX()) {
     assert(CurrentFnDescSym && "The function descriptor symbol needs to be"
 		                           " initalized first.");
 

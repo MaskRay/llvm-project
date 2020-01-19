@@ -427,10 +427,6 @@ public:
 
   virtual void EmitFunctionEntryLabel();
 
-  virtual void EmitFunctionDescriptor() {
-    llvm_unreachable("Function descriptor is target-specific.");
-  }
-
   virtual void EmitMachineConstantPoolValue(MachineConstantPoolValue *MCPV);
 
   /// Targets can override this to change how global constants that are part of

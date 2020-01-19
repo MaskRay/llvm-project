@@ -20,7 +20,6 @@ MCAsmInfoXCOFF::MCAsmInfoXCOFF() {
   UseDotAlignForAlignment = true;
   AsciiDirective = nullptr; // not supported
   AscizDirective = nullptr; // not supported
-  NeedsFunctionDescriptors = true;
   HasDotLGloblDirective = true;
   Data64bitsDirective = "\t.llong\t";
   SupportsQuotedNames = false;

@@ -400,9 +400,6 @@ protected:
   // %hi(), and similar unary operators.
   bool HasMipsExpressions = false;
 
-  // If true, emit function descriptor symbol on AIX.
-  bool NeedsFunctionDescriptors = false;
-
 public:
   explicit MCAsmInfo();
   virtual ~MCAsmInfo();
@@ -665,7 +662,6 @@ public:
   bool canRelaxRelocations() const { return RelaxELFRelocations; }
   void setRelaxELFRelocations(bool V) { RelaxELFRelocations = V; }
   bool hasMipsExpressions() const { return HasMipsExpressions; }
-  bool needsFunctionDescriptors() const { return NeedsFunctionDescriptors; }
 };
 
 } // end namespace llvm

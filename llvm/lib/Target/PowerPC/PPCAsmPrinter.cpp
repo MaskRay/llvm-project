@@ -165,7 +165,7 @@ public:
 
   void EmitGlobalVariable(const GlobalVariable *GV) override;
 
-  void EmitFunctionDescriptor() override;
+  void EmitFunctionEntryLabel() override;
 
   void EmitEndOfAsmFile(Module &) override;
 };
@@ -1670,7 +1670,7 @@ void PPCAIXAsmPrinter::EmitGlobalVariable(const GlobalVariable *GV) {
   EmitGlobalConstant(GV->getParent()->getDataLayout(), GV->getInitializer());
 }
 
-void PPCAIXAsmPrinter::EmitFunctionDescriptor() {
+void PPCAIXAsmPrinter::EmitFunctionEntryLabel() {
   const DataLayout &DL = getDataLayout();
   const unsigned PointerSize = DL.getPointerSizeInBits() == 64 ? 8 : 4;
 
@@ -1693,6 +1693,7 @@ void PPCAIXAsmPrinter::EmitFunctionDescriptor() {
   OutStreamer->EmitIntValue(0, PointerSize);
 
   OutStreamer->SwitchSection(Current.first, Current.second);
+  AsmPrinter::EmitFunctionEntryLabel();
 }
 
 void PPCAIXAsmPrinter::EmitEndOfAsmFile(Module &M) {
