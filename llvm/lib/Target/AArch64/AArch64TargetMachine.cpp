@@ -411,6 +411,7 @@ public:
   void addPostRegAlloc() override;
   void addPreSched2() override;
   void addPreEmitPass() override;
+  void addPreEmitPass2() override;
 
   std::unique_ptr<CSEConfigBase> getCSEConfig() const override;
 };
@@ -630,14 +631,6 @@ void AArch64PassConfig::addPreEmitPass() {
   if (EnableA53Fix835769)
     addPass(createAArch64A53Fix835769());
 
-  if (EnableBranchTargets)
-    addPass(createAArch64BranchTargetsPass());
-
-  // Relax conditional branch instructions if they're otherwise out of
-  // range of their destination.
-  if (BranchRelaxation)
-    addPass(&BranchRelaxationPassID);
-
   // Identify valid longjmp targets for Windows Control Flow Guard.
   if (TM->getTargetTriple().isOSWindows())
     addPass(createCFGuardLongjmpPass());
@@ -648,4 +641,14 @@ void AArch64PassConfig::addPreEmitPass() {
   if (TM->getOptLevel() != CodeGenOpt::None && EnableCollectLOH &&
       TM->getTargetTriple().isOSBinFormatMachO())
     addPass(createAArch64CollectLOHPass());
+}
+
+void AArch64PassConfig::addPreEmitPass2() {
+  if (EnableBranchTargets)
+    addPass(createAArch64BranchTargetsPass());
+
+  // Relax conditional branch instructions if they're otherwise out of
+  // range of their destination.
+  if (BranchRelaxation)
+    addPass(&BranchRelaxationPassID);
 }
