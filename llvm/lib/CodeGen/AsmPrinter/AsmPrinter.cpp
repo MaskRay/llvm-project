@@ -706,6 +706,21 @@ void AsmPrinter::EmitFunctionHeader() {
     }
   }
 
+  // Emit M NOPs for -fpatchable-function-entry=N,M where M>0. We arbitrarily
+  // place prefix data before NOPs.
+  unsigned PatchableFunctionPrefix = 0;
+  (void)F.getFnAttribute("patchable-function-prefix")
+      .getValueAsString()
+      .getAsInteger(10, PatchableFunctionPrefix);
+  if (PatchableFunctionPrefix) {
+    CurrentPatchableFunctionEntrySym =
+        OutContext.createLinkerPrivateTempSymbol();
+    OutStreamer->EmitLabel(CurrentPatchableFunctionEntrySym);
+    emitPatchableFunctionPrefix(PatchableFunctionPrefix);
+  } else {
+    CurrentPatchableFunctionEntrySym = CurrentFnBegin;
+  }
+
   // Emit the function descriptor. This is a virtual function to allow targets
   // to emit their specific function descriptor.
   if (MAI->needsFunctionDescriptors())
@@ -3222,7 +3237,7 @@ void AsmPrinter::emitPatchableFunctionEntries() {
           "__patchable_function_entries", ELF::SHT_PROGBITS, Flags));
     }
     EmitAlignment(Align(PointerSize));
-    OutStreamer->EmitSymbolValue(CurrentFnBegin, PointerSize);
+    OutStreamer->EmitSymbolValue(CurrentPatchableFunctionEntrySym, PointerSize);
   }
 }
 

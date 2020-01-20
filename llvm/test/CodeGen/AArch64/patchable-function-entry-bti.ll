@@ -10,6 +10,7 @@ define i32 @f0() "patchable-function-entry"="0" "branch-target-enforcement" {
   ret i32 0
 }
 
+;; -fpatchable-function-entry=1 -mbranch-protection=bti
 define i32 @f1() "patchable-function-entry"="1" "branch-target-enforcement" {
 ; CHECK-LABEL: f1:
 ; CHECK-NEXT:  .Lfunc_begin1:
@@ -19,5 +20,23 @@ define i32 @f1() "patchable-function-entry"="1" "branch-target-enforcement" {
 ; CHECK:       .section __patchable_function_entries,"awo",@progbits,f1,unique,0
 ; CHECK-NEXT:  .p2align 3
 ; CHECK-NEXT:  .xword .Lfunc_begin1
+  ret i32 0
+}
+
+;; -fpatchable-function-entry=2,1 -mbranch-protection=bti
+define i32 @f1_1() "patchable-function-entry"="1" "patchable-function-prefix"="1" "branch-target-enforcement" {
+; CHECK-LABEL: .type f1_1,@function
+; CHECK-NEXT: .Ltmp0:
+; CHECK-NEXT: nop
+; CHECK-NEXT: f1_1:
+; CHECK-NEXT: .Lfunc_begin2:
+; CHECK:      // %bb.0:
+; CHECK-NEXT:  hint #34
+; CHECK-NEXT:  nop
+; CHECK-NEXT:  mov w0, wzr
+; CHECK:      .size f1_1, .Lfunc_end2-f1_1
+; CHECK:      .section __patchable_function_entries,"awo",@progbits,f1,unique,0
+; CHECK-NEXT: .p2align 3
+; CHECK-NEXT: .xword .Ltmp0
   ret i32 0
 }

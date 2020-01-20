@@ -113,6 +113,9 @@ public:
 
   ProfileSummaryInfo *PSI;
 
+  /// The symbol for the entry in __patchable_function_entires.
+  MCSymbol *CurrentPatchableFunctionEntrySym = nullptr;
+
   /// The symbol for the current function. This is recalculated at the beginning
   /// of each call to runOnMachineFunction().
   MCSymbol *CurrentFnSym = nullptr;
@@ -448,6 +451,10 @@ public:
   /// Targets can override this to customize the output of IMPLICIT_DEF
   /// instructions in verbose mode.
   virtual void emitImplicitDef(const MachineInstr *MI) const;
+
+  /// Used by -fpatchable-function-entry=_,N where N>0. Insert NOPs before the
+  /// function entry.
+  virtual void emitPatchableFunctionPrefix(int N) {}
 
   //===------------------------------------------------------------------===//
   // Symbol Lowering Routines.

@@ -113,6 +113,7 @@ public:
                                    const MachineInstr *MI);
 
   void EmitInstruction(const MachineInstr *MI) override;
+  void emitPatchableFunctionPrefix(int N) override;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AsmPrinter::getAnalysisUsage(AU);
@@ -1295,6 +1296,11 @@ void AArch64AsmPrinter::EmitInstruction(const MachineInstr *MI) {
   MCInst TmpInst;
   MCInstLowering.Lower(MI, TmpInst);
   EmitToStreamer(*OutStreamer, TmpInst);
+}
+
+void AArch64AsmPrinter::emitPatchableFunctionPrefix(int N) {
+  while (N--)
+    EmitToStreamer(*OutStreamer, MCInstBuilder(AArch64::HINT).addImm(0));
 }
 
 // Force static initialization.
