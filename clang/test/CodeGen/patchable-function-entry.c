@@ -17,10 +17,14 @@ __attribute__((patchable_function_entry(2, 0))) void f20() {}
 __attribute__((patchable_function_entry(2, 0))) void f20decl();
 void f20decl() {}
 
-// OPT: define void @f() #2
+// CHECK: define void @f52() #2
+__attribute__((patchable_function_entry(5, 2))) void f52() {}
+
+// OPT: define void @f() #3
 void f() {}
 
 /// M in patchable_function_entry(N,M) is currently ignored.
 // CHECK: attributes #0 = { {{.*}} "patchable-function-entry"="0"
 // CHECK: attributes #1 = { {{.*}} "patchable-function-entry"="2"
-// OPT:   attributes #2 = { {{.*}} "patchable-function-entry"="1"
+// CHECK: attributes #2 = { {{.*}} "patchable-function-entry"="3" "patchable-function-prefix"="2"
+// OPT:   attributes #3 = { {{.*}} "patchable-function-entry"="1"
