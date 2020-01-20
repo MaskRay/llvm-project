@@ -67,3 +67,25 @@ define void @f5() "patchable-function-entry"="5" comdat {
 ; 64-NEXT:     .quad .Lfunc_begin4
   ret void
 }
+
+;; -fpatchable-function-entry=3,2
+;; "patchable-function-prefix" emits data before the function entry label.
+define void @f3_2() "patchable-function-prefix"="2" "patchable-function-entry"="1" {
+; CHECK-LABEL: .type f3_2,@function
+; CHECK-NEXT: .Ltmp0: # @f3_2
+; CHECK-NEXT:  nop
+; CHECK-NEXT:  nop
+; CHECK-NEXT:  f3_2:
+; CHECK:       # %bb.0:
+; CHECK-NEXT:  nop
+;; .size does not include the prefix.
+; CHECK:       .size f3_2, .Lfunc_end5-f3_2
+; NOFSECT      .section __patchable_function_entries,"awo",@progbits,f0,unique,0
+; FSECT:       .section __patchable_function_entries,"awo",@progbits,f3_2,unique,4
+; 32:          .p2align 2
+; 32-NEXT:     .long .Ltmp0
+; 64:          .p2align 3
+; 64-NEXT:     .quad .Ltmp0
+  %frame = alloca i8, i32 16
+  ret void
+}

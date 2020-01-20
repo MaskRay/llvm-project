@@ -2638,3 +2638,10 @@ void X86AsmPrinter::EmitInstruction(const MachineInstr *MI) {
 
   EmitAndCountInstruction(TmpInst);
 }
+
+void X86AsmPrinter::emitPatchableFunctionPrefix(int N) {
+  // Emit 1-byte NOPs so that after a partial patch, the remaining are still
+  // valid.
+  while (N--)
+    OutStreamer->EmitInstruction(MCInstBuilder(X86::NOOP), getSubtargetInfo());
+}
