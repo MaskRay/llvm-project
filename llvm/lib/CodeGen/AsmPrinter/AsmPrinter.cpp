@@ -450,6 +450,14 @@ MCSymbol *AsmPrinter::getSymbol(const GlobalValue *GV) const {
   return TM.getSymbol(GV);
 }
 
+MCSymbol *AsmPrinter::getSymbolPreferLocal(const GlobalValue &GV) const {
+  if (TM.getTargetTriple().isOSBinFormatELF() &&
+      GlobalObject::isExternalLinkage(GV.getLinkage()) && GV.isDSOLocal() &&
+      !GV.isDeclaration() && isa<GlobalObject>(GV))
+    return getSymbolWithGlobalValueBase(&GV, "$local");
+  return TM.getSymbol(&GV);
+}
+
 /// EmitGlobalVariable - Emit the specified global variable to the .s file.
 void AsmPrinter::EmitGlobalVariable(const GlobalVariable *GV) {
   bool IsEmuTLSVar = TM.useEmulatedTLS() && GV->isThreadLocal();
@@ -631,6 +639,9 @@ void AsmPrinter::EmitGlobalVariable(const GlobalVariable *GV) {
   EmitAlignment(Alignment, GV);
 
   OutStreamer->EmitLabel(EmittedInitSym);
+  MCSymbol *LocalAlias = getSymbolPreferLocal(*GV);
+  if (LocalAlias != EmittedInitSym)
+    OutStreamer->EmitLabel(LocalAlias);
 
   EmitGlobalConstant(GV->getParent()->getDataLayout(), GV->getInitializer());
 
@@ -752,7 +763,14 @@ void AsmPrinter::EmitFunctionEntryLabel() {
     report_fatal_error("'" + Twine(CurrentFnSym->getName()) +
                        "' label emitted multiple times to assembly file");
 
-  return OutStreamer->EmitLabel(CurrentFnSym);
+  OutStreamer->EmitLabel(CurrentFnSym);
+
+  if (TM.getTargetTriple().isOSBinFormatELF()) {
+    const Function &F = MF->getFunction();
+    MCSymbol *Sym = getSymbolPreferLocal(F);
+    if (Sym != CurrentFnSym)
+      OutStreamer->EmitLabel(Sym);
+  }
 }
 
 /// emitComments - Pretty-print comments for instructions.
