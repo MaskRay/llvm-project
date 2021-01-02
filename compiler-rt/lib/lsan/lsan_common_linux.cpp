@@ -15,7 +15,7 @@
 #include "sanitizer_common/sanitizer_platform.h"
 #include "lsan_common.h"
 
-#if CAN_SANITIZE_LEAKS && (SANITIZER_LINUX || SANITIZER_NETBSD)
+#if CAN_SANITIZE_LEAKS && (SANITIZER_LINUX || SANITIZER_FREEBSD || SANITIZER_NETBSD)
 #include <link.h>
 
 #include "sanitizer_common/sanitizer_common.h"
@@ -80,7 +80,8 @@ static int ProcessGlobalRegionsCallback(struct dl_phdr_info *info, size_t size,
                                         void *data) {
   Frontier *frontier = reinterpret_cast<Frontier *>(data);
   for (uptr j = 0; j < info->dlpi_phnum; j++) {
-    const ElfW(Phdr) *phdr = &(info->dlpi_phdr[j]);
+    // Don't use ElfW(Phdr): FreeBSD link.h does not define ElfW.
+    const auto *phdr = &(info->dlpi_phdr[j]);
     // We're looking for .data and .bss sections, which reside in writeable,
     // loadable segments.
     if (!(phdr->p_flags & PF_W) || (phdr->p_type != PT_LOAD) ||

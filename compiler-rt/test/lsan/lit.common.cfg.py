@@ -90,8 +90,9 @@ config.substitutions.append( ("%clangxx_hwasan ", build_invocation(clang_lsan_cx
 supported_android = config.android and config.target_arch in ['x86_64', 'i386', 'aarch64'] and 'android-thread-properties-api' in config.available_features
 supported_linux = (not config.android) and config.host_os == 'Linux' and config.host_arch in ['aarch64', 'x86_64', 'ppc64', 'ppc64le', 'mips64', 'riscv64', 'arm', 'armhf', 'armv7l', 's390x', 'loongarch64']
 supported_darwin = config.host_os == 'Darwin' and config.target_arch in ['x86_64']
+supported_freebsd = config.host_os == 'FreeBSD' and config.target_arch in ['x86_64']
 supported_netbsd = config.host_os == 'NetBSD' and config.target_arch in ['x86_64', 'i386']
-if not (supported_android or supported_linux or supported_darwin or supported_netbsd):
+if not (supported_android or supported_linux or supported_darwin or supported_freebsd or supported_netbsd):
   config.unsupported = True
 
 # Don't support Thumb due to broken fast unwinder
