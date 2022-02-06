@@ -34,6 +34,10 @@ multiclass B<string name, string help1, string help2> {
   def no_ # NAME: Flag<["--", "-"], "no-" # name>, HelpText<help2>;
 }
 
+defm archive_as_start_lib
+    : BB<"archive-as-start-lib", "Parse an archive as --start-lib object files",
+         "Don't parse an archive as --start-lib object files (default)">;
+
 defm auxiliary: Eq<"auxiliary", "Set DT_AUXILIARY field to the specified name">;
 
 def Bno_symbolic: F<"Bno-symbolic">, HelpText<"Don't bind default visibility defined symbols locally for -shared (default)">;

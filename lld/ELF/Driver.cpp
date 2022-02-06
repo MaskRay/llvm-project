@@ -227,15 +227,7 @@ void LinkerDriver::addFile(StringRef path, bool withLOption) {
       return;
     }
 
-    std::unique_ptr<Archive> file =
-        CHECK(Archive::create(mbref), path + ": failed to parse archive");
-
-    // If an archive file has no symbol table, it may be intentional (used as a
-    // group of lazy object files where the symbol table is not useful), or the
-    // user is attempting LTO and using a default ar command that doesn't
-    // understand the LLVM bitcode file. Treat the archive as a group of lazy
-    // object files.
-    if (!file->isEmpty() && !file->hasSymbolTable()) {
+    auto parseAsStartLib = [&]() {
       for (const std::pair<MemoryBufferRef, uint64_t> &p :
            getArchiveMembers(mbref)) {
         auto magic = identify_magic(p.first.getBuffer());
@@ -246,11 +238,25 @@ void LinkerDriver::addFile(StringRef path, bool withLOption) {
           error(path + ": archive member '" + p.first.getBufferIdentifier() +
                 "' is neither ET_REL nor LLVM bitcode");
       }
+    };
+
+    if (config->archiveAsStartLib) {
+      parseAsStartLib();
       return;
     }
 
-    // Handle the regular case.
-    files.push_back(make<ArchiveFile>(std::move(file)));
+    std::unique_ptr<Archive> file =
+        CHECK(Archive::create(mbref), path + ": failed to parse archive");
+
+    // If an archive file has no symbol table, it may be intentional (used as a
+    // group of lazy object files where the symbol table is not useful), or the
+    // user is attempting LTO and using a default ar command that doesn't
+    // understand the LLVM bitcode file. Treat the archive as a group of lazy
+    // object files.
+    if (!file->isEmpty() && !file->hasSymbolTable())
+      parseAsStartLib();
+    else
+      files.push_back(make<ArchiveFile>(std::move(file)));
     return;
   }
   case file_magic::elf_shared_object:
@@ -973,6 +979,8 @@ static void readConfigs(opt::InputArgList &args) {
       args.hasFlag(OPT_allow_multiple_definition,
                    OPT_no_allow_multiple_definition, false) ||
       hasZOption(args, "muldefs");
+  config->archiveAsStartLib =
+      args.hasFlag(OPT_archive_as_start_lib, OPT_no_archive_as_start_lib, false);
   config->auxiliaryList = args::getStrings(args, OPT_auxiliary);
   if (opt::Arg *arg =
           args.getLastArg(OPT_Bno_symbolic, OPT_Bsymbolic_non_weak_functions,

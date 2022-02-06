@@ -149,6 +149,7 @@ struct Configuration {
       callGraphProfile;
   bool allowMultipleDefinition;
   bool androidPackDynRelocs;
+  bool archiveAsStartLib;
   bool armHasBlx = false;
   bool armHasMovtMovw = false;
   bool armJ1J2BranchEncoding = false;

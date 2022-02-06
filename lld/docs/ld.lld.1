@@ -320,6 +320,10 @@ Do not page align sections, link against static libraries.
 .It Fl -no-allow-shlib-undefined
 Do not allow unresolved references in shared libraries.
 This option is enabled by default when linking an executable.
+.It Fl -no-archive-as-start-lib
+Don't parse an archive as a group of
+.Cm -start-lib
+object files.
 .It Fl -no-as-needed
 Always set
 .Dv DT_NEEDED
