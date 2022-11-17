@@ -1130,6 +1130,7 @@ void llvm::thinLTOFinalizeInModule(Module &TheModule,
     // It is illegal for comdats to contain declarations.
     auto *GO = dyn_cast_or_null<GlobalObject>(&GV);
     if (GO && GO->isDeclarationForLinker() && GO->hasComdat()) {
+      errs() << "+++ made ae " << GO->getName() << "\n";
       NonPrevailingComdats.insert(GO->getComdat());
       GO->setComdat(nullptr);
     }
@@ -1167,6 +1168,8 @@ void llvm::thinLTOFinalizeInModule(Module &TheModule,
       GlobalObject *Obj = GA.getAliaseeObject();
       assert(Obj && "aliasee without an base object is unimplemented");
       if (Obj->hasAvailableExternallyLinkage()) {
+        errs() << "+++ ae " << GA.getName() << " due to " << Obj->getName()
+               << "\n";
         GA.setLinkage(GlobalValue::AvailableExternallyLinkage);
         Changed = true;
       }

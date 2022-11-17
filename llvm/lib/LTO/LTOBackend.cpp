@@ -521,6 +521,7 @@ static void dropDeadSymbols(Module &Mod, const GVSummaryMapTy &DefinedGlobals,
   for (auto &GV : Mod.global_values())
     if (GlobalValueSummary *GVS = DefinedGlobals.lookup(GV.getGUID()))
       if (!Index.isGlobalValueLive(GVS)) {
+        errs() << "+++ dropDead " << GV.getName() << "\n";
         DeadGVs.push_back(&GV);
         convertToDeclaration(GV);
       }
