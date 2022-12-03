@@ -60,6 +60,11 @@ public:
   // is used to uniquify them.
   llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *> comdatGroups;
 
+  bool addCmseSymPair(Symbol *acle_sg_sym, Symbol *sym);
+  llvm::MapVector<Symbol *, Symbol *> cmseSymMap;
+  SmallVector<std::pair<Symbol *, Symbol *>, 0> cmseSymVector;
+  llvm::StringMap<Defined *> cmseImportLib;
+
 private:
   SmallVector<Symbol *, 0> findByVersion(SymbolVersion ver);
   SmallVector<Symbol *, 0> findAllByVersion(SymbolVersion ver,

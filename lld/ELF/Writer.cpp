@@ -453,6 +453,9 @@ template <class ELFT> void elf::createSyntheticSections() {
   in.igotPlt = std::make_unique<IgotPltSection>();
   add(*in.igotPlt);
 
+  in.armCmseSGSection = std::make_unique<ArmCmseSGSection>();
+  add(*in.armCmseSGSection);
+
   // _GLOBAL_OFFSET_TABLE_ is defined relative to either .got.plt or .got. Treat
   // it as a relocation and ensure the referenced section is created.
   if (ElfSym::globalOffsetTable && config->emachine != EM_MIPS) {
@@ -590,6 +593,9 @@ template <class ELFT> void Writer<ELFT>::run() {
     if (auto e = buffer->commit())
       fatal("failed to write output '" + buffer->getPath() +
             "': " + toString(std::move(e)));
+
+    if (config->emachine == EM_ARM)
+      writeARMCmseImportLib<ELFT>();
   }
 }
 
@@ -2133,6 +2139,7 @@ template <class ELFT> void Writer<ELFT>::finalizeSections() {
     // static symbol table.
     finalizeSynthetic(in.symTab.get());
     finalizeSynthetic(in.ppc64LongBranchTarget.get());
+    finalizeSynthetic(in.armCmseSGSection.get());
   }
 
   // Relaxation to delete inter-basic block jumps created by basic block

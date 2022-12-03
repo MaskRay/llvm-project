@@ -527,6 +527,12 @@ template <class ELFT> void ObjFile<ELFT>::parse(bool ignoreComdats) {
     return;
   }
 
+  if (toString(this) == config->in_implib) {
+    initializeJustSymbols();
+    importCmseSymbols(obj);
+    return;
+  }
+
   // Handle dependent libraries and selection of section groups as these are not
   // done in parallel.
   ArrayRef<Elf_Shdr> objSections = getELFShdrs<ELFT>();
@@ -1031,6 +1037,18 @@ InputSectionBase *ObjFile<ELFT>::createInputSection(uint32_t idx,
   return makeThreadLocal<InputSection>(*this, sec, name);
 }
 
+// Cortex-M Security Extensions. Prefix for functions that should be exported
+// for the non-secure world.
+#define ACLESESYM_PREFIX "__acle_se_"
+#define ACLESESYM_PREFIX_LEN 10
+bool isACLESESymbolName(llvm::StringRef name) {
+  return name.startswith(ACLESESYM_PREFIX);
+}
+
+llvm::StringRef getNameFromACLESE(llvm::StringRef name) {
+  return name.drop_front(ACLESESYM_PREFIX_LEN);
+}
+
 // Initialize this->Symbols. this->Symbols is a parallel array as
 // its corresponding ELF symbol table.
 template <class ELFT>
@@ -1095,6 +1113,29 @@ void ObjFile<ELFT>::initializeSymbols(const object::ELFFile<ELFT> &obj) {
   }
 }
 
+// Initialize this->Symbols. this->Symbols is a parallel array as
+// its corresponding ELF symbol table.
+template <class ELFT>
+void ObjFile<ELFT>::importCmseSymbols(const object::ELFFile<ELFT> &obj) {
+  ArrayRef<Elf_Sym> eSyms = this->getELFSyms<ELFT>();
+  if (numSymbols == 0) {
+    numSymbols = eSyms.size();
+    symbols = std::make_unique<Symbol *[]>(numSymbols);
+  }
+
+  // Some entries have been filled by LazyObjFile.
+  for (size_t i = firstGlobal, end = eSyms.size(); i != end; ++i) {
+    const Elf_Sym &eSym = eSyms[i];
+    Defined *sym = reinterpret_cast<Defined *>(make<SymbolUnion>());
+
+    // Initialize symbol fields.
+    memset(sym, 0, sizeof(Symbol));
+    sym->setName(CHECK(eSyms[i].getName(stringTable), this));
+    sym->value = eSym.st_value;
+    symtab.cmseImportLib[sym->getName()] = sym;
+  }
+}
+
 template <class ELFT>
 void ObjFile<ELFT>::initSectionsAndLocalSyms(bool ignoreComdats) {
   if (!justSymbols)
@@ -1139,16 +1180,71 @@ void ObjFile<ELFT>::initSectionsAndLocalSyms(bool ignoreComdats) {
   }
 }
 
+static void processArmCmseSymbol(Symbol &sym, uint32_t secIdx) {
+  if (!(config->emachine == EM_ARM))
+    return;
+
+  if (!isACLESESymbolName(sym.getName()))
+    return;
+
+  StringRef ext_name = getNameFromACLESE(sym.getName());
+  // Try to find the associated symbol. Search only in global symbols
+  // because the specification requires to produce output library with
+  // this symbol having global visibility.
+  Symbol *ext_sym = symtab.find(ext_name);
+  if (ext_sym == NULL || !ext_sym->isDefined()) {
+    error("CMSE symbol " + sym.getName() + " detected in " +
+          toString(sym.file) + " but no associated global symbol definition " +
+          ext_name + " found.");
+    return;
+  }
+  auto &d_sym = cast<Defined>(sym);
+  auto &d_extsym = cast<Defined>(*ext_sym);
+
+  if (secIdx == SHN_ABS) {
+    // It is not possible to create a veneer and point the
+    // associated symbol to it if the associated symbol is already
+    // absolute.
+    if (d_sym.value == d_extsym.value)
+      error("CMSE symbol " + ext_sym->getName() + " in " +
+            toString(ext_sym->file) +
+            " is absolute and cannot be changed to point to a new secure "
+            "gateway veneer.");
+    // Values are different, nothing to do.
+    return;
+  }
+
+  // Validate both symbols.
+  if (!(d_sym.isFunc() && (d_sym.value & 0x1))) {
+    error("CMSE symbol " + sym.getName() + " in " + toString(sym.file) +
+          " is not a Thumb code symbol.");
+    return;
+  }
+
+  if (!(d_extsym.isFunc() && (d_extsym.value & 0x1))) {
+    error("CMSE symbol " + ext_sym->getName() + " in " +
+          toString(ext_sym->file) + " is not a Thumb code symbol.");
+    return;
+  }
+  // <sym> will be redefined later in the link in .gnu.sgstubs
+  symtab.addCmseSymPair(&sym, ext_sym);
+}
 // Called after all ObjFile::parse is called for all ObjFiles. This checks
 // duplicate symbols and may do symbol property merge in the future.
 template <class ELFT> void ObjFile<ELFT>::postParse() {
   static std::mutex mu;
   ArrayRef<Elf_Sym> eSyms = this->getELFSyms<ELFT>();
+  if (toString(this) == config->in_implib)
+    return;
+
   for (size_t i = firstGlobal, end = eSyms.size(); i != end; ++i) {
     const Elf_Sym &eSym = eSyms[i];
     Symbol &sym = *symbols[i];
     uint32_t secIdx = eSym.st_shndx;
     uint8_t binding = eSym.getBinding();
+
+    processArmCmseSymbol(sym, secIdx);
+
     if (LLVM_UNLIKELY(binding != STB_GLOBAL && binding != STB_WEAK &&
                       binding != STB_GNU_UNIQUE))
       errorOrWarn(toString(this) + ": symbol (" + Twine(i) +

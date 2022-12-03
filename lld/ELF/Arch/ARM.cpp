@@ -6,10 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "OutputSections.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
 #include "Target.h"
 #include "lld/Common/ErrorHandler.h"
+#include "lld/Common/Filesystem.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Support/Endian.h"
 
@@ -18,6 +20,7 @@ using namespace llvm::support::endian;
 using namespace llvm::ELF;
 using namespace lld;
 using namespace lld::elf;
+using namespace llvm::object;
 
 namespace {
 class ARM final : public TargetInfo {
@@ -909,6 +912,135 @@ int64_t ARM::getImplicitAddend(const uint8_t *buf, RelType type) const {
     return 0;
   }
 }
+
+template <typename ELFT> void elf::writeARMCmseImportLib() {
+  if (config->emachine != EM_ARM)
+    return;
+
+  if (in.armCmseSGSection->getSize() == 0)
+    return;
+
+  if (config->out_implib.empty())
+    return;
+
+  SmallVector<SyntheticSection *, 0> inputSections;
+  SmallVector<OutputSection *, 0> outputSections;
+
+  StringTableSection *shStrTab = make<StringTableSection>(".shstrtab", false);
+  StringTableSection *strTab = make<StringTableSection>(".strtab", false);
+  SymbolTableBaseSection *symTab = make<SymbolTableSection<ELFT>>(*strTab);
+  SymtabShndxSection *symTabShndx = make<SymtabShndxSection>();
+
+  inputSections.push_back(symTab);
+  inputSections.push_back(symTabShndx);
+  inputSections.push_back(shStrTab);
+  inputSections.push_back(strTab);
+
+  OutputSection *elfHeader1 = make<OutputSection>(symTab->name, 0, 0);
+  OutputSection *elfHeader2 = make<OutputSection>(strTab->name, 0, 0);
+  OutputSection *elfHeader3 = make<OutputSection>(shStrTab->name, 0, 0);
+  OutputSection *elfHeader4 = make<OutputSection>(symTabShndx->name, 0, 0);
+
+  auto recordInputSections = [](OutputSection *osec, InputSectionBase *isec) {
+    osec->recordSection(isec);
+    osec->finalizeInputSections();
+  };
+  recordInputSections(elfHeader1, symTab);
+  recordInputSections(elfHeader2, strTab);
+  recordInputSections(elfHeader3, shStrTab);
+  recordInputSections(elfHeader4, symTabShndx);
+
+  in.armCmseSGSection->exportEntries(symTab);
+
+  auto addOutputSection = [&](OutputSection &osec) {
+    outputSections.push_back(&osec);
+    osec.sectionIndex = outputSections.size();
+    osec.shName = shStrTab->addString(osec.name);
+  };
+  addOutputSection(*elfHeader1);
+  addOutputSection(*elfHeader2);
+  addOutputSection(*elfHeader3);
+  addOutputSection(*elfHeader4);
+
+  elfHeader1->size = symTab->getSize();
+  elfHeader2->size = strTab->getSize();
+  elfHeader3->size = shStrTab->getSize();
+  elfHeader4->size = symTabShndx->getSize();
+
+  for (SyntheticSection *isec : inputSections)
+    isec->finalizeContents();
+
+  uint64_t off = sizeof(typename ELFT::Ehdr);
+  // Assign file offsets to output sections.
+  for (OutputSection *osec : outputSections) {
+    osec->offset = alignToPowerOf2(off, osec->addralign);
+    off = osec->offset + osec->size;
+  }
+
+  uint64_t sectionHeaderOff = alignToPowerOf2(off, config->wordsize);
+  uint64_t fileSize = sectionHeaderOff +
+                      (outputSections.size() + 1) * sizeof(typename ELFT::Shdr);
+
+  unlinkAsync(config->out_implib);
+  unsigned flags = 0;
+  if (!config->mmapOutputFile)
+    flags |= FileOutputBuffer::F_no_mmap;
+
+  Expected<std::unique_ptr<FileOutputBuffer>> bufferOrErr =
+      FileOutputBuffer::create(config->out_implib, fileSize, flags);
+
+  if (!bufferOrErr) {
+    error("failed to open " + config->out_implib + ": " +
+          llvm::toString(bufferOrErr.takeError()));
+    return;
+  }
+
+  std::unique_ptr<FileOutputBuffer> &buffer = *bufferOrErr;
+  uint8_t *buf = buffer->getBufferStart();
+
+  alignToPowerOf2(off, config->wordsize);
+  auto *eHdr = reinterpret_cast<typename ELFT::Ehdr *>(buf);
+  eHdr->e_type = ET_REL;
+  eHdr->e_entry = 0;
+  eHdr->e_shoff = sectionHeaderOff;
+
+  Partition part;
+  elf::writeEhdr<ELFT>(buf, part);
+  // Write the section header table.
+  //
+  // The ELF header can only store numbers up to SHN_LORESERVE in the e_shnum
+  // and e_shstrndx fields. When the value of one of these fields exceeds
+  // SHN_LORESERVE ELF requires us to put sentinel values in the ELF header and
+  // use fields in the section header at index 0 to store
+  // the value. The sentinel values and fields are:
+  // e_shnum = 0, SHdrs[0].sh_size = number of sections.
+  // e_shstrndx = SHN_XINDEX, SHdrs[0].sh_link = .shstrtab section index.
+  auto *sHdrs = reinterpret_cast<typename ELFT::Shdr *>(buf + eHdr->e_shoff);
+  // TODO: eHdr->e_shnum = outputSections.size() + 1 gives warning;
+  // unable to get the associated symbol table for SHT_SYMTAB_SHNDX section with
+  // index 4: sh_link (5) is greater than or equal to the total number of
+  // sections (5). Find out why.
+  eHdr->e_shnum = outputSections.size();
+  eHdr->e_shstrndx = elfHeader3->sectionIndex;
+
+  for (OutputSection *osec : outputSections)
+    osec->writeHeaderTo<ELFT>(++sHdrs);
+
+  // Write section contents to a mmap'ed file.
+  parallel::TaskGroup tg;
+
+  elfHeader1->writeTo<ELFT>(buf + elfHeader1->offset, tg);
+  elfHeader2->writeTo<ELFT>(buf + elfHeader2->offset, tg);
+  elfHeader3->writeTo<ELFT>(buf + elfHeader3->offset, tg);
+  elfHeader4->writeTo<ELFT>(buf + elfHeader4->offset, tg);
+
+  errorToErrorCode(buffer->commit());
+}
+
+template void elf::writeARMCmseImportLib<ELF32LE>();
+template void elf::writeARMCmseImportLib<ELF32BE>();
+template void elf::writeARMCmseImportLib<ELF64LE>();
+template void elf::writeARMCmseImportLib<ELF64BE>();
 
 TargetInfo *elf::getARMTargetInfo() {
   static ARM target;

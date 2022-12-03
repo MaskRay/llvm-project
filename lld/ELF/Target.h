@@ -215,6 +215,7 @@ void writePrefixedInstruction(uint8_t *loc, uint64_t insn);
 void addPPC64SaveRestore();
 uint64_t getPPC64TocBase();
 uint64_t getAArch64Page(uint64_t expr);
+template <typename ELFT> void writeARMCmseImportLib();
 void riscvFinalizeRelax(int passes);
 
 LLVM_LIBRARY_VISIBILITY extern const TargetInfo *target;

@@ -2183,6 +2183,129 @@ static uint32_t getSymSectionIndex(Symbol *sym) {
   return SHN_ABS;
 }
 
+ArmCmseSGSection::ArmCmseSGSection()
+    : SyntheticSection(llvm::ELF::SHF_ALLOC | llvm::ELF::SHF_EXECINSTR,
+                       llvm::ELF::SHT_PROGBITS,
+                       /*alignment=*/32, ".gnu.sgstubs") {
+  this->entsize = 8;
+  // The range of addresses used in in_implib should be fixed.
+  for (auto &p : symtab.cmseImportLib) {
+    Defined *sym = p.second;
+    if (impLibMinAddr > sym->value)
+      impLibMinAddr = sym->value;
+    if (impLibMaxAddr <= sym->value) {
+      impLibMaxAddr = sym->value + this->entsize;
+    }
+  }
+  if (config->emachine == EM_ARM && !symtab.cmseSymVector.empty()) {
+    addMappingSymbol();
+
+    for (const auto &[acle_sg_sym, sym] : symtab.cmseSymVector)
+      addSGVeneer(acle_sg_sym, sym);
+  }
+}
+
+void ArmCmseSGSection::addSGVeneer(Symbol *acle_sg_sym, Symbol *sym) {
+  entries.push_back(std::make_pair(acle_sg_sym, sym));
+  if (acle_sg_sym->file != sym->file ||
+      cast<Defined>(*acle_sg_sym).value != cast<Defined>(*sym).value) {
+    // Symbol addresses different, nothing to do.
+    return;
+  }
+  // Only secure symbols with values equal to that of it's non-secure
+  // counterpart needs to be in the .sg.stubs section.
+  auto SI = symtab.cmseImportLib.find(sym->getName());
+  if (SI == symtab.cmseImportLib.end()) {
+    ArmCmseVariableAddressSGVeneer *ss =
+        make<ArmCmseVariableAddressSGVeneer>(sym, acle_sg_sym);
+    ss->parent = this;
+    this->sgSections.push_back(ss);
+    ctx.inputSections.push_back(ss);
+    newEntries += 1;
+  } else {
+    Defined *impSym = symtab.cmseImportLib[sym->getName()];
+    ArmCmseFixedAddressSGVeneer *ss =
+        make<ArmCmseFixedAddressSGVeneer>(sym, acle_sg_sym, impSym->value);
+    ss->parent = this;
+    this->sgSections.push_back(ss);
+    ctx.inputSections.push_back(ss);
+  }
+}
+
+void ArmCmseSGSection::exportEntries(SymbolTableBaseSection *symTab) {
+  for (const std::pair<Symbol *, Symbol *> &p : entries) {
+    Defined *d = cast<Defined>(p.second);
+    symTab->addSymbol(makeDefined(nullptr, d->getName(), STB_GLOBAL,
+                                  /*stOther=*/0, STT_FUNC, d->getVA(),
+                                  d->getSize(), nullptr));
+  }
+}
+
+void ArmCmseSGSection::writeTo(uint8_t *buf) {
+  for (auto *s : this->sgSections) {
+    auto off = s->outSecOff - getVA();
+    s->writeTo(buf + off);
+  }
+}
+
+void ArmCmseSGSection::addMappingSymbol() {
+  addSyntheticLocal("$t", STT_NOTYPE, /* off */ 0, /* size */ 0, *this);
+}
+
+size_t ArmCmseSGSection::getSize() const {
+  if (sgSections.empty())
+    return impLibMaxAddr - getVA() + (newEntries * entsize);
+
+  return entries.size() * entsize;
+}
+
+void ArmCmseSGSection::finalizeContents() {
+  auto it = std::partition(
+      this->sgSections.begin(), this->sgSections.end(), [](ArmCmseSGVeneer *i) {
+        return symtab.cmseImportLib.find(i->sym->getName()) !=
+               symtab.cmseImportLib.end();
+      });
+  std::sort(this->sgSections.begin(), it,
+            [](ArmCmseSGVeneer *a, ArmCmseSGVeneer *b) {
+              return cast<ArmCmseFixedAddressSGVeneer>(a)->getAddr() <
+                     cast<ArmCmseFixedAddressSGVeneer>(b)->getAddr();
+            });
+  for (ArmCmseSGVeneer *ss : this->sgSections) {
+    if (dyn_cast<ArmCmseVariableAddressSGVeneer>(ss))
+      break;
+    ArmCmseFixedAddressSGVeneer *s = dyn_cast<ArmCmseFixedAddressSGVeneer>(ss);
+    ss->outSecOff = (s->getAddr() & ~1);
+    Defined(ss->file, StringRef(), ss->sym->binding, ss->sym->stOther,
+            ss->sym->type, (ss->outSecOff - getVA()) | 1, this->entsize, this)
+        .overwrite(*ss->sym);
+  }
+  size_t off = (impLibMaxAddr < getVA() ? getVA() : impLibMaxAddr);
+  off += (newEntries * entsize);
+  for (ArmCmseSGVeneer *ss : llvm::reverse(this->sgSections)) {
+    if (dyn_cast<ArmCmseFixedAddressSGVeneer>(ss))
+      break;
+    ArmCmseVariableAddressSGVeneer *s =
+        dyn_cast<ArmCmseVariableAddressSGVeneer>(ss);
+    off -= s->entsize;
+    ss->outSecOff = (off & ~1);
+    Defined(ss->file, StringRef(), ss->sym->binding, ss->sym->stOther,
+            ss->sym->type, (ss->outSecOff - getVA()) | 1, this->entsize, this)
+        .overwrite(*ss->sym);
+  }
+}
+
+void ArmCmseSGVeneer::writeTo(uint8_t *buf) {
+  const uint8_t data[] = {
+      0x7f, 0xe9, 0x7f, 0xe9, // SG
+      0x00, 0xf0, 0x00, 0xb0, // B.W S
+
+  };
+  memcpy(buf, data, sizeof(data));
+  uint64_t s = acle_sg_sym->getVA();
+  uint64_t p = getVA() + 4;
+  target->relocateNoSym(buf + 4, R_ARM_THM_JUMP24, s - p - 4);
+}
+
 // Write the internal symbol table contents to the output symbol table.
 template <class ELFT> void SymbolTableSection<ELFT>::writeTo(uint8_t *buf) {
   // The first entry is a null entry as per the ELF spec.
@@ -3822,6 +3945,7 @@ void InStruct::reset() {
   strTab.reset();
   symTab.reset();
   symTabShndx.reset();
+  armCmseSGSection.reset();
 }
 
 constexpr char kMemtagAndroidNoteName[] = "Android";

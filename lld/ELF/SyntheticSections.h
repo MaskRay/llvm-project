@@ -1219,6 +1219,78 @@ public:
   void writeTo(uint8_t *buf) override;
   size_t getSize() const override;
 };
+class ArmCmseSGVeneer : public SyntheticSection {
+public:
+  enum Kind { Unknown, FixedAddress, VarAddress };
+
+  Kind kind() const { return (Kind)veneerKind; }
+  uint8_t veneerKind;
+
+  ArmCmseSGVeneer(Symbol *sym, Symbol *acle_sg_sym, Kind kind)
+      : SyntheticSection(llvm::ELF::SHF_ALLOC | llvm::ELF::SHF_EXECINSTR,
+                         llvm::ELF::SHT_PROGBITS,
+                         /*alignment=*/32, ".gnu.sgstubs"),
+        veneerKind(kind), sym(sym), acle_sg_sym(acle_sg_sym) {}
+  void writeTo(uint8_t *buf) override;
+  Symbol *sym;
+  Symbol *acle_sg_sym;
+};
+
+// A Secure Gateway Veneer that is positioned on the address
+// specified in the CMSE import library.
+// The symbol table in the import library should have a size
+// specified
+class ArmCmseFixedAddressSGVeneer : public ArmCmseSGVeneer {
+public:
+  ArmCmseFixedAddressSGVeneer(Symbol *sym, Symbol *acle_sg_sym, uint64_t addr)
+      : ArmCmseSGVeneer(sym, acle_sg_sym, ArmCmseSGVeneer::FixedAddress) {
+
+    entsize = 8;
+    entaddr = addr;
+  }
+  size_t getSize() const override { return this->entsize; };
+  size_t getAddr() const { return this->entaddr; };
+  static bool classof(const ArmCmseSGVeneer *s) {
+    return s->kind() != VarAddress;
+  }
+
+private:
+  uint64_t entaddr;
+};
+
+// A Secure Gateway Veneer that is positioned out of the range
+// used by the CMSE import library.
+// The size is fixed at 8.
+class ArmCmseVariableAddressSGVeneer : public ArmCmseSGVeneer {
+public:
+  ArmCmseVariableAddressSGVeneer(Symbol *sym, Symbol *acle_sg_sym)
+      : ArmCmseSGVeneer(sym, acle_sg_sym, ArmCmseSGVeneer::VarAddress) {
+    this->entsize = 8;
+  }
+  size_t getSize() const override { return this->entsize; };
+  static bool classof(const ArmCmseSGVeneer *s) {
+    return s->kind() != FixedAddress;
+  }
+};
+
+class ArmCmseSGSection : public SyntheticSection {
+public:
+  ArmCmseSGSection();
+  bool isNeeded() const override { return !entries.empty(); }
+  size_t getSize() const override;
+  void writeTo(uint8_t *buf) override;
+  void addSGVeneer(Symbol *sym, Symbol *ext_sym);
+  void addMappingSymbol();
+  void finalizeContents() override;
+  void exportEntries(SymbolTableBaseSection *symTab);
+  uint64_t impLibMinAddr = -1;
+  uint64_t impLibMaxAddr = 0;
+
+private:
+  SmallVector<std::pair<Symbol *, Symbol *>, 0> entries;
+  SmallVector<ArmCmseSGVeneer *, 0> sgSections;
+  uint64_t newEntries = 0;
+};
 
 InputSection *createInterpSection();
 MergeInputSection *createCommentSection();
@@ -1296,6 +1368,7 @@ struct InStruct {
   std::unique_ptr<StringTableSection> strTab;
   std::unique_ptr<SymbolTableBaseSection> symTab;
   std::unique_ptr<SymtabShndxSection> symTabShndx;
+  std::unique_ptr<ArmCmseSGSection> armCmseSGSection;
 
   void reset();
 };

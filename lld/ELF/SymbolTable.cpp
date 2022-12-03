@@ -99,6 +99,15 @@ Symbol *SymbolTable::insert(StringRef name) {
   return sym;
 }
 
+// Find an existing symbol or create a new one.
+bool SymbolTable::addCmseSymPair(Symbol *acle_sg_sym, Symbol *sym) {
+  auto p = cmseSymMap.insert(std::make_pair(acle_sg_sym, sym));
+  if (p.second) {
+    cmseSymVector.push_back(std::make_pair(acle_sg_sym, sym));
+  }
+  return p.second;
+}
+
 // This variant of addSymbol is used by BinaryFile::parse to check duplicate
 // symbol errors.
 Symbol *SymbolTable::addAndCheckDuplicate(const Defined &newSym) {

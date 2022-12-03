@@ -80,6 +80,14 @@ defm split_stack_adjust_size
 
 def O: JoinedOrSeparate<["-"], "O">, HelpText<"Optimize output file size">;
 
+def cmse_implib: F<"cmse-implib">, HelpText<"Make import library to be a secure gateway import">;
+
+defm in_implib: Eq<"in-implib", "Import library whose symbols address must remain stable">,
+  MetaVarName<"<file>">;
+
+defm out_implib: Eq<"out-implib", "Generate import library">,
+  MetaVarName<"<file>">;
+
 defm Tbss: Eq<"Tbss", "Same as --section-start with .bss as the sectionname">;
 
 defm Tdata: Eq<"Tdata", "Same as --section-start with .data as the sectionname">;

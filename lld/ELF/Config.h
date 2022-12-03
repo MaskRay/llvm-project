@@ -166,6 +166,8 @@ struct Config {
   llvm::StringRef thinLTOCacheDir;
   llvm::StringRef thinLTOIndexOnlyArg;
   llvm::StringRef whyExtract;
+  llvm::StringRef in_implib;
+  llvm::StringRef out_implib;
   StringRef zBtiReport = "none";
   StringRef zCetReport = "none";
   llvm::StringRef ltoBasicBlockSections;
@@ -186,6 +188,7 @@ struct Config {
   llvm::MapVector<std::pair<const InputSectionBase *, const InputSectionBase *>,
                   uint64_t>
       callGraphProfile;
+  bool cmse_implib = false;
   bool allowMultipleDefinition;
   bool androidPackDynRelocs = false;
   bool armHasBlx = false;
