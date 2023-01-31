@@ -157,13 +157,13 @@ searchLibrary(StringRef name, ArrayRef<StringRef> searchPaths, bool bStatic) {
   return "";
 }
 
-// Convert Unix-ish command line arguments to Windows-ish ones and
-// then call coff::link.
-bool mingw::link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
-                 llvm::raw_ostream &stderrOS, bool exitEarly,
-                 bool disableOutput) {
-  auto *ctx = new CommonLinkerContext;
-  ctx->e.initialize(stdoutOS, stderrOS, exitEarly, disableOutput);
+static std::optional<bool> translate(ArrayRef<const char *> argsArr,
+                                     llvm::raw_ostream &stdoutOS,
+                                     llvm::raw_ostream &stderrOS,
+                                     bool exitEarly, bool disableOutput,
+                                     std::vector<const char *> &vec) {
+  CommonLinkerContext ctx;
+  ctx.e.initialize(stdoutOS, stderrOS, exitEarly, disableOutput);
 
   MinGWOptTable parser;
   opt::InputArgList args = parser.parse(argsArr.slice(1));
@@ -470,15 +470,22 @@ bool mingw::link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
     return true;
 
   // Repack vector of strings to vector of const char pointers for coff::link.
-  std::vector<const char *> vec;
   for (const std::string &s : linkArgs)
     vec.push_back(s.c_str());
   // Pass the actual binary name, to make error messages be printed with
   // the right prefix.
   vec[0] = argsArr[0];
+  return std::nullopt;
+}
 
-  // The context will be re-created in the COFF driver.
-  lld::CommonLinkerContext::destroy();
-
+// Convert Unix-ish command line arguments to Windows-ish ones and
+// then call coff::link.
+bool mingw::link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
+                 llvm::raw_ostream &stderrOS, bool exitEarly,
+                 bool disableOutput) {
+  std::vector<const char *> vec;
+  if (std::optional<bool> ret =
+          translate(argsArr, stdoutOS, stderrOS, exitEarly, disableOutput, vec))
+    return *ret;
   return coff::link(vec, stdoutOS, stderrOS, exitEarly, disableOutput);
 }

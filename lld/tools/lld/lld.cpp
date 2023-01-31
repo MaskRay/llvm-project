@@ -171,10 +171,6 @@ static int lldMain(int argc, const char **argv, llvm::raw_ostream &stdoutOS,
   if (exitEarly)
     exitLld(!r ? 1 : 0);
 
-  // Delete the global context and clear the global context pointer, so that it
-  // cannot be accessed anymore.
-  CommonLinkerContext::destroy();
-
   return !r ? 1 : 0;
 }
 

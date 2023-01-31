@@ -63,15 +63,13 @@ namespace lld::coff {
 
 bool link(ArrayRef<const char *> args, llvm::raw_ostream &stdoutOS,
           llvm::raw_ostream &stderrOS, bool exitEarly, bool disableOutput) {
-  // This driver-specific context will be freed later by lldMain().
-  auto *ctx = new COFFLinkerContext;
+  COFFLinkerContext ctx;
+  ctx.e.initialize(stdoutOS, stderrOS, exitEarly, disableOutput);
+  ctx.e.logName = args::getFilenameWithoutExe(args[0]);
+  ctx.e.errorLimitExceededMsg = "too many errors emitted, stopping now"
+                                " (use /errorlimit:0 to see all errors)";
 
-  ctx->e.initialize(stdoutOS, stderrOS, exitEarly, disableOutput);
-  ctx->e.logName = args::getFilenameWithoutExe(args[0]);
-  ctx->e.errorLimitExceededMsg = "too many errors emitted, stopping now"
-                                 " (use /errorlimit:0 to see all errors)";
-
-  ctx->driver.linkerMain(args);
+  ctx.driver.linkerMain(args);
 
   return errorCount() == 0;
 }

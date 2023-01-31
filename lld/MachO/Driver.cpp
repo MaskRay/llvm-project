@@ -1365,11 +1365,9 @@ static void handleExplicitExports() {
 bool macho::link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
                  llvm::raw_ostream &stderrOS, bool exitEarly,
                  bool disableOutput) {
-  // This driver-specific context will be freed later by lldMain().
-  auto *ctx = new CommonLinkerContext;
-
-  ctx->e.initialize(stdoutOS, stderrOS, exitEarly, disableOutput);
-  ctx->e.cleanupCallback = []() {
+  CommonLinkerContext ctx;
+  ctx.e.initialize(stdoutOS, stderrOS, exitEarly, disableOutput);
+  ctx.e.cleanupCallback = []() {
     resolvedFrameworks.clear();
     resolvedLibraries.clear();
     cachedReads.clear();
@@ -1392,15 +1390,15 @@ bool macho::link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
     InputFile::resetIdCount();
   };
 
-  ctx->e.logName = args::getFilenameWithoutExe(argsArr[0]);
+  ctx.e.logName = args::getFilenameWithoutExe(argsArr[0]);
 
   MachOOptTable parser;
   InputArgList args = parser.parse(argsArr.slice(1));
 
-  ctx->e.errorLimitExceededMsg = "too many errors emitted, stopping now "
-                                 "(use --error-limit=0 to see all errors)";
-  ctx->e.errorLimit = args::getInteger(args, OPT_error_limit_eq, 20);
-  ctx->e.verbose = args.hasArg(OPT_verbose);
+  ctx.e.errorLimitExceededMsg = "too many errors emitted, stopping now "
+                                "(use --error-limit=0 to see all errors)";
+  ctx.e.errorLimit = args::getInteger(args, OPT_error_limit_eq, 20);
+  ctx.e.verbose = args.hasArg(OPT_verbose);
 
   if (args.hasArg(OPT_help_hidden)) {
     parser.printHelp(argsArr[0], /*showHidden=*/true);

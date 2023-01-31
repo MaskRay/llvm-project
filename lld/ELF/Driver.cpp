@@ -109,11 +109,9 @@ void Ctx::reset() {
 bool elf::link(ArrayRef<const char *> args, llvm::raw_ostream &stdoutOS,
                llvm::raw_ostream &stderrOS, bool exitEarly,
                bool disableOutput) {
-  // This driver-specific context will be freed later by lldMain().
-  auto *ctx = new CommonLinkerContext;
-
-  ctx->e.initialize(stdoutOS, stderrOS, exitEarly, disableOutput);
-  ctx->e.cleanupCallback = []() {
+  CommonLinkerContext ctx;
+  ctx.e.initialize(stdoutOS, stderrOS, exitEarly, disableOutput);
+  ctx.e.cleanupCallback = []() {
     elf::ctx.reset();
     symtab = SymbolTable();
 
@@ -128,9 +126,9 @@ bool elf::link(ArrayRef<const char *> args, llvm::raw_ostream &stdoutOS,
 
     SharedFile::vernauxNum = 0;
   };
-  ctx->e.logName = args::getFilenameWithoutExe(args[0]);
-  ctx->e.errorLimitExceededMsg = "too many errors emitted, stopping now (use "
-                                 "--error-limit=0 to see all errors)";
+  ctx.e.logName = args::getFilenameWithoutExe(args[0]);
+  ctx.e.errorLimitExceededMsg = "too many errors emitted, stopping now (use "
+                                "--error-limit=0 to see all errors)";
 
   config = ConfigWrapper();
   script = std::make_unique<LinkerScript>();
