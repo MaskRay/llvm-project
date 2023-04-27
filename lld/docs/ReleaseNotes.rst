@@ -35,6 +35,13 @@ ELF Improvements
 * ``--debug-names`` is added to create a merged ``.debug_names`` index
   from input ``.debug_names`` sections. Type units are not handled yet.
   (`#86508 <https://github.com/llvm/llvm-project/pull/86508>`_)
+* ``--fat-lto-objects`` option is added to support LLVM FatLTO.
+  Without ``--fat-lto-objects``, LLD will link LLVM FatLTO objects using the
+  relocatable object file. (`D146778 <https://reviews.llvm.org/D146778>`_)
+
+* Experimental ``--thinlto-index=`` is added for distributed ThinLTO.
+  They address some symbol resolution issues with the old ``--thinlto-index-only=``.
+  (`D130229 <https://reviews.llvm.org/D130229>`_)
 
 Breaking changes
 ----------------

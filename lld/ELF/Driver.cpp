@@ -1390,10 +1390,13 @@ static void readConfigs(opt::InputArgList &args) {
       parseCachePruningPolicy(args.getLastArgValue(OPT_thinlto_cache_policy)),
       "--thinlto-cache-policy: invalid cache policy");
   config->thinLTOEmitImportsFiles = args.hasArg(OPT_thinlto_emit_imports_files);
-  config->thinLTOEmitIndexFiles = args.hasArg(OPT_thinlto_emit_index_files) ||
+  config->thinLTOIndex = args.getLastArgValue(OPT_thinlto_index);
+  config->thinLTOEmitIndexFiles = config->thinLTOIndex.size() ||
+                                  args.hasArg(OPT_thinlto_emit_index_files) ||
                                   args.hasArg(OPT_thinlto_index_only) ||
                                   args.hasArg(OPT_thinlto_index_only_eq);
-  config->thinLTOIndexOnly = args.hasArg(OPT_thinlto_index_only) ||
+  config->thinLTOIndexOnly = config->thinLTOIndex.size() ||
+                             args.hasArg(OPT_thinlto_index_only) ||
                              args.hasArg(OPT_thinlto_index_only_eq);
   config->thinLTOIndexOnlyArg = args.getLastArgValue(OPT_thinlto_index_only_eq);
   config->thinLTOObjectSuffixReplace =
@@ -1410,7 +1413,7 @@ static void readConfigs(opt::InputArgList &args) {
             "--thinlto-emit-index-files");
   }
   if (!config->thinLTOPrefixReplaceNativeObject.empty() &&
-      config->thinLTOIndexOnlyArg.empty()) {
+      config->thinLTOIndex.empty() && config->thinLTOIndexOnlyArg.empty()) {
     error("--thinlto-prefix-replace=old_dir;new_dir;obj_dir must be used with "
           "--thinlto-index-only=");
   }
@@ -2885,7 +2888,7 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
   // Skip the normal linked output if some LTO options are specified.
   //
-  // For --thinlto-index-only, index file creation is performed in
+  // For --thinlto-index{,-only}, index file creation is performed in
   // compileBitcodeFiles, so we are done afterwards. --plugin-opt=emit-llvm and
   // --plugin-opt=emit-asm create output files in bitcode or assembly code,
   // respectively. When only certain thinLTO modules are specified for
