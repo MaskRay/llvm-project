@@ -2107,12 +2107,11 @@ static void SetRISCVSmallDataLimit(const ToolChain &TC, const ArgList &Args,
   const Driver &D = TC.getDriver();
   const llvm::Triple &Triple = TC.getTriple();
   // Default small data limitation is eight.
-  const char *SmallDataLimit = "8";
+  const char *SmallDataLimit = "0";
   // Get small data limitation.
   if (Args.getLastArg(options::OPT_shared, options::OPT_fpic,
                       options::OPT_fPIC)) {
     // Not support linker relaxation for PIC.
-    SmallDataLimit = "0";
     if (Args.hasArg(options::OPT_G)) {
       D.Diag(diag::warn_drv_unsupported_sdata);
     }
@@ -2120,7 +2119,6 @@ static void SetRISCVSmallDataLimit(const ToolChain &TC, const ArgList &Args,
                  .equals_insensitive("large") &&
              (Triple.getArch() == llvm::Triple::riscv64)) {
     // Not support linker relaxation for RV64 with large code model.
-    SmallDataLimit = "0";
     if (Args.hasArg(options::OPT_G)) {
       D.Diag(diag::warn_drv_unsupported_sdata);
     }
