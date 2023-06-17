@@ -229,3 +229,13 @@ lla a5, (0xFF + a_symbol) - 4
 # CHECK: auipc a5, %pcrel_hi(a_symbol-4)
 # CHECK: addi  a5, a5, %pcrel_lo(.Lpcrel_hi37)
 lla a5, a_symbol - 4
+
+# CHECK: .Lpcrel_hi38:
+# CHECK: auipc a5, %pcrel_hi(a_symbol-5)
+# CHECK: addi  a5, a5, %pcrel_lo(.Lpcrel_hi38)
+/**/lla /**/a5/**/, /**/a_symbol/**/ - /**/5/**/
+
+# CHECK: .Lpcrel_hi39:
+# CHECK: auipc a5, %pcrel_hi(a_symbol+5)
+# CHECK: addi  a5, a5, %pcrel_lo(.Lpcrel_hi39)
+/**/lla /**/a5/**/, /**/a_symbol/**/ + /**/5/**/

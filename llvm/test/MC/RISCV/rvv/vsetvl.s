@@ -154,7 +154,7 @@ vsetivli a2, 15, e32, m1, ta, ma
 # CHECK-ERROR: instruction requires the following: 'V' (Vector Extension for Application Processors), 'Zve32x' or 'Zve64x' (Vector Extensions for Embedded Processors){{$}}
 # CHECK-UNKNOWN: 57 f6 07 cd <unknown>
 
-vsetivli a2, 31, e32, m1, ta, ma
+/**/vsetivli /**/a2/**/, /**/31/**/, /**/e32/**/, /**/m1/**/, /**/ta/**/, /**/ma/**/
 # CHECK-INST: vsetivli a2, 31, e32, m1, ta, ma
 # CHECK-ENCODING: [0x57,0xf6,0x0f,0xcd]
 # CHECK-ERROR: instruction requires the following: 'V' (Vector Extension for Application Processors), 'Zve32x' or 'Zve64x' (Vector Extensions for Embedded Processors){{$}}

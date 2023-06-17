@@ -1617,7 +1617,7 @@ OperandMatchResultTy RISCVAsmParser::parseRegister(OperandVector &Operands,
       Operands.push_back(RISCVOperand::createToken("(", FirstS));
     SMLoc S = getLoc();
     SMLoc E = SMLoc::getFromPointer(S.getPointer() + Name.size());
-    getLexer().Lex();
+    Lex();
     Operands.push_back(RISCVOperand::createReg(RegNo, S, E));
   }
 
@@ -1978,11 +1978,11 @@ OperandMatchResultTy RISCVAsmParser::parseBareSymbol(OperandVector &Operands) {
     return MatchOperand_Success;
   case AsmToken::Plus:
     Opcode = MCBinaryExpr::Add;
-    getLexer().Lex();
+    Lex();
     break;
   case AsmToken::Minus:
     Opcode = MCBinaryExpr::Sub;
-    getLexer().Lex();
+    Lex();
     break;
   }
 
@@ -2130,8 +2130,7 @@ OperandMatchResultTy RISCVAsmParser::parseVTypeI(OperandVector &Operands) {
   if (parseVTypeToken(Identifier, State, Sew, Lmul, Fractional, TailAgnostic,
                       MaskAgnostic))
     return MatchOperand_NoMatch;
-
-  getLexer().Lex();
+  Lex();
 
   while (parseOptionalToken(AsmToken::Comma)) {
     if (getLexer().isNot(AsmToken::Identifier))
@@ -2142,8 +2141,7 @@ OperandMatchResultTy RISCVAsmParser::parseVTypeI(OperandVector &Operands) {
     if (parseVTypeToken(Identifier, State, Sew, Lmul, Fractional, TailAgnostic,
                         MaskAgnostic))
       break;
-
-    getLexer().Lex();
+    Lex();
   }
 
   if (getLexer().is(AsmToken::EndOfStatement) && State == VTypeState_Done) {
