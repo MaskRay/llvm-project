@@ -38,7 +38,6 @@ class raw_pwrite_stream;
 /// to that file format or custom semantics expected by the object writer
 /// implementation.
 class MCObjectStreamer : public MCStreamer {
-  std::unique_ptr<MCAssembler> Assembler;
   bool EmitEHFrame;
   bool EmitDebugFrame;
   struct PendingMCFixup {
@@ -105,7 +104,6 @@ public:
   void visitUsedSymbol(const MCSymbol &Sym) override;
 
   MCAssembler &getAssembler() { return *Assembler; }
-  MCAssembler *getAssemblerPtr() override;
   /// \name MCStreamer Interface
   /// @{
 

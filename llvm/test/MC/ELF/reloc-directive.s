@@ -53,13 +53,12 @@ y: ret
 .reloc 2*., R_X86_64_NONE, a
 # ERR: {{.*}}.s:[[#@LINE+1]]:8: error: .reloc offset is not relocatable
 .reloc a+a, R_X86_64_NONE, a
-## GNU as accepts a-a but rejects b-a.
-# ERR: {{.*}}.s:[[#@LINE+1]]:8: error: .reloc offset is not representable
-.reloc a-a, R_X86_64_NONE, a
-## TODO GNU as accepts x-x and y-x.
-# ERR: {{.*}}.s:[[#@LINE+1]]:8: error: .reloc offset is not representable
-.reloc x-x, R_X86_64_NONE, a
 
 # ERR: {{.*}}.s:[[#@LINE+1]]:8: error: directional label undefined
 .reloc 1f, R_X86_64_NONE, a
 .endif
+
+## GNU as accepts a-a but rejects b-a.
+.reloc a-a, R_X86_64_NONE, a
+# ERR: {{.*}}.s:[[#@LINE+1]]:8: error: .reloc offset is not representable
+.reloc x-x, R_X86_64_NONE, a

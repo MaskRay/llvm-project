@@ -1530,10 +1530,10 @@ bool AsmParser::parseExpression(const MCExpr *&Res, SMLoc &EndLoc) {
     Lex();
   }
 
-  // Try to constant fold it up front, if possible. Do not exploit
-  // assembler here.
+  // Try to constant fold it up front, if possible. Use the assembler if
+  // available to fold more cases.
   int64_t Value;
-  if (Res->evaluateAsAbsolute(Value))
+  if (Res->evaluateAsAbsolute(Value, getStreamer().getAssemblerPtr()))
     Res = MCConstantExpr::create(Value, getContext());
 
   return false;
