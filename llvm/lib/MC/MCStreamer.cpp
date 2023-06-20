@@ -91,9 +91,10 @@ void MCTargetStreamer::emitRawBytes(StringRef Data) {
 
 void MCTargetStreamer::emitAssignment(MCSymbol *Symbol, const MCExpr *Value) {}
 
-MCStreamer::MCStreamer(MCContext &Ctx)
+MCStreamer::MCStreamer(MCContext &Ctx, std::unique_ptr<MCAssembler> Assembler)
     : Context(Ctx), CurrentWinFrameInfo(nullptr),
-      CurrentProcWinFrameInfoStartIndex(0), UseAssemblerInfoForParsing(false) {
+      CurrentProcWinFrameInfoStartIndex(0), UseAssemblerInfoForParsing(false),
+      Assembler(std::move(Assembler)) {
   SectionStack.push_back(std::pair<MCSectionSubPair, MCSectionSubPair>());
 }
 
@@ -106,6 +107,15 @@ void MCStreamer::reset() {
   SymbolOrdering.clear();
   SectionStack.clear();
   SectionStack.push_back(std::pair<MCSectionSubPair, MCSectionSubPair>());
+}
+
+// AssemblerPtr is used for evaluation of expressions and causes
+// difference between asm and object outputs. Return nullptr to in
+// inline asm mode to limit divergence to assembly inputs.
+MCAssembler *MCStreamer::getAssemblerPtr() {
+  if (getUseAssemblerInfoForParsing())
+    return Assembler.get();
+  return nullptr;
 }
 
 raw_ostream &MCStreamer::getCommentOS() {

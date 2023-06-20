@@ -48,7 +48,6 @@ class MCAsmStreamer final : public MCStreamer {
   formatted_raw_ostream &OS;
   const MCAsmInfo *MAI;
   std::unique_ptr<MCInstPrinter> InstPrinter;
-  std::unique_ptr<MCAssembler> Assembler;
 
   SmallString<128> ExplicitCommentToEmit;
   SmallString<128> CommentToEmit;
@@ -75,14 +74,15 @@ public:
                 bool isVerboseAsm, bool useDwarfDirectory,
                 MCInstPrinter *printer, std::unique_ptr<MCCodeEmitter> emitter,
                 std::unique_ptr<MCAsmBackend> asmbackend, bool showInst)
-      : MCStreamer(Context), OSOwner(std::move(os)), OS(*OSOwner),
-        MAI(Context.getAsmInfo()), InstPrinter(printer),
-        Assembler(std::make_unique<MCAssembler>(
-            Context, std::move(asmbackend), std::move(emitter),
-            (asmbackend) ? asmbackend->createObjectWriter(NullStream)
-                         : nullptr)),
-        CommentStream(CommentToEmit), IsVerboseAsm(isVerboseAsm),
-        ShowInst(showInst), UseDwarfDirectory(useDwarfDirectory) {
+      : MCStreamer(Context,
+                   std::make_unique<MCAssembler>(
+                       Context, std::move(asmbackend), std::move(emitter),
+                       (asmbackend) ? asmbackend->createObjectWriter(NullStream)
+                                    : nullptr)),
+        OSOwner(std::move(os)), OS(*OSOwner), MAI(Context.getAsmInfo()),
+        InstPrinter(printer), CommentStream(CommentToEmit),
+        IsVerboseAsm(isVerboseAsm), ShowInst(showInst),
+        UseDwarfDirectory(useDwarfDirectory) {
     assert(InstPrinter);
     if (IsVerboseAsm)
         InstPrinter->setCommentStream(CommentStream);
@@ -93,7 +93,6 @@ public:
   }
 
   MCAssembler &getAssembler() { return *Assembler; }
-  MCAssembler *getAssemblerPtr() override { return nullptr; }
 
   inline void EmitEOL() {
     // Dump Explicit Comments here.

@@ -17,6 +17,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCDirectives.h"
 #include "llvm/MC/MCDwarf.h"
 #include "llvm/MC/MCLinkerOptimizationHint.h"
@@ -255,7 +256,9 @@ class MCStreamer {
   bool AllowAutoPadding = false;
 
 protected:
-  MCStreamer(MCContext &Ctx);
+  std::unique_ptr<MCAssembler> Assembler;
+
+  MCStreamer(MCContext &Ctx, std::unique_ptr<MCAssembler> Assembler = {});
 
   virtual void emitCFIStartProcImpl(MCDwarfFrameInfo &Frame);
   virtual void emitCFIEndProcImpl(MCDwarfFrameInfo &CurFrame);
@@ -296,7 +299,7 @@ public:
 
   MCContext &getContext() const { return Context; }
 
-  virtual MCAssembler *getAssemblerPtr() { return nullptr; }
+  MCAssembler *getAssemblerPtr();
 
   void setUseAssemblerInfoForParsing(bool v) { UseAssemblerInfoForParsing = v; }
   bool getUseAssemblerInfoForParsing() { return UseAssemblerInfoForParsing; }

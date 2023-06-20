@@ -28,9 +28,9 @@ MCObjectStreamer::MCObjectStreamer(MCContext &Context,
                                    std::unique_ptr<MCAsmBackend> TAB,
                                    std::unique_ptr<MCObjectWriter> OW,
                                    std::unique_ptr<MCCodeEmitter> Emitter)
-    : MCStreamer(Context),
-      Assembler(std::make_unique<MCAssembler>(
-          Context, std::move(TAB), std::move(Emitter), std::move(OW))),
+    : MCStreamer(Context, std::make_unique<MCAssembler>(Context, std::move(TAB),
+                                                        std::move(Emitter),
+                                                        std::move(OW))),
       EmitEHFrame(true), EmitDebugFrame(false) {
   if (Assembler->getBackendPtr())
     setAllowAutoPadding(Assembler->getBackend().allowAutoPadding());
@@ -39,15 +39,6 @@ MCObjectStreamer::MCObjectStreamer(MCContext &Context,
 }
 
 MCObjectStreamer::~MCObjectStreamer() = default;
-
-// AssemblerPtr is used for evaluation of expressions and causes
-// difference between asm and object outputs. Return nullptr to in
-// inline asm mode to limit divergence to assembly inputs.
-MCAssembler *MCObjectStreamer::getAssemblerPtr() {
-  if (getUseAssemblerInfoForParsing())
-    return Assembler.get();
-  return nullptr;
-}
 
 void MCObjectStreamer::addPendingLabel(MCSymbol* S) {
   MCSection *CurSection = getCurrentSectionOnly();

@@ -61,7 +61,7 @@ TEST10:
 	.fill 1, 3, 0x12345678
 
 # CHECK: TEST11
-# CHECK: .fill TEST11-TEST10, 1, 0x0
+# CHECK: .fill TEST11 - TEST10, 1, 0x0
 TEST11:
   .fill TEST11 - TEST10
 
