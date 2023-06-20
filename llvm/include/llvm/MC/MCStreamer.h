@@ -17,6 +17,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCDirectives.h"
 #include "llvm/MC/MCDwarf.h"
 #include "llvm/MC/MCFragment.h"
@@ -253,8 +254,9 @@ class MCStreamer {
 
 protected:
   MCFragment *CurFrag = nullptr;
+  std::unique_ptr<MCAssembler> Assembler;
 
-  MCStreamer(MCContext &Ctx);
+  MCStreamer(MCContext &Ctx, std::unique_ptr<MCAssembler> Asm = {});
 
   /// This is called by popSection and switchSection, if the current
   /// section changes.
@@ -299,9 +301,7 @@ public:
 
   MCContext &getContext() const { return Context; }
 
-  // MCObjectStreamer has an MCAssembler and allows more expression folding at
-  // parse time.
-  virtual MCAssembler *getAssemblerPtr() { return nullptr; }
+  MCAssembler *getAssemblerPtr();
 
   void setUseAssemblerInfoForParsing(bool v) { UseAssemblerInfoForParsing = v; }
   bool getUseAssemblerInfoForParsing() { return UseAssemblerInfoForParsing; }

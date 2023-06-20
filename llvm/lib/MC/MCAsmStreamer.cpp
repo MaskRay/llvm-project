@@ -48,7 +48,6 @@ class MCAsmStreamer final : public MCStreamer {
   formatted_raw_ostream &OS;
   const MCAsmInfo *MAI;
   std::unique_ptr<MCInstPrinter> InstPrinter;
-  std::unique_ptr<MCAssembler> Assembler;
 
   SmallString<128> ExplicitCommentToEmit;
   SmallString<128> CommentToEmit;
@@ -74,13 +73,13 @@ public:
   MCAsmStreamer(MCContext &Context, std::unique_ptr<formatted_raw_ostream> os,
                 MCInstPrinter *printer, std::unique_ptr<MCCodeEmitter> emitter,
                 std::unique_ptr<MCAsmBackend> asmbackend)
-      : MCStreamer(Context), OSOwner(std::move(os)), OS(*OSOwner),
-        MAI(Context.getAsmInfo()), InstPrinter(printer),
-        Assembler(std::make_unique<MCAssembler>(
-            Context, std::move(asmbackend), std::move(emitter),
-            (asmbackend) ? asmbackend->createObjectWriter(NullStream)
-                         : nullptr)),
-        CommentStream(CommentToEmit) {
+      : MCStreamer(Context,
+                   std::make_unique<MCAssembler>(
+                       Context, std::move(asmbackend), std::move(emitter),
+                       (asmbackend) ? asmbackend->createObjectWriter(NullStream)
+                                    : nullptr)),
+        OSOwner(std::move(os)), OS(*OSOwner), MAI(Context.getAsmInfo()),
+        InstPrinter(printer), CommentStream(CommentToEmit) {
     assert(InstPrinter);
     if (Assembler->getBackendPtr())
       setAllowAutoPadding(Assembler->getBackend().allowAutoPadding());
@@ -109,7 +108,6 @@ public:
   }
 
   MCAssembler &getAssembler() { return *Assembler; }
-  MCAssembler *getAssemblerPtr() override { return nullptr; }
 
   inline void EmitEOL() {
     // Dump Explicit Comments here.
