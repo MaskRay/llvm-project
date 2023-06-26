@@ -375,7 +375,9 @@ static bool shouldConsiderTemplateVisibility(const FunctionDecl *fn,
   if (!specInfo->isExplicitInstantiationOrSpecialization())
     return true;
 
-  return !fn->hasAttr<VisibilityAttr>();
+  return !fn->hasAttr<VisibilityAttr>() && !specInfo->getTemplate()
+                                                ->getTemplatedDecl()
+                                                ->hasAttr<VisibilityAttr>();
 }
 
 /// Merge in template-related linkage and visibility for the given
@@ -1274,12 +1276,20 @@ getExplicitVisibilityAux(const NamedDecl *ND,
   }
   // Also handle function template specializations.
   if (const auto *fn = dyn_cast<FunctionDecl>(ND)) {
-    // If the function is a specialization of a template with an
-    // explicit visibility attribute, use that.
-    if (FunctionTemplateSpecializationInfo *templateInfo
-          = fn->getTemplateSpecializationInfo())
-      return getVisibilityOf(templateInfo->getTemplate()->getTemplatedDecl(),
-                             kind);
+    // If the function is a specialization of a template,
+    if (FunctionTemplateSpecializationInfo *templateInfo =
+            fn->getTemplateSpecializationInfo()) {
+      // ... If the template has an explicit visibility attribute, use that.
+      if (auto Vis = getVisibilityOf(
+              templateInfo->getTemplate()->getTemplatedDecl(), kind))
+        return Vis;
+      // ... If the template instantiates from a member template with an
+      // explicit visibility attribute, use that.
+      if (auto *InstantiatedFrom =
+              templateInfo->getTemplate()->getInstantiatedFromMemberTemplate())
+        return getVisibilityOf(InstantiatedFrom->getTemplatedDecl(), kind);
+      return std::nullopt;
+    }
 
     // If the function is a member of a specialization of a class template
     // and the corresponding decl has explicit visibility, use that.
