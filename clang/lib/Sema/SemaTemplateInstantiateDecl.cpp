@@ -821,6 +821,18 @@ void Sema::InstantiateAttrs(const MultiLevelTemplateArgumentList &TemplateArgs,
       continue;
     }
 
+    if (auto *A = dyn_cast<VisibilityAttr>(TmplAttr)) {
+      if (isa<FunctionDecl>(Tmpl) && !New->hasAttr<VisibilityAttr>()) {
+        auto *NewA = A->clone(Context);
+        NewA->setImplicit(true);
+        New->addAttr(NewA);
+      }
+      continue;
+    }
+
+    if (auto *A = dyn_cast<TypeVisibilityAttr>(TmplAttr))
+      continue;
+
     assert(!TmplAttr->isPackExpansion());
     if (TmplAttr->isLateParsed() && LateAttrs) {
       // Late parsed attributes must be instantiated and attached after the

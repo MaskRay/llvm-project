@@ -1013,8 +1013,8 @@ namespace test51 {
   void DEFAULT zed() {
   }
   template void zed<&da>();
-  // CHECK-LABEL: define weak_odr hidden void @_ZN6test513zedIXadL_ZNS_2daEEEEEvv(
-  // CHECK-HIDDEN-LABEL: define weak_odr hidden void @_ZN6test513zedIXadL_ZNS_2daEEEEEvv(
+  // CHECK-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2daEEEEEvv(
+  // CHECK-HIDDEN-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2daEEEEEvv(
 
   template void DEFAULT zed<&db>();
   // CHECK-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2dbEEEEEvv(
@@ -1025,8 +1025,8 @@ namespace test51 {
   // CHECK-HIDDEN-LABEL: define weak_odr hidden void @_ZN6test513zedIXadL_ZNS_2dcEEEEEvv(
 
   template void zed<&ha>();
-  // CHECK-LABEL: define weak_odr hidden void @_ZN6test513zedIXadL_ZNS_2haEEEEEvv(
-  // CHECK-HIDDEN-LABEL: define weak_odr hidden void @_ZN6test513zedIXadL_ZNS_2haEEEEEvv(
+  // CHECK-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2haEEEEEvv(
+  // CHECK-HIDDEN-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2haEEEEEvv(
 
   template void DEFAULT zed<&hb>();
   // CHECK-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2hbEEEEEvv(
@@ -1041,11 +1041,11 @@ namespace test51 {
   template void zed<&hd>();
   template void DEFAULT zed<&he>();
 #pragma GCC visibility pop
-  // CHECK-LABEL: define weak_odr hidden void @_ZN6test513zedIXadL_ZNS_2ddEEEEEvv(
-  // CHECK-LABEL: define weak_odr hidden void @_ZN6test513zedIXadL_ZNS_2hdEEEEEvv(
+  // CHECK-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2ddEEEEEvv(
+  // CHECK-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2hdEEEEEvv(
   // CHECK-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2heEEEEEvv(
-  // CHECK-HIDDEN-LABEL: define weak_odr hidden void @_ZN6test513zedIXadL_ZNS_2ddEEEEEvv(
-  // CHECK-HIDDEN-LABEL: define weak_odr hidden void @_ZN6test513zedIXadL_ZNS_2hdEEEEEvv(
+  // CHECK-HIDDEN-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2ddEEEEEvv(
+  // CHECK-HIDDEN-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2hdEEEEEvv(
   // CHECK-HIDDEN-LABEL: define weak_odr void @_ZN6test513zedIXadL_ZNS_2heEEEEEvv(
 
   void use() {
@@ -1437,6 +1437,7 @@ namespace test71 {
   template <class T> template <class U>
   U foo<T>::bar() { return {}; }
 
+  /// foo<int>::{zed,bar} get the instantiated-from member's HIDDEN, overriding DEFAULT.
   extern template struct DEFAULT foo<int>;
 
   int use() {
@@ -1444,13 +1445,12 @@ namespace test71 {
     foo<long> p;
     return o.zed() + o.bar<int>() + p.zed() + p.bar<int>();
   }
-  /// FIXME: foo<int>::bar is hidden in GCC w/ or w/o -fvisibility=hidden.
   // CHECK-LABEL: declare hidden noundef i32 @_ZN6test713fooIiE3zedEv(
-  // CHECK-LABEL: define linkonce_odr noundef i32 @_ZN6test713fooIiE3barIiEET_v(
+  // CHECK-LABEL: define linkonce_odr hidden noundef i32 @_ZN6test713fooIiE3barIiEET_v(
   // CHECK-LABEL: define linkonce_odr hidden noundef i64 @_ZN6test713fooIlE3zedEv(
-  // CHECK-LABEL: define linkonce_odr noundef i32 @_ZN6test713fooIlE3barIiEET_v(
+  // CHECK-LABEL: define linkonce_odr hidden noundef i32 @_ZN6test713fooIlE3barIiEET_v(
   // CHECK-HIDDEN-LABEL: declare hidden noundef i32 @_ZN6test713fooIiE3zedEv(
-  // CHECK-HIDDEN-LABEL: define linkonce_odr noundef i32 @_ZN6test713fooIiE3barIiEET_v(
+  // CHECK-HIDDEN-LABEL: define linkonce_odr hidden noundef i32 @_ZN6test713fooIiE3barIiEET_v(
   // CHECK-HIDDEN-LABEL: define linkonce_odr hidden noundef i64 @_ZN6test713fooIlE3zedEv(
   // CHECK-HIDDEN-LABEL: define linkonce_odr hidden noundef i32 @_ZN6test713fooIlE3barIiEET_v(
 }

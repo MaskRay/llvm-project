@@ -595,9 +595,6 @@ class Attr {
   list<TargetSpecificSpelling> TargetSpecificSpellings = [];
   // Set to true for attributes with arguments which require delayed parsing.
   bit LateParsed = 0;
-  // Set to false to prevent an attribute from being propagated from a template
-  // to the instantiation.
-  bit Clone = 1;
   // Set to true for attributes which must be instantiated within templates
   bit TemplateDependent = 0;
   // Set to true for attributes that have a corresponding AST node.
@@ -3077,7 +3074,6 @@ def MatrixType : TypeAttr {
 }
 
 def Visibility : InheritableAttr {
-  let Clone = 0;
   let Spellings = [GCC<"visibility">];
   let Args = [EnumArgument<"Visibility", "VisibilityType",
                            ["default", "hidden", "internal", "protected"],
@@ -3087,7 +3083,6 @@ def Visibility : InheritableAttr {
 }
 
 def TypeVisibility : InheritableAttr {
-  let Clone = 0;
   let Spellings = [Clang<"type_visibility">];
   let Args = [EnumArgument<"Visibility", "VisibilityType",
                            ["default", "hidden", "internal", "protected"],

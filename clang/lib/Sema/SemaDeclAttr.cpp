@@ -2886,9 +2886,11 @@ static T *mergeVisibilityAttr(Sema &S, Decl *D, const AttributeCommonInfo &CI,
     typename T::VisibilityType existingValue = existingAttr->getVisibility();
     if (existingValue == value)
       return nullptr;
-    S.Diag(existingAttr->getLocation(), diag::err_mismatched_visibility);
-    S.Diag(CI.getLoc(), diag::note_previous_attribute);
     D->dropAttr<T>();
+    if (!existingAttr->isImplicit()) {
+      S.Diag(existingAttr->getLocation(), diag::err_mismatched_visibility);
+      S.Diag(CI.getLoc(), diag::note_previous_attribute);
+    }
   }
   return ::new (S.Context) T(S.Context, CI, value);
 }

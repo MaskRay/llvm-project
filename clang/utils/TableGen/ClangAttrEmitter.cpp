@@ -3769,8 +3769,7 @@ void EmitClangAttrTemplateInstantiateHelper(const std::vector<Record *> &Attrs,
     if (!R.getValueAsBit("ASTNode"))
       continue;
     OS << "    case attr::" << R.getName() << ": {\n";
-    bool ShouldClone = R.getValueAsBit("Clone") &&
-                       (!AppliesToDecl ||
+    bool ShouldClone = (!AppliesToDecl ||
                         R.getValueAsBit("MeaningfulToClassTemplateDefinition"));
 
     if (!ShouldClone) {
