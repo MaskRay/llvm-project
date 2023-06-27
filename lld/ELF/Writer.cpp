@@ -539,8 +539,6 @@ template <class ELFT> void Writer<ELFT>::run() {
 
   // If --compressed-debug-sections is specified, compress .debug_* sections.
   // Do it right now because it changes the size of output sections.
-  for (OutputSection *sec : outputSections)
-    sec->maybeCompress<ELFT>();
 
   if (script->hasSectionsCommand)
     script->allocateHeaders(mainPart->phdrs);
@@ -1619,6 +1617,14 @@ template <class ELFT> void Writer<ELFT>::finalizeAddressDependentContent() {
   // Converts call x@GDPLT to call __tls_get_addr
   if (config->emachine == EM_HEXAGON)
     hexagonTLSSymbolUpdate(outputSections);
+
+  // Compress SHF_COMPRESSED sections using assignAddresses computed content and
+  // sizes. If there are data commands with changed values, the compressed
+  // content will be invalid, but we do not detect the case. If the section has
+  // changes size due to future assignAddresses calls, we will report an error
+  // in assignOffsets.
+  for (OutputSection *sec : outputSections)
+    sec->maybeCompress<ELFT>();
 
   uint32_t pass = 0, assignPasses = 0;
   for (;;) {

@@ -1033,6 +1033,8 @@ void LinkerScript::assignOffsets(OutputSection *sec) {
     if (sec == findFirstSection(l))
       l->lmaOffset = state->lmaOffset;
 
+  const uint64_t savedDot2 = dot;
+  const size_t savedSize = sec->size;
   // We can call this method multiple times during the creation of
   // thunks and want to start over calculation each time.
   sec->size = 0;
@@ -1072,6 +1074,15 @@ void LinkerScript::assignOffsets(OutputSection *sec) {
       // .foo { *(.aaa) a = SIZEOF(.foo); *(.bbb) }
       expandOutputSection(dot - pos);
     }
+  }
+
+  // See the comment in finalizeAddressDependentContent.
+  if (sec->compressed.shards) {
+    if (sec->size != sec->compressed.uncompressedSize)
+      fatal("uncompressed size of SHF_COMPRESSED section '" + sec->name +
+            "' is dependent on linker script commands");
+    sec->size = savedSize;
+    dot = savedDot2 + savedSize;
   }
 
   // Non-SHF_ALLOC sections do not affect the addresses of other OutputSections

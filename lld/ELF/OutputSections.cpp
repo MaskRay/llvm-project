@@ -330,8 +330,14 @@ template <class ELFT> void OutputSection::maybeCompress() {
   (void)sizeof(Elf_Chdr);
 
   // Compress only DWARF debug sections.
-  if (config->compressDebugSections == DebugCompressionType::None ||
-      (flags & SHF_ALLOC) || !name.starts_with(".debug_") || size == 0)
+  DebugCompressionType type = DebugCompressionType::None;
+  for (auto &[glob, t] : config->compressSections)
+    if (glob.match(name))
+      type = t;
+  if (config->compressDebugSections != DebugCompressionType::None &&
+      !(flags & SHF_ALLOC) && name.starts_with(".debug_") && size)
+    type = config->compressDebugSections;
+  if (type == DebugCompressionType::None)
     return;
 
   llvm::TimeTraceScope timeScope("Compress debug sections");
@@ -347,9 +353,10 @@ template <class ELFT> void OutputSection::maybeCompress() {
   // Use ZSTD's streaming compression API which permits parallel workers working
   // on the stream. See http://facebook.github.io/zstd/zstd_manual.html
   // "Streaming compression - HowTo".
-  if (config->compressDebugSections == DebugCompressionType::Zstd) {
+  if (type == DebugCompressionType::Zstd) {
     // Allocate a buffer of half of the input size, and grow it by 1.5x if
     // insufficient.
+    compressed.type = ELFCOMPRESS_ZSTD;
     compressed.shards = std::make_unique<SmallVector<uint8_t, 0>[]>(1);
     SmallVector<uint8_t, 0> &out = compressed.shards[0];
     out.resize_for_overwrite(std::max<size_t>(size / 2, 32));
@@ -422,6 +429,7 @@ template <class ELFT> void OutputSection::maybeCompress() {
   }
   size += 4; // checksum
 
+  compressed.type = ELFCOMPRESS_ZLIB;
   compressed.shards = std::move(shardsOut);
   compressed.numShards = numShards;
   compressed.checksum = checksum;
@@ -453,15 +461,14 @@ void OutputSection::writeTo(uint8_t *buf, parallel::TaskGroup &tg) {
   // just write it down.
   if (compressed.shards) {
     auto *chdr = reinterpret_cast<typename ELFT::Chdr *>(buf);
+    chdr->ch_type = compressed.type;
     chdr->ch_size = compressed.uncompressedSize;
     chdr->ch_addralign = addralign;
     buf += sizeof(*chdr);
-    if (config->compressDebugSections == DebugCompressionType::Zstd) {
-      chdr->ch_type = ELFCOMPRESS_ZSTD;
+    if (compressed.type == ELFCOMPRESS_ZSTD) {
       memcpy(buf, compressed.shards[0].data(), compressed.shards[0].size());
       return;
     }
-    chdr->ch_type = ELFCOMPRESS_ZLIB;
 
     // Compute shard offsets.
     auto offsets = std::make_unique<size_t[]>(compressed.numShards);
