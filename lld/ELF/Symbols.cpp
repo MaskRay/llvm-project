@@ -683,3 +683,14 @@ void Symbol::resolve(const SharedSymbol &other) {
   } else if (traced)
     printTraceSymbol(other, getName());
 }
+
+void Defined::overwrite(Symbol &sym) const {
+  bool dso = isa_and_nonnull<SharedFile>(sym.file);
+  Symbol::overwrite(sym, DefinedKind);
+  if (dso)
+    sym.versionId = llvm::ELF::VER_NDX_GLOBAL;
+  auto &s = static_cast<Defined &>(sym);
+  s.value = value;
+  s.size = size;
+  s.section = section;
+}
