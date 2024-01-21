@@ -1300,8 +1300,19 @@ bool AArch64CallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
            !Subtarget.noBTIAtReturnTwice() &&
            MF.getInfo<AArch64FunctionInfo>()->branchTargetEnforcement())
     Opc = AArch64::BLR_BTI;
-  else
+  else {
+    // For an intrinsic call (e.g. memset), use GOT if "RtLibUseGOT" (-fno-plt)
+    // is set.
+    if (Info.Callee.isSymbol() && F.getParent()->getRtLibUseGOT()) {
+      auto Reg =
+          MRI.createGenericVirtualRegister(getLLTForType(*F.getType(), DL));
+      MIRBuilder.buildInstr(TargetOpcode::G_GLOBAL_VALUE)
+          .addDef(Reg)
+          .addExternalSymbol(Info.Callee.getSymbolName(), AArch64II::MO_GOT);
+      Info.Callee = MachineOperand::CreateReg(Reg, false);
+    }
     Opc = getCallOpcode(MF, Info.Callee.isReg(), false);
+  }
 
   auto MIB = MIRBuilder.buildInstrNoInsert(Opc);
   unsigned CalleeOpNo = 0;
