@@ -263,7 +263,8 @@ void __atomic_exchange_c(int size, void *ptr, void *val, void *old, int model) {
 
 #define OPTIMISED_CASE(n, lockfree, type)                                      \
   type __atomic_load_##n(type *src, int model) {                               \
-    if (lockfree(src))                                                         \
+    typedef type __attribute__((aligned(1))) type_u;                           \
+    if (lockfree((type_u *)src))                                               \
       return __c11_atomic_load((_Atomic(type) *)src, model);                   \
     Lock *l = lock_for_pointer(src);                                           \
     lock(l);                                                                   \
@@ -276,7 +277,8 @@ OPTIMISED_CASES
 
 #define OPTIMISED_CASE(n, lockfree, type)                                      \
   void __atomic_store_##n(type *dest, type val, int model) {                   \
-    if (lockfree(dest)) {                                                      \
+    typedef type __attribute__((aligned(1))) type_u;                           \
+    if (lockfree((type_u *)dest)) {                                            \
       __c11_atomic_store((_Atomic(type) *)dest, val, model);                   \
       return;                                                                  \
     }                                                                          \
@@ -291,7 +293,8 @@ OPTIMISED_CASES
 
 #define OPTIMISED_CASE(n, lockfree, type)                                      \
   type __atomic_exchange_##n(type *dest, type val, int model) {                \
-    if (lockfree(dest))                                                        \
+    typedef type __attribute__((aligned(1))) type_u;                           \
+    if (lockfree((type_u *)dest))                                              \
       return __c11_atomic_exchange((_Atomic(type) *)dest, val, model);         \
     Lock *l = lock_for_pointer(dest);                                          \
     lock(l);                                                                   \
@@ -306,7 +309,8 @@ OPTIMISED_CASES
 #define OPTIMISED_CASE(n, lockfree, type)                                      \
   bool __atomic_compare_exchange_##n(type *ptr, type *expected, type desired,  \
                                      int success, int failure) {               \
-    if (lockfree(ptr))                                                         \
+    typedef type __attribute__((aligned(1))) type_u;                           \
+    if (lockfree((type_u *)ptr))                                               \
       return __c11_atomic_compare_exchange_strong(                             \
           (_Atomic(type) *)ptr, expected, desired, success, failure);          \
     Lock *l = lock_for_pointer(ptr);                                           \
@@ -328,7 +332,8 @@ OPTIMISED_CASES
 ////////////////////////////////////////////////////////////////////////////////
 #define ATOMIC_RMW(n, lockfree, type, opname, op)                              \
   type __atomic_fetch_##opname##_##n(type *ptr, type val, int model) {         \
-    if (lockfree(ptr))                                                         \
+    typedef type __attribute__((aligned(1))) type_u;                           \
+    if (lockfree((type_u *)ptr))                                               \
       return __c11_atomic_fetch_##opname((_Atomic(type) *)ptr, val, model);    \
     Lock *l = lock_for_pointer(ptr);                                           \
     lock(l);                                                                   \
@@ -340,7 +345,8 @@ OPTIMISED_CASES
 
 #define ATOMIC_RMW_NAND(n, lockfree, type)                                     \
   type __atomic_fetch_nand_##n(type *ptr, type val, int model) {               \
-    if (lockfree(ptr))                                                         \
+    typedef type __attribute__((aligned(1))) type_u;                           \
+    if (lockfree((type_u *)ptr))                                               \
       return __c11_atomic_fetch_nand((_Atomic(type) *)ptr, val, model);        \
     Lock *l = lock_for_pointer(ptr);                                           \
     lock(l);                                                                   \
