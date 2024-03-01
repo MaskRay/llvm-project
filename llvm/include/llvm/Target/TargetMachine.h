@@ -100,6 +100,7 @@ protected: // Can only create subclasses.
   CodeModel::Model CMModel = CodeModel::Small;
   uint64_t LargeDataThreshold = 0;
   CodeGenOptLevel OptLevel = CodeGenOptLevel::Default;
+  bool FDPIC = false;
 
   /// Contains target specific asm information.
   std::unique_ptr<const MCAsmInfo> AsmInfo;
@@ -240,6 +241,7 @@ public:
   bool isLargeGlobalValue(const GlobalValue *GV) const;
 
   bool isPositionIndependent() const;
+  bool isFDPIC() const { return FDPIC; }
 
   bool shouldAssumeDSOLocal(const GlobalValue *GV) const;
 

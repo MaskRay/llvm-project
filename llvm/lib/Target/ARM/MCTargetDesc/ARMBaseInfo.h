@@ -307,7 +307,7 @@ namespace ARMII {
     /// containing
     /// bits 24 through 31 of the address. Used only with Thumb1 MOV and ADD
     // instructions.
-    MO_HI_8_15 = 0x800
+    MO_HI_8_15 = 0x800,
   };
 
   enum {

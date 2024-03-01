@@ -505,6 +505,7 @@ static int compileModule(char **argv, LLVMContext &Context) {
 
     Options.BinutilsVersion =
         TargetMachine::parseBinutilsVersion(BinutilsVersion);
+    Options.MCOptions.FDPIC = mc::getFDPIC();
     Options.MCOptions.ShowMCEncoding = ShowMCEncoding;
     Options.MCOptions.AsmVerbose = AsmVerbose;
     Options.MCOptions.PreserveAsmComments = PreserveComments;

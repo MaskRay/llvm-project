@@ -58,6 +58,8 @@ StringRef ARMConstantPoolValue::getModifierText() const {
     return "none";
   case ARMCP::TLSGD:
     return "tlsgd";
+  case ARMCP::GOT:
+    return "GOT";
   case ARMCP::GOT_PREL:
     return "GOT_PREL";
   case ARMCP::GOTTPOFF:
@@ -68,6 +70,10 @@ StringRef ARMConstantPoolValue::getModifierText() const {
     return "SBREL";
   case ARMCP::SECREL:
     return "secrel32";
+  case ARMCP::GOTFUNCDESC:
+    return "GOTFUNCDESC";
+  case ARMCP::GOTOFFFUNCDESC:
+    return "GOTOFFFUNCDESC";
   }
   llvm_unreachable("Unknown modifier!");
 }

@@ -1354,6 +1354,8 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
       Builder.defineMacro("__pie__", Twine(PICLevel));
     }
   }
+  if (LangOpts.FDPIC)
+    Builder.defineMacro("__FDPIC__");
 
   // Macros to control C99 numerics and <float.h>
   Builder.defineMacro("__FLT_RADIX__", "2");
