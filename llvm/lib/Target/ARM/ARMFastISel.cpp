@@ -523,8 +523,8 @@ unsigned ARMFastISel::ARMMaterializeGV(const GlobalValue *GV, MVT VT) {
   // For now 32-bit only.
   if (VT != MVT::i32 || GV->isThreadLocal()) return 0;
 
-  // ROPI/RWPI not currently supported.
-  if (Subtarget->isROPI() || Subtarget->isRWPI())
+  // ROPI/RWPI/FDPIC not currently supported.
+  if (Subtarget->isROPI() || Subtarget->isRWPI() || TM.isFDPIC())
     return 0;
 
   bool IsIndirect = Subtarget->isGVIndirectSymbol(GV);

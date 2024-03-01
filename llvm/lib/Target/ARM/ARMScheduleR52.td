@@ -511,8 +511,8 @@ def : InstRW<[R52WriteISTM, R52WriteAdr, R52Read_ISS, R52Read_EX2],
 // LDRLIT pseudo instructions, they expand to LDR + PICADD
 def : InstRW<[R52WriteLd],
       (instregex "t?LDRLIT_ga_abs", "t?LDRLIT_ga_pcrel$")>;
-// LDRLIT_ga_pcrel_ldr expands to LDR + PICLDR
-def : InstRW<[R52WriteLd], (instregex "LDRLIT_ga_pcrel_ldr")>;
+// LDRLIT_ga_pcrel_ldr/LDRLIT_ga_sbrel_ldr expands to LDR + PICLDR
+def : InstRW<[R52WriteLd], (instregex "LDRLIT_ga_(pcrel|sbrel)_ldr")>;
 
 
 

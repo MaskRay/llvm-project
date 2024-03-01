@@ -711,7 +711,7 @@ bool ARMInstructionSelector::selectGlobal(MachineInstrBuilder &MIB,
     return constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
   }
 
-  bool isReadOnly = STI.getTargetLowering()->isReadOnly(GV);
+  bool isReadOnly = STI.getTargetLowering()->isReadOnly(GV).first;
   if (STI.isROPI() && isReadOnly) {
     unsigned Opc = UseMovt ? Opcodes.MOV_ga_pcrel : Opcodes.LDRLIT_ga_pcrel;
     MIB->setDesc(TII.get(Opc));

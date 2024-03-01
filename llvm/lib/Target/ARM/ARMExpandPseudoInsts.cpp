@@ -2702,6 +2702,55 @@ bool ARMExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
       MI.eraseFromParent();
       return true;
     }
+
+    case ARM::LDRLIT_ga_sbrel:
+    case ARM::LDRLIT_ga_sbrel_ldr:
+    case ARM::tLDRLIT_ga_sbrel: {
+      Register DstReg = MI.getOperand(0).getReg();
+      bool DstIsDead = MI.getOperand(0).isDead();
+      const MachineOperand &MO1 = MI.getOperand(1);
+      auto Flags = MO1.getTargetFlags();
+      const GlobalValue *GV = MO1.getGlobal();
+      bool IsARM = Opcode != ARM::tLDRLIT_ga_sbrel;
+      unsigned LDRLITOpc = IsARM ? ARM::LDRi12 : ARM::tLDRpci;
+      unsigned AddOpc =
+          IsARM
+              ? (Opcode == ARM::LDRLIT_ga_sbrel_ldr ? ARM::SB_LDR : ARM::SB_ADD)
+              : ARM::tSB_ADD;
+
+      // We need a new const-pool entry to load from.
+      MachineConstantPool *MCP = MBB.getParent()->getConstantPool();
+      unsigned ARMPCLabelIndex = AFI->createPICLabelUId();
+      ARMCP::ARMCPModifier Modifier =
+          (Flags & ARMII::MO_GOT)
+              ? (isa<Function>(GV) ? ARMCP::GOTFUNCDESC : ARMCP::GOT)
+          : (Flags & ARMII::MO_SBREL) ? ARMCP::GOTOFFFUNCDESC
+                                      : ARMCP::no_modifier;
+      auto *CPV = ARMConstantPoolConstant::Create(GV, ARMPCLabelIndex,
+                                                  ARMCP::CPValue, 0, Modifier,
+                                                  /*AddCurrentAddr=*/false);
+
+      {
+        auto MIB =
+            BuildMI(MBB, MBBI, MI.getDebugLoc(), TII->get(LDRLITOpc), DstReg)
+                .addConstantPoolIndex(MCP->getConstantPoolIndex(CPV, Align(4)));
+        if (IsARM)
+          MIB.addImm(0);
+        MIB.add(predOps(ARMCC::AL));
+      }
+      {
+        auto MIB =
+            BuildMI(MBB, MBBI, MI.getDebugLoc(), TII->get(AddOpc))
+                .addReg(DstReg, RegState::Define | getDeadRegState(DstIsDead))
+                .addReg(DstReg)
+                .addImm(ARMPCLabelIndex);
+        if (IsARM)
+          MIB.add(predOps(ARMCC::AL));
+      }
+      MI.eraseFromParent();
+      return true;
+    }
+
     case ARM::MOV_ga_pcrel:
     case ARM::MOV_ga_pcrel_ldr:
     case ARM::t2MOV_ga_pcrel: {
@@ -2731,10 +2780,11 @@ bool ARMExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
           .addImm(LabelId)
           .copyImplicitOps(MI);
 
-      MachineInstrBuilder MIB3 = BuildMI(MBB, MBBI, MI.getDebugLoc(),
-                                         TII->get(PICAddOpc))
-        .addReg(DstReg, RegState::Define | getDeadRegState(DstIsDead))
-        .addReg(DstReg).addImm(LabelId);
+      MachineInstrBuilder MIB3 =
+          BuildMI(MBB, MBBI, MI.getDebugLoc(), TII->get(PICAddOpc))
+              .addReg(DstReg, RegState::Define | getDeadRegState(DstIsDead))
+              .addReg(DstReg)
+              .addImm(LabelId);
       if (isARM) {
         MIB3.add(predOps(ARMCC::AL));
         if (Opcode == ARM::MOV_ga_pcrel_ldr)

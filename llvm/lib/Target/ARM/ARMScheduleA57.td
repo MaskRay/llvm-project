@@ -376,8 +376,8 @@ def : InstRW<[A57Write_3cyc_1M], (instregex "(t2)?USAD8", "(t2)?USADA8")>;
 // Load, immed offset
 // LDR and LDRB have LDRi12 and LDRBi12 forms for immediate
 def : InstRW<[A57Write_4cyc_1L], (instregex "LDRi12", "LDRBi12",
-  "LDRcp", "(t2|t)?LDRConstPool", "LDRLIT_ga_(pcrel|abs)",
-  "PICLDR", "tLDR")>;
+  "LDRcp", "(t2|t)?LDRConstPool", "LDRLIT_ga_(pcrel|abs|sbrel)",
+  "PICLDR", "tLDR", "SB_LDR")>;
 
 def : InstRW<[A57Write_4cyc_1L],
   (instregex "t2LDRS?(B|H)?(pcrel|T|i8|i12|pci|pci_pic|s)?$")>;

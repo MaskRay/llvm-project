@@ -95,6 +95,7 @@ LLVMTargetMachine::LLVMTargetMachine(const Target &T,
   this->RM = RM;
   this->CMModel = CM;
   this->OptLevel = OL;
+  this->FDPIC = Options.MCOptions.FDPIC;
 
   if (EnableTrapUnreachable)
     this->Options.TrapUnreachable = true;

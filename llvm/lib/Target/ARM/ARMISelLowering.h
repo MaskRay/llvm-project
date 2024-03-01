@@ -57,11 +57,12 @@ class VectorType;
     // Start the numbering where the builtin ops and target ops leave off.
     FIRST_NUMBER = ISD::BUILTIN_OP_END,
 
-    Wrapper,    // Wrapper - A wrapper node for TargetConstantPool,
-                // TargetExternalSymbol, and TargetGlobalAddress.
-    WrapperPIC, // WrapperPIC - A wrapper node for TargetGlobalAddress in
-                // PIC mode.
-    WrapperJT,  // WrapperJT - A wrapper node for TargetJumpTable
+    Wrapper,      // Wrapper - A wrapper node for TargetConstantPool,
+                  // TargetExternalSymbol, and TargetGlobalAddress.
+    WrapperPIC,   // WrapperPIC - A wrapper node for TargetGlobalAddress in
+                  // PIC mode.
+    WrapperSBRel, // Wrapper node for TargetGlobalAddress in FDPIC mode
+    WrapperJT,    // WrapperJT - A wrapper node for TargetJumpTable
 
     // Add pseudo op to model memcpy for struct byval.
     COPY_STRUCT_BYVAL,
@@ -79,6 +80,7 @@ class VectorType;
     INTRET_GLUE, // Interrupt return with an LR-offset and a flag operand.
 
     PIC_ADD, // Add with a PC operand and a PIC label.
+    SB_ADD,  // Add static base register and a PIC label.
 
     ASRL, // MVE long arithmetic shift right.
     LSRL, // MVE long shift right.
@@ -243,7 +245,8 @@ class VectorType;
     VADDLVAps, // Same as VADDLVp[su] but with a v4i1 predicate mask
     VADDLVApu,
     VMLAVs, // sign- or zero-extend the elements of two vectors to i32, multiply
-    VMLAVu, //   them and add the results together, returning an i32 of the sum
+    VMLAVu, //   them and add the results together, returning an i32 of their
+            //   sum
     VMLAVps, // Same as VMLAV[su] with a v4i1 predicate mask
     VMLAVpu,
     VMLALVs,  // Same as VMLAV but with i64, returning the low and
@@ -416,7 +419,7 @@ class VectorType;
       return (Kind != ScalarCondVectorVal);
     }
 
-    bool isReadOnly(const GlobalValue *GV) const;
+    std::pair<bool, bool> isReadOnly(const GlobalValue *GV) const;
 
     /// getSetCCResultType - Return the value type to use for ISD::SETCC.
     EVT getSetCCResultType(const DataLayout &DL, LLVMContext &Context,

@@ -3778,6 +3778,11 @@ defm rwpi : BoolFOption<"rwpi",
   PosFlag<SetTrue, [], [ClangOption, FlangOption, CC1Option],
           "Generate read-write position independent code (ARM only)">,
   NegFlag<SetFalse, [], [ClangOption, FlangOption, CC1Option]>>;
+defm fdpic : BoolMOption<"fdpic",
+  LangOpts<"FDPIC">, DefaultFalse,
+  PosFlag<SetTrue, [TargetSpecific], [ClangOption, FlangOption, CC1Option],
+          "Generate function descriptor position independent code (ARM only)">,
+  NegFlag<SetFalse, [TargetSpecific], [ClangOption, FlangOption]>>;
 def fplugin_EQ : Joined<["-"], "fplugin=">, Group<f_Group>,
   Flags<[NoXarchOption, NoArgumentUnused]>, MetaVarName<"<dsopath>">,
   HelpText<"Load the named plugin (dynamic shared object)">;

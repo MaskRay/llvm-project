@@ -5681,6 +5681,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (RelocationModel == llvm::Reloc::RWPI ||
       RelocationModel == llvm::Reloc::ROPI_RWPI)
     CmdArgs.push_back("-frwpi");
+  if (Triple.isARM() && Triple.isOSBinFormatELF())
+    Args.addOptInFlag(CmdArgs, options::OPT_mfdpic, options::OPT_mno_fdpic);
 
   if (Arg *A = Args.getLastArg(options::OPT_meabi)) {
     CmdArgs.push_back("-meabi");

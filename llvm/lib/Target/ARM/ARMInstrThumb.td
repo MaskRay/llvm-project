@@ -396,6 +396,17 @@ def tPICADD : TIt<(outs GPR:$dst), (ins GPR:$lhs, pclabel:$cp), IIC_iALUr, "",
   let Inst{2-0} = dst;
 }
 
+// Used by tLDRLIT_ga_sbrel
+let isNotDuplicable = 1, isCodeGenOnly = 1 in
+def tSB_ADD : TIt<(outs GPR:$dst), (ins GPR:$lhs, pclabel:$cp), IIC_iALUr, "",
+                  [(set GPR:$dst, (ARMsb_add GPR:$lhs, imm:$cp))]>,
+              T1Special<{0,0,?,?}>, Sched<[WriteALU]> {
+  // A8.6.6
+  bits<3> dst;
+  let Inst{6-3} = 0b1001; // Rm = pc
+  let Inst{2-0} = dst;
+}
+
 // ADD <Rd>, sp, #<imm8>
 // FIXME: This should not be marked as having side effects, and it should be
 // rematerializable. Clearing the side effect bit causes miscompilations,
@@ -1598,6 +1609,13 @@ def tLDRLIT_ga_abs : PseudoInst<(outs tGPR:$dst), (ins i32imm:$src),
                                 [(set tGPR:$dst,
                                       (ARMWrapper tglobaladdr:$src))]>,
                      Requires<[IsThumb, DontUseMovt, DontGenExecuteOnly]>;
+
+// GOT access for FDPIC
+def tLDRLIT_ga_sbrel : PseudoInst<(outs tGPR:$dst), (ins i32imm:$addr),
+                                  IIC_iLoadiALU,
+                                  [(set tGPR:$dst,
+                                        (ARMWrapperSBRel tglobaladdr:$addr))]>,
+                       Requires<[IsThumb]>;
 
 // 32-bit immediate using mov/add with the 4 :lower0_7: to :upper8_15:
 // relocations.

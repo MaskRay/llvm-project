@@ -244,7 +244,7 @@ void ARMSubtarget::initSubtargetFeatures(StringRef CPU, StringRef FS) {
       (Options.UnsafeFPMath || isTargetDarwin()))
     HasNEONForFP = true;
 
-  if (isRWPI())
+  if (isRWPI() || TM.isFDPIC())
     ReserveR9 = true;
 
   // If MVEVectorCostFactor is still 0 (has not been set to anything else), default it to 2

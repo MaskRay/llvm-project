@@ -130,6 +130,7 @@ def ARMsmmlsr      : SDNode<"ARMISD::SMMLSR", SDT_MulHSR>;
 // Node definitions.
 def ARMWrapper       : SDNode<"ARMISD::Wrapper",     SDTIntUnaryOp>;
 def ARMWrapperPIC    : SDNode<"ARMISD::WrapperPIC",  SDTIntUnaryOp>;
+def ARMWrapperSBRel  : SDNode<"ARMISD::WrapperSBRel", SDTIntUnaryOp>;
 def ARMWrapperJT     : SDNode<"ARMISD::WrapperJT",   SDTIntUnaryOp>;
 
 def ARMcallseq_start : SDNode<"ISD::CALLSEQ_START", SDT_ARMCallSeqStart,
@@ -186,6 +187,7 @@ def ARMcmpZ          : SDNode<"ARMISD::CMPZ", SDT_ARMCmp,
                               [SDNPOutGlue, SDNPCommutative]>;
 
 def ARMpic_add       : SDNode<"ARMISD::PIC_ADD", SDT_ARMPICAdd>;
+def ARMsb_add       : SDNode<"ARMISD::SB_ADD", SDT_ARMPICAdd>;
 
 def ARMasrl          : SDNode<"ARMISD::ASRL", SDT_ARMIntShiftParts, []>;
 def ARMlsrl          : SDNode<"ARMISD::LSRL", SDT_ARMIntShiftParts, []>;
@@ -2400,6 +2402,10 @@ def PICADD  : ARMPseudoInst<(outs GPR:$dst), (ins GPR:$a, pclabel:$cp, pred:$p),
                             4, IIC_iALUr,
                             [(set GPR:$dst, (ARMpic_add GPR:$a, imm:$cp))]>,
                             Sched<[WriteALU, ReadALU]>;
+def SB_ADD  : ARMPseudoInst<(outs GPR:$dst), (ins GPR:$a, pclabel:$cp, pred:$p),
+                            4, IIC_iALUr,
+                            [(set GPR:$dst, (ARMsb_add GPR:$a, imm:$cp))]>,
+                            Sched<[WriteALU, ReadALU]>;
 
 let AddedComplexity = 10 in {
 def PICLDR  : ARMPseudoInst<(outs GPR:$dst), (ins addrmodepc:$addr, pred:$p),
@@ -2421,6 +2427,10 @@ def PICLDRSH : ARMPseudoInst<(outs GPR:$Rt), (ins addrmodepc:$addr, pred:$p),
 def PICLDRSB : ARMPseudoInst<(outs GPR:$Rt), (ins addrmodepc:$addr, pred:$p),
                             4, IIC_iLoad_bh_r,
                             [(set GPR:$Rt, (sextloadi8 addrmodepc:$addr))]>;
+
+def SB_LDR  : ARMPseudoInst<(outs GPR:$dst), (ins addrmodepc:$addr, pred:$p),
+                            4, IIC_iLoad_r,
+                            [(set GPR:$dst, (load addrmodepc:$addr))]>;
 }
 let AddedComplexity = 10 in {
 def PICSTR  : ARMPseudoInst<(outs), (ins GPR:$src, addrmodepc:$addr, pred:$p),
@@ -6042,6 +6052,17 @@ def MOV_ga_pcrel_ldr : PseudoInst<(outs GPR:$dst), (ins i32imm:$addr),
                                 IIC_iMOVix2ld,
                     [(set GPR:$dst, (load (ARMWrapperPIC tglobaladdr:$addr)))]>,
                     Requires<[IsARM, UseMovtInPic]>;
+
+def LDRLIT_ga_sbrel : PseudoInst<(outs GPR:$dst), (ins i32imm:$addr),
+                                 IIC_iLoadiALU,
+                                 [(set GPR:$dst,
+                                       (ARMWrapperSBRel tglobaladdr:$addr))]>,
+                      Requires<[IsARM]>;
+
+let AddedComplexity = 10 in
+def LDRLIT_ga_sbrel_ldr : PseudoInst<(outs GPR:$dst), (ins i32imm:$addr), NoItinerary,
+  [(set GPR:$dst, (load (ARMWrapperSBRel tglobaladdr:$addr)))]>,
+  Requires<[IsARM]>;
 } // isReMaterializable
 
 // The many different faces of TLS access.

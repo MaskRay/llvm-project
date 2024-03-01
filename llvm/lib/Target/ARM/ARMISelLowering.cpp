@@ -1702,6 +1702,7 @@ const char *ARMTargetLowering::getTargetNodeName(unsigned Opcode) const {
     break;
     MAKE_CASE(ARMISD::Wrapper)
     MAKE_CASE(ARMISD::WrapperPIC)
+    MAKE_CASE(ARMISD::WrapperSBRel)
     MAKE_CASE(ARMISD::WrapperJT)
     MAKE_CASE(ARMISD::COPY_STRUCT_BYVAL)
     MAKE_CASE(ARMISD::CALL)
@@ -1716,6 +1717,7 @@ const char *ARMTargetLowering::getTargetNodeName(unsigned Opcode) const {
     MAKE_CASE(ARMISD::SERET_GLUE)
     MAKE_CASE(ARMISD::INTRET_GLUE)
     MAKE_CASE(ARMISD::PIC_ADD)
+    MAKE_CASE(ARMISD::SB_ADD)
     MAKE_CASE(ARMISD::CMP)
     MAKE_CASE(ARMISD::CMN)
     MAKE_CASE(ARMISD::CMPZ)
@@ -3921,13 +3923,14 @@ static SDValue promoteToConstantPool(const ARMTargetLowering *TLI,
   return DAG.getNode(ARMISD::Wrapper, dl, MVT::i32, CPAddr);
 }
 
-bool ARMTargetLowering::isReadOnly(const GlobalValue *GV) const {
+std::pair<bool, bool>
+ARMTargetLowering::isReadOnly(const GlobalValue *GV) const {
   if (const GlobalAlias *GA = dyn_cast<GlobalAlias>(GV))
     if (!(GV = GA->getAliaseeObject()))
-      return false;
+      return {false, false};
   if (const auto *V = dyn_cast<GlobalVariable>(GV))
-    return V->isConstant();
-  return isa<Function>(GV);
+    return {V->isConstant(), false};
+  return {isa<Function>(GV), isa<Function>(GV)};
 }
 
 SDValue ARMTargetLowering::LowerGlobalAddress(SDValue Op,
@@ -3948,29 +3951,40 @@ SDValue ARMTargetLowering::LowerGlobalAddressELF(SDValue Op,
   EVT PtrVT = getPointerTy(DAG.getDataLayout());
   SDLoc dl(Op);
   const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
-  bool IsRO = isReadOnly(GV);
+  auto [IsRO, IsFunc] = isReadOnly(GV);
 
   // promoteToConstantPool only if not generating XO text section
   if (GV->isDSOLocal() && !Subtarget->genExecuteOnly())
     if (SDValue V = promoteToConstantPool(this, GV, DAG, PtrVT, dl))
       return V;
 
-  if (isPositionIndependent()) {
-    SDValue G = DAG.getTargetGlobalAddress(
-        GV, dl, PtrVT, 0, GV->isDSOLocal() ? 0 : ARMII::MO_GOT);
-    SDValue Result = DAG.getNode(ARMISD::WrapperPIC, dl, PtrVT, G);
-    if (!GV->isDSOLocal())
-      Result =
-          DAG.getLoad(PtrVT, dl, DAG.getEntryNode(), Result,
-                      MachinePointerInfo::getGOT(DAG.getMachineFunction()));
-    return Result;
-  } else if (Subtarget->isROPI() && IsRO) {
-    // PC-relative.
+  bool FDPIC = getTargetMachine().isFDPIC();
+  if (FDPIC) {
+    // Indirect SB-relative addressing for preemptible functions and data
+    // (GOTFUNCDESC for functions).
+    if (!GV->isDSOLocal()) {
+      SDValue G = DAG.getTargetGlobalAddress(GV, dl, PtrVT, 0, ARMII::MO_GOT);
+      SDValue Result = DAG.getNode(ARMISD::WrapperSBRel, dl, PtrVT, G);
+      return DAG.getLoad(PtrVT, dl, DAG.getEntryNode(), Result,
+                         MachinePointerInfo::getGOT(DAG.getMachineFunction()));
+    }
+    // SB-relative addressing for local functions.
+    if (IsFunc) {
+      SDValue G = DAG.getTargetGlobalAddress(GV, dl, PtrVT, 0, ARMII::MO_SBREL);
+      SDValue Result = DAG.getNode(ARMISD::WrapperSBRel, dl, PtrVT, G);
+      return Result;
+    }
+  }
+  // PC-relative addressing for code and read-only data in the ROPI mode, and
+  // also FDPIC for local data.
+  if (IsRO && (Subtarget->isROPI() || FDPIC)) {
     SDValue G = DAG.getTargetGlobalAddress(GV, dl, PtrVT);
     SDValue Result = DAG.getNode(ARMISD::WrapperPIC, dl, PtrVT, G);
     return Result;
-  } else if (Subtarget->isRWPI() && !IsRO) {
-    // SB-relative.
+  }
+  // SB-relative addressing for writable data in the RWPI mode, and also FDPIC
+  // for preemptible data.
+  if (!IsRO && (Subtarget->isRWPI() || FDPIC)) {
     SDValue RelAddr;
     if (Subtarget->useMovt()) {
       ++NumMovwMovt;
@@ -3978,7 +3992,7 @@ SDValue ARMTargetLowering::LowerGlobalAddressELF(SDValue Op,
       RelAddr = DAG.getNode(ARMISD::Wrapper, dl, PtrVT, G);
     } else { // use literal pool for address constant
       ARMConstantPoolValue *CPV =
-        ARMConstantPoolConstant::Create(GV, ARMCP::SBREL);
+          ARMConstantPoolConstant::Create(GV, ARMCP::SBREL);
       SDValue CPAddr = DAG.getTargetConstantPool(CPV, PtrVT, Align(4));
       CPAddr = DAG.getNode(ARMISD::Wrapper, dl, MVT::i32, CPAddr);
       RelAddr = DAG.getLoad(
@@ -3987,6 +4001,16 @@ SDValue ARMTargetLowering::LowerGlobalAddressELF(SDValue Op,
     }
     SDValue SB = DAG.getCopyFromReg(DAG.getEntryNode(), dl, ARM::R9, PtrVT);
     SDValue Result = DAG.getNode(ISD::ADD, dl, PtrVT, SB, RelAddr);
+    return Result;
+  }
+  if (isPositionIndependent()) {
+    SDValue G = DAG.getTargetGlobalAddress(
+        GV, dl, PtrVT, 0, GV->isDSOLocal() ? 0 : ARMII::MO_GOT);
+    SDValue Result = DAG.getNode(ARMISD::WrapperPIC, dl, PtrVT, G);
+    if (!GV->isDSOLocal())
+      Result =
+          DAG.getLoad(PtrVT, dl, DAG.getEntryNode(), Result,
+                      MachinePointerInfo::getGOT(DAG.getMachineFunction()));
     return Result;
   }
 

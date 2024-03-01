@@ -651,14 +651,13 @@ void ARMAsmPrinter::emitAttributes() {
   // Emit build attributes for the available hardware.
   ATS.emitTargetAttributes(STI);
 
-  // RW data addressing.
-  if (isPositionIndependent()) {
-    ATS.emitAttribute(ARMBuildAttrs::ABI_PCS_RW_data,
-                      ARMBuildAttrs::AddressRWPCRel);
-  } else if (STI.isRWPI()) {
+  if (STI.isRWPI() || TM.isFDPIC()) {
     // RWPI specific attributes.
     ATS.emitAttribute(ARMBuildAttrs::ABI_PCS_RW_data,
                       ARMBuildAttrs::AddressRWSBRel);
+  } else if (isPositionIndependent()) {
+    ATS.emitAttribute(ARMBuildAttrs::ABI_PCS_RW_data,
+                      ARMBuildAttrs::AddressRWPCRel);
   }
 
   // RO data addressing.
@@ -806,7 +805,7 @@ void ARMAsmPrinter::emitAttributes() {
   }
 
   // We currently do not support using R9 as the TLS pointer.
-  if (STI.isRWPI())
+  if (STI.isRWPI() || TM.isFDPIC())
     ATS.emitAttribute(ARMBuildAttrs::ABI_PCS_R9_use,
                       ARMBuildAttrs::R9IsSB);
   else if (STI.isR9Reserved())
@@ -848,8 +847,14 @@ getModifierVariantKind(ARMCP::ARMCPModifier Modifier) {
     return MCSymbolRefExpr::VK_GOTTPOFF;
   case ARMCP::SBREL:
     return MCSymbolRefExpr::VK_ARM_SBREL;
+  case ARMCP::GOT:
+    return MCSymbolRefExpr::VK_GOT;
   case ARMCP::GOT_PREL:
     return MCSymbolRefExpr::VK_ARM_GOT_PREL;
+  case ARMCP::GOTFUNCDESC:
+    return MCSymbolRefExpr::VK_GOTFUNCDESC;
+  case ARMCP::GOTOFFFUNCDESC:
+    return MCSymbolRefExpr::VK_GOTOFFFUNCDESC;
   case ARMCP::SECREL:
     return MCSymbolRefExpr::VK_SECREL;
   }
@@ -1705,11 +1710,13 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
                                        MI->getOperand(0).getIndex(), OutContext));
     return;
   }
-  case ARM::tPICADD: {
-    // This is a pseudo op for a label + instruction sequence, which looks like:
+  case ARM::tPICADD:
+  case ARM::tSB_ADD: {
+    // tPICADD a pseudo op for a label + instruction sequence, which looks like:
     // LPC0:
-    //     add r0, pc
-    // This adds the address of LPC0 to r0.
+    //     add rX, pc
+    // This adds the address of LPC0 to rX.
+    // tSB_ADD expands to add rX, r9.
 
     // Emit the label.
     OutStreamer->emitLabel(getPICLabel(DL.getPrivateGlobalPrefix(),
@@ -1717,20 +1724,23 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
                                        MI->getOperand(2).getImm(), OutContext));
 
     // Form and emit the add.
-    EmitToStreamer(*OutStreamer, MCInstBuilder(ARM::tADDhirr)
-      .addReg(MI->getOperand(0).getReg())
-      .addReg(MI->getOperand(0).getReg())
-      .addReg(ARM::PC)
-      // Add predicate operands.
-      .addImm(ARMCC::AL)
-      .addReg(0));
+    EmitToStreamer(*OutStreamer,
+                   MCInstBuilder(ARM::tADDhirr)
+                       .addReg(MI->getOperand(0).getReg())
+                       .addReg(MI->getOperand(0).getReg())
+                       .addReg(Opc == ARM::tPICADD ? ARM::PC : ARM::R9)
+                       // Add predicate operands.
+                       .addImm(ARMCC::AL)
+                       .addReg(0));
     return;
   }
-  case ARM::PICADD: {
-    // This is a pseudo op for a label + instruction sequence, which looks like:
+  case ARM::PICADD:
+  case ARM::SB_ADD: {
+    // PICADD is a pseudo op for a label + instruction sequence, which looks like:
     // LPC0:
     //     add r0, pc, r0
     // This adds the address of LPC0 to r0.
+    // tSB_ADD expands to add rX, r9, rY.
 
     // Emit the label.
     OutStreamer->emitLabel(getPICLabel(DL.getPrivateGlobalPrefix(),
@@ -1738,15 +1748,16 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
                                        MI->getOperand(2).getImm(), OutContext));
 
     // Form and emit the add.
-    EmitToStreamer(*OutStreamer, MCInstBuilder(ARM::ADDrr)
-      .addReg(MI->getOperand(0).getReg())
-      .addReg(ARM::PC)
-      .addReg(MI->getOperand(1).getReg())
-      // Add predicate operands.
-      .addImm(MI->getOperand(3).getImm())
-      .addReg(MI->getOperand(4).getReg())
-      // Add 's' bit operand (always reg0 for this)
-      .addReg(0));
+    EmitToStreamer(*OutStreamer,
+                   MCInstBuilder(ARM::ADDrr)
+                       .addReg(MI->getOperand(0).getReg())
+                       .addReg(Opc == ARM::SB_ADD ? ARM::R9 : ARM::PC)
+                       .addReg(MI->getOperand(1).getReg())
+                       // Add predicate operands.
+                       .addImm(MI->getOperand(3).getImm())
+                       .addReg(MI->getOperand(4).getReg())
+                       // Add 's' bit operand (always reg0 for this)
+                       .addReg(0));
     return;
   }
   case ARM::PICSTR:
@@ -1756,12 +1767,14 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
   case ARM::PICLDRB:
   case ARM::PICLDRH:
   case ARM::PICLDRSB:
-  case ARM::PICLDRSH: {
+  case ARM::PICLDRSH:
+  case ARM::SB_LDR: {
     // This is a pseudo op for a label + instruction sequence, which looks like:
     // LPC0:
     //     OP r0, [pc, r0]
     // The LCP0 label is referenced by a constant pool entry in order to get
     // a PC-relative address at the ldr instruction.
+    // For SB_LDR, this expands to ldr rX, [r9, rX]
 
     // Emit the label.
     OutStreamer->emitLabel(getPICLabel(DL.getPrivateGlobalPrefix(),
@@ -1771,6 +1784,7 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
     // Form and emit the load
     unsigned Opcode;
     switch (MI->getOpcode()) {
+      // clang-format off
     default:
       llvm_unreachable("Unexpected opcode!");
     case ARM::PICSTR:   Opcode = ARM::STRrs; break;
@@ -1781,15 +1795,19 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
     case ARM::PICLDRH:  Opcode = ARM::LDRH; break;
     case ARM::PICLDRSB: Opcode = ARM::LDRSB; break;
     case ARM::PICLDRSH: Opcode = ARM::LDRSH; break;
+    case ARM::SB_LDR:   Opcode = ARM::LDRrs; break;
+      // clang-format on
     }
-    EmitToStreamer(*OutStreamer, MCInstBuilder(Opcode)
-      .addReg(MI->getOperand(0).getReg())
-      .addReg(ARM::PC)
-      .addReg(MI->getOperand(1).getReg())
-      .addImm(0)
-      // Add predicate operands.
-      .addImm(MI->getOperand(3).getImm())
-      .addReg(MI->getOperand(4).getReg()));
+    EmitToStreamer(
+        *OutStreamer,
+        MCInstBuilder(Opcode)
+            .addReg(MI->getOperand(0).getReg())
+            .addReg(MI->getOpcode() == ARM::SB_LDR ? ARM::R9 : ARM::PC)
+            .addReg(MI->getOperand(1).getReg())
+            .addImm(0)
+            // Add predicate operands.
+            .addImm(MI->getOperand(3).getImm())
+            .addReg(MI->getOperand(4).getReg()));
 
     return;
   }
