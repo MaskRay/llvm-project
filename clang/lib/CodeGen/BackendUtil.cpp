@@ -474,9 +474,12 @@ static bool initTargetOptions(DiagnosticsEngine &Diags,
   Options.MCOptions.AsmVerbose = CodeGenOpts.AsmVerbose;
   Options.MCOptions.Dwarf64 = CodeGenOpts.Dwarf64;
   Options.MCOptions.PreserveAsmComments = CodeGenOpts.PreserveAsmComments;
+  Options.MCOptions.Crel = CodeGenOpts.Crel;
+  Options.MCOptions.ImplicitAddendsForData = CodeGenOpts.ImplicitAddendsForData;
   Options.MCOptions.X86RelaxRelocations = CodeGenOpts.RelaxELFRelocations;
   Options.MCOptions.CompressDebugSections =
       CodeGenOpts.getCompressDebugSections();
+  Options.MCOptions.CompressRelocations = CodeGenOpts.getCompressRelocations();
   Options.MCOptions.ABIName = TargetOpts.ABI;
   for (const auto &Entry : HSOpts.UserEntries)
     if (!Entry.IsFramework &&

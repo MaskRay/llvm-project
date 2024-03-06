@@ -825,6 +825,12 @@ Disable combining and sorting multiple relocation sections.
 .It Cm nocopyreloc
 Disable the creation of copy relocations.
 .Pp
+.It Cm crel
+Produce CREL dynamic relocations in
+.Li .crel.dyn
+section. When -z now is specified, produce JUMP_SLOT relocations in
+.Li .crel.plt
+.Pp
 .It Cm nodefaultlib
 Set the
 .Dv DF_1_NODEFLIB
@@ -888,6 +894,9 @@ Use REL format for dynamic relocations.
 .Pp
 .It Cm rela
 Use RELA format for dynamic relocations.
+.Pp
+.It Cm relr
+Use CREL format for dynamic relocations.
 .Pp
 .It Cm retpolineplt
 Emit retpoline format PLT entries as a mitigation for CVE-2017-5715.

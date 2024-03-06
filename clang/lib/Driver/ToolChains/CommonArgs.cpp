@@ -1072,6 +1072,40 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
 
   addMachineOutlinerArgs(D, Args, CmdArgs, ToolChain.getEffectiveTriple(),
                          /*IsLTO=*/true, PluginOptPrefix);
+
+  for (const Arg *A : Args.filtered(options::OPT_Wa_COMMA)) {
+    bool Crel = false, ImplicitAddendsForData = false;
+    for (StringRef V : A->getValues()) {
+      if (V == "--crel")
+        Crel = true;
+      else if (V == "--no-crel")
+        Crel = false;
+      else if (V == "--implicit-addends-for-data")
+        ImplicitAddendsForData = true;
+      else if (V == "--no-implicit-addends-for-data")
+        ImplicitAddendsForData = false;
+      else
+        continue;
+      A->claim();
+    }
+    if (Crel) {
+      if (Triple.isOSBinFormatELF() && !Triple.isMIPS()) {
+        CmdArgs.push_back(Args.MakeArgString(Twine(PluginOptPrefix) + "-crel"));
+      } else {
+        D.Diag(diag::err_drv_unsupported_opt_for_target)
+            << "-Wa,--crel" << D.getTargetTriple();
+      }
+    }
+    if (ImplicitAddendsForData) {
+      if (Triple.isOSBinFormatELF() && !Triple.isMIPS()) {
+        CmdArgs.push_back(Args.MakeArgString(Twine(PluginOptPrefix) +
+                                             "-implicit-addends-for-data"));
+      } else {
+        D.Diag(diag::err_drv_unsupported_opt_for_target)
+            << "-Wa,--implicit-addends-for-data" << D.getTargetTriple();
+      }
+    }
+  }
 }
 
 /// Adds the '-lcgpu' and '-lmgpu' libraries to the compilation to include the

@@ -19,6 +19,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Endian.h"
+#include "llvm/Support/LEB128.h"
 #include "llvm/Support/xxhash.h"
 #include <algorithm>
 #include <mutex>
@@ -133,21 +134,108 @@ void InputSectionBase::decompress() const {
   compressed = false;
 }
 
-template <class ELFT> RelsOrRelas<ELFT> InputSectionBase::relsOrRelas() const {
+template <class ELFT>
+RelsOrRelas<ELFT> InputSectionBase::relsOrRelas(bool supportsCrel) const {
   if (relSecIdx == 0)
     return {};
   RelsOrRelas<ELFT> ret;
-  typename ELFT::Shdr shdr =
-      cast<ELFFileBase>(file)->getELFShdrs<ELFT>()[relSecIdx];
+  auto *f = cast<ObjFile<ELFT>>(file);
+  typename ELFT::Shdr shdr = f->template getELFShdrs<ELFT>()[relSecIdx];
+  if (shdr.sh_type == SHT_CREL) {
+    if (supportsCrel) {
+      ret.crels = Relocs<typename ELFT::Crel>(
+          (const uint8_t *)f->mb.getBufferStart() + shdr.sh_offset);
+      return ret;
+    }
+    auto *const &relSec = f->getSections()[relSecIdx];
+    // When relsOrRelas is called for the first time, relSec is null (without
+    // --emit-relocs) or an InputSection with zero eqClass[0].
+    if (!relSec || !cast<InputSection>(relSec)->eqClass[0]) {
+      auto *sec = makeThreadLocal<InputSection>(*f, shdr, name);
+      if (shdr.sh_flags & SHF_COMPRESSED)
+        sec->decompress();
+      f->setSection(relSecIdx, sec);
+
+      auto *p = sec->content_;
+      const auto hdr = readULEB128(p);
+      const size_t count = hdr / 8, shift = hdr % 4;
+      typename ELFT::uint offset = 0, addend = 0;
+      uint32_t symidx = 0, type = 0;
+
+      if (hdr & 4) {
+        cast<InputSection>(sec)->eqClass[0] = SHT_RELA;
+        auto *relas = makeThreadLocalN<typename ELFT::Rela>(count);
+        for (size_t i = 0; i != count; ++i) {
+          const uint8_t b = *p++;
+          offset += b >> 3;
+          if (b >= 0x80)
+            offset += (readULEB128(p) << 4) - 0x10;
+          if (b & 1)
+            symidx += readSLEB128(p);
+          if (b & 2)
+            type += readSLEB128(p);
+          if (b & 4)
+            addend += readSLEB128(p);
+          relas[i].r_offset = offset << shift;
+          relas[i].setSymbolAndType(symidx, type, false);
+          relas[i].r_addend = addend;
+        }
+        sec->content_ = reinterpret_cast<uint8_t *>(relas);
+      } else {
+        cast<InputSection>(sec)->eqClass[0] = SHT_REL;
+        auto *rels = makeThreadLocalN<typename ELFT::Rel>(count);
+        for (size_t i = 0; i != count; ++i) {
+          const uint8_t b = *p++;
+          offset += b >> 2;
+          if (b >= 0x80)
+            offset += (readULEB128(p) << 5) - 0x20;
+          if (b & 1)
+            symidx += readSLEB128(p);
+          if (b & 2)
+            type += readSLEB128(p);
+          rels[i].r_offset = offset << shift;
+          rels[i].setSymbolAndType(symidx, type, false);
+        }
+        sec->content_ = reinterpret_cast<uint8_t *>(rels);
+      }
+      sec->size = count; // count instead of size to avoid division below
+    }
+    if (cast<InputSection>(relSec)->eqClass[0] == SHT_REL) {
+      ret.rels = ArrayRef(
+          reinterpret_cast<const typename ELFT::Rel *>(relSec->content_),
+          relSec->size);
+    } else {
+      ret.relas = {ArrayRef(
+          reinterpret_cast<const typename ELFT::Rela *>(relSec->content_),
+          relSec->size)};
+    }
+    return ret;
+  }
+
+  const void *content;
+  size_t size;
+  // If relocations are compressed, decompress to an allocated buffer.
+  if (shdr.sh_flags & SHF_COMPRESSED) {
+    auto *const &relSec = f->getSections()[relSecIdx];
+    if (!relSec) {
+      f->setSection(relSecIdx, makeThreadLocal<InputSection>(*f, shdr, name));
+      relSec->decompress();
+    }
+    content = relSec->content_;
+    size = relSec->size;
+  } else {
+    content = f->mb.getBufferStart() + shdr.sh_offset;
+    size = shdr.sh_size;
+  }
+
   if (shdr.sh_type == SHT_REL) {
-    ret.rels = ArrayRef(reinterpret_cast<const typename ELFT::Rel *>(
-                            file->mb.getBufferStart() + shdr.sh_offset),
-                        shdr.sh_size / sizeof(typename ELFT::Rel));
+    ret.rels = {ArrayRef(reinterpret_cast<const typename ELFT::Rel *>(content),
+                         size / sizeof(typename ELFT::Rel))};
   } else {
     assert(shdr.sh_type == SHT_RELA);
-    ret.relas = ArrayRef(reinterpret_cast<const typename ELFT::Rela *>(
-                             file->mb.getBufferStart() + shdr.sh_offset),
-                         shdr.sh_size / sizeof(typename ELFT::Rela));
+    ret.relas = {
+        ArrayRef(reinterpret_cast<const typename ELFT::Rela *>(content),
+                 size / sizeof(typename ELFT::Rela))};
   }
   return ret;
 }
@@ -901,7 +989,7 @@ uint64_t InputSectionBase::getRelocTargetVA(const InputFile *file, RelType type,
 // So, we handle relocations for non-alloc sections directly in this
 // function as a performance optimization.
 template <class ELFT, class RelTy>
-void InputSection::relocateNonAlloc(uint8_t *buf, ArrayRef<RelTy> rels) {
+void InputSection::relocateNonAlloc(uint8_t *buf, Relocs<RelTy> rels) {
   const unsigned bits = sizeof(typename ELFT::uint) * 8;
   const TargetInfo &target = *elf::target;
   const auto emachine = config->emachine;
@@ -1062,8 +1150,10 @@ void InputSectionBase::relocate(uint8_t *buf, uint8_t *bufEnd) {
   auto *sec = cast<InputSection>(this);
   // For a relocatable link, also call relocateNonAlloc() to rewrite applicable
   // locations with tombstone values.
-  const RelsOrRelas<ELFT> rels = sec->template relsOrRelas<ELFT>();
-  if (rels.areRelocsRel())
+  const RelsOrRelas<ELFT> rels = sec->template relsOrRelas<ELFT>(true);
+  if (rels.areRelocsCrel())
+    sec->relocateNonAlloc<ELFT>(buf, rels.crels);
+  else if (rels.areRelocsRel())
     sec->relocateNonAlloc<ELFT>(buf, rels.rels);
   else
     sec->relocateNonAlloc<ELFT>(buf, rels.relas);
@@ -1407,10 +1497,14 @@ template void InputSection::writeTo<ELF32BE>(uint8_t *);
 template void InputSection::writeTo<ELF64LE>(uint8_t *);
 template void InputSection::writeTo<ELF64BE>(uint8_t *);
 
-template RelsOrRelas<ELF32LE> InputSectionBase::relsOrRelas<ELF32LE>() const;
-template RelsOrRelas<ELF32BE> InputSectionBase::relsOrRelas<ELF32BE>() const;
-template RelsOrRelas<ELF64LE> InputSectionBase::relsOrRelas<ELF64LE>() const;
-template RelsOrRelas<ELF64BE> InputSectionBase::relsOrRelas<ELF64BE>() const;
+template RelsOrRelas<ELF32LE>
+InputSectionBase::relsOrRelas<ELF32LE>(bool) const;
+template RelsOrRelas<ELF32BE>
+InputSectionBase::relsOrRelas<ELF32BE>(bool) const;
+template RelsOrRelas<ELF64LE>
+InputSectionBase::relsOrRelas<ELF64LE>(bool) const;
+template RelsOrRelas<ELF64BE>
+InputSectionBase::relsOrRelas<ELF64BE>(bool) const;
 
 template MergeInputSection::MergeInputSection(ObjFile<ELF32LE> &,
                                               const ELF32LE::Shdr &, StringRef);

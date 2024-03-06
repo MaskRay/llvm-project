@@ -36,7 +36,10 @@ VALUE_CODEGENOPT(Name, Bits, Default)
 #endif
 
 CODEGENOPT(DisableIntegratedAS, 1, 0) ///< -no-integrated-as
+CODEGENOPT(Crel, 1, 0) ///< -Wa,--crel
+CODEGENOPT(ImplicitAddendsForData, 1, 0) ///< -Wa,--implicit-addends-for-data
 CODEGENOPT(RelaxELFRelocations, 1, 1) ///< -Wa,-mrelax-relocations={yes,no}
+ENUM_CODEGENOPT(CompressRelocations, llvm::DebugCompressionType, 2, llvm::DebugCompressionType::None)
 CODEGENOPT(AsmVerbose        , 1, 0) ///< -dA, -fverbose-asm.
 CODEGENOPT(PreserveAsmComments, 1, 1) ///< -dA, -fno-preserve-as-comments.
 CODEGENOPT(AssumeSaneOperatorNew , 1, 1) ///< implicit __attribute__((malloc)) operator new

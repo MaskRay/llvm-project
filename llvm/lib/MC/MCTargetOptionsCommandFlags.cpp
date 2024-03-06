@@ -46,6 +46,8 @@ MCOPT(bool, FatalWarnings)
 MCOPT(bool, NoWarn)
 MCOPT(bool, NoDeprecatedWarn)
 MCOPT(bool, NoTypeCheck)
+MCOPT(bool, Crel)
+MCOPT(bool, ImplicitAddendsForData)
 MCOPT(bool, X86RelaxRelocations)
 MCOPT(std::string, ABIName)
 MCOPT(std::string, AsSecureLogFile)
@@ -123,6 +125,16 @@ llvm::mc::RegisterMCTargetOptionsFlags::RegisterMCTargetOptionsFlags() {
       "no-type-check", cl::desc("Suppress type errors (Wasm)"));
   MCBINDOPT(NoTypeCheck);
 
+  static cl::opt<bool> Crel("crel",
+                            cl::desc("Use CREL relocation format for ELF"));
+  MCBINDOPT(Crel);
+
+  static cl::opt<bool> ImplicitAddendsForData(
+      "implicit-addends-for-data",
+      cl::desc(
+          "Use implicit addends for sections that do not contain instruction"));
+  MCBINDOPT(ImplicitAddendsForData);
+
   static cl::opt<bool> X86RelaxRelocations(
       "x86-relax-relocations",
       cl::desc(
@@ -156,6 +168,8 @@ MCTargetOptions llvm::mc::InitMCTargetOptionsFromFlags() {
   Options.MCNoWarn = getNoWarn();
   Options.MCNoDeprecatedWarn = getNoDeprecatedWarn();
   Options.MCNoTypeCheck = getNoTypeCheck();
+  Options.Crel = getCrel();
+  Options.ImplicitAddendsForData = getImplicitAddendsForData();
   Options.X86RelaxRelocations = getX86RelaxRelocations();
   Options.EmitDwarfUnwind = getEmitDwarfUnwind();
   Options.EmitCompactUnwindNonCanonical = getEmitCompactUnwindNonCanonical();

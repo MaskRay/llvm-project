@@ -61,6 +61,13 @@ public:
 
   bool Dwarf64 : 1;
 
+  // Use CREL relocation format for ELF. This can be used with
+  // ImplicitAddendsForData.
+  bool Crel = false;
+
+  // Use implicit addends for ELF sections that do not contain instructions.
+  bool ImplicitAddendsForData = false;
+
   // If true, prefer R_X86_64_[REX_]GOTPCRELX to R_X86_64_GOTPCREL on x86-64
   // ELF.
   bool X86RelaxRelocations = true;
@@ -82,6 +89,9 @@ public:
 
   // Whether to compress DWARF debug sections.
   DebugCompressionType CompressDebugSections = DebugCompressionType::None;
+
+  // Whether to compress ELF relocation sections.
+  DebugCompressionType CompressRelocations = DebugCompressionType::None;
 
   std::string ABIName;
   std::string AssemblyLanguage;
