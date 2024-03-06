@@ -12,8 +12,29 @@
 # CHECK-NEXT: R_X86_64_IRELATIVE
 # CHECK-NEXT: R_X86_64_IRELATIVE
 
-# CHECK:      0 NOTYPE  LOCAL  HIDDEN     [[#]] __rela_iplt_start
-# CHECK-NEXT: 0 NOTYPE  LOCAL  HIDDEN     [[#]] __rela_iplt_end
+# CHECK:      Symbol table '.symtab'
+# CHECK:      {{0*}}[[#%x,S:]]   0 NOTYPE  LOCAL  HIDDEN     [[#]] __rela_iplt_start
+# CHECK-NEXT: {{0*}}[[#%x,S+48]] 0 NOTYPE  LOCAL  HIDDEN     [[#]] __rela_iplt_end
+# CHECK:                         0 NOTYPE  WEAK   DEFAULT    UND   __crel_iplt_start
+# CHECK-NEXT:                    0 NOTYPE  WEAK   DEFAULT    UND   __crel_iplt_end
+
+# RUN: ld.lld -z crel %t.o -o %t.crel
+# RUN: llvm-readelf -Srs %t.crel | FileCheck %s --check-prefix=CREL
+# RUN: ld.lld -z crel -z rela %t.o -o %t.crela
+# RUN: llvm-readelf -Srs %t.crela | FileCheck %s --check-prefix=CREL
+
+# CREL:      .crel.dyn         CREL            [[#%x,]] [[#%x,]] [[#%x,DYNSZ:]]
+
+# CREL:      Relocation section '.crel.dyn' at offset {{.*}} contains 2 entries:
+# CREL-NEXT:     Type
+# CREL-NEXT: R_X86_64_IRELATIVE
+# CREL-NEXT: R_X86_64_IRELATIVE
+
+# CREL:      Symbol table '.symtab'
+# CREL:      [[#%x,S:]]      0 NOTYPE  LOCAL  HIDDEN     [[#]] __crel_iplt_start
+# CREL-NEXT: [[#%x,S+DYNSZ]] 0 NOTYPE  LOCAL  HIDDEN     [[#]] __crel_iplt_end
+# CREL:                      0 NOTYPE  WEAK   DEFAULT    UND   __rela_iplt_start
+# CREL-NEXT:                 0 NOTYPE  WEAK   DEFAULT    UND   __rela_iplt_end
 
 # RUN: ld.lld -pie %t.o -o %t1
 # RUN: llvm-readelf -s %t1 | FileCheck %s --check-prefix=PIC
@@ -60,6 +81,8 @@ unused:
 
 .weak __rela_iplt_start
 .weak __rela_iplt_end
+.weak __crel_iplt_start
+.weak __crel_iplt_end
 
 .globl _start
 _start:
@@ -69,3 +92,5 @@ _start:
 .data
   .quad __rela_iplt_start
   .quad __rela_iplt_end
+  .quad __crel_iplt_start
+  .quad __crel_iplt_end

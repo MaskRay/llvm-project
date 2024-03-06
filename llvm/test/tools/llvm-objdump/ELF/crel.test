@@ -1,0 +1,113 @@
+# RUN: yaml2obj --docnum=1 %s -o %t
+# RUN: llvm-objdump -r %t | FileCheck %s --strict-whitespace --match-full-lines
+
+#      CHECK:RELOCATION RECORDS FOR [.text]:
+# CHECK-NEXT:OFFSET           TYPE                     VALUE
+# CHECK-NEXT:0000000000000001 R_X86_64_32              g1+0x1
+# CHECK-NEXT:0000000000000002 R_X86_64_64              l1+0x2
+# CHECK-NEXT:0000000000000000 R_X86_64_32S             g1-0x1
+# CHECK-NEXT:0000000000000004 R_X86_64_32S             .text-0x8000000000000000
+#CHECK-EMPTY:
+# CHECK-NEXT:RELOCATION RECORDS FOR [nonalloc]:
+# CHECK-NEXT:OFFSET           TYPE                     VALUE
+# CHECK-NEXT:0000000000000010 R_X86_64_64              g1+0x1
+# CHECK-NEXT:0000000000000020 R_X86_64_64              g2+0x2
+
+--- !ELF
+FileHeader: !FileHeader
+  Class: ELFCLASS64
+  Data: ELFDATA2LSB
+  Type: ET_REL
+  Machine: EM_X86_64
+
+Sections:
+- Name: .text
+  Type: SHT_PROGBITS
+  Content: "0000000000000000"
+  Flags: [SHF_ALLOC]
+- Name: .crel.text
+  Type: SHT_CREL
+  Info: .text
+  Link: .symtab
+  Relocations:
+    - Offset: 0x1
+      Symbol: g1
+      Type:   R_X86_64_32
+      Addend: 1
+    - Offset: 0x2
+      Symbol: l1
+      Type:   R_X86_64_64
+      Addend: 2
+    - Offset: 0x0
+      Symbol: g1
+      Type:   R_X86_64_32S
+      Addend: 0xffffffffffffffff
+    - Offset: 0x4
+      Symbol: .text
+      Type:   R_X86_64_32S
+      Addend: 0x8000000000000000
+- Name: nonalloc
+  Type: SHT_PROGBITS
+  Size: 0x30
+- Name: .crelnonalloc
+  Type: SHT_CREL
+  Info: nonalloc
+  Link: .symtab
+  Relocations:
+    - Offset: 0x10
+      Symbol: g1
+      Type:   R_X86_64_64
+      Addend: 1
+    - Offset: 0x20
+      Symbol: g2
+      Type:   R_X86_64_64
+      Addend: 2
+
+Symbols:
+  - Name: .text
+    Type: STT_SECTION
+    Section: .text
+  - Name:    l1
+  - Name:    g1
+    Section: .text
+    Value:   0x0
+    Size:    4
+    Binding: STB_GLOBAL
+  - Name:    g2
+    Binding: STB_GLOBAL
+
+## Check relocation formatting on ELFCLASS32 as well.
+# RUN: yaml2obj --docnum=2 %s > %t2
+# RUN: llvm-objdump -r %t2 | FileCheck %s --check-prefix=ELF32 --strict-whitespace --match-full-lines
+
+#      ELF32:RELOCATION RECORDS FOR [.text]:
+# ELF32-NEXT:OFFSET   TYPE                     VALUE
+# ELF32-NEXT:00000008 R_386_PC32               l1+0x1
+# ELF32-NEXT:00000004 R_386_32                 g1
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS32
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_386
+Sections:
+- Name: .text
+  Type: SHT_PROGBITS
+  Size: 0x10
+- Name: .crel.text
+  Type: SHT_CREL
+  Info: .text
+  Link: .symtab
+  Relocations:
+    - Offset: 0x8
+      Symbol: l1
+      Type:   R_386_PC32
+      Addend: 1
+    - Offset: 0x4
+      Symbol: g1
+      Type:   R_386_32
+Symbols:
+  - Name:    l1
+  - Name:    g1
+    Binding: STB_GLOBAL

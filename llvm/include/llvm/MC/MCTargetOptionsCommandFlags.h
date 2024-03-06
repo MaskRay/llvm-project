@@ -49,6 +49,8 @@ bool getNoDeprecatedWarn();
 
 bool getNoTypeCheck();
 
+bool getCrel();
+
 bool getX86RelaxRelocations();
 
 std::string getABIName();
