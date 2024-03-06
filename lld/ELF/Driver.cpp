@@ -562,6 +562,7 @@ static void checkZOptions(opt::InputArgList &args) {
   args::getZOptionValue(args, OPT_z, "max-page-size", 0);
   args::getZOptionValue(args, OPT_z, "common-page-size", 0);
   getZFlag(args, "rel", "rela", false);
+  hasZOption(args, "crel");
   for (auto *arg : args.filtered(OPT_z))
     if (!arg->isClaimed())
       warn("unknown -z value: " + StringRef(arg->getValue()));
@@ -1135,23 +1136,27 @@ static SmallVector<StringRef, 0> getSymbolOrderingFile(MemoryBufferRef mb) {
   return names.takeVector();
 }
 
-static bool getIsRela(opt::InputArgList &args) {
+static void getIsRela(opt::InputArgList &args) {
   // The psABI specifies the default relocation entry format.
   bool rela = is_contained({EM_AARCH64, EM_AMDGPU, EM_HEXAGON, EM_LOONGARCH,
                             EM_PPC, EM_PPC64, EM_RISCV, EM_S390, EM_X86_64},
                            config->emachine);
+  bool crel = false;
   // If -z rel or -z rela is specified, use the last option.
   for (auto *arg : args.filtered(OPT_z)) {
     StringRef s(arg->getValue());
     if (s == "rel")
-      rela = false;
+      rela = crel = false;
     else if (s == "rela")
-      rela = true;
+      rela = true, crel = false;
+    else if (s == "crel")
+      rela = crel = true;
     else
       continue;
     arg->claim();
   }
-  return rela;
+  config->isRela = rela;
+  config->crel = crel;
 }
 
 static void parseClangOption(StringRef opt, const Twine &msg) {
@@ -1775,7 +1780,7 @@ static void setConfigs(opt::InputArgList &args) {
   // We pick the format for dynamic relocations according to the psABI for each
   // processor, but a contrary choice can be made if the dynamic loader
   // supports.
-  config->isRela = getIsRela(args);
+  getIsRela(args);
 
   // If the output uses REL relocations we must store the dynamic relocation
   // addends to the output sections. We also store addends for RELA relocations

@@ -6634,6 +6634,11 @@ def triple : Separate<["-"], "triple">,
 
 } // let Visibility = [CC1Option, CC1AsOption, FC1Option]
 
+defm crel : BoolMOption<"crel",
+  CodeGenOpts<"CREL">, DefaultFalse,
+  PosFlag<SetTrue, [TargetSpecific], [CC1Option, CC1AsOption], "Enable CREL relocation format (ELF only)">,
+  NegFlag<SetFalse, [TargetSpecific]>, BothFlags<[], [ClangOption]>>;
+
 //===----------------------------------------------------------------------===//
 // Target Options (other)
 //===----------------------------------------------------------------------===//
@@ -6862,6 +6867,10 @@ def compress_debug_sections_EQ : Joined<["-", "--"], "compress-debug-sections=">
     MarshallingInfoEnum<CodeGenOpts<"CompressDebugSections">, "None">;
 def compress_debug_sections : Flag<["-", "--"], "compress-debug-sections">,
   Alias<compress_debug_sections_EQ>, AliasArgs<["zlib"]>;
+def compress_relocations_EQ : Joined<["--"], "compress-relocations=">,
+    HelpText<"Compress relocations">, Values<"none,zlib,zstd">,
+    NormalizedValuesScope<"llvm::DebugCompressionType">, NormalizedValues<["None", "Zlib", "Zstd"]>,
+    MarshallingInfoEnum<CodeGenOpts<"CompressRelocations">, "None">;
 def mno_exec_stack : Flag<["-"], "mnoexecstack">,
   HelpText<"Mark the file as not needing an executable stack">,
   MarshallingInfoFlag<CodeGenOpts<"NoExecStack">>;
