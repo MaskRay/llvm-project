@@ -991,6 +991,9 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
                                            "-split-machine-functions"));
   }
 
+  if (Args.hasFlag(options::OPT_mrelleb, options::OPT_mno_relleb, false))
+    CmdArgs.push_back(Args.MakeArgString(Twine(PluginOptPrefix) + "-relleb"));
+
   if (Arg *A = getLastProfileSampleUseArg(Args)) {
     StringRef FName = A->getValue();
     if (!llvm::sys::fs::exists(FName))

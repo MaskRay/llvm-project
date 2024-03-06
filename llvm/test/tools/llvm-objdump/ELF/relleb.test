@@ -1,0 +1,97 @@
+# RUN: yaml2obj --docnum=1 %s -o %t
+# RUN: llvm-objdump -r %t | FileCheck %s --strict-whitespace --match-full-lines
+
+#      CHECK:RELOCATION RECORDS FOR [.text]:
+# CHECK-NEXT:OFFSET           TYPE                     VALUE
+# CHECK-NEXT:0000000000000001 R_X86_64_32              glob1+0x1
+# CHECK-NEXT:0000000000000001 R_X86_64_32              glob2+0x1
+# CHECK-NEXT:0000000000000002 R_X86_64_64              loc1+0x2
+# CHECK-NEXT:0000000000000000 R_X86_64_32S             glob1-0x1
+# CHECK-NEXT:0000000000000004 R_X86_64_32S             .text
+
+--- !ELF
+FileHeader: !FileHeader
+  Class: ELFCLASS64
+  Data: ELFDATA2LSB
+  Type: ET_REL
+  Machine: EM_X86_64
+
+Sections:
+- Name: .text
+  Type: SHT_PROGBITS
+  Content: "0000000000000000"
+  Flags: [SHF_ALLOC]
+
+- Name: .relleb.text
+  Type: SHT_RELLEB
+  Info: .text
+  Link: .symtab
+  Relocations:
+    - Offset: 0x1
+      Symbol: glob1
+      Type:   R_X86_64_32
+      Addend: 1
+    - Offset: 0x1
+      Symbol: glob2
+      Type:   R_X86_64_32
+      Addend: 1
+    - Offset: 0x2
+      Symbol: loc1
+      Type:   R_X86_64_64
+      Addend: 2
+    - Offset: 0x0
+      Symbol: glob1
+      Type:   R_X86_64_32S
+      Addend: 0xffffffffffffffff
+    - Offset: 0x4
+      Symbol: .text
+      Type:   R_X86_64_32S
+      Addend: 0
+
+Symbols:
+  - Name: .text
+    Type: STT_SECTION
+    Section: .text
+  - Name: loc1
+  - Name:    glob1
+    Section: .text
+    Value:   0x0
+    Size:    4
+    Binding: STB_GLOBAL
+  - Name:    glob2
+    Binding: STB_GLOBAL
+
+## Check relocation formatting on 32 bit as well to verify the formatting is correct.
+# RUN: yaml2obj --docnum=2 %s > %t2
+# RUN: llvm-objdump -r %t2 | FileCheck %s --check-prefix=ELF32 --strict-whitespace --match-full-lines
+
+#      ELF32:RELOCATION RECORDS FOR [.text]:
+# ELF32-NEXT:OFFSET   TYPE                     VALUE
+# ELF32-NEXT:00000001 R_386_32                 global
+# ELF32-NEXT:00000002 R_386_PC32               local+0x1
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS32
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_386
+Sections:
+- Name: .text
+  Type: SHT_PROGBITS
+- Name: .relleb.text
+  Type: SHT_RELLEB
+  Info: .text
+  Link: .symtab
+  Relocations:
+    - Offset: 0x1
+      Symbol: global
+      Type:   R_386_32
+    - Offset: 0x2
+      Symbol: local
+      Type:   R_386_PC32
+      Addend: 1
+Symbols:
+  - Name:    local
+  - Name:    global
+    Binding: STB_GLOBAL

@@ -303,6 +303,7 @@ StringRef llvm::object::getELFSectionTypeName(uint32_t Machine, unsigned Type) {
     STRINGIFY_ENUM_CASE(ELF, SHT_GROUP);
     STRINGIFY_ENUM_CASE(ELF, SHT_SYMTAB_SHNDX);
     STRINGIFY_ENUM_CASE(ELF, SHT_RELR);
+    STRINGIFY_ENUM_CASE(ELF, SHT_RELLEB);
     STRINGIFY_ENUM_CASE(ELF, SHT_ANDROID_REL);
     STRINGIFY_ENUM_CASE(ELF, SHT_ANDROID_RELA);
     STRINGIFY_ENUM_CASE(ELF, SHT_ANDROID_RELR);
@@ -390,6 +391,52 @@ ELFFile<ELFT>::decode_relrs(Elf_Relr_Range relrs) const {
   }
 
   return Relocs;
+}
+
+template <class ELFT>
+Expected<std::vector<typename ELFT::Rela>>
+ELFFile<ELFT>::decodeRelleb(ArrayRef<uint8_t> Content) const {
+  DataExtractor Data(Content, true, ELFT::Is64Bits ? 8 : 4);
+  DataExtractor::Cursor Cur(0);
+  uint64_t NumRelocs = Data.getULEB128(Cur);
+  std::vector<Elf_Rela> Relocs(NumRelocs);
+  typename ELFT::uint Offset = 0, Addend = 0;
+  uint32_t Symidx = 0, Type = 0;
+  for (Elf_Rela &Rela : Relocs) {
+    // For ELFCLASS64, decode a 65-bit integer where bit 0 indicates whether
+    // symidx/type are equal to the previous entry's. The remaining 64 bits
+    // encode the delta offset relative to the previous offset.
+    const uint8_t B = Data.getU8(Cur);
+    Offset += B >> 1;
+    if (B >= 0x80)
+      Offset += (Data.getULEB128(Cur) << 6) - 0x40;
+    Rela.r_offset = Offset;
+    int64_t X = Data.getSLEB128(Cur);
+    if (B & 1) {
+      Addend += X;
+    } else {
+      if (X < 0) {
+        X = ~X;
+        Type += Data.getSLEB128(Cur);
+        Addend += Data.getSLEB128(Cur);
+      }
+      Symidx = X;
+    }
+    Rela.setSymbolAndType(Symidx, Type, false);
+    Rela.r_addend = Addend;
+  }
+  if (!Cur)
+    return std::move(Cur.takeError());
+  return Relocs;
+}
+
+template <class ELFT>
+Expected<std::vector<typename ELFT::Rela>>
+ELFFile<ELFT>::rellebs(const Elf_Shdr &Sec) const {
+  Expected<ArrayRef<uint8_t>> ContentsOrErr = getSectionContents(Sec);
+  if (!ContentsOrErr)
+    return ContentsOrErr.takeError();
+  return decodeRelleb(*ContentsOrErr);
 }
 
 template <class ELFT>

@@ -6104,6 +6104,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     }
   }
 
+  if (Triple.isOSBinFormatELF())
+    Args.addOptInFlag(CmdArgs, options::OPT_mrelleb, options::OPT_mno_relleb);
+
   Args.AddLastArg(CmdArgs, options::OPT_finstrument_functions,
                   options::OPT_finstrument_functions_after_inlining,
                   options::OPT_finstrument_function_entry_bare);
@@ -8469,6 +8472,9 @@ void ClangAs::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-mrelocation-model");
     CmdArgs.push_back(RMName);
   }
+
+  if (Triple.isOSBinFormatELF())
+    Args.addOptInFlag(CmdArgs, options::OPT_mrelleb, options::OPT_mno_relleb);
 
   // Optionally embed the -cc1as level arguments into the debug info, for build
   // analysis.

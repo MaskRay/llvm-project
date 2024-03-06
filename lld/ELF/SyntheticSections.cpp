@@ -40,6 +40,7 @@
 #include "llvm/Support/Parallel.h"
 #include "llvm/Support/TimeProfiler.h"
 #include <cstdlib>
+#include <type_traits>
 
 using namespace llvm;
 using namespace llvm::dwarf;
@@ -1382,8 +1383,12 @@ DynamicSection<ELFT>::computeContents() {
       (in.relaIplt->isNeeded() &&
        part.relaDyn->getParent() == in.relaIplt->getParent())) {
     addInSec(part.relaDyn->dynamicTag, *part.relaDyn);
-    entries.emplace_back(part.relaDyn->sizeDynamicTag,
-                         addRelaSz(*part.relaDyn));
+    if (config->relleb && in.relaIplt->isNeeded())
+      addInSec(in.relaIplt->dynamicTag, *in.relaIplt);
+    // DT_RELLEB is not associated with a SZ tag.
+    if (part.relaDyn->sizeDynamicTag)
+      entries.emplace_back(part.relaDyn->sizeDynamicTag,
+                           addRelaSz(*part.relaDyn));
 
     bool isRela = config->isRela;
     addInt(isRela ? DT_RELAENT : DT_RELENT,
@@ -1989,6 +1994,72 @@ bool AndroidPackedRelocationSection<ELFT>::updateAllocSize() {
   // because changing this section's size can affect section layout, which in
   // turn can affect the sizes of the LEB-encoded integers stored in this
   // section.
+  return relocData.size() != oldSize;
+}
+
+template <class uint>
+RELLEBSection<uint>::RELLEBSection(StringRef name, unsigned concurrency)
+    : RelocationBaseSection(name, SHT_RELLEB, DT_RELLEB, 0,
+                            /*combreloc=*/false, concurrency) {}
+
+template <class uint> bool RELLEBSection<uint>::updateAllocSize() {
+  const size_t count = relocs.size();
+  SmallVector<Elf_Relleb_Impl<sizeof(uint) == 8>, 0> rellebs(count);
+  for (size_t i = 0; i != count; ++i) {
+    const DynamicReloc &rel = relocs[i];
+    rellebs[i].r_offset = rel.getOffset();
+    rellebs[i].r_symidx = rel.getSymIndex(getPartition().dynSymTab.get());
+    rellebs[i].r_type = rel.type;
+    rellebs[i].r_addend = rel.computeAddend();
+  }
+  llvm::sort(rellebs, [](const auto &a, const auto &b) {
+    if (a.r_type != b.r_type)
+      return a.r_type < b.r_type;
+    return a.r_offset < b.r_offset;
+  });
+
+  size_t oldSize = relocData.size();
+  relocData.clear();
+  raw_svector_ostream os(relocData);
+  uint offset = 0, addend = 0;
+  uint32_t symidx = 0, type = 0;
+  encodeULEB128(count, os);
+  for (const auto &rel : rellebs) {
+    // For ELFCLASS64, encode a 65-bit integer where bit 0 indicates whether
+    // symidx/type are equal to the previous entry's. The remaining 64 bits
+    // encode the delta offset relative to the previous offset.
+    auto deltaOffset = static_cast<uint64_t>(rel.r_offset - offset);
+    offset = rel.r_offset;
+    uint8_t b =
+        deltaOffset * 2 + (symidx == rel.r_symidx && type == rel.r_type);
+    if (deltaOffset < 0x40) {
+      os << char(b);
+    } else {
+      os << char(b | 0x80);
+      encodeULEB128(deltaOffset >> 6, os);
+    }
+    if (b & 1) {
+      encodeSLEB128(std::make_signed_t<uint>(rel.r_addend - addend), os);
+      addend = rel.r_addend;
+    } else {
+      symidx = rel.r_symidx;
+      if (type == rel.r_type && addend == static_cast<uint>(rel.r_addend)) {
+        encodeSLEB128(symidx, os);
+      } else {
+        encodeSLEB128(~static_cast<int64_t>(symidx), os);
+        encodeSLEB128(static_cast<int32_t>(rel.r_type - type), os);
+        type = rel.r_type;
+        encodeSLEB128(std::make_signed_t<uint>(rel.r_addend - addend), os);
+        addend = rel.r_addend;
+      }
+    }
+  }
+
+  if (relocData.size() < oldSize) {
+    log(".relleb.dyn needs " + Twine(oldSize - relocData.size()) +
+        " padding byte(s)");
+    relocData.resize(oldSize);
+  }
   return relocData.size() != oldSize;
 }
 
@@ -4030,6 +4101,9 @@ template class elf::AndroidPackedRelocationSection<ELF32LE>;
 template class elf::AndroidPackedRelocationSection<ELF32BE>;
 template class elf::AndroidPackedRelocationSection<ELF64LE>;
 template class elf::AndroidPackedRelocationSection<ELF64BE>;
+
+template class elf::RELLEBSection<uint32_t>;
+template class elf::RELLEBSection<uint64_t>;
 
 template class elf::RelrSection<ELF32LE>;
 template class elf::RelrSection<ELF32BE>;
