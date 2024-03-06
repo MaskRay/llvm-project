@@ -19,6 +19,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Endian.h"
+#include "llvm/Support/LEB128.h"
 #include "llvm/Support/xxhash.h"
 #include <algorithm>
 #include <mutex>
@@ -137,17 +138,72 @@ template <class ELFT> RelsOrRelas<ELFT> InputSectionBase::relsOrRelas() const {
   if (relSecIdx == 0)
     return {};
   RelsOrRelas<ELFT> ret;
-  typename ELFT::Shdr shdr =
-      cast<ELFFileBase>(file)->getELFShdrs<ELFT>()[relSecIdx];
+  auto *f = cast<ObjFile<ELFT>>(file);
+  typename ELFT::Shdr shdr = f->template getELFShdrs<ELFT>()[relSecIdx];
+  if (shdr.sh_type == SHT_CREL) {
+    auto *const &relSec = f->getSections()[relSecIdx];
+    // When relsOrRelas is called for the first time, relSec is null (without
+    // --emit-relocs) or an InputSection with zero eqClass[0].
+    if (!relSec || !cast<InputSection>(relSec)->eqClass[0]) {
+      auto *sec = makeThreadLocal<InputSection>(*f, shdr, name);
+      cast<InputSection>(sec)->eqClass[0] = 1;
+      if (shdr.sh_flags & SHF_COMPRESSED)
+        sec->decompress();
+      f->setSection(relSecIdx, sec);
+
+      auto *p = sec->content_;
+      const auto countShift = decodeULEB128AndInc(p);
+      const size_t count = countShift / 4, shift = countShift % 4;
+      auto *relas = makeThreadLocalN<typename ELFT::Rela>(count);
+      typename ELFT::uint offset = 0, addend = 0;
+      uint32_t symidx = 0, type = 0;
+      for (size_t i = 0; i != count; ++i) {
+        const uint8_t b = *p++;
+        offset += b >> 3;
+        if (b >= 0x80)
+          offset += (decodeULEB128AndInc(p) << 4) - 0x10;
+        if (b & 1)
+          symidx += decodeSLEB128AndInc(p);
+        if (b & 2)
+          type += decodeSLEB128AndInc(p);
+        if (b & 4)
+          addend += decodeSLEB128AndInc(p);
+        relas[i].r_offset = offset << shift;
+        relas[i].setSymbolAndType(symidx, type, false);
+        relas[i].r_addend = addend;
+      }
+      sec->content_ = reinterpret_cast<uint8_t *>(relas);
+      sec->size = count; // count instead of size to avoid division below
+    }
+    ret.relas = ArrayRef(
+        reinterpret_cast<const typename ELFT::Rela *>(relSec->content_),
+        relSec->size);
+    return ret;
+  }
+
+  const void *content;
+  size_t size;
+  // If relocations are compressed, decompress to an allocated buffer.
+  if (shdr.sh_flags & SHF_COMPRESSED) {
+    auto *const &relSec = f->getSections()[relSecIdx];
+    if (!relSec) {
+      f->setSection(relSecIdx, makeThreadLocal<InputSection>(*f, shdr, name));
+      relSec->decompress();
+    }
+    content = relSec->content_;
+    size = relSec->size;
+  } else {
+    content = f->mb.getBufferStart() + shdr.sh_offset;
+    size = shdr.sh_size;
+  }
+
   if (shdr.sh_type == SHT_REL) {
-    ret.rels = ArrayRef(reinterpret_cast<const typename ELFT::Rel *>(
-                            file->mb.getBufferStart() + shdr.sh_offset),
-                        shdr.sh_size / sizeof(typename ELFT::Rel));
+    ret.rels = ArrayRef(reinterpret_cast<const typename ELFT::Rel *>(content),
+                        size / sizeof(typename ELFT::Rel));
   } else {
     assert(shdr.sh_type == SHT_RELA);
-    ret.relas = ArrayRef(reinterpret_cast<const typename ELFT::Rela *>(
-                             file->mb.getBufferStart() + shdr.sh_offset),
-                         shdr.sh_size / sizeof(typename ELFT::Rela));
+    ret.relas = ArrayRef(reinterpret_cast<const typename ELFT::Rela *>(content),
+                         size / sizeof(typename ELFT::Rela));
   }
   return ret;
 }

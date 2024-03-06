@@ -596,6 +596,7 @@ ELFDumper<ELFT>::dumpSections() {
       return [this](const Elf_Shdr *S) { return dumpSymtabShndxSection(S); };
     case ELF::SHT_REL:
     case ELF::SHT_RELA:
+    case ELF::SHT_CREL:
       return [this](const Elf_Shdr *S) { return dumpRelocSection(S); };
     case ELF::SHT_RELR:
       return [this](const Elf_Shdr *S) { return dumpRelrSection(S); };
@@ -1176,10 +1177,23 @@ ELFDumper<ELFT>::dumpRelocSection(const Elf_Shdr *Shdr) {
       S->Relocations->push_back(R);
     }
   } else {
-    auto Rels = Obj.relas(*Shdr);
-    if (!Rels)
-      return Rels.takeError();
-    for (const Elf_Rela &Rel : *Rels) {
+    std::vector<Elf_Rela> Relas;
+    if (Shdr->sh_type == ELF::SHT_CREL) {
+      Expected<ArrayRef<uint8_t>> ContentOrErr = Obj.getSectionContents(*Shdr);
+      if (!ContentOrErr)
+        return ContentOrErr.takeError();
+      auto Crel = Obj.decodeCrel(*ContentOrErr);
+      if (!Crel)
+        return Crel.takeError();
+      Relas = std::move(*Crel);
+    } else {
+      auto Rels = Obj.relas(*Shdr);
+      if (!Rels)
+        return Rels.takeError();
+      Relas = std::move(*Rels);
+    }
+
+    for (const Elf_Rela &Rel : Relas) {
       ELFYAML::Relocation R;
       if (Error E = dumpRelocation(&Rel, *SymTabOrErr, R))
         return std::move(E);

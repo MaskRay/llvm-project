@@ -419,6 +419,9 @@ template <class ELFT> void elf::createSyntheticSections() {
     if (config->androidPackDynRelocs)
       part.relaDyn = std::make_unique<AndroidPackedRelocationSection<ELFT>>(
           relaDynName, threadCount);
+    else if (config->zCrel)
+      part.relaDyn = std::make_unique<CrelSection<typename ELFT::uint>>(
+          ".crel.dyn", threadCount);
     else
       part.relaDyn = std::make_unique<RelocationSection<ELFT>>(
           relaDynName, config->zCombreloc, threadCount);
@@ -683,6 +686,27 @@ static void markUsedLocalSymbolsImpl(ObjFile<ELFT> *file,
   }
 }
 
+static void markUsedLocalSymbolsImplCrel(InputFile *file,
+                                         llvm::ArrayRef<uint8_t> crel) {
+  auto *p = crel.data();
+  const size_t count = decodeULEB128AndInc(p) / 4;
+  uint32_t symidx = 0;
+  for (size_t i = 0; i != count; ++i) {
+    const uint8_t b = *p++;
+    if (b >= 0x80)
+      decodeULEB128AndInc(p);
+    if (b & 1)
+      symidx += decodeSLEB128AndInc(p);
+    if (b & 2)
+      decodeSLEB128AndInc(p);
+    if (b & 4)
+      decodeSLEB128AndInc(p);
+    Symbol &sym = file->getSymbol(symidx);
+    if (sym.isLocal())
+      sym.used = true;
+  }
+}
+
 // The function ensures that the "used" field of local symbols reflects the fact
 // that the symbol is used in a relocation from a live section.
 template <class ELFT> static void markUsedLocalSymbols() {
@@ -700,6 +724,8 @@ template <class ELFT> static void markUsedLocalSymbols() {
         markUsedLocalSymbolsImpl(f, isec->getDataAs<typename ELFT::Rel>());
       else if (isec->type == SHT_RELA)
         markUsedLocalSymbolsImpl(f, isec->getDataAs<typename ELFT::Rela>());
+      else if (isec->type == SHT_CREL)
+        markUsedLocalSymbolsImplCrel(f, isec->content());
     }
   }
 }
@@ -2729,11 +2755,12 @@ template <class ELFT> void Writer<ELFT>::assignFileOffsets() {
         lastRX->lastSec == sec)
       off = alignToPowerOf2(off, config->maxPageSize);
   }
-  for (OutputSection *osec : outputSections)
-    if (!(osec->flags & SHF_ALLOC)) {
-      osec->offset = alignToPowerOf2(off, osec->addralign);
-      off = osec->offset + osec->size;
-    }
+  for (OutputSection *osec : outputSections) {
+    if (osec->flags & SHF_ALLOC)
+      continue;
+    osec->offset = alignToPowerOf2(off, osec->addralign);
+    off = osec->offset + osec->size;
+  }
 
   sectionHeaderOff = alignToPowerOf2(off, config->wordsize);
   fileSize = sectionHeaderOff + (outputSections.size() + 1) * sizeof(Elf_Shdr);

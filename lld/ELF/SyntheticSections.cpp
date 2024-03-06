@@ -40,6 +40,7 @@
 #include "llvm/Support/Parallel.h"
 #include "llvm/Support/TimeProfiler.h"
 #include <cstdlib>
+#include <type_traits>
 
 using namespace llvm;
 using namespace llvm::dwarf;
@@ -1382,8 +1383,12 @@ DynamicSection<ELFT>::computeContents() {
       (in.relaIplt->isNeeded() &&
        part.relaDyn->getParent() == in.relaIplt->getParent())) {
     addInSec(part.relaDyn->dynamicTag, *part.relaDyn);
-    entries.emplace_back(part.relaDyn->sizeDynamicTag,
-                         addRelaSz(*part.relaDyn));
+    if (config->zCrel && in.relaIplt->isNeeded())
+      addInSec(in.relaIplt->dynamicTag, *in.relaIplt);
+    // DT_CREL is not associated with a SZ tag.
+    if (part.relaDyn->sizeDynamicTag)
+      entries.emplace_back(part.relaDyn->sizeDynamicTag,
+                           addRelaSz(*part.relaDyn));
 
     bool isRela = config->isRela;
     addInt(isRela ? DT_RELAENT : DT_RELENT,
@@ -1989,6 +1994,73 @@ bool AndroidPackedRelocationSection<ELFT>::updateAllocSize() {
   // because changing this section's size can affect section layout, which in
   // turn can affect the sizes of the LEB-encoded integers stored in this
   // section.
+  return relocData.size() != oldSize;
+}
+
+template <class uint>
+CrelSection<uint>::CrelSection(StringRef name, unsigned concurrency)
+    : RelocationBaseSection(name, SHT_CREL, DT_CREL, 0,
+                            /*combreloc=*/false, concurrency) {}
+
+template <class uint> bool CrelSection<uint>::updateAllocSize() {
+  const size_t count = relocs.size();
+  uint offsetMask = 8;
+  SmallVector<Elf_Crel_Impl<sizeof(uint) == 8>, 0> crels(count);
+  for (size_t i = 0; i != count; ++i) {
+    const DynamicReloc &rel = relocs[i];
+    crels[i].r_offset = rel.getOffset();
+    crels[i].r_symidx = rel.getSymIndex(getPartition().dynSymTab.get());
+    crels[i].r_type = rel.type;
+    crels[i].r_addend = rel.computeAddend();
+    offsetMask |= crels[i].r_offset;
+  }
+  llvm::sort(crels, [](const auto &a, const auto &b) {
+    if (a.r_type != b.r_type)
+      return a.r_type < b.r_type;
+    return a.r_offset < b.r_offset;
+  });
+  const size_t shift = llvm::countr_zero(offsetMask);
+
+  size_t oldSize = relocData.size();
+  relocData.clear();
+  raw_svector_ostream os(relocData);
+  uint offset = 0, addend = 0;
+  uint32_t symidx = 0, type = 0;
+  encodeULEB128(count * 4 + shift, os);
+  for (const auto &rel : crels) {
+    // For ELFCLASS64, encode a 65-bit integer where bit 0 indicates whether
+    // symidx/type are equal to the previous entry's. The remaining 64 bits
+    // encode the delta offset relative to the previous offset.
+    auto deltaOffset = static_cast<uint64_t>(rel.r_offset - offset >> shift);
+    offset = rel.r_offset;
+    uint8_t b = deltaOffset * 8 + (symidx != rel.r_symidx) +
+                (type != rel.r_type ? 2 : 0) +
+                (addend != uint(rel.r_addend) ? 4 : 0);
+    if (deltaOffset < 0x10) {
+      os << char(b);
+    } else {
+      os << char(b | 0x80);
+      encodeULEB128(deltaOffset >> 4, os);
+    }
+    if (b & 1) {
+      encodeSLEB128(static_cast<int32_t>(rel.r_symidx - symidx), os);
+      symidx = rel.r_symidx;
+    }
+    if (b & 2) {
+      encodeSLEB128(static_cast<int32_t>(rel.r_type - type), os);
+      type = rel.r_type;
+    }
+    if (b & 4) {
+      encodeSLEB128(std::make_signed_t<uint>(rel.r_addend - addend), os);
+      addend = rel.r_addend;
+    }
+  }
+
+  if (relocData.size() < oldSize) {
+    log(".crel.dyn needs " + Twine(oldSize - relocData.size()) +
+        " padding byte(s)");
+    relocData.resize(oldSize);
+  }
   return relocData.size() != oldSize;
 }
 
@@ -4030,6 +4102,9 @@ template class elf::AndroidPackedRelocationSection<ELF32LE>;
 template class elf::AndroidPackedRelocationSection<ELF32BE>;
 template class elf::AndroidPackedRelocationSection<ELF64LE>;
 template class elf::AndroidPackedRelocationSection<ELF64BE>;
+
+template class elf::CrelSection<uint32_t>;
+template class elf::CrelSection<uint64_t>;
 
 template class elf::RelrSection<ELF32LE>;
 template class elf::RelrSection<ELF32BE>;

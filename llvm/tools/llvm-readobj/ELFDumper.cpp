@@ -378,6 +378,7 @@ protected:
 
   DynRegionInfo DynRelRegion;
   DynRegionInfo DynRelaRegion;
+  DynRegionInfo DynCrelRegion;
   DynRegionInfo DynRelrRegion;
   DynRegionInfo DynPLTRelRegion;
   std::optional<DynRegionInfo> DynSymRegion;
@@ -1894,7 +1895,7 @@ ELFDumper<ELFT>::ELFDumper(const object::ELFObjectFile<ELFT> &O,
                            ScopedPrinter &Writer)
     : ObjDumper(Writer, O.getFileName()), ObjF(O), Obj(O.getELFFile()),
       FileName(O.getFileName()), DynRelRegion(O, *this),
-      DynRelaRegion(O, *this), DynRelrRegion(O, *this),
+      DynRelaRegion(O, *this), DynCrelRegion(O, *this), DynRelrRegion(O, *this),
       DynPLTRelRegion(O, *this), DynSymTabShndxRegion(O, *this),
       DynamicTable(O, *this) {
   if (!O.IsContentValid())
@@ -2052,6 +2053,9 @@ template <typename ELFT> void ELFDumper<ELFT>::parseDynamicTable() {
     case ELF::DT_RELAENT:
       DynRelaRegion.EntSize = Dyn.getVal();
       DynRelaRegion.EntSizePrintName = "DT_RELAENT value";
+      break;
+    case ELF::DT_CREL:
+      DynCrelRegion.Addr = toMappedAddr(Dyn.getTag(), Dyn.getPtr());
       break;
     case ELF::DT_SONAME:
       SONameOffset = Dyn.getVal();
@@ -2426,6 +2430,7 @@ std::string ELFDumper<ELFT>::getDynamicEntry(uint64_t Type,
   case DT_FINI_ARRAY:
   case DT_PREINIT_ARRAY:
   case DT_DEBUG:
+  case DT_CREL:
   case DT_VERDEF:
   case DT_VERNEED:
   case DT_VERSYM:
@@ -3841,7 +3846,8 @@ void GNUELFDumper<ELFT>::printRelRelaReloc(const Relocation<ELFT> &R,
 template <class ELFT>
 static void printRelocHeaderFields(formatted_raw_ostream &OS, unsigned SType,
                                    const typename ELFT::Ehdr &EHeader) {
-  bool IsRela = SType == ELF::SHT_RELA || SType == ELF::SHT_ANDROID_RELA;
+  bool IsRela = is_contained(
+      {ELF::SHT_RELA, ELF::SHT_CREL, ELF::SHT_ANDROID_RELA}, SType);
   bool IsRelr =
       SType == ELF::SHT_RELR || SType == ELF::SHT_ANDROID_RELR ||
       (EHeader.e_machine == EM_AARCH64 && SType == ELF::SHT_AARCH64_AUTH_RELR);
@@ -3876,7 +3882,8 @@ template <class ELFT>
 static bool isRelocationSec(const typename ELFT::Shdr &Sec,
                             const typename ELFT::Ehdr &EHeader) {
   return Sec.sh_type == ELF::SHT_REL || Sec.sh_type == ELF::SHT_RELA ||
-         Sec.sh_type == ELF::SHT_RELR || Sec.sh_type == ELF::SHT_ANDROID_REL ||
+         Sec.sh_type == ELF::SHT_RELR || Sec.sh_type == ELF::SHT_CREL ||
+         Sec.sh_type == ELF::SHT_ANDROID_REL ||
          Sec.sh_type == ELF::SHT_ANDROID_RELA ||
          Sec.sh_type == ELF::SHT_ANDROID_RELR ||
          (EHeader.e_machine == EM_AARCH64 &&
@@ -3894,6 +3901,13 @@ template <class ELFT> void GNUELFDumper<ELFT>::printRelocations() {
       if (!RelasOrErr)
         return RelasOrErr.takeError();
       return RelasOrErr->size();
+    }
+
+    if (Sec.sh_type == ELF::SHT_CREL) {
+      if (Expected<std::vector<Elf_Rela>> RelasOrErr = this->Obj.crels(Sec))
+        return RelasOrErr->size();
+      else
+        return RelasOrErr.takeError();
     }
 
     if (!opts::RawRelr &&
@@ -4834,6 +4848,28 @@ template <class ELFT> void ELFDumper<ELFT>::printDynamicRelocationsHelper() {
     for (const Elf_Rel &Rel :
          this->DynRelRegion.template getAsArrayRef<Elf_Rel>())
       printDynamicReloc(Relocation<ELFT>(Rel, IsMips64EL));
+  }
+
+  if (this->DynCrelRegion.Size > 0) {
+    printDynamicRelocHeader(ELF::SHT_CREL, "CREL", this->DynCrelRegion);
+    // While the size is unknown, a valid CREL has at least one byte. We can
+    // check whether Addr is in bounds, and then decode CREL until the file
+    // end.
+    this->DynCrelRegion.Size = 1;
+    if (!this->DynCrelRegion.template getAsArrayRef<uint8_t>().empty()) {
+      const uint64_t Offset =
+          DynCrelRegion.Addr -
+          (const uint8_t *)ObjF.getMemoryBufferRef().getBufferStart();
+      const uint64_t ObjSize = ObjF.getMemoryBufferRef().getBufferSize();
+      auto RelasOrErr = Obj.decodeCrel(
+          ArrayRef<uint8_t>(DynCrelRegion.Addr, ObjSize - Offset));
+      if (!RelasOrErr) {
+        reportUniqueWarning(toString(RelasOrErr.takeError()));
+      } else {
+        for (const Elf_Rela &Rel : *RelasOrErr)
+          printDynamicReloc(Relocation<ELFT>(Rel, false));
+      }
+    }
   }
 
   if (this->DynRelrRegion.Size > 0) {
@@ -6314,6 +6350,15 @@ void ELFDumper<ELFT>::forEachRelocationDo(
     for (const Elf_Rel &R : Obj.decode_relrs(*RangeOrErr))
       RelRelaFn(Relocation<ELFT>(R, IsMips64EL), RelNdx++, Sec,
                 /*SymTab=*/nullptr);
+    break;
+  }
+  case ELF::SHT_CREL: {
+    if (Expected<std::vector<Elf_Rela>> RelasOrErr = Obj.crels(Sec)) {
+      for (const Elf_Rela &R : *RelasOrErr)
+        RelRelaFn(Relocation<ELFT>(R, false), RelNdx++, Sec, SymTab);
+    } else {
+      Warn(RelasOrErr.takeError());
+    }
     break;
   }
   case ELF::SHT_ANDROID_REL:

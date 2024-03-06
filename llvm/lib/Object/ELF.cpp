@@ -303,6 +303,7 @@ StringRef llvm::object::getELFSectionTypeName(uint32_t Machine, unsigned Type) {
     STRINGIFY_ENUM_CASE(ELF, SHT_GROUP);
     STRINGIFY_ENUM_CASE(ELF, SHT_SYMTAB_SHNDX);
     STRINGIFY_ENUM_CASE(ELF, SHT_RELR);
+    STRINGIFY_ENUM_CASE(ELF, SHT_CREL);
     STRINGIFY_ENUM_CASE(ELF, SHT_ANDROID_REL);
     STRINGIFY_ENUM_CASE(ELF, SHT_ANDROID_RELA);
     STRINGIFY_ENUM_CASE(ELF, SHT_ANDROID_RELR);
@@ -390,6 +391,48 @@ ELFFile<ELFT>::decode_relrs(Elf_Relr_Range relrs) const {
   }
 
   return Relocs;
+}
+
+template <class ELFT>
+Expected<std::vector<typename ELFT::Rela>>
+ELFFile<ELFT>::decodeCrel(ArrayRef<uint8_t> Content) const {
+  DataExtractor Data(Content, true, ELFT::Is64Bits ? 8 : 4);
+  DataExtractor::Cursor Cur(0);
+  const uint64_t CountShift = Data.getULEB128(Cur);
+  const size_t Count = CountShift / 4, Shift = CountShift % 4;
+  std::vector<Elf_Rela> Relocs(Count);
+  typename ELFT::uint Offset = 0, Addend = 0;
+  uint32_t Symidx = 0, Type = 0;
+  for (Elf_Rela &Rela : Relocs) {
+    // For ELFCLASS64, decode a 65-bit integer where bit 0 indicates whether
+    // symidx/type are equal to the previous entry's. The remaining 64 bits
+    // encode the delta offset relative to the previous offset.
+    const uint8_t B = Data.getU8(Cur);
+    Offset += B >> 3;
+    if (B >= 0x80)
+      Offset += (Data.getULEB128(Cur) << 4) - 0x10;
+    if (B & 1)
+      Symidx += Data.getSLEB128(Cur);
+    if (B & 2)
+      Type += Data.getSLEB128(Cur);
+    if (B & 4)
+      Addend += Data.getSLEB128(Cur);
+    Rela.r_offset = Offset << Shift;
+    Rela.setSymbolAndType(Symidx, Type, false);
+    Rela.r_addend = Addend;
+  }
+  if (!Cur)
+    return std::move(Cur.takeError());
+  return Relocs;
+}
+
+template <class ELFT>
+Expected<std::vector<typename ELFT::Rela>>
+ELFFile<ELFT>::crels(const Elf_Shdr &Sec) const {
+  Expected<ArrayRef<uint8_t>> ContentsOrErr = getSectionContents(Sec);
+  if (!ContentsOrErr)
+    return ContentsOrErr.takeError();
+  return decodeCrel(*ContentsOrErr);
 }
 
 template <class ELFT>
