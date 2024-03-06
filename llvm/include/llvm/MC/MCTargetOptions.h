@@ -61,7 +61,10 @@ public:
 
   bool Dwarf64 : 1;
 
-  // Use CREL relocation format for ELF.
+  bool CompactShdr = false;
+
+  // Use CREL relocation format for ELF. This can be used with
+  // CompactShdr.
   bool Crel = false;
 
   bool ImplicitMapSyms = false;

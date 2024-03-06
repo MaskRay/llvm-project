@@ -36,6 +36,7 @@ VALUE_CODEGENOPT(Name, Bits, Default)
 #endif
 
 CODEGENOPT(DisableIntegratedAS, 1, 0) ///< -no-integrated-as
+CODEGENOPT(CompactShdr, 1, 0) ///< -Wa,--cshdr
 CODEGENOPT(Crel, 1, 0) ///< -Wa,--crel
 CODEGENOPT(ImplicitMapSyms, 1, 0) ///< -Wa,-mmapsyms=implicit
 CODEGENOPT(AsmVerbose        , 1, 0) ///< -dA, -fverbose-asm.

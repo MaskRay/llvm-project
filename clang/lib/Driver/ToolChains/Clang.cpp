@@ -2553,6 +2553,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
 
   const llvm::Triple &Triple = C.getDefaultToolChain().getTriple();
   bool IsELF = Triple.isOSBinFormatELF();
+  bool CompactShdr = false;
   bool Crel = false, ExperimentalCrel = false;
   bool ImplicitMapSyms = false;
   bool UseRelaxRelocations = C.getDefaultToolChain().useRelaxRelocations();
@@ -2727,6 +2728,10 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
         Crel = false;
       } else if (Value == "--allow-experimental-crel") {
         ExperimentalCrel = true;
+      } else if (Value == "--cshdr") {
+        CompactShdr = true;
+      } else if (Value == "--no-cshdr") {
+        CompactShdr = false;
       } else if (Value.starts_with("-I")) {
         CmdArgs.push_back(Value.data());
         // We need to consume the next argument if the current arg is a plain
@@ -2786,6 +2791,14 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
   }
   if (ImplicitIt.size())
     AddARMImplicitITArgs(Args, CmdArgs, ImplicitIt);
+  if (CompactShdr) {
+    if (Triple.isOSBinFormatELF()) {
+      CmdArgs.push_back("--cshdr");
+    } else {
+      D.Diag(diag::err_drv_unsupported_opt_for_target)
+          << "-Wa,--cshdr" << D.getTargetTriple();
+    }
+  }
   if (Crel) {
     if (!ExperimentalCrel)
       D.Diag(diag::err_drv_experimental_crel);

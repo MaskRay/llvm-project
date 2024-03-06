@@ -24,6 +24,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/LEB128.h"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -270,7 +271,7 @@ public:
 
 private:
   StringRef Buf;
-  std::vector<Elf_Shdr> FakeSections;
+  mutable std::vector<Elf_Shdr> FakeSections;
   SmallString<0> FakeSectionStrings;
 
   ELFFile(StringRef Object);
@@ -930,6 +931,31 @@ Expected<typename ELFT::ShdrRange> ELFFile<ELFT>::sections() const {
     return ArrayRef<Elf_Shdr>();
   }
 
+  uint32_t NumSections = getHeader().e_shnum;
+  if (getHeader().e_shentsize == 0) {
+    if (FakeSections.empty()) {
+      auto *p = reinterpret_cast<const uint8_t *>(base() + SectionTableOffset);
+      for (uint32_t i = 0; i != NumSections; ++i) {
+        Elf_Shdr shdr = {};
+        uint8_t presence = *p++;
+        shdr.sh_name = decodeULEB128AndIncUnsafe(p);
+        shdr.sh_type =
+            presence & 1 ? decodeULEB128AndIncUnsafe(p) : ELF::SHT_PROGBITS;
+        shdr.sh_flags = presence & 2 ? decodeULEB128AndIncUnsafe(p) : 0;
+        shdr.sh_addr = presence & 4 ? decodeULEB128AndIncUnsafe(p) : 0;
+        shdr.sh_offset = decodeULEB128AndIncUnsafe(p);
+        shdr.sh_size = presence & 8 ? decodeULEB128AndIncUnsafe(p) : 0;
+        shdr.sh_link = presence & 16 ? decodeULEB128AndIncUnsafe(p) : 0;
+        shdr.sh_info = presence & 32 ? decodeULEB128AndIncUnsafe(p) : 0;
+        shdr.sh_addralign =
+            presence & 64 ? uintX_t(1) << decodeULEB128AndIncUnsafe(p) : 1;
+        shdr.sh_entsize = presence & 128 ? decodeULEB128AndIncUnsafe(p) : 0;
+        FakeSections.push_back(shdr);
+      }
+    }
+    return FakeSections;
+  }
+
   if (getHeader().e_shentsize != sizeof(Elf_Shdr))
     return createError("invalid e_shentsize in ELF header: " +
                        Twine(getHeader().e_shentsize));
@@ -949,7 +975,6 @@ Expected<typename ELFT::ShdrRange> ELFFile<ELFT>::sections() const {
   const Elf_Shdr *First =
       reinterpret_cast<const Elf_Shdr *>(base() + SectionTableOffset);
 
-  uintX_t NumSections = getHeader().e_shnum;
   if (NumSections == 0)
     NumSections = First->sh_size;
 

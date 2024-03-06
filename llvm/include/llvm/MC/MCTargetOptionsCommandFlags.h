@@ -51,6 +51,8 @@ bool getNoTypeCheck();
 
 bool getSaveTempLabels();
 
+bool getCompactShdr();
+
 bool getCrel();
 
 bool getImplicitMapSyms();

@@ -1128,7 +1128,7 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
                          /*IsLTO=*/true, PluginOptPrefix);
 
   bool IsELF = Triple.isOSBinFormatELF();
-  bool Crel = false;
+  bool Crel = false, CompactShdr = false;
   bool ImplicitMapSyms = false;
   for (const Arg *A : Args.filtered(options::OPT_Wa_COMMA)) {
     for (StringRef V : A->getValues()) {
@@ -1147,13 +1147,25 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
       if (Equal.first == "-mmapsyms") {
         ImplicitMapSyms = Equal.second == "implicit";
         checkArg(IsELF && Triple.isAArch64(), {"default", "implicit"});
-      } else if (V == "--crel")
+      } else if (V == "--cshdr")
+        CompactShdr = true;
+      else if (V == "--no-cshdr")
+        CompactShdr = false;
+      else if (V == "--crel")
         Crel = true;
       else if (V == "--no-crel")
         Crel = false;
       else
         continue;
       A->claim();
+    }
+  }
+  if (CompactShdr) {
+    if (Triple.isOSBinFormatELF()) {
+      CmdArgs.push_back(Args.MakeArgString(Twine(PluginOptPrefix) + "-cshdr"));
+    } else {
+      D.Diag(diag::err_drv_unsupported_opt_for_target)
+          << "-Wa,--cshdr" << D.getTargetTriple();
     }
   }
   if (Crel) {
