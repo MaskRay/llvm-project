@@ -18,6 +18,7 @@
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/Config/llvm-config.h" // LLVM_ENABLE_ZLIB
 #include "llvm/Support/Compression.h"
+#include "llvm/Support/LEB128.h"
 #include "llvm/Support/Parallel.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TimeProfiler.h"
@@ -115,7 +116,19 @@ void OutputSection::recordSection(InputSectionBase *isec) {
 // other InputSections.
 void OutputSection::commitSection(InputSection *isec) {
   if (LLVM_UNLIKELY(type != isec->type)) {
-    if (hasInputSections || typeIsSet) {
+    if (!hasInputSections && !typeIsSet) {
+      type = isec->type;
+    } else if (isStaticRelSecType(type) && isStaticRelSecType(isec->type) &&
+               (type == SHT_CREL) != (isec->type == SHT_CREL)) {
+      // Combine mixed SHT_REL[A] and SHT_CREL to SHT_CREL.
+      type = SHT_CREL;
+      if (type == SHT_REL) {
+        if (name.consume_front(".rel"))
+          name = saver().save(".crel" + name);
+      } else if (name.consume_front(".rela")) {
+        name = saver().save(".crel" + name);
+      }
+    } else {
       if (typeIsSet || !canMergeToProgbits(type) ||
           !canMergeToProgbits(isec->type)) {
         // The (NOLOAD) changes the section type to SHT_NOBITS, the intention is
@@ -133,8 +146,6 @@ void OutputSection::commitSection(InputSection *isec) {
       }
       if (!typeIsSet)
         type = SHT_PROGBITS;
-    } else {
-      type = isec->type;
     }
   }
   if (!hasInputSections) {
@@ -470,6 +481,11 @@ void OutputSection::writeTo(uint8_t *buf, parallel::TaskGroup &tg) {
   llvm::TimeTraceScope timeScope("Write sections", name);
   if (type == SHT_NOBITS)
     return;
+  if (type == SHT_CREL && !(flags & SHF_ALLOC)) {
+    buf += encodeULEB128(crelCount, buf);
+    memcpy(buf, crelBody.data(), crelBody.size());
+    return;
+  }
 
   // If the section is compressed due to
   // --compress-debug-section/--compress-sections, the content is already known.
@@ -595,6 +611,142 @@ static void finalizeShtGroup(OutputSection *os, InputSection *section) {
   os->size = (1 + seen.size()) * sizeof(uint32_t);
 }
 
+template <class uint>
+LLVM_ATTRIBUTE_ALWAYS_INLINE static void
+encodeOneCrel(raw_svector_ostream &os, uint &outOffset, uint32_t &outSymidx,
+              uint32_t &outType, uint &outAddend, uint offset,
+              const Symbol &sym, uint32_t type, uint addend) {
+  const auto deltaOffset = static_cast<uint64_t>(offset - outOffset);
+  outOffset = offset;
+  int64_t symidx = in.symTab->getSymbolIndex(sym);
+  if (sym.type == STT_SECTION) {
+    auto *d = dyn_cast<Defined>(&sym);
+    if (d) {
+      SectionBase *section = d->section;
+      assert(section->isLive());
+      addend = sym.getVA(addend) - section->getOutputSection()->addr;
+    } else {
+      // Encode R_*_NONE(symidx=0).
+      symidx = type = addend = 0;
+    }
+  }
+
+  uint8_t odd = outSymidx == symidx && outType == type,
+          b = deltaOffset * 2 + odd;
+  if (deltaOffset < 0x40) {
+    os << char(b);
+  } else {
+    os << char(b | 0x80);
+    encodeULEB128(deltaOffset >> 6, os);
+  }
+  outSymidx = symidx;
+  if (!odd && outType == type && outAddend == addend) {
+    encodeSLEB128(symidx, os);
+  } else {
+    if (!odd) {
+      encodeSLEB128(~static_cast<int64_t>(symidx), os);
+      encodeSLEB128(static_cast<int32_t>(type - outType), os);
+      outType = type;
+    }
+    encodeSLEB128(std::make_signed_t<uint>(addend - outAddend), os);
+    outAddend = addend;
+  }
+}
+
+template <class ELFT>
+static size_t relToCrel(raw_svector_ostream &os, typename ELFT::uint &outOffset,
+                        uint32_t &outSymidx, uint32_t &outType,
+                        typename ELFT::uint &outAddend, InputSection *relSec,
+                        InputSectionBase *sec) {
+  const auto &file = *cast<ELFFileBase>(relSec->file);
+  if (relSec->type == SHT_REL) {
+    auto rels = relSec->getDataAs<typename ELFT::Rel>();
+    // zero addend may not be desired.
+    for (auto rel : rels) {
+      encodeOneCrel<typename ELFT::uint>(os, outOffset, outSymidx, outType,
+                                         outAddend, sec->getVA(rel.r_offset),
+                                         file.getRelocTargetSym(rel),
+                                         rel.getType(config->isMips64EL), 0);
+    }
+    return rels.size();
+  } else {
+    auto rels = relSec->getDataAs<typename ELFT::Rela>();
+    for (auto rel : rels) {
+      encodeOneCrel<typename ELFT::uint>(
+          os, outOffset, outSymidx, outType, outAddend,
+          sec->getVA(rel.r_offset), file.getRelocTargetSym(rel),
+          rel.getType(config->isMips64EL), getAddend<ELFT>(rel));
+    }
+    return rels.size();
+  }
+}
+
+template <class uint> void OutputSection::finalizeNonAllocCrelImpl() {
+  raw_svector_ostream os(crelBody);
+  uint64_t totalCount = 0;
+  uint outOffset = 0, outAddend = 0;
+  uint32_t outSymidx = 0, outType = 0;
+  assert(commands.size() == 1);
+  auto *isd = cast<InputSectionDescription>(commands[0]);
+  for (InputSection *relSec : isd->sections) {
+    const auto &file = *cast<ELFFileBase>(relSec->file);
+    (void)relSec->contentMaybeDecompress();
+    InputSectionBase *sec = relSec->getRelocatedSection();
+    if (relSec->type != SHT_CREL) {
+      if constexpr (sizeof(uint) == 4) {
+        totalCount += config->isLE
+                          ? relToCrel<ELF32LE>(os, outOffset, outSymidx,
+                                               outType, outAddend, relSec, sec)
+                          : relToCrel<ELF32BE>(os, outOffset, outSymidx,
+                                               outType, outAddend, relSec, sec);
+      } else {
+        totalCount += config->isLE
+                          ? relToCrel<ELF64LE>(os, outOffset, outSymidx,
+                                               outType, outAddend, relSec, sec)
+                          : relToCrel<ELF64BE>(os, outOffset, outSymidx,
+                                               outType, outAddend, relSec, sec);
+      }
+      continue;
+    }
+
+    auto *p = relSec->content_;
+    const uint64_t count = decodeULEB128AndInc(p);
+    totalCount += count;
+    uint offset = 0, addend = 0;
+    uint32_t symidx = 0, type = 0;
+    for (size_t i = 0; i != count; ++i) {
+      const uint8_t b = *p++;
+      offset += b >> 1;
+      if (b >= 0x80)
+        offset += (decodeULEB128AndInc(p) << 6) - 0x40;
+      int64_t x = decodeSLEB128AndInc(p);
+      if (b & 1) {
+        addend += x;
+      } else {
+        if (x < 0) {
+          x = ~x;
+          type += decodeSLEB128AndInc(p);
+          addend += decodeSLEB128AndInc(p);
+        }
+        symidx = x;
+      }
+      encodeOneCrel(os, outOffset, outSymidx, outType, outAddend,
+                    (uint)sec->getVA(offset), file.getSymbol(symidx), type,
+                    addend);
+    }
+  }
+
+  crelCount = totalCount;
+  size = getULEB128Size(totalCount) + crelBody.size();
+}
+
+void OutputSection::finalizeNonAllocCrel() {
+  if (config->is64)
+    finalizeNonAllocCrelImpl<uint64_t>();
+  else
+    finalizeNonAllocCrelImpl<uint32_t>();
+}
+
 void OutputSection::finalize() {
   InputSection *first = getFirstInputSection(this);
 
@@ -631,6 +783,8 @@ void OutputSection::finalize() {
   InputSectionBase *s = first->getRelocatedSection();
   info = s->getOutputSection()->sectionIndex;
   flags |= SHF_INFO_LINK;
+  if (type == SHT_CREL)
+    finalizeNonAllocCrel();
 }
 
 // Returns true if S is in one of the many forms the compiler driver may pass
