@@ -608,6 +608,7 @@ static void checkZOptions(opt::InputArgList &args) {
   args::getZOptionValue(args, OPT_z, "max-page-size", 0);
   args::getZOptionValue(args, OPT_z, "common-page-size", 0);
   getZFlag(args, "rel", "rela", false);
+  getZFlag(args, "crel", "nocrel", false);
   for (auto *arg : args.filtered(OPT_z))
     if (!arg->isClaimed())
       warn("unknown -z value: " + StringRef(arg->getValue()));
@@ -1196,8 +1197,10 @@ static SmallVector<StringRef, 0> getSymbolOrderingFile(Ctx &ctx,
 }
 
 static bool getIsRela(Ctx &ctx, opt::InputArgList &args) {
-  // The psABI specifies the default relocation entry format.
-  bool rela = is_contained({EM_AARCH64, EM_AMDGPU, EM_HEXAGON, EM_LOONGARCH,
+  // Architectures have a preference on REL vs RELA. If -z crel is specified,
+  // default to implicit addends.
+  bool rela = !ctx.arg.zCrel &&
+              is_contained({EM_AARCH64, EM_AMDGPU, EM_HEXAGON, EM_LOONGARCH,
                             EM_PPC, EM_PPC64, EM_RISCV, EM_S390, EM_X86_64},
                            ctx.arg.emachine);
   // If -z rel or -z rela is specified, use the last option.
@@ -1748,6 +1751,7 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
 
   std::tie(ctx.arg.buildId, ctx.arg.buildIdVector) = getBuildId(args);
 
+  ctx.arg.zCrel = getZFlag(args, "crel", "nocrel", false);
   if (getZFlag(args, "pack-relative-relocs", "nopack-relative-relocs", false)) {
     ctx.arg.relrGlibc = true;
     ctx.arg.relrPackDynRelocs = true;
