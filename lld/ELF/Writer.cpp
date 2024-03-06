@@ -388,6 +388,27 @@ static void markUsedLocalSymbolsImpl(ObjFile<ELFT> *file,
   }
 }
 
+static void markUsedLocalSymbolsImplCrel(InputFile *file,
+                                         llvm::ArrayRef<uint8_t> crel) {
+  auto *p = crel.data();
+  const size_t count = readULEB128(p) / 8;
+  uint32_t symidx = 0;
+  for (size_t i = 0; i != count; ++i) {
+    const uint8_t b = *p++;
+    if (b >= 0x80)
+      readULEB128(p);
+    if (b & 1)
+      symidx += readSLEB128(p);
+    if (b & 2)
+      readSLEB128(p);
+    if (b & 4)
+      readSLEB128(p);
+    Symbol &sym = file->getSymbol(symidx);
+    if (sym.isLocal())
+      sym.used = true;
+  }
+}
+
 // The function ensures that the "used" field of local symbols reflects the fact
 // that the symbol is used in a relocation from a live section.
 template <class ELFT> static void markUsedLocalSymbols() {
@@ -405,6 +426,8 @@ template <class ELFT> static void markUsedLocalSymbols() {
         markUsedLocalSymbolsImpl(f, isec->getDataAs<typename ELFT::Rel>());
       else if (isec->type == SHT_RELA)
         markUsedLocalSymbolsImpl(f, isec->getDataAs<typename ELFT::Rela>());
+      else if (isec->type == SHT_CREL)
+        markUsedLocalSymbolsImplCrel(f, isec->content());
     }
   }
 }
@@ -773,17 +796,19 @@ void PhdrEntry::add(OutputSection *sec) {
 
 // A statically linked position-dependent executable should only contain
 // IRELATIVE relocations and no other dynamic relocations. Encapsulation symbols
-// __rel[a]_iplt_{start,end} will be defined for .rel[a].dyn, to be
+// __[c]rel[a]_iplt_{start,end} will be defined for .rel[a].dyn, to be
 // processed by the libc runtime. Other executables or DSOs use dynamic tags
 // instead.
 template <class ELFT> void Writer<ELFT>::addRelIpltSymbols() {
   if (config->isPic)
     return;
 
-  // __rela_iplt_{start,end} are initially defined relative to dummy section 0.
-  // We'll override Out::elfHeader with relaDyn later when we are sure that
-  // .rela.dyn will be present in the output.
-  std::string name = config->isRela ? "__rela_iplt_start" : "__rel_iplt_start";
+  // __[c]rel[a]_iplt_{start,end} are initially defined relative to dummy
+  // section 0.  We'll override Out::elfHeader with relaDyn later when we are
+  // sure that .rela.dyn/.crel.dyn will be present in the output.
+  std::string name = config->zCrel    ? "__crel_iplt_start"
+                     : config->isRela ? "__rela_iplt_start"
+                                      : "__rel_iplt_start";
   ElfSym::relaIpltStart =
       addOptionalRegular(name, Out::elfHeader, 0, STV_HIDDEN);
   name.replace(name.size() - 5, 5, "end");
@@ -1479,8 +1504,11 @@ template <class ELFT> void Writer<ELFT>::finalizeAddressDependentContent() {
         changed |= (it != part.relrAuthDyn->relocs.end());
         part.relrAuthDyn->relocs.erase(it, part.relrAuthDyn->relocs.end());
       }
-      if (part.relaDyn)
+      if (part.relaDyn) {
         changed |= part.relaDyn->updateAllocSize();
+        if (ElfSym::relaIpltEnd)
+          ElfSym::relaIpltEnd->value = mainPart->relaDyn->getSize();
+      }
       if (part.relrDyn)
         changed |= part.relrDyn->updateAllocSize();
       if (part.relrAuthDyn)
@@ -1488,6 +1516,7 @@ template <class ELFT> void Writer<ELFT>::finalizeAddressDependentContent() {
       if (part.memtagGlobalDescriptors)
         changed |= part.memtagGlobalDescriptors->updateAllocSize();
     }
+    changed |= in.relaPlt->updateAllocSize();
 
     std::pair<const OutputSection *, const Defined *> changes =
         script->assignAddresses();

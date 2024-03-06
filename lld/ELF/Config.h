@@ -315,6 +315,7 @@ struct Config {
   bool writeAddends;
   bool zCombreloc;
   bool zCopyreloc;
+  bool zCrel = false;
   bool zForceBti;
   bool zForceIbt;
   bool zGlobal;
