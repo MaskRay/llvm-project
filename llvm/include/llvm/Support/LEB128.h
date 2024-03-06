@@ -252,6 +252,17 @@ LLVM_ABI extern unsigned getULEB128Size(uint64_t Value);
 /// Utility function to get the size of the SLEB128-encoded value.
 LLVM_ABI extern unsigned getSLEB128Size(int64_t Value);
 
+// A bijective variant of LEB128 where the length information is determined by
+// counting trailing zero bits in the first byte. Specifically, if the first
+// byte has n-1 trailing zeros, then the encoded integer occupies n bytes total.
+// The special case of a zero first byte signals a 9-byte encoding.
+//
+// The remaining bits in the first byte, plus all subsequent bytes, contain the
+// actual value in little-endian order.
+LLVM_ABI void encodeCLeb128(uint64_t x, raw_ostream &os);
+LLVM_ABI uint64_t getUCLeb128(const uint8_t *&p, const uint8_t *end);
+LLVM_ABI uint64_t getUCLeb128Unsafe(const uint8_t *&p);
+
 } // namespace llvm
 
 #endif // LLVM_SUPPORT_LEB128_H

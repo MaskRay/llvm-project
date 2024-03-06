@@ -24,6 +24,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/LEB128.h"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -277,7 +278,7 @@ public:
 
 private:
   StringRef Buf;
-  std::vector<Elf_Shdr> FakeSections;
+  mutable std::vector<Elf_Shdr> FakeSections;
   SmallString<0> FakeSectionStrings;
 
   // When the number of program headers is >= PN_XNUM, the actual number is
@@ -1005,6 +1006,53 @@ Expected<typename ELFT::ShdrRange> ELFFile<ELFT>::sections() const {
     return ArrayRef<Elf_Shdr>();
   }
 
+  uint32_t NumSections = getHeader().e_shnum;
+  if (getHeader().e_shentsize == 0) {
+    bool Uninit = FakeSections.empty();
+    // When e_shnum is 0, getShNum() calls sections() to read section 0,
+    // which may populate FakeSections with a single entry. Clear and rebuild to
+    // ensure consistency.
+    if (Expected<uint64_t> ShNumOrErr = getShNum())
+      NumSections = *ShNumOrErr;
+    else
+      return ShNumOrErr.takeError();
+    if (Uninit) {
+      FakeSections.clear();
+      const uint8_t *P = base() + SectionTableOffset;
+      const uint8_t *End = end();
+      bool Err = false;
+      auto get = [&](const uint8_t *&P) {
+        auto *OrigP = P;
+        uint64_t Val = getUCLeb128(P, End);
+        Err |= OrigP == P;
+        return Val;
+      };
+      for (uint32_t i = 0; i != NumSections; ++i) {
+        if (P == End) {
+          Err = 1;
+          break;
+        }
+        Elf_Shdr Shdr = {};
+        uint8_t Presence = *P++;
+        Shdr.sh_name = get(P);
+        Shdr.sh_offset = get(P);
+        Shdr.sh_type = Presence & 1 ? get(P) : ELF::SHT_PROGBITS;
+        Shdr.sh_flags = Presence & 2 ? get(P) : 0;
+        Shdr.sh_addr = Presence & 4 ? get(P) : 0;
+        Shdr.sh_size = Presence & 8 ? get(P) : 0;
+        Shdr.sh_link = Presence & 16 ? get(P) : 0;
+        Shdr.sh_info = Presence & 32 ? get(P) : 0;
+        Shdr.sh_addralign = Presence & 64 ? uintX_t(1) << get(P) : 1;
+        Shdr.sh_entsize = Presence & 128 ? get(P) : 0;
+        FakeSections.push_back(Shdr);
+      }
+      if (Err)
+        return createError(
+            "CLEB128-encoded section header goes past the end of the file");
+    }
+    return FakeSections;
+  }
+
   if (getHeader().e_shentsize != sizeof(Elf_Shdr))
     return createError("invalid e_shentsize in ELF header: " +
                        Twine(getHeader().e_shentsize));
@@ -1024,7 +1072,6 @@ Expected<typename ELFT::ShdrRange> ELFFile<ELFT>::sections() const {
   const Elf_Shdr *First =
       reinterpret_cast<const Elf_Shdr *>(base() + SectionTableOffset);
 
-  uintX_t NumSections = 0;
   if (Expected<uint64_t> ShNumOrErr = getShNum())
     NumSections = *ShNumOrErr;
   else
