@@ -29,6 +29,7 @@
 #include "llvm/Support/ELFAttributes.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/LEB128.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/ScopedPrinter.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
@@ -284,6 +285,9 @@ protected:
   const Elf_Shdr *DotSymtabSec = nullptr; // Symbol table section.
   const Elf_Shdr *DotSymtabShndxSec = nullptr; // SHT_SYMTAB_SHNDX section.
 
+  // Hold RELLEB relocations for SectionRef::relocations().
+  mutable SmallVector<SmallVector<Elf_Relleb, 0>, 0> Rellebs;
+
   Error initContent() override;
 
   void moveSymbolNext(DataRefImpl &Symb) const override;
@@ -438,6 +442,7 @@ public:
 
   const Elf_Rel *getRel(DataRefImpl Rel) const;
   const Elf_Rela *getRela(DataRefImpl Rela) const;
+  Elf_Relleb getRelleb(DataRefImpl Rel) const;
 
   Expected<const Elf_Sym *> getSymbol(DataRefImpl Sym) const {
     return EF.template getEntry<Elf_Sym>(Sym.d.a, Sym.d.b);
@@ -1015,6 +1020,37 @@ ELFObjectFile<ELFT>::section_rel_begin(DataRefImpl Sec) const {
   uintptr_t SHT = reinterpret_cast<uintptr_t>((*SectionsOrErr).begin());
   RelData.d.a = (Sec.p - SHT) / EF.getHeader().e_shentsize;
   RelData.d.b = 0;
+  if (reinterpret_cast<const Elf_Shdr *>(Sec.p)->sh_type == ELF::SHT_RELLEB) {
+    ArrayRef<uint8_t> Content = cantFail(getSectionContents(Sec));
+    const uint8_t *P = Content.data();
+    auto Count = decodeULEB128AndInc(P);
+    typename ELFT::uint Offset = 0, Addend = 0;
+    uint32_t Symidx = 0, Type = 0;
+    if (RelData.d.a + 1 > Rellebs.size())
+      Rellebs.resize(RelData.d.a + 1);
+    if (Rellebs[RelData.d.a].empty()) {
+      for (size_t i = 0; i != Count; ++i) {
+        const uint8_t B = *P++;
+        Offset += B >> 1;
+        if (B >= 0x80)
+          Offset += (decodeULEB128AndInc(P) << 6) - 0x40;
+        int64_t X = decodeSLEB128AndInc(P);
+        if (B & 1) {
+          Addend += X;
+        } else {
+          if (X < 0) {
+            X = ~X;
+            Type += decodeSLEB128AndInc(P);
+            Addend += decodeSLEB128AndInc(P);
+          }
+          Symidx = X;
+        }
+        Rellebs[RelData.d.a].push_back(
+            Elf_Relleb{Offset, uint32_t(Symidx), Type,
+                       std::make_signed_t<typename ELFT::uint>(Addend)});
+      }
+    }
+  }
   return relocation_iterator(RelocationRef(RelData, this));
 }
 
@@ -1023,9 +1059,13 @@ relocation_iterator
 ELFObjectFile<ELFT>::section_rel_end(DataRefImpl Sec) const {
   const Elf_Shdr *S = reinterpret_cast<const Elf_Shdr *>(Sec.p);
   relocation_iterator Begin = section_rel_begin(Sec);
+  DataRefImpl RelData = Begin->getRawDataRefImpl();
+  if (S->sh_type == ELF::SHT_RELLEB) {
+    RelData.d.b = Rellebs[RelData.d.a].size();
+    return relocation_iterator(RelocationRef(RelData, this));
+  }
   if (S->sh_type != ELF::SHT_RELA && S->sh_type != ELF::SHT_REL)
     return Begin;
-  DataRefImpl RelData = Begin->getRawDataRefImpl();
   const Elf_Shdr *RelSec = getRelSection(RelData);
 
   // Error check sh_link here so that getRelocationSymbol can just use it.
@@ -1043,7 +1083,7 @@ Expected<section_iterator>
 ELFObjectFile<ELFT>::getRelocatedSection(DataRefImpl Sec) const {
   const Elf_Shdr *EShdr = getSection(Sec);
   uintX_t Type = EShdr->sh_type;
-  if (Type != ELF::SHT_REL && Type != ELF::SHT_RELA)
+  if (Type != ELF::SHT_REL && Type != ELF::SHT_RELA && Type != ELF::SHT_RELLEB)
     return section_end();
 
   Expected<const Elf_Shdr *> SecOrErr = EF.getSection(EShdr->sh_info);
@@ -1063,7 +1103,9 @@ symbol_iterator
 ELFObjectFile<ELFT>::getRelocationSymbol(DataRefImpl Rel) const {
   uint32_t symbolIdx;
   const Elf_Shdr *sec = getRelSection(Rel);
-  if (sec->sh_type == ELF::SHT_REL)
+  if (sec->sh_type == ELF::SHT_RELLEB)
+    symbolIdx = getRelleb(Rel).r_symidx;
+  else if (sec->sh_type == ELF::SHT_REL)
     symbolIdx = getRel(Rel)->getSymbol(EF.isMips64EL());
   else
     symbolIdx = getRela(Rel)->getSymbol(EF.isMips64EL());
@@ -1080,6 +1122,8 @@ ELFObjectFile<ELFT>::getRelocationSymbol(DataRefImpl Rel) const {
 template <class ELFT>
 uint64_t ELFObjectFile<ELFT>::getRelocationOffset(DataRefImpl Rel) const {
   const Elf_Shdr *sec = getRelSection(Rel);
+  if (sec->sh_type == ELF::SHT_RELLEB)
+    return getRelleb(Rel).r_offset;
   if (sec->sh_type == ELF::SHT_REL)
     return getRel(Rel)->r_offset;
 
@@ -1089,6 +1133,8 @@ uint64_t ELFObjectFile<ELFT>::getRelocationOffset(DataRefImpl Rel) const {
 template <class ELFT>
 uint64_t ELFObjectFile<ELFT>::getRelocationType(DataRefImpl Rel) const {
   const Elf_Shdr *sec = getRelSection(Rel);
+  if (sec->sh_type == ELF::SHT_RELLEB)
+    return getRelleb(Rel).r_type;
   if (sec->sh_type == ELF::SHT_REL)
     return getRel(Rel)->getType(EF.isMips64EL());
   else
@@ -1110,9 +1156,11 @@ void ELFObjectFile<ELFT>::getRelocationTypeName(
 template <class ELFT>
 Expected<int64_t>
 ELFObjectFile<ELFT>::getRelocationAddend(DataRefImpl Rel) const {
-  if (getRelSection(Rel)->sh_type != ELF::SHT_RELA)
-    return createError("Section is not SHT_RELA");
-  return (int64_t)getRela(Rel)->r_addend;
+  if (getRelSection(Rel)->sh_type == ELF::SHT_RELA)
+    return (int64_t)getRela(Rel)->r_addend;
+  if (getRelSection(Rel)->sh_type == ELF::SHT_RELLEB)
+    return (int64_t)getRelleb(Rel).r_addend;
+  return createError("Section is not SHT_RELA");
 }
 
 template <class ELFT>
@@ -1133,6 +1181,13 @@ ELFObjectFile<ELFT>::getRela(DataRefImpl Rela) const {
   if (!Ret)
     report_fatal_error(Twine(errorToErrorCode(Ret.takeError()).message()));
   return *Ret;
+}
+
+template <class ELFT>
+typename ELFObjectFile<ELFT>::Elf_Relleb
+ELFObjectFile<ELFT>::getRelleb(DataRefImpl Rel) const {
+  assert(getRelSection(Rel)->sh_type == ELF::SHT_RELLEB);
+  return Rellebs[Rel.d.a][Rel.d.b];
 }
 
 template <class ELFT>

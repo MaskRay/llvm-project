@@ -20,6 +20,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/LEB128.h"
 
 namespace lld {
 namespace elf {
@@ -449,7 +450,8 @@ public:
 };
 
 inline bool isStaticRelSecType(uint32_t type) {
-  return type == llvm::ELF::SHT_RELA || type == llvm::ELF::SHT_REL;
+  return type == llvm::ELF::SHT_RELA || type == llvm::ELF::SHT_RELLEB ||
+         type == llvm::ELF::SHT_REL;
 }
 
 inline bool isDebugSection(const InputSectionBase &sec) {
