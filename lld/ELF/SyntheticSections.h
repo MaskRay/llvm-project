@@ -595,6 +595,20 @@ private:
   SmallVector<char, 0> relocData;
 };
 
+template <class uint> class CrelSection final : public RelocationBaseSection {
+public:
+  CrelSection(StringRef name, unsigned concurrency);
+
+  bool updateAllocSize() override;
+  size_t getSize() const override { return relocData.size(); }
+  void writeTo(uint8_t *buf) override {
+    memcpy(buf, relocData.data(), relocData.size());
+  }
+
+private:
+  SmallVector<char, 0> relocData;
+};
+
 struct RelativeReloc {
   uint64_t getOffset() const { return inputSec->getVA(offsetInSec); }
 

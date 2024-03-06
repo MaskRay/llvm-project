@@ -44,6 +44,7 @@
 #include "llvm/Support/TimeProfiler.h"
 #include <cinttypes>
 #include <cstdlib>
+#include <type_traits>
 
 using namespace llvm;
 using namespace llvm::dwarf;
@@ -1395,20 +1396,23 @@ DynamicSection<ELFT>::computeContents() {
 
   if (part.relaDyn->isNeeded()) {
     addInSec(part.relaDyn->dynamicTag, *part.relaDyn);
-    entries.emplace_back(part.relaDyn->sizeDynamicTag,
-                         addRelaSz(*part.relaDyn));
+    // DT_CREL is not associated with SZ/ENT/COUNT tags.
+    if (!config->zCrel) {
+      entries.emplace_back(part.relaDyn->sizeDynamicTag,
+                           addRelaSz(*part.relaDyn));
 
-    bool isRela = config->isRela;
-    addInt(isRela ? DT_RELAENT : DT_RELENT,
-           isRela ? sizeof(Elf_Rela) : sizeof(Elf_Rel));
+      bool isRela = config->isRela;
+      addInt(isRela ? DT_RELAENT : DT_RELENT,
+             isRela ? sizeof(Elf_Rela) : sizeof(Elf_Rel));
 
-    // MIPS dynamic loader does not support RELCOUNT tag.
-    // The problem is in the tight relation between dynamic
-    // relocations and GOT. So do not emit this tag on MIPS.
-    if (config->emachine != EM_MIPS) {
-      size_t numRelativeRels = part.relaDyn->getRelativeRelocCount();
-      if (config->zCombreloc && numRelativeRels)
-        addInt(isRela ? DT_RELACOUNT : DT_RELCOUNT, numRelativeRels);
+      // MIPS dynamic loader does not support RELCOUNT tag.
+      // The problem is in the tight relation between dynamic
+      // relocations and GOT. So do not emit this tag on MIPS.
+      if (config->emachine != EM_MIPS) {
+        size_t numRelativeRels = part.relaDyn->getRelativeRelocCount();
+        if (config->zCombreloc && numRelativeRels)
+          addInt(isRela ? DT_RELACOUNT : DT_RELCOUNT, numRelativeRels);
+      }
     }
   }
   if (part.relrDyn && part.relrDyn->getParent() &&
@@ -1422,7 +1426,8 @@ DynamicSection<ELFT>::computeContents() {
   }
   if (isMain && in.relaPlt->isNeeded()) {
     addInSec(DT_JMPREL, *in.relaPlt);
-    entries.emplace_back(DT_PLTRELSZ, addPltRelSz());
+    if (!(config->zCrel && config->zNow))
+      entries.emplace_back(DT_PLTRELSZ, addPltRelSz());
     switch (config->emachine) {
     case EM_MIPS:
       addInSec(DT_MIPS_PLTGOT, *in.gotPlt);
@@ -1452,7 +1457,9 @@ DynamicSection<ELFT>::computeContents() {
       addInSec(DT_PLTGOT, *in.gotPlt);
       break;
     }
-    addInt(DT_PLTREL, config->isRela ? DT_RELA : DT_REL);
+    addInt(DT_PLTREL, config->zCrel && config->zNow ? DT_CREL
+                      : config->isRela              ? DT_RELA
+                                                    : DT_REL);
   }
 
   if (config->emachine == EM_AARCH64) {
@@ -1998,6 +2005,77 @@ bool AndroidPackedRelocationSection<ELFT>::updateAllocSize() {
   // because changing this section's size can affect section layout, which in
   // turn can affect the sizes of the LEB-encoded integers stored in this
   // section.
+  return relocData.size() != oldSize;
+}
+
+template <class uint>
+CrelSection<uint>::CrelSection(StringRef name, unsigned concurrency)
+    : RelocationBaseSection(name, SHT_CREL, DT_CREL, 0,
+                            /*combreloc=*/false, concurrency) {}
+
+template <class uint> bool CrelSection<uint>::updateAllocSize() {
+  const size_t count = relocs.size();
+  uint offsetMask = 8;
+  SmallVector<Elf_Crel_Impl<sizeof(uint) == 8>, 0> crels(count);
+  // Group dynamic relocations by type and sort each group by offset to reduce
+  // the code size.
+  for (size_t i = 0; i != count; ++i) {
+    const DynamicReloc &rel = relocs[i];
+    crels[i].r_offset = rel.getOffset();
+    crels[i].r_symidx = rel.getSymIndex(getPartition().dynSymTab.get());
+    crels[i].r_type = rel.type;
+    crels[i].r_addend = config->isRela ? rel.computeAddend() : 0;
+    offsetMask |= crels[i].r_offset;
+  }
+  llvm::sort(crels, [](const auto &a, const auto &b) {
+    if (a.r_type != b.r_type)
+      return a.r_type < b.r_type;
+    return a.r_offset < b.r_offset;
+  });
+  const int shift = llvm::countr_zero(offsetMask);
+
+  // hdr & 4 indicates 2 or 3 flag bits in delta offset and flags members.
+  const size_t oldSize = relocData.size(), addendBit = config->isRela ? 4 : 0,
+               flagBits = addendBit ? 3 : 2;
+  relocData.clear();
+  raw_svector_ostream os(relocData);
+  uint offset = 0, addend = 0;
+  uint32_t symidx = 0, type = 0;
+  encodeULEB128(count * 8 + addendBit + shift, os);
+  for (const auto &rel : crels) {
+    // The delta offset and flags member may be larger than uint64_t. Special
+    // case the first byte (2 or 3 flag bits and 4 or 5 offset bits). Other
+    // ULEB128 bytes encode the remaining delta offset bits.
+    const uint deltaOffset = (rel.r_offset - offset) >> shift;
+    offset = rel.r_offset;
+    uint8_t b = (deltaOffset << flagBits) + (symidx != rel.r_symidx) +
+                (type != rel.r_type ? 2 : 0) +
+                (addend != uint(rel.r_addend) ? 4 : 0);
+    if (deltaOffset < (0x80 >> flagBits)) {
+      os << char(b);
+    } else {
+      os << char(b | 0x80);
+      encodeULEB128(deltaOffset >> (7 - flagBits), os);
+    }
+    if (b & 1) {
+      encodeSLEB128(static_cast<int32_t>(rel.r_symidx - symidx), os);
+      symidx = rel.r_symidx;
+    }
+    if (b & 2) {
+      encodeSLEB128(static_cast<int32_t>(rel.r_type - type), os);
+      type = rel.r_type;
+    }
+    if (b & 4 & addendBit) {
+      encodeSLEB128(std::make_signed_t<uint>(rel.r_addend - addend), os);
+      addend = rel.r_addend;
+    }
+  }
+
+  if (relocData.size() < oldSize) {
+    log(".crel.dyn needs " + Twine(oldSize - relocData.size()) +
+        " padding byte(s)");
+    relocData.resize(oldSize);
+  }
   return relocData.size() != oldSize;
 }
 
@@ -4731,6 +4809,9 @@ template <class ELFT> void elf::createSyntheticSections() {
     if (config->androidPackDynRelocs)
       part.relaDyn = std::make_unique<AndroidPackedRelocationSection<ELFT>>(
           relaDynName, threadCount);
+    else if (config->zCrel)
+      part.relaDyn = std::make_unique<CrelSection<typename ELFT::uint>>(
+          ".crel.dyn", threadCount);
     else
       part.relaDyn = std::make_unique<RelocationSection<ELFT>>(
           relaDynName, config->zCombreloc, threadCount);
@@ -4853,11 +4934,16 @@ template <class ELFT> void elf::createSyntheticSections() {
       in.got->hasGotOffRel = true;
   }
 
-  // We always need to add rel[a].plt to output if it has entries.
-  // Even for static linking it can contain R_[*]_IRELATIVE relocations.
-  in.relaPlt = std::make_unique<RelocationSection<ELFT>>(
-      config->isRela ? ".rela.plt" : ".rel.plt", /*sort=*/false,
-      /*threadCount=*/1);
+  // Lazy binding requires random access to the DT_JMPREL relocation entry.  If
+  // lazy binding is disabled, we can use CREL.
+  if (config->zCrel && config->zNow) {
+    in.relaPlt = std::make_unique<CrelSection<typename ELFT::uint>>(
+        ".crel.plt", /*threadCount=*/1);
+  } else {
+    in.relaPlt = std::make_unique<RelocationSection<ELFT>>(
+        config->isRela ? ".rela.plt" : ".rel.plt", /*sort=*/false,
+        /*threadCount=*/1);
+  }
   add(*in.relaPlt);
 
   if ((config->emachine == EM_386 || config->emachine == EM_X86_64) &&

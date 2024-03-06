@@ -315,6 +315,7 @@ inline uint64_t overwriteULEB128(uint8_t *bufLoc, uint64_t val) {
   *bufLoc = val;
   return val;
 }
+
 } // namespace elf
 } // namespace lld
 
