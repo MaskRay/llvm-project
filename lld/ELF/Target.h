@@ -315,6 +315,20 @@ inline uint64_t overwriteULEB128(uint8_t *bufLoc, uint64_t val) {
   *bufLoc = val;
   return val;
 }
+
+inline uint64_t readLEB128(const uint8_t *&p, uint64_t leb) {
+  uint64_t acc = 0, shift = 0, byte;
+  do {
+    byte = *p++;
+    acc |= (byte - 128 * (byte >= leb)) << shift;
+    shift += 7;
+  } while (byte >= 128);
+  return acc;
+}
+
+inline uint64_t readULEB128(const uint8_t *&p) { return readLEB128(p, 128); }
+inline int64_t readSLEB128(const uint8_t *&p) { return readLEB128(p, 64); }
+
 } // namespace elf
 } // namespace lld
 

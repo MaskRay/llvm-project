@@ -449,7 +449,8 @@ public:
 };
 
 inline bool isStaticRelSecType(uint32_t type) {
-  return type == llvm::ELF::SHT_RELA || type == llvm::ELF::SHT_REL;
+  return type == llvm::ELF::SHT_RELA || type == llvm::ELF::SHT_CREL ||
+         type == llvm::ELF::SHT_REL;
 }
 
 inline bool isDebugSection(const InputSectionBase &sec) {

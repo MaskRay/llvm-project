@@ -75,6 +75,15 @@ static cl::opt<DebugCompressionType> CompressDebugSections(
                clEnumValN(DebugCompressionType::Zstd, "zstd", "Use zstd")),
     cl::cat(MCCategory));
 
+static cl::opt<DebugCompressionType> CompressRelocations(
+    "compress-relocations", cl::ValueOptional,
+    cl::init(DebugCompressionType::None),
+    cl::desc("Compress relocation sections"),
+    cl::values(clEnumValN(DebugCompressionType::None, "none", "No compression"),
+               clEnumValN(DebugCompressionType::Zlib, "zlib", "Use zlib"),
+               clEnumValN(DebugCompressionType::Zstd, "zstd", "Use zstd")),
+    cl::cat(MCCategory));
+
 static cl::opt<bool>
     ShowInst("show-inst", cl::desc("Show internal instruction representation"),
              cl::cat(MCCategory));
@@ -360,6 +369,7 @@ int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv, "llvm machine code playground\n");
   MCTargetOptions MCOptions = mc::InitMCTargetOptionsFromFlags();
   MCOptions.CompressDebugSections = CompressDebugSections.getValue();
+  MCOptions.CompressRelocations = CompressRelocations.getValue();
 
   setDwarfDebugFlags(argc, argv);
   setDwarfDebugProducer();

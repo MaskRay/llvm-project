@@ -164,6 +164,12 @@ struct AssemblerInvocation {
   LLVM_PREFERRED_TYPE(bool)
   unsigned EmitCompactUnwindNonCanonical : 1;
 
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned ImplicitAddendsForData : 1;
+
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned Crel : 1;
+
   /// The name of the relocation model to use.
   std::string RelocationModel;
 
@@ -204,6 +210,8 @@ public:
     EmbedBitcode = 0;
     EmitDwarfUnwind = EmitDwarfUnwindType::Default;
     EmitCompactUnwindNonCanonical = false;
+    Crel = false;
+    ImplicitAddendsForData = false;
   }
 
   static bool CreateFromArgs(AssemblerInvocation &Res,
@@ -373,6 +381,8 @@ bool AssemblerInvocation::CreateFromArgs(AssemblerInvocation &Opts,
 
   Opts.EmitCompactUnwindNonCanonical =
       Args.hasArg(OPT_femit_compact_unwind_non_canonical);
+  Opts.Crel = Args.hasArg(OPT_crel);
+  Opts.ImplicitAddendsForData = Args.hasArg(OPT_implicit_addends_for_data);
 
   Opts.AsSecureLogFile = Args.getLastArgValue(OPT_as_secure_log_file);
 
@@ -428,6 +438,8 @@ static bool ExecuteAssemblerImpl(AssemblerInvocation &Opts,
   MCTargetOptions MCOptions;
   MCOptions.EmitDwarfUnwind = Opts.EmitDwarfUnwind;
   MCOptions.EmitCompactUnwindNonCanonical = Opts.EmitCompactUnwindNonCanonical;
+  MCOptions.Crel = Opts.Crel;
+  MCOptions.ImplicitAddendsForData = Opts.ImplicitAddendsForData;
   MCOptions.X86RelaxRelocations = Opts.RelaxELFRelocations;
   MCOptions.CompressDebugSections = Opts.CompressDebugSections;
   MCOptions.AsSecureLogFile = Opts.AsSecureLogFile;
