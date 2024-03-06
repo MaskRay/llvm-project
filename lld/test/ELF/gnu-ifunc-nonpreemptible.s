@@ -17,6 +17,27 @@
 # CHECK:                      0 NOTYPE  LOCAL  HIDDEN     [[#]] __rela_iplt_start
 # CHECK-NEXT:                 0 NOTYPE  LOCAL  HIDDEN     [[#]] __rela_iplt_end
 # CHECK-NEXT: {{0*}}[[#QUX]]  0 IFUNC   GLOBAL DEFAULT    [[#]] qux
+# CHECK:                      0 NOTYPE  WEAK   DEFAULT    UND   __crel_iplt_start
+# CHECK-NEXT:                 0 NOTYPE  WEAK   DEFAULT    UND   __crel_iplt_end
+
+# RUN: ld.lld -z crel a.o -o a.crel
+# RUN: llvm-readelf -Srs a.crel | FileCheck %s --check-prefix=CREL
+# RUN: ld.lld -z crel -z rela a.o -o a.crela
+# RUN: llvm-readelf -Srs a.crela | FileCheck %s --check-prefix=CREL
+
+# CREL:      .crel.dyn         CREL            [[#%x,]] [[#%x,]] [[#%x,DYNSZ:]]
+
+# CREL:      Relocation section '.crel.dyn' at offset {{.*}} contains 3 entries:
+# CREL-NEXT:     Type
+# CREL-NEXT: {{0*}}[[#%x,O:]] [[#%x,]] R_X86_64_IRELATIVE
+# CREL-NEXT: {{0*}}[[#O+8]]   [[#%x,]] R_X86_64_IRELATIVE
+# CREL-NEXT: {{0*}}[[#O+16]]  [[#%x,]] R_X86_64_IRELATIVE
+
+# CREL:      Symbol table '.symtab'
+# CREL:      [[#%x,S:]]      0 NOTYPE  LOCAL  HIDDEN     [[#]] __crel_iplt_start
+# CREL-NEXT: [[#%x,S+DYNSZ]] 0 NOTYPE  LOCAL  HIDDEN     [[#]] __crel_iplt_end
+# CREL:                      0 NOTYPE  WEAK   DEFAULT    UND   __rela_iplt_start
+# CREL-NEXT:                 0 NOTYPE  WEAK   DEFAULT    UND   __rela_iplt_end
 
 # RUN: ld.lld -pie a.o b.so -o a1
 # RUN: llvm-readelf -rs a1 | FileCheck %s --check-prefixes=PIC,PIE
@@ -25,8 +46,10 @@
 
 # PIC:      {{0*}}[[#%x,O:]] [[#%x,]] R_X86_64_RELATIVE
 # PIC-NEXT:                           R_X86_64_GLOB_DAT      0000000000000000 ext + 0
-# PIC-NEXT: {{0*}}[[#O-16]]  [[#%x,]] R_X86_64_64            0000000000000000 __rela_iplt_start + 0
-# PIC-NEXT: {{0*}}[[#O-8]]   [[#%x,]] R_X86_64_64            0000000000000000 __rela_iplt_end + 0
+# PIC-NEXT: {{0*}}[[#O-32]]  [[#%x,]] R_X86_64_64            0000000000000000 __rela_iplt_start + 0
+# PIC-NEXT: {{0*}}[[#O-24]]  [[#%x,]] R_X86_64_64            0000000000000000 __rela_iplt_end + 0
+# PIC-NEXT: {{0*}}[[#O-16]]  [[#%x,]] R_X86_64_64            0000000000000000 __crel_iplt_start + 0
+# PIC-NEXT: {{0*}}[[#O-8]]   [[#%x,]] R_X86_64_64            0000000000000000 __crel_iplt_end + 0
 # PIE-NEXT: {{0*}}[[#O+8]]   [[#%x,]] R_X86_64_IRELATIVE
 # PIE-NEXT: {{0*}}[[#O+16]]  [[#%x,]] R_X86_64_IRELATIVE
 # PIE-NEXT: {{0*}}[[#O+24]]  [[#%x,]] R_X86_64_IRELATIVE
@@ -74,6 +97,8 @@ unused: mov ext@gotpcrel(%rip), %rax
 
 .weak __rela_iplt_start
 .weak __rela_iplt_end
+.weak __crel_iplt_start
+.weak __crel_iplt_end
 
 .globl _start
 _start:
@@ -84,6 +109,8 @@ _start:
 .data
   .quad __rela_iplt_start
   .quad __rela_iplt_end
+  .quad __crel_iplt_start
+  .quad __crel_iplt_end
   .quad .data
 
 #--- b.s
