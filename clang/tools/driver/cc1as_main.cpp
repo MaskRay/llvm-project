@@ -164,6 +164,8 @@ struct AssemblerInvocation {
   unsigned EmitCompactUnwindNonCanonical : 1;
 
   LLVM_PREFERRED_TYPE(bool)
+  unsigned CompactShdr : 1;
+  LLVM_PREFERRED_TYPE(bool)
   unsigned Crel : 1;
   LLVM_PREFERRED_TYPE(bool)
   unsigned ImplicitMapsyms : 1;
@@ -216,6 +218,7 @@ public:
     EmbedBitcode = 0;
     EmitDwarfUnwind = EmitDwarfUnwindType::Default;
     EmitCompactUnwindNonCanonical = false;
+    CompactShdr = false;
     Crel = false;
     ImplicitMapsyms = 0;
     X86RelaxRelocations = 0;
@@ -388,6 +391,7 @@ bool AssemblerInvocation::CreateFromArgs(AssemblerInvocation &Opts,
 
   Opts.EmitCompactUnwindNonCanonical =
       Args.hasArg(OPT_femit_compact_unwind_non_canonical);
+  Opts.CompactShdr = Args.hasArg(OPT_cshdr);
   Opts.Crel = Args.hasArg(OPT_crel);
   Opts.ImplicitMapsyms = Args.hasArg(OPT_mmapsyms_implicit);
   Opts.X86RelaxRelocations = !Args.hasArg(OPT_mrelax_relocations_no);
@@ -451,6 +455,7 @@ static bool ExecuteAssemblerImpl(AssemblerInvocation &Opts,
   MCOptions.EmitDwarfUnwind = Opts.EmitDwarfUnwind;
   MCOptions.EmitCompactUnwindNonCanonical = Opts.EmitCompactUnwindNonCanonical;
   MCOptions.MCSaveTempLabels = Opts.SaveTemporaryLabels;
+  MCOptions.CompactShdr = Opts.CompactShdr;
   MCOptions.Crel = Opts.Crel;
   MCOptions.ImplicitMapSyms = Opts.ImplicitMapsyms;
   MCOptions.X86RelaxRelocations = Opts.X86RelaxRelocations;

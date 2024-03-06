@@ -126,6 +126,14 @@ public:
     return encodeSLEB128(Val, OS);
   }
 
+  unsigned writeUCLeb128(uint64_t Val) {
+    if (!checkLimit(9))
+      return 0;
+    auto Pos = OS.tell();
+    encodeCLeb128(Val, OS);
+    return OS.tell() - Pos;
+  }
+
   template <typename T> void write(T Val, llvm::endianness E) {
     if (checkLimit(sizeof(T)))
       support::endian::write<T>(OS, Val, E);
@@ -227,7 +235,7 @@ template <class ELFT> class ELFState {
   void initProgramHeaders(std::vector<Elf_Phdr> &PHeaders);
   bool initImplicitHeader(ContiguousBlobAccumulator &CBA, Elf_Shdr &Header,
                           StringRef SecName, ELFYAML::Section *YAMLSec);
-  void initSectionHeaders(std::vector<Elf_Shdr> &SHeaders,
+  bool initSectionHeaders(std::vector<Elf_Shdr> &SHeaders,
                           ContiguousBlobAccumulator &CBA);
   void overrideSectionHeaders(std::vector<Elf_Shdr> &SHeaders);
   void initSymtabSectionHeader(Elf_Shdr &SHeader, SymtabType STType,
@@ -513,11 +521,13 @@ void ELFState<ELFT>::writeELFHeader(raw_ostream &OS) {
   else
     Header.e_phnum = 0;
 
-  Header.e_shentsize = Doc.Header.EShEntSize ? (uint16_t)*Doc.Header.EShEntSize
-                                             : sizeof(Elf_Shdr);
-
   const ELFYAML::SectionHeaderTable &SectionHeaders =
       Doc.getSectionHeaderTable();
+  if (!SectionHeaders.Compact.value_or(false)) {
+    Header.e_shentsize = Doc.Header.EShEntSize
+                             ? (uint16_t)*Doc.Header.EShEntSize
+                             : sizeof(Elf_Shdr);
+  }
 
   if (Doc.Header.EShOff)
     Header.e_shoff = *Doc.Header.EShOff;
@@ -763,7 +773,7 @@ static StringRef getDefaultLinkSec(unsigned SecType) {
 }
 
 template <class ELFT>
-void ELFState<ELFT>::initSectionHeaders(std::vector<Elf_Shdr> &SHeaders,
+bool ELFState<ELFT>::initSectionHeaders(std::vector<Elf_Shdr> &SHeaders,
                                         ContiguousBlobAccumulator &CBA) {
   // Ensure SHN_UNDEF entry is present. An all-zero section header is a
   // valid SHN_UNDEF entry since SHT_NULL == 0.
@@ -781,6 +791,10 @@ void ELFState<ELFT>::initSectionHeaders(std::vector<Elf_Shdr> &SHeaders,
             dyn_cast<ELFYAML::SectionHeaderTable>(D.get())) {
       if (S->NoHeaders.value_or(false))
         continue;
+      if (S->Compact.value_or(false)) {
+        S->Offset = CBA.getOffset();
+        return true;
+      }
 
       if (!S->Offset)
         S->Offset = alignToOffset(CBA, sizeof(typename ELFT::uint),
@@ -909,6 +923,7 @@ void ELFState<ELFT>::initSectionHeaders(std::vector<Elf_Shdr> &SHeaders,
     LocationCounter += SHeader.sh_size;
     SectionHeadersOverrideHelper.push_back({&SHeader, *Sec});
   }
+  return false;
 }
 
 template <class ELFT>
@@ -2125,7 +2140,7 @@ bool ELFState<ELFT>::writeELF(raw_ostream &OS, ELFYAML::Object &Doc,
   ContiguousBlobAccumulator CBA(SectionContentBeginOffset, MaxSize);
 
   std::vector<Elf_Shdr> SHeaders;
-  State.initSectionHeaders(SHeaders, CBA);
+  bool CompactShdr = State.initSectionHeaders(SHeaders, CBA);
 
   // Now we can decide segment offsets.
   State.setProgramHeaderLayout(PHeaders, SHeaders);
@@ -2134,6 +2149,38 @@ bool ELFState<ELFT>::writeELF(raw_ostream &OS, ELFYAML::Object &Doc,
   // header layout happens, because otherwise the layout will use the new
   // values.
   State.overrideSectionHeaders(SHeaders);
+
+  if (CompactShdr) {
+    auto StartOffset = CBA.getOffset();
+    for (auto &Shdr : SHeaders) {
+      unsigned Align = Shdr.sh_addralign ? Log2_64(Shdr.sh_addralign) : 0;
+      uint8_t Presence = (Shdr.sh_type != ELF::SHT_PROGBITS ? 1 : 0) |
+                         (Shdr.sh_flags ? 2 : 0) | (Shdr.sh_addr ? 4 : 0) |
+                         (Shdr.sh_size ? 8 : 0) | (Shdr.sh_link ? 16 : 0) |
+                         (Shdr.sh_info ? 32 : 0) | (Align ? 64 : 0) |
+                         (Shdr.sh_entsize ? 128 : 0);
+      CBA.write(Presence);
+      CBA.writeUCLeb128(Shdr.sh_name);
+      CBA.writeUCLeb128(Shdr.sh_offset);
+      if (Shdr.sh_type != ELF::SHT_PROGBITS)
+        CBA.writeUCLeb128(Shdr.sh_type);
+      if (Shdr.sh_flags)
+        CBA.writeUCLeb128(Shdr.sh_flags);
+      if (Shdr.sh_addr)
+        CBA.writeUCLeb128(Shdr.sh_addr);
+      if (Shdr.sh_size)
+        CBA.writeUCLeb128(Shdr.sh_size);
+      if (Shdr.sh_link)
+        CBA.writeUCLeb128(Shdr.sh_link);
+      if (Shdr.sh_info)
+        CBA.writeUCLeb128(Shdr.sh_info);
+      if (Align)
+        CBA.writeUCLeb128(Align);
+      if (Shdr.sh_entsize)
+        CBA.writeUCLeb128(Shdr.sh_entsize);
+    }
+    State.LocationCounter += CBA.getOffset() - StartOffset;
+  }
 
   bool ReachedLimit = CBA.getOffset() > MaxSize;
   if (Error E = CBA.takeLimitError()) {
@@ -2154,7 +2201,7 @@ bool ELFState<ELFT>::writeELF(raw_ostream &OS, ELFYAML::Object &Doc,
   writeArrayData(OS, ArrayRef(PHeaders));
 
   const ELFYAML::SectionHeaderTable &SHT = Doc.getSectionHeaderTable();
-  if (!SHT.NoHeaders.value_or(false))
+  if (!SHT.NoHeaders.value_or(false) && !SHT.Compact.value_or(false))
     CBA.updateDataAt(*SHT.Offset, SHeaders.data(),
                      SHT.getNumHeaders(SHeaders.size()) * sizeof(Elf_Shdr));
 

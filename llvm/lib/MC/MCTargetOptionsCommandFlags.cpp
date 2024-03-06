@@ -48,6 +48,7 @@ MCOPT(bool, NoWarn)
 MCOPT(bool, NoDeprecatedWarn)
 MCOPT(bool, NoTypeCheck)
 MCOPT(bool, SaveTempLabels)
+MCOPT(bool, CompactShdr)
 MCOPT(bool, Crel)
 MCOPT(bool, ImplicitMapSyms)
 MCOPT(bool, X86RelaxRelocations)
@@ -137,6 +138,10 @@ llvm::mc::RegisterMCTargetOptionsFlags::RegisterMCTargetOptionsFlags() {
       "save-temp-labels", cl::desc("Don't discard temporary labels"));
   MCBINDOPT(SaveTempLabels);
 
+  static cl::opt<bool> CompactShdr(
+      "cshdr", cl::desc("Use compact section header table for ELF"));
+  MCBINDOPT(CompactShdr);
+
   static cl::opt<bool> Crel("crel",
                             cl::desc("Use CREL relocation format for ELF"));
   MCBINDOPT(Crel);
@@ -188,6 +193,7 @@ MCTargetOptions llvm::mc::InitMCTargetOptionsFromFlags() {
   Options.MCNoDeprecatedWarn = getNoDeprecatedWarn();
   Options.MCNoTypeCheck = getNoTypeCheck();
   Options.MCSaveTempLabels = getSaveTempLabels();
+  Options.CompactShdr = getCompactShdr();
   Options.Crel = getCrel();
   Options.ImplicitMapSyms = getImplicitMapSyms();
   Options.X86RelaxRelocations = getX86RelaxRelocations();

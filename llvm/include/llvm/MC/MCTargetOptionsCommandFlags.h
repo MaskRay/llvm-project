@@ -54,6 +54,8 @@ LLVM_ABI bool getNoTypeCheck();
 
 LLVM_ABI bool getSaveTempLabels();
 
+LLVM_ABI bool getCompactShdr();
+
 LLVM_ABI bool getCrel();
 
 LLVM_ABI bool getImplicitMapSyms();

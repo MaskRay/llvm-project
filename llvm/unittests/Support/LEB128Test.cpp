@@ -474,4 +474,81 @@ TEST(LEB128Test, ULEB128Size) {
   EXPECT_EQ(10u, getULEB128Size(UINT64_MAX));
 }
 
+TEST(CLeb128Test, get) {
+#define EXPECT_CLEB128(VALUE, EXPECTED, SIZE)                                  \
+  do {                                                                         \
+    const uint8_t *V = reinterpret_cast<const uint8_t *>(VALUE);               \
+    const uint8_t *P = V;                                                      \
+    const uint8_t *End = V + sizeof(VALUE) - 1;                                \
+    uint64_t Result = getUCLeb128(P, End);                                     \
+    EXPECT_EQ(Result, EXPECTED);                                               \
+    EXPECT_EQ(P - V, SIZE);                                                    \
+    P = V;                                                                     \
+    Result = getUCLeb128Unsafe(P);                                             \
+    EXPECT_EQ(Result, EXPECTED);                                               \
+    EXPECT_EQ(P - V, SIZE);                                                    \
+  } while (0)
+
+  // Fast path: single byte with LSB = 1 (value = byte >> 1)
+  EXPECT_CLEB128("\x01", 0u, 1);
+  EXPECT_CLEB128("\x7f", 63u, 1);
+  EXPECT_CLEB128("\xff", 127u, 1);
+  EXPECT_CLEB128("\x02\x02", 128u, 2);
+  EXPECT_CLEB128("\x00\x00\x01\x00\x00\x00\x00\x00\x00", 256u, 9);
+
+  // Test (1<<56)-2
+  EXPECT_CLEB128("\x80\xfe\xff\xff\xff\xff\xff\xff", 0xfffffffffffffeu, 8);
+  EXPECT_CLEB128("\x00\xfe\xff\xff\xff\xff\xff\xff\x00", 0xfffffffffffffeu, 9);
+
+#undef EXPECT_CLEB128
+
+  // Test bounds checking in safe version
+  {
+    const uint8_t data[] = {0x02, 0x02}; // 2-byte encoding for 128
+    const uint8_t *p = data;
+
+    // Insufficient buffer (should return 0)
+    p = data;
+    EXPECT_EQ(getUCLeb128(p, data + 1), 0u);
+    EXPECT_EQ(p, data);
+
+    // Empty buffer
+    p = data;
+    EXPECT_EQ(getUCLeb128(p, data), 0u);
+    EXPECT_EQ(p, data);
+  }
+
+  // Test 9-byte format bounds checking
+  {
+    const uint8_t data[] = {0x00, 0x01, 0x02, 0x03, 0x04,
+                            0x05, 0x06, 0x07, 0x08, 0x09};
+    const uint8_t *p = data;
+
+    // Sufficient buffer for 9-byte format
+    EXPECT_EQ(getUCLeb128(p, data + 10), 0x0807060504030201ULL);
+
+    // Insufficient buffer for 9-byte format
+    p = data;
+    EXPECT_EQ(getUCLeb128(p, data + 8), 0u);
+  }
+}
+
+TEST(CLeb128Test, encode) {
+  // Test round-trip consistency.
+  const uint64_t vals[] = {0u,    1u,     63u,    127u,           128u,
+                           129u,  255u,   256u,   512u,           1024u,
+                           8192u, 16384u, 65536u, UINT64_MAX / 2, UINT64_MAX};
+  for (uint64_t val : vals) {
+    std::string encoded;
+    raw_string_ostream os(encoded);
+    encodeCLeb128(val, os);
+
+    const uint8_t *p = reinterpret_cast<const uint8_t *>(encoded.data());
+    uint64_t decoded = getUCLeb128Unsafe(p);
+    EXPECT_EQ(val, decoded) << "Round-trip failed for value " << val;
+  }
+
+#undef EXPECT_CLEB128_ENCODE_EQ
+}
+
 }  // anonymous namespace

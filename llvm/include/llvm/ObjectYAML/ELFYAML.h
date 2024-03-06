@@ -344,6 +344,7 @@ struct SectionHeaderTable : Chunk {
   std::optional<std::vector<SectionHeader>> Sections;
   std::optional<std::vector<SectionHeader>> Excluded;
   std::optional<bool> NoHeaders;
+  std::optional<bool> Compact;
 
   size_t getNumHeaders(size_t SectionsNum) const {
     if (IsImplicit || isDefault())

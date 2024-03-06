@@ -28,6 +28,7 @@ CODEGENOPT(Name, Bits, Default, Compatibility)
 #endif
 
 CODEGENOPT(DisableIntegratedAS, 1, 0, Benign) ///< -no-integrated-as
+CODEGENOPT(CompactShdr, 1, 0, Benign) ///< -Wa,--cshdr
 CODEGENOPT(Crel, 1, 0, Benign) ///< -Wa,--crel
 CODEGENOPT(ImplicitMapSyms, 1, 0, Benign) ///< -Wa,-mmapsyms=implicit
 CODEGENOPT(AsmVerbose        , 1, 0, Benign) ///< -dA, -fverbose-asm.

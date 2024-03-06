@@ -182,9 +182,7 @@ public:
   static bool classof(const InputFile *f) { return f->isElf(); }
 
   void init();
-  template <typename ELFT> llvm::object::ELFFile<ELFT> getObj() const {
-    return check(llvm::object::ELFFile<ELFT>::create(mb.getBuffer()));
-  }
+  template <typename ELFT> llvm::object::ELFFile<ELFT> getObj() const;
 
   StringRef getStringTable() const { return stringTable; }
 
@@ -251,8 +249,11 @@ template <class ELFT> class ObjFile : public ELFFileBase {
 public:
   static bool classof(const InputFile *f) { return f->kind() == ObjKind; }
 
-  llvm::object::ELFFile<ELFT> getObj() const {
-    return this->ELFFileBase::getObj<ELFT>();
+  mutable std::optional<llvm::object::ELFFile<ELFT>> obj;
+  const llvm::object::ELFFile<ELFT> &getObj() const {
+    if (!obj)
+      obj.emplace(check(llvm::object::ELFFile<ELFT>::create(mb.getBuffer())));
+    return *obj;
   }
 
   ObjFile(Ctx &ctx, ELFKind ekind, MemoryBufferRef m, StringRef archiveName)
@@ -375,6 +376,12 @@ public:
   static bool classof(const InputFile *f) { return f->kind() == BinaryKind; }
   void parse();
 };
+
+template <class ELFT> llvm::object::ELFFile<ELFT> ELFFileBase::getObj() const {
+  if (kind() == ObjKind)
+    return static_cast<const ObjFile<ELFT> *>(this)->getObj();
+  return check(llvm::object::ELFFile<ELFT>::create(mb.getBuffer()));
+}
 
 InputFile *createInternalFile(Ctx &, StringRef name);
 std::unique_ptr<ELFFileBase> createObjFile(Ctx &, MemoryBufferRef mb,

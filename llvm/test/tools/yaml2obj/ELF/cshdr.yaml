@@ -1,0 +1,54 @@
+## Test we can generate a compact section header table.
+
+# RUN: yaml2obj %s --docnum=1 -DCOMPACT=false -o %t1.n
+# RUN: llvm-readelf -hS %t1.n | FileCheck %s --check-prefixes=CHECK1-NORMAL,CHECK
+# RUN: yaml2obj %s --docnum=1 -DCOMPACT=true -o %t1
+# RUN: llvm-readelf -hS %t1 | FileCheck %s --check-prefixes=CHECK1-COMPACT,CHECK
+
+# CHECK1-NORMAL:       Size of section headers:           64 (bytes)
+# CHECK1-COMPACT:      Size of section headers:           0 (bytes)
+
+# CHECK:       Number of section headers:         8
+# CHECK:       Section header string table index: 7
+
+# CHECK:       Section Headers:
+# CHECK:       Name              Type            Address          Off    Size   ES Flg Lk Inf Al
+# CHECK:                         NULL            0000000000000000 000000 000000 00      0   0  {{[0-9]+}}
+# CHECK:       .foo              PROGBITS        0000000000000000 000040 000000 00 WAE  0 131 9223372036854775808
+# CHECK-NEXT:  .bar              PROGBITS        0000000000004001 000040 000000 00      0   0  2
+# CHECK-NEXT:  .another.1        PROGBITS        0000000000000000 000040 000000 00      1   0  1
+# CHECK-NEXT:  .another.2        NOBITS          0000000000000000 000040 000000 00      2   0  1
+# CHECK-NEXT:  .symtab           SYMTAB          0000000000000000 000040 000048 18      6   3  8
+# CHECK-NEXT:  .strtab           STRTAB          0000000000000000 000088 000009 00      0   0  1
+# CHECK-NEXT:  .shstrtab         STRTAB          0000000000000000 000091 00003b 00      0   0  1
+
+--- !ELF
+FileHeader:
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
+Sections:
+  - Name: .foo
+    Type: SHT_PROGBITS
+    Info: 131
+    ShAddrAlign: 0x8000000000000000
+    ShFlags: 0x80000003
+  - Name: .bar
+    Type: SHT_PROGBITS
+    Address: 0x4001
+    AddressAlign: 2
+  - Name: .another.1
+    Link: .foo
+    Type: SHT_PROGBITS
+    AddressAlign: 1
+  - Name: .another.2
+    Link: .bar
+    Type: SHT_NOBITS
+    AddressAlign: 1
+  - Type: SectionHeaderTable
+    Compact: [[COMPACT]]
+Symbols:
+  - Name:    foo
+    Section: .foo
+  - Name:    bar
+    Section: .bar
