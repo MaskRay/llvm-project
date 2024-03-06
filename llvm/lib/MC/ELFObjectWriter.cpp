@@ -201,16 +201,18 @@ public:
 
   void writeSectionData(MCSection &Sec);
 
-  void writeSectionHeaderEntry(uint32_t Name, uint32_t Type, uint64_t Flags,
-                               uint64_t Address, uint64_t Offset, uint64_t Size,
-                               uint32_t Link, uint32_t Info,
-                               MaybeAlign Alignment, uint64_t EntrySize);
+  void writeSectionHeaderEntry(const MCTargetOptions *TO, uint32_t Name,
+                               uint32_t Type, uint64_t Flags, uint64_t Address,
+                               uint64_t Offset, uint64_t Size, uint32_t Link,
+                               uint32_t Info, MaybeAlign Alignment,
+                               uint64_t EntrySize);
 
   void writeRelocations(const MCSectionELF &Sec);
 
   uint64_t writeObject();
-  void writeSectionHeader(uint32_t GroupSymbolIndex, uint64_t Offset,
-                          uint64_t Size, const MCSectionELF &Section);
+  void writeSectionHeader(const MCTargetOptions *TO, uint32_t GroupSymbolIndex,
+                          uint64_t Offset, uint64_t Size,
+                          const MCSectionELF &Section);
 };
 } // end anonymous namespace
 
@@ -331,9 +333,12 @@ void ELFWriter::writeHeader() {
   W.write<uint16_t>(0);                  // e_phentsize = prog header entry size
   W.write<uint16_t>(0);                  // e_phnum = # prog header entries = 0
 
-  // e_shentsize = Section header entry size
-  W.write<uint16_t>(is64Bit() ? sizeof(ELF::Elf64_Shdr)
-                              : sizeof(ELF::Elf32_Shdr));
+  // e_shentsize = 0 (cshdr) or section header entry size
+  MCContext &Ctx = Asm.getContext();
+  const MCTargetOptions *TO = Ctx.getTargetOptions();
+  W.write<uint16_t>(TO->CompactShdr ? 0
+                    : is64Bit()     ? sizeof(ELF::Elf64_Shdr)
+                                    : sizeof(ELF::Elf32_Shdr));
 
   // e_shnum     = # of section header ents
   W.write<uint16_t>(0);
@@ -766,12 +771,37 @@ void ELFWriter::writeSectionData(MCSection &Sec) {
   W.OS << toStringRef(Compressed);
 }
 
-void ELFWriter::writeSectionHeaderEntry(uint32_t Name, uint32_t Type,
-                                        uint64_t Flags, uint64_t Address,
-                                        uint64_t Offset, uint64_t Size,
-                                        uint32_t Link, uint32_t Info,
-                                        MaybeAlign Alignment,
-                                        uint64_t EntrySize) {
+void ELFWriter::writeSectionHeaderEntry(
+    const MCTargetOptions *TO, uint32_t Name, uint32_t Type, uint64_t Flags,
+    uint64_t Address, uint64_t Offset, uint64_t Size, uint32_t Link,
+    uint32_t Info, MaybeAlign Alignment, uint64_t EntrySize) {
+  if (TO && TO->CompactShdr) {
+    unsigned align = Alignment ? Log2(*Alignment) : 0;
+    uint8_t presence = (Type != ELF::SHT_PROGBITS ? 1 : 0) | (Flags ? 2 : 0) |
+                       (Address ? 4 : 0) | (Size ? 8 : 0) | (Link ? 16 : 0) |
+                       (Info ? 32 : 0) | (align ? 64 : 0) |
+                       (EntrySize ? 128 : 0);
+    W.OS << presence;
+    encodeULEB128(Name, W.OS); // sh_name
+    if (Type != ELF::SHT_PROGBITS)
+      encodeULEB128(Type, W.OS); // sh_type
+    if (Flags)
+      encodeULEB128(Flags, W.OS); // sh_flags
+    if (Address)
+      encodeULEB128(Address, W.OS); // sh_addr
+    encodeULEB128(Offset, W.OS);    // sh_offset
+    if (Size)
+      encodeULEB128(Size, W.OS); // sh_size
+    if (Link)
+      encodeULEB128(Link, W.OS); // sh_link
+    if (Info)
+      encodeULEB128(Info, W.OS); // sh_info
+    if (align)
+      encodeULEB128(align, W.OS); // sh_addralign
+    if (EntrySize)
+      encodeULEB128(EntrySize, W.OS); // sh_entsize
+    return;
+  }
   W.write<uint32_t>(Name);        // sh_name: index into string table
   W.write<uint32_t>(Type);        // sh_type
   writeWord(Flags);               // sh_flags
@@ -864,7 +894,8 @@ void ELFWriter::writeRelocations(const MCSectionELF &Sec) {
   }
 }
 
-void ELFWriter::writeSectionHeader(uint32_t GroupSymbolIndex, uint64_t Offset,
+void ELFWriter::writeSectionHeader(const MCTargetOptions *TO,
+                                   uint32_t GroupSymbolIndex, uint64_t Offset,
                                    uint64_t Size, const MCSectionELF &Section) {
   uint64_t sh_link = 0;
   uint64_t sh_info = 0;
@@ -912,7 +943,7 @@ void ELFWriter::writeSectionHeader(uint32_t GroupSymbolIndex, uint64_t Offset,
       sh_link = Sym->getSection().getOrdinal();
   }
 
-  writeSectionHeaderEntry(StrTabBuilder.getOffset(Section.getName()),
+  writeSectionHeaderEntry(TO, StrTabBuilder.getOffset(Section.getName()),
                           Section.getType(), Section.getFlags(), 0, Offset,
                           Size, sh_link, sh_info, Section.getAlign(),
                           Section.getEntrySize());
@@ -921,12 +952,13 @@ void ELFWriter::writeSectionHeader(uint32_t GroupSymbolIndex, uint64_t Offset,
 void ELFWriter::writeSectionHeaders() {
   uint64_t Start = W.OS.tell();
   const unsigned NumSections = SectionTable.size();
+  auto *TO = Asm.getContext().getTargetOptions();
 
   // Null section first.
   uint64_t FirstSectionSize =
       (NumSections + 1) >= ELF::SHN_LORESERVE ? NumSections + 1 : 0;
-  writeSectionHeaderEntry(0, 0, 0, 0, 0, FirstSectionSize, 0, 0, std::nullopt,
-                          0);
+  writeSectionHeaderEntry(TO, 0, 0, 0, 0, 0, FirstSectionSize, 0, 0,
+                          std::nullopt, 0);
 
   for (const MCSectionELF *Section : SectionTable) {
     uint32_t GroupSymbolIndex;
@@ -983,7 +1015,7 @@ void ELFWriter::writeSectionHeaders() {
       }
     }
 
-    writeSectionHeader(GroupSymbolIndex, Offsets.first, Size, *Section);
+    writeSectionHeader(TO, GroupSymbolIndex, Offsets.first, Size, *Section);
   }
 
   stats::SectionHeaderBytes += W.OS.tell() - Start;
@@ -1376,9 +1408,8 @@ void ELFObjectWriter::recordRelocation(const MCFragment &F,
 
 bool ELFObjectWriter::usesRela(const MCTargetOptions *TO,
                                const MCSectionELF &Sec) const {
-  return (hasRelocationAddend() &&
-          Sec.getType() != ELF::SHT_LLVM_CALL_GRAPH_PROFILE) ||
-         (TO && TO->Crel);
+  return (hasRelocationAddend() || (TO && TO->Crel)) &&
+         Sec.getType() != ELF::SHT_LLVM_CALL_GRAPH_PROFILE;
 }
 
 bool ELFObjectWriter::isSymbolRefDifferenceFullyResolvedImpl(

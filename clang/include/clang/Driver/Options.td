@@ -7727,6 +7727,9 @@ def massembler_fatal_warnings : Flag<["-"], "massembler-fatal-warnings">,
 def crel : Flag<["--"], "crel">,
   HelpText<"Enable CREL relocation format (ELF only)">,
   MarshallingInfoFlag<CodeGenOpts<"Crel">>;
+def cshdr : Flag<["--"], "cshdr">,
+  HelpText<"Enable compact section header table (ELF only)">,
+  MarshallingInfoFlag<CodeGenOpts<"CompactShdr">>;
 def mmapsyms_implicit : Flag<["-"], "mmapsyms=implicit">,
   HelpText<"Allow mapping symbol at section beginning to be implicit, "
     "lowering number of mapping symbols at the expense of some "
