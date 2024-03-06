@@ -1135,12 +1135,16 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
                          /*IsLTO=*/true, PluginOptPrefix);
 
   for (const Arg *A : Args.filtered(options::OPT_Wa_COMMA)) {
-    bool Crel = false;
+    bool Crel = false, CompactShdr = false;
     for (StringRef V : A->getValues()) {
       if (V == "--crel")
         Crel = true;
       else if (V == "--no-crel")
         Crel = false;
+      else if (V == "--cshdr")
+        CompactShdr = true;
+      else if (V == "--no-cshdr")
+        CompactShdr = false;
       else
         continue;
       A->claim();
@@ -1151,6 +1155,15 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
       } else {
         D.Diag(diag::err_drv_unsupported_opt_for_target)
             << "-Wa,--crel" << D.getTargetTriple();
+      }
+    }
+    if (CompactShdr) {
+      if (Triple.isOSBinFormatELF() && !Triple.isMIPS()) {
+        CmdArgs.push_back(
+            Args.MakeArgString(Twine(PluginOptPrefix) + "-cshdr"));
+      } else {
+        D.Diag(diag::err_drv_unsupported_opt_for_target)
+            << "-Wa,--cshdr" << D.getTargetTriple();
       }
     }
   }

@@ -203,15 +203,16 @@ public:
   void writeSectionData(const MCAssembler &Asm, MCSection &Sec,
                         const MCAsmLayout &Layout);
 
-  void WriteSecHdrEntry(uint32_t Name, uint32_t Type, uint64_t Flags,
-                        uint64_t Address, uint64_t Offset, uint64_t Size,
-                        uint32_t Link, uint32_t Info, MaybeAlign Alignment,
-                        uint64_t EntrySize);
+  void WriteSecHdrEntry(const MCTargetOptions *TO, uint32_t Name, uint32_t Type,
+                        uint64_t Flags, uint64_t Address, uint64_t Offset,
+                        uint64_t Size, uint32_t Link, uint32_t Info,
+                        MaybeAlign Alignment, uint64_t EntrySize);
 
   void writeRelocations(const MCAssembler &Asm, const MCSectionELF &Sec);
 
   uint64_t writeObject(MCAssembler &Asm, const MCAsmLayout &Layout);
-  void writeSection(const SectionIndexMapTy &SectionIndexMap,
+  void writeSection(const MCTargetOptions *TO,
+                    const SectionIndexMapTy &SectionIndexMap,
                     uint32_t GroupSymbolIndex, uint64_t Offset, uint64_t Size,
                     const MCSectionELF &Section);
 };
@@ -397,6 +398,7 @@ bool ELFWriter::is64Bit() const {
 
 // Emit the ELF header.
 void ELFWriter::writeHeader(const MCAssembler &Asm) {
+  auto *TO = Asm.getContext().getTargetOptions();
   // ELF Header
   // ----------
   //
@@ -430,8 +432,8 @@ void ELFWriter::writeHeader(const MCAssembler &Asm) {
 
   W.write<uint16_t>(OWriter.TargetObjectWriter->getEMachine()); // e_machine = target
 
-  W.write<uint32_t>(ELF::EV_CURRENT);         // e_version
-  WriteWord(0);                    // e_entry, no entry point in .o file
+  W.write<uint32_t>(ELF::EV_CURRENT); // e_version
+  WriteWord(0);                       // e_entry, no entry point in .o file
   WriteWord(0);                    // e_phoff, no program header for .o
   WriteWord(0);                     // e_shoff = sec hdr table off in bytes
 
@@ -445,9 +447,10 @@ void ELFWriter::writeHeader(const MCAssembler &Asm) {
   W.write<uint16_t>(0);                  // e_phentsize = prog header entry size
   W.write<uint16_t>(0);                  // e_phnum = # prog header entries = 0
 
-  // e_shentsize = Section header entry size
-  W.write<uint16_t>(is64Bit() ? sizeof(ELF::Elf64_Shdr)
-                              : sizeof(ELF::Elf32_Shdr));
+  // e_shentsize = 0 (cshdr) or section header entry size
+  W.write<uint16_t>(TO->CompactShdr ? 0
+                    : is64Bit()     ? sizeof(ELF::Elf64_Shdr)
+                                    : sizeof(ELF::Elf32_Shdr));
 
   // e_shnum     = # of section header ents
   W.write<uint16_t>(0);
@@ -927,35 +930,62 @@ void ELFWriter::writeSectionData(const MCAssembler &Asm, MCSection &Sec,
   W.OS << toStringRef(Compressed);
 }
 
-void ELFWriter::WriteSecHdrEntry(uint32_t Name, uint32_t Type, uint64_t Flags,
+void ELFWriter::WriteSecHdrEntry(const MCTargetOptions *TO, uint32_t Name,
+                                 uint32_t Type, uint64_t Flags,
                                  uint64_t Address, uint64_t Offset,
                                  uint64_t Size, uint32_t Link, uint32_t Info,
                                  MaybeAlign Alignment, uint64_t EntrySize) {
-  W.write<uint32_t>(Name);        // sh_name: index into string table
-  W.write<uint32_t>(Type);        // sh_type
-  WriteWord(Flags);     // sh_flags
-  WriteWord(Address);   // sh_addr
-  WriteWord(Offset);    // sh_offset
-  WriteWord(Size);      // sh_size
-  W.write<uint32_t>(Link);        // sh_link
-  W.write<uint32_t>(Info);        // sh_info
-  WriteWord(Alignment ? Alignment->value() : 0); // sh_addralign
-  WriteWord(EntrySize); // sh_entsize
+  if (TO && TO->CompactShdr) {
+    unsigned align = Alignment ? Log2(*Alignment) : 0;
+    uint8_t presence = (Type != ELF::SHT_PROGBITS ? 1 : 0) | (Flags ? 2 : 0) |
+                       (Address ? 4 : 0) | (Size ? 8 : 0) | (Link ? 16 : 0) |
+                       (Info ? 32 : 0) | (align ? 64 : 0) |
+                       (EntrySize ? 128 : 0);
+    W.OS << presence;
+    encodeULEB128(Name, W.OS); // sh_name
+    if (Type != ELF::SHT_PROGBITS)
+      encodeULEB128(Type, W.OS); // sh_type
+    if (Flags)
+      encodeULEB128(Flags, W.OS); // sh_flags
+    if (Address)
+      encodeULEB128(Address, W.OS); // sh_addr
+    encodeULEB128(Offset, W.OS);    // sh_offset
+    if (Size)
+      encodeULEB128(Size, W.OS); // sh_size
+    if (Link)
+      encodeULEB128(Link, W.OS); // sh_link
+    if (Info)
+      encodeULEB128(Info, W.OS); // sh_info
+    if (align)
+      encodeULEB128(align, W.OS); // sh_addralign
+    if (EntrySize)
+      encodeULEB128(EntrySize, W.OS); // sh_entsize
+  } else {
+    W.write<uint32_t>(Name); // sh_name: index into string table
+    W.write<uint32_t>(Type); // sh_type
+    WriteWord(Flags);        // sh_flags
+    WriteWord(Address);      // sh_addr
+    WriteWord(Offset);       // sh_offset
+    WriteWord(Size);         // sh_size
+    W.write<uint32_t>(Link); // sh_link
+    W.write<uint32_t>(Info); // sh_info
+    WriteWord(Alignment ? Alignment->value() : 0); // sh_addralign
+    WriteWord(EntrySize);                          // sh_entsize
+  }
 }
 
 template <class uint>
 static void encodeCrel(ArrayRef<ELFRelocationEntry> Relocs, raw_ostream &OS) {
   uint OffsetMask = 8, Offset = 0, Addend = 0;
   uint32_t Symidx = 0, Type = 0;
-  // hdr & 4 indicates 3 flag bits in delta offset and flags members.
-  for (const ELFRelocationEntry &Entry : Relocs)
-    OffsetMask |= Entry.Offset;
+  for (unsigned i = 0, e = Relocs.size(); i != e; ++i)
+    OffsetMask |= Relocs[i].Offset;
   const int Shift = llvm::countr_zero(OffsetMask);
   encodeULEB128(Relocs.size() * 8 + ELF::CREL_HDR_ADDEND + Shift, OS);
   for (const ELFRelocationEntry &Entry : Relocs) {
-    // The delta offset and flags member may be larger than uint64_t. Special
-    // case the first byte (3 flag bits and 4 offset bits). Other ULEB128 bytes
-    // encode the remaining delta offset bits.
+    // For 64-bit uint, encode a 65-bit integer where bit 0 indicates whether
+    // symidx/type are equal to the previous entry's. The remaining 64 bits
+    // encode the delta offset.
     auto DeltaOffset = static_cast<uint>((Entry.Offset - Offset) >> Shift);
     Offset = Entry.Offset;
     uint32_t CurSymidx = Entry.Symbol ? Entry.Symbol->getIndex() : 0;
@@ -1054,7 +1084,8 @@ void ELFWriter::writeRelocations(const MCAssembler &Asm,
   }
 }
 
-void ELFWriter::writeSection(const SectionIndexMapTy &SectionIndexMap,
+void ELFWriter::writeSection(const MCTargetOptions *TO,
+                             const SectionIndexMapTy &SectionIndexMap,
                              uint32_t GroupSymbolIndex, uint64_t Offset,
                              uint64_t Size, const MCSectionELF &Section) {
   uint64_t sh_link = 0;
@@ -1105,7 +1136,7 @@ void ELFWriter::writeSection(const SectionIndexMapTy &SectionIndexMap,
     }
   }
 
-  WriteSecHdrEntry(StrTabBuilder.getOffset(Section.getName()),
+  WriteSecHdrEntry(TO, StrTabBuilder.getOffset(Section.getName()),
                    Section.getType(), Section.getFlags(), 0, Offset, Size,
                    sh_link, sh_info, Section.getAlign(),
                    Section.getEntrySize());
@@ -1119,9 +1150,10 @@ void ELFWriter::writeSectionHeader(
   // Null section first.
   uint64_t FirstSectionSize =
       (NumSections + 1) >= ELF::SHN_LORESERVE ? NumSections + 1 : 0;
-  WriteSecHdrEntry(0, 0, 0, 0, 0, FirstSectionSize, 0, 0, std::nullopt, 0);
+  auto *TO = Layout.getAssembler().getContext().getTargetOptions();
+  WriteSecHdrEntry(TO, 0, 0, 0, 0, 0, FirstSectionSize, 0, 0, std::nullopt, 0);
 
-  for (const MCSectionELF *Section : SectionTable) {
+  for (auto [i, Section] : enumerate(SectionTable)) {
     uint32_t GroupSymbolIndex;
     unsigned Type = Section->getType();
     if (Type != ELF::SHT_GROUP)
@@ -1137,7 +1169,7 @@ void ELFWriter::writeSectionHeader(
     else
       Size = Offsets.second - Offsets.first;
 
-    writeSection(SectionIndexMap, GroupSymbolIndex, Offsets.first, Size,
+    writeSection(TO, SectionIndexMap, GroupSymbolIndex, Offsets.first, Size,
                  *Section);
   }
 }
@@ -1586,9 +1618,8 @@ void ELFObjectWriter::recordRelocation(MCAssembler &Asm,
 
 bool ELFObjectWriter::usesRela(const MCTargetOptions *TO,
                                const MCSectionELF &Sec) const {
-  return (hasRelocationAddend() &&
-          Sec.getType() != ELF::SHT_LLVM_CALL_GRAPH_PROFILE) ||
-         (TO && TO->Crel);
+  return (hasRelocationAddend() || (TO && TO->Crel)) &&
+         Sec.getType() != ELF::SHT_LLVM_CALL_GRAPH_PROFILE;
 }
 
 bool ELFObjectWriter::isSymbolRefDifferenceFullyResolvedImpl(

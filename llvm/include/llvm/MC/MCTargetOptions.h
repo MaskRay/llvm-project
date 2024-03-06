@@ -61,8 +61,12 @@ public:
 
   bool Dwarf64 : 1;
 
-  // Use CREL relocation format for ELF.
+  // Use CREL relocation format for ELF. This can be used with
+  // CompactShdr.
   bool Crel = false;
+
+  // Use implicit addends for ELF sections that do not contain instructions.
+  bool CompactShdr = false;
 
   // If true, prefer R_X86_64_[REX_]GOTPCRELX to R_X86_64_GOTPCREL on x86-64
   // ELF.

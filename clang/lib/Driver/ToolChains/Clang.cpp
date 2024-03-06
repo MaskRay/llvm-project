@@ -2500,7 +2500,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
   bool TakeNextArg = false;
 
   const llvm::Triple &Triple = C.getDefaultToolChain().getTriple();
-  bool Crel = false, ExperimentalCrel = false;
+  bool Crel = false, ExperimentalCrel = false, CompactShdr = false;
   bool UseRelaxRelocations = C.getDefaultToolChain().useRelaxRelocations();
   bool UseNoExecStack = false;
   const char *MipsTargetFeature = nullptr;
@@ -2626,10 +2626,14 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
         CmdArgs.push_back(Value.data());
       } else if (Value == "--crel") {
         Crel = true;
-      } else if (Value == "--no-crel") {
-        Crel = false;
       } else if (Value == "--allow-experimental-crel") {
         ExperimentalCrel = true;
+      } else if (Value == "--no-crel") {
+        Crel = false;
+      } else if (Value == "--cshdr") {
+        CompactShdr = true;
+      } else if (Value == "--no-cshdr") {
+        CompactShdr = false;
       } else if (Value == "-mrelax-relocations=yes" ||
                  Value == "--mrelax-relocations=yes") {
         UseRelaxRelocations = true;
@@ -2703,6 +2707,14 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
     } else {
       D.Diag(diag::err_drv_unsupported_opt_for_target)
           << "-Wa,--crel" << D.getTargetTriple();
+    }
+  }
+  if (CompactShdr) {
+    if (Triple.isOSBinFormatELF() && !Triple.isMIPS()) {
+      CmdArgs.push_back("--cshdr");
+    } else {
+      D.Diag(diag::err_drv_unsupported_opt_for_target)
+          << "-Wa,--cshdr" << D.getTargetTriple();
     }
   }
   if (!UseRelaxRelocations)

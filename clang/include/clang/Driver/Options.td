@@ -7007,6 +7007,9 @@ def massembler_fatal_warnings : Flag<["-"], "massembler-fatal-warnings">,
 def crel : Flag<["--"], "crel">,
   HelpText<"Enable CREL relocation format (ELF only)">,
   MarshallingInfoFlag<CodeGenOpts<"Crel">>;
+def implicit_addends_for_data : Flag<["--"], "cshdr">,
+  HelpText<"Use implicit addends for sections that do not contain instructions (ELF only)">,
+  MarshallingInfoFlag<CodeGenOpts<"CompactShdr">>;
 def mrelax_relocations_no : Flag<["-"], "mrelax-relocations=no">,
     HelpText<"Disable x86 relax relocations">,
     MarshallingInfoNegativeFlag<CodeGenOpts<"RelaxELFRelocations">>;

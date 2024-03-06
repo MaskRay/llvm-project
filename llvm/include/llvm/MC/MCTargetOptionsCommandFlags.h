@@ -50,6 +50,7 @@ bool getNoDeprecatedWarn();
 bool getNoTypeCheck();
 
 bool getCrel();
+bool getCompactShdr();
 bool getX86RelaxRelocations();
 
 std::string getABIName();
