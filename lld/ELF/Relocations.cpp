@@ -385,8 +385,7 @@ static void maybeReportDiscarded(Ctx &ctx, ELFSyncStream &msg, Undefined &sym) {
   auto *file = dyn_cast<ObjFile<ELFT>>(sym.file);
   if (!file || !sym.discardedSecIdx)
     return;
-  ArrayRef<typename ELFT::Shdr> objSections =
-      file->template getELFShdrs<ELFT>();
+  ArrayRef<typename ELFT::Shdr> objSections = check(file->getObj().sections());
 
   if (sym.type == ELF::STT_SECTION) {
     msg << "relocation refers to a discarded section: ";

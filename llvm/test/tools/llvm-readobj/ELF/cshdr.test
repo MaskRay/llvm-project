@@ -1,0 +1,33 @@
+## See tools/yaml2obj/ELF/cshdr.yaml for main tests.
+
+# RUN: yaml2obj %s -o %t1
+# RUN: llvm-readelf -hS %t1 | FileCheck %s --check-prefix=CHECK
+
+## Overwrite the last byte (part of the last section header) to a malformed CLEB128.
+# RUN: %python -c 'import io; f = open("%t1", "r+b"); f.seek(-1, io.SEEK_END); f.write(b"\x02");'
+# RUN: not llvm-readelf -hS %t1 2>&1 | FileCheck %s -DINPUT=%t1 --check-prefix=ERR1
+
+## Test out-of-bounds presence byte.
+# RUN: %python -c 'import io; f = open("%t1", "r+b"); f.truncate(89)'
+# RUN: not llvm-readelf -hS %t1 2>&1 | FileCheck %s -DINPUT=%t1 --check-prefix=ERR2
+
+# CHECK:       Start of section headers:          89 (bytes into file)
+# CHECK:       Size of section headers:           0 (bytes)
+
+# ERR1: error: '[[INPUT]]': unable to continue dumping, the file is corrupt: compact section header 3 goes past the end of the file
+# ERR2: error: '[[INPUT]]': unable to continue dumping, the file is corrupt: compact section header 0 goes past the end of the file
+
+--- !ELF
+FileHeader:
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
+Sections:
+  - Name: .foo
+    Type: SHT_PROGBITS
+  - Type: SectionHeaderTable
+    Compact: [[COMPACT=true]]
+    Sections:
+      - Name: .foo
+      - Name: .strtab
+      - Name: .shstrtab

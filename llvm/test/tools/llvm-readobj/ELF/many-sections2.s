@@ -5,6 +5,9 @@
 # RUN: llvm-mc %s -filetype=obj -triple=x86_64-pc-linux -o %t
 # RUN: llvm-readelf -s %t | FileCheck %s
 
+# RUN: llvm-mc %s -filetype=obj -triple=x86_64 -cshdr -o %t
+# RUN: llvm-readelf -s %t | FileCheck %s
+
 .irp i, 0, 1, 2, 3, 4, 5, 6,
   .irp j, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
     .irp k, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,

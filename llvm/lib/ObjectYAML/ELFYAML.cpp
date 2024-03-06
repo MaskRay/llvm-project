@@ -1555,6 +1555,7 @@ static void sectionHeaderTableMapping(IO &IO,
   IO.mapOptional("Sections", SHT.Sections);
   IO.mapOptional("Excluded", SHT.Excluded);
   IO.mapOptional("NoHeaders", SHT.NoHeaders);
+  IO.mapOptional("Compact", SHT.Compact);
 }
 
 static void sectionMapping(IO &IO, ELFYAML::LinkerOptionsSection &Section) {
