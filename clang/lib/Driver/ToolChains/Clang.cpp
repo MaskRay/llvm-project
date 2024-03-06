@@ -2500,7 +2500,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
   bool TakeNextArg = false;
 
   const llvm::Triple &Triple = C.getDefaultToolChain().getTriple();
-  bool Crel = false, ImplicitAddendsForData = false;
+  bool Crel = false, LightElf = false;
   bool UseRelaxRelocations = C.getDefaultToolChain().useRelaxRelocations();
   bool UseNoExecStack = false;
   const char *MipsTargetFeature = nullptr;
@@ -2628,10 +2628,10 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
         Crel = true;
       } else if (Value == "--no-crel") {
         Crel = false;
-      } else if (Value == "--implicit-addends-for-data") {
-        ImplicitAddendsForData = true;
-      } else if (Value == "--no-implicit-addends-for-data") {
-        ImplicitAddendsForData = false;
+      } else if (Value == "--light-elf") {
+        LightElf = true;
+      } else if (Value == "--no-light-elf") {
+        LightElf = false;
       } else if (Value == "-mrelax-relocations=yes" ||
                  Value == "--mrelax-relocations=yes") {
         UseRelaxRelocations = true;
@@ -2705,12 +2705,12 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
           << "-Wa,--crel" << D.getTargetTriple();
     }
   }
-  if (ImplicitAddendsForData) {
+  if (LightElf) {
     if (Triple.isOSBinFormatELF() && !Triple.isMIPS()) {
-      CmdArgs.push_back("--implicit-addends-for-data");
+      CmdArgs.push_back("--light-elf");
     } else {
       D.Diag(diag::err_drv_unsupported_opt_for_target)
-          << "-Wa,--implicit-addends-for-data" << D.getTargetTriple();
+          << "-Wa,--light-elf" << D.getTargetTriple();
     }
   }
   if (!UseRelaxRelocations)

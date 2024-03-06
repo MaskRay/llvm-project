@@ -522,8 +522,7 @@ static std::string maybeReportDiscarded(Undefined &sym) {
   auto *file = dyn_cast_or_null<ObjFile<ELFT>>(sym.file);
   if (!file || !sym.discardedSecIdx)
     return "";
-  ArrayRef<typename ELFT::Shdr> objSections =
-      file->template getELFShdrs<ELFT>();
+  ArrayRef<typename ELFT::Shdr> objSections = check(file->getObj().sections());
 
   std::string msg;
   if (sym.type == ELF::STT_SECTION) {

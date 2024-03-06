@@ -1030,7 +1030,7 @@ ELFObjectFile<ELFT>::section_rel_begin(DataRefImpl Sec) const {
 
       const auto Hdr = Data.getULEB128(Cur);
       const size_t Count = Hdr / 8, FlagBits = Hdr & 4 ? 3 : 2, Shift = Hdr % 4;
-      uintX_t Offset = 0, Addend = 0;
+      typename ELFT::uint Offset = 0, Addend = 0;
       uint32_t Symidx = 0, Type = 0;
       for (size_t i = 0; i != Count; ++i) {
         const uint8_t B = Data.getU8(Cur);

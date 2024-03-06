@@ -1074,16 +1074,16 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
                          /*IsLTO=*/true, PluginOptPrefix);
 
   for (const Arg *A : Args.filtered(options::OPT_Wa_COMMA)) {
-    bool Crel = false, ImplicitAddendsForData = false;
+    bool Crel = false, LightElf = false;
     for (StringRef V : A->getValues()) {
       if (V == "--crel")
         Crel = true;
       else if (V == "--no-crel")
         Crel = false;
-      else if (V == "--implicit-addends-for-data")
-        ImplicitAddendsForData = true;
-      else if (V == "--no-implicit-addends-for-data")
-        ImplicitAddendsForData = false;
+      else if (V == "--light-elf")
+        LightElf = true;
+      else if (V == "--no-light-elf")
+        LightElf = false;
       else
         continue;
       A->claim();
@@ -1096,13 +1096,13 @@ void tools::addLTOOptions(const ToolChain &ToolChain, const ArgList &Args,
             << "-Wa,--crel" << D.getTargetTriple();
       }
     }
-    if (ImplicitAddendsForData) {
+    if (LightElf) {
       if (Triple.isOSBinFormatELF() && !Triple.isMIPS()) {
-        CmdArgs.push_back(Args.MakeArgString(Twine(PluginOptPrefix) +
-                                             "-implicit-addends-for-data"));
+        CmdArgs.push_back(
+            Args.MakeArgString(Twine(PluginOptPrefix) + "-light-elf"));
       } else {
         D.Diag(diag::err_drv_unsupported_opt_for_target)
-            << "-Wa,--implicit-addends-for-data" << D.getTargetTriple();
+            << "-Wa,--light-elf" << D.getTargetTriple();
       }
     }
   }

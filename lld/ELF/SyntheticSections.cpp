@@ -2017,8 +2017,6 @@ template <class uint> bool CrelSection<uint>::updateAllocSize() {
   const size_t count = relocs.size();
   uint offsetMask = 8;
   SmallVector<Elf_Crel_Impl<sizeof(uint) == 8>, 0> crels(count);
-  // Group dynamic relocations by type and sort each group by offset to reduce
-  // the code size.
   for (size_t i = 0; i != count; ++i) {
     const DynamicReloc &rel = relocs[i];
     crels[i].r_offset = rel.getOffset();
@@ -2034,7 +2032,6 @@ template <class uint> bool CrelSection<uint>::updateAllocSize() {
   });
   const int shift = llvm::countr_zero(offsetMask);
 
-  // hdr & 4 indicates 2 or 3 flag bits in delta offset and flags members.
   const size_t oldSize = relocData.size(), addendBit = config->isRela ? 4 : 0,
                flagBits = addendBit ? 3 : 2;
   relocData.clear();
@@ -2043,9 +2040,9 @@ template <class uint> bool CrelSection<uint>::updateAllocSize() {
   uint32_t symidx = 0, type = 0;
   encodeULEB128(count * 8 + addendBit + shift, os);
   for (const auto &rel : crels) {
-    // The delta offset and flags member may be larger than uint64_t. Special
-    // case the first byte (2 or 3 flag bits and 4 or 5 offset bits). Other
-    // ULEB128 bytes encode the remaining delta offset bits.
+    // For ELFCLASS64, encode a 65-bit integer where bit 0 indicates whether
+    // symidx/type are equal to the previous entry's. The remaining 64 bits
+    // encode the delta offset relative to the previous offset.
     const uint deltaOffset = (rel.r_offset - offset) >> shift;
     offset = rel.r_offset;
     uint8_t b = (deltaOffset << flagBits) + (symidx != rel.r_symidx) +

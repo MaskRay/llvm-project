@@ -47,7 +47,7 @@ MCOPT(bool, NoWarn)
 MCOPT(bool, NoDeprecatedWarn)
 MCOPT(bool, NoTypeCheck)
 MCOPT(bool, Crel)
-MCOPT(bool, ImplicitAddendsForData)
+MCOPT(bool, LightElf)
 MCOPT(bool, X86RelaxRelocations)
 MCOPT(std::string, ABIName)
 MCOPT(std::string, AsSecureLogFile)
@@ -129,11 +129,11 @@ llvm::mc::RegisterMCTargetOptionsFlags::RegisterMCTargetOptionsFlags() {
                             cl::desc("Use CREL relocation format for ELF"));
   MCBINDOPT(Crel);
 
-  static cl::opt<bool> ImplicitAddendsForData(
-      "implicit-addends-for-data",
+  static cl::opt<bool> LightElf(
+      "light-elf",
       cl::desc(
           "Use implicit addends for sections that do not contain instruction"));
-  MCBINDOPT(ImplicitAddendsForData);
+  MCBINDOPT(LightElf);
 
   static cl::opt<bool> X86RelaxRelocations(
       "x86-relax-relocations",
@@ -168,8 +168,8 @@ MCTargetOptions llvm::mc::InitMCTargetOptionsFromFlags() {
   Options.MCNoWarn = getNoWarn();
   Options.MCNoDeprecatedWarn = getNoDeprecatedWarn();
   Options.MCNoTypeCheck = getNoTypeCheck();
-  Options.Crel = getCrel();
-  Options.ImplicitAddendsForData = getImplicitAddendsForData();
+  Options.LightElf = getLightElf();
+  Options.Crel = getCrel() || Options.LightElf;
   Options.X86RelaxRelocations = getX86RelaxRelocations();
   Options.EmitDwarfUnwind = getEmitDwarfUnwind();
   Options.EmitCompactUnwindNonCanonical = getEmitCompactUnwindNonCanonical();

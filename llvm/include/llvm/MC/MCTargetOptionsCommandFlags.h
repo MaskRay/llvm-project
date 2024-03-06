@@ -50,7 +50,7 @@ bool getNoDeprecatedWarn();
 bool getNoTypeCheck();
 
 bool getCrel();
-bool getImplicitAddendsForData();
+bool getLightElf();
 bool getX86RelaxRelocations();
 
 std::string getABIName();

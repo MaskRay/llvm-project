@@ -37,7 +37,7 @@ VALUE_CODEGENOPT(Name, Bits, Default)
 
 CODEGENOPT(DisableIntegratedAS, 1, 0) ///< -no-integrated-as
 CODEGENOPT(Crel, 1, 0) ///< -Wa,--crel
-CODEGENOPT(ImplicitAddendsForData, 1, 0) ///< -Wa,--implicit-addends-for-data
+CODEGENOPT(LightElf, 1, 0) ///< -Wa,--light-elf
 CODEGENOPT(RelaxELFRelocations, 1, 1) ///< -Wa,-mrelax-relocations={yes,no}
 ENUM_CODEGENOPT(CompressRelocations, llvm::DebugCompressionType, 2, llvm::DebugCompressionType::None)
 CODEGENOPT(AsmVerbose        , 1, 0) ///< -dA, -fverbose-asm.
