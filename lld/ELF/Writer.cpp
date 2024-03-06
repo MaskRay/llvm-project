@@ -788,17 +788,19 @@ void PhdrEntry::add(OutputSection *sec) {
 
 // A statically linked position-dependent executable should only contain
 // IRELATIVE relocations and no other dynamic relocations. Encapsulation symbols
-// __rel[a]_iplt_{start,end} will be defined for .rel[a].dyn, to be
+// __[c]rel[a]_iplt_{start,end} will be defined for .rel[a].dyn, to be
 // processed by the libc runtime. Other executables or DSOs use dynamic tags
 // instead.
 template <class ELFT> void Writer<ELFT>::addRelIpltSymbols() {
   if (config->isPic)
     return;
 
-  // __rela_iplt_{start,end} are initially defined relative to dummy section 0.
-  // We'll override Out::elfHeader with relaDyn later when we are sure that
-  // .rela.dyn will be present in the output.
-  std::string name = config->isRela ? "__rela_iplt_start" : "__rel_iplt_start";
+  // __[c]rel[a]_iplt_{start,end} are initially defined relative to dummy
+  // section 0.  We'll override Out::elfHeader with relaDyn later when we are
+  // sure that .rela.dyn/.crel.dyn will be present in the output.
+  std::string name = config->zCrel    ? "__crel_iplt_start"
+                     : config->isRela ? "__rela_iplt_start"
+                                      : "__rel_iplt_start";
   ElfSym::relaIpltStart =
       addOptionalRegular(name, Out::elfHeader, 0, STV_HIDDEN);
   name.replace(name.size() - 5, 5, "end");
@@ -1494,8 +1496,11 @@ template <class ELFT> void Writer<ELFT>::finalizeAddressDependentContent() {
         changed |= (it != part.relrAuthDyn->relocs.end());
         part.relrAuthDyn->relocs.erase(it, part.relrAuthDyn->relocs.end());
       }
-      if (part.relaDyn)
+      if (part.relaDyn) {
         changed |= part.relaDyn->updateAllocSize();
+        if (ElfSym::relaIpltEnd)
+          ElfSym::relaIpltEnd->value = mainPart->relaDyn->getSize();
+      }
       if (part.relrDyn)
         changed |= part.relrDyn->updateAllocSize();
       if (part.relrAuthDyn)
@@ -1503,6 +1508,7 @@ template <class ELFT> void Writer<ELFT>::finalizeAddressDependentContent() {
       if (part.memtagGlobalDescriptors)
         changed |= part.memtagGlobalDescriptors->updateAllocSize();
     }
+    changed |= in.relaPlt->updateAllocSize();
 
     std::pair<const OutputSection *, const Defined *> changes =
         script->assignAddresses();
