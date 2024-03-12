@@ -12,8 +12,10 @@
 # CHECK:             Name              Type            Address          Off    Size   ES Flg Lk Inf Al
 # COMPRESSED:        .debug_foo        PROGBITS        0000000000000000 000040 {{.*}} 00   C  0   0  8
 # COMPRESSED-NEXT:   .notdebug_foo     PROGBITS        0000000000000000 {{.*}} 000008 00      0   0  0
+# COMPRESSED:        .debug_alloc      PROGBITS        0000000000000000 {{.*}} 000040 00   A  0   0  0
 # UNCOMPRESSED:      .debug_foo        PROGBITS        0000000000000000 000040 000008 00      0   0  0
 # UNCOMPRESSED-NEXT: .notdebug_foo     PROGBITS        0000000000000000 {{.*}} 000008 00      0   0  0
+# UNCOMPRESSED:      .debug_alloc      PROGBITS        0000000000000000 {{.*}} 000040 00   A  0   0  0
 
 ## Relocations do not change.
 # CHECK:             Relocation section '.rela.debug_foo' at offset {{.*}} contains 2 entries:
@@ -46,3 +48,27 @@ Sections:
     Flags:        [ SHF_COMPRESSED ]
     AddressAlign: 8
     Content:      "010000000000000004000000000000000100000000000000ffffffff"
+
+# RUN: yaml2obj --docnum=2 %s -o %t.alloc
+# RUN: llvm-objcopy --decompress-debug-sections %t.alloc %t.alloc.de
+# RUN: llvm-readelf -S %t.alloc.de | FileCheck %s --check-prefixes=ALLOC
+
+# ALLOC:        Name              Type            Address          Off      Size     ES Flg Lk Inf Al
+# ALLOC:        .debug_alloc      PROGBITS        0000000000000000 [[#%x,]] [[#%x,]] 00  AC  0   0  0
+# ALLOC:        nodebug           PROGBITS        0000000000000000 [[#%x,]] [[#%x,]] 00   C  0   0  0
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_X86_64
+Sections:
+  - Type:         SHT_PROGBITS
+    Name:         .debug_alloc
+    Flags:        [ SHF_ALLOC, SHF_COMPRESSED ]
+    Content:      "010000000000000008000000000000000100000000000000789cd3628000000158002b"
+  - Type:         SHT_PROGBITS
+    Name:         nodebug
+    Flags:        [ SHF_COMPRESSED ]
+    Content:      "010000000000000008000000000000000100000000000000789cd3628000000158002b"
