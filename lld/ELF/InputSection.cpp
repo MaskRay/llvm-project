@@ -146,7 +146,6 @@ template <class ELFT> RelsOrRelas<ELFT> InputSectionBase::relsOrRelas() const {
     // --emit-relocs) or an InputSection with zero eqClass[0].
     if (!relSec || !cast<InputSection>(relSec)->eqClass[0]) {
       auto *sec = makeThreadLocal<InputSection>(*f, shdr, name);
-      cast<InputSection>(sec)->eqClass[0] = 1;
       if (shdr.sh_flags & SHF_COMPRESSED)
         sec->decompress();
       f->setSection(relSecIdx, sec);
@@ -154,30 +153,56 @@ template <class ELFT> RelsOrRelas<ELFT> InputSectionBase::relsOrRelas() const {
       auto *p = sec->content_;
       const auto hdr = readULEB128(p);
       const size_t count = hdr / 8, shift = hdr % 4;
-      auto *relas = makeThreadLocalN<typename ELFT::Rela>(count);
       typename ELFT::uint offset = 0, addend = 0;
       uint32_t symidx = 0, type = 0;
-      for (size_t i = 0; i != count; ++i) {
-        const uint8_t b = *p++;
-        offset += b >> 3;
-        if (b >= 0x80)
-          offset += (readULEB128(p) << 4) - 0x10;
-        if (b & 1)
-          symidx += readSLEB128(p);
-        if (b & 2)
-          type += readSLEB128(p);
-        if (b & 4)
-          addend += readSLEB128(p);
-        relas[i].r_offset = offset << shift;
-        relas[i].setSymbolAndType(symidx, type, false);
-        relas[i].r_addend = addend;
+
+      if (hdr & 4) {
+        cast<InputSection>(sec)->eqClass[0] = SHT_RELA;
+        auto *relas = makeThreadLocalN<typename ELFT::Rela>(count);
+        for (size_t i = 0; i != count; ++i) {
+          const uint8_t b = *p++;
+          offset += b >> 3;
+          if (b >= 0x80)
+            offset += (readULEB128(p) << 4) - 0x10;
+          if (b & 1)
+            symidx += readSLEB128(p);
+          if (b & 2)
+            type += readSLEB128(p);
+          if (b & 4)
+            addend += readSLEB128(p);
+          relas[i].r_offset = offset << shift;
+          relas[i].setSymbolAndType(symidx, type, false);
+          relas[i].r_addend = addend;
+        }
+        sec->content_ = reinterpret_cast<uint8_t *>(relas);
+      } else {
+        cast<InputSection>(sec)->eqClass[0] = SHT_REL;
+        auto *rels = makeThreadLocalN<typename ELFT::Rel>(count);
+        for (size_t i = 0; i != count; ++i) {
+          const uint8_t b = *p++;
+          offset += b >> 2;
+          if (b >= 0x80)
+            offset += (readULEB128(p) << 5) - 0x20;
+          if (b & 1)
+            symidx += readSLEB128(p);
+          if (b & 2)
+            type += readSLEB128(p);
+          rels[i].r_offset = offset << shift;
+          rels[i].setSymbolAndType(symidx, type, false);
+        }
+        sec->content_ = reinterpret_cast<uint8_t *>(rels);
       }
-      sec->content_ = reinterpret_cast<uint8_t *>(relas);
       sec->size = count; // count instead of size to avoid division below
     }
-    ret.relas = ArrayRef(
-        reinterpret_cast<const typename ELFT::Rela *>(relSec->content_),
-        relSec->size);
+    if (cast<InputSection>(relSec)->eqClass[0] == SHT_REL) {
+      ret.rels = ArrayRef(
+          reinterpret_cast<const typename ELFT::Rel *>(relSec->content_),
+          relSec->size);
+    } else {
+      ret.relas = ArrayRef(
+          reinterpret_cast<const typename ELFT::Rela *>(relSec->content_),
+          relSec->size);
+    }
     return ret;
   }
 

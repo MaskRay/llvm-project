@@ -45,6 +45,8 @@ class MCSectionELF final : public MCSection {
   /// section header index of the section where LinkedToSym is defined.
   const MCSymbol *LinkedToSym;
 
+  bool HasNonDataRelocs = false;
+
 private:
   friend class MCContext;
 

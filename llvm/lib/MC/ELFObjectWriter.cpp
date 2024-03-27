@@ -38,6 +38,7 @@
 #include "llvm/MC/MCValue.h"
 #include "llvm/MC/StringTableBuilder.h"
 #include "llvm/Support/Alignment.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Endian.h"
@@ -63,6 +64,8 @@ using namespace llvm;
 
 #undef  DEBUG_TYPE
 #define DEBUG_TYPE "reloc-info"
+
+static cl::opt<bool> RelaOnlyForCode("rela-only-for-code", cl::desc("x"));
 
 namespace {
 
@@ -945,13 +948,15 @@ void ELFWriter::WriteSecHdrEntry(uint32_t Name, uint32_t Type, uint64_t Flags,
 
 template <class uint>
 static void encodeCrel(ArrayRef<ELFRelocationEntry> Relocs,
+                       uint8_t AddendBit,
                        raw_svector_ostream &os) {
   uint OffsetMask = 8, Offset = 0, Addend = 0;
   uint32_t Symidx = 0, Type = 0;
+  const uint8_t FlagBits = AddendBit ? 3 : 2;
   for (unsigned i = 0, e = Relocs.size(); i != e; ++i)
     OffsetMask |= Relocs[i].Offset;
   const int Shift = llvm::countr_zero(OffsetMask);
-  encodeULEB128(Relocs.size() * 8 + /*addend_bit*/4 + Shift, os);
+  encodeULEB128(Relocs.size() * 8 + AddendBit + Shift, os);
   Offset = 0;
   for (const ELFRelocationEntry &Entry : Relocs) {
     // For 64-bit uint, encode a 65-bit integer where bit 0 indicates whether
@@ -960,13 +965,13 @@ static void encodeCrel(ArrayRef<ELFRelocationEntry> Relocs,
     auto DeltaOffset = static_cast<uint>((Entry.Offset - Offset) >> Shift);
     Offset = Entry.Offset;
     uint32_t CurSymidx = Entry.Symbol ? Entry.Symbol->getIndex() : 0;
-    uint8_t B = DeltaOffset * 8 + (Symidx != CurSymidx) +
-                (Type != Entry.Type ? 2 : 0) + (Addend != Entry.Addend ? 4 : 0);
-    if (DeltaOffset < 0x10) {
+    uint8_t B = (DeltaOffset << FlagBits) + (Symidx != CurSymidx) +
+                (Type != Entry.Type ? 2 : 0) + (Addend != Entry.Addend && AddendBit ? 4 : 0);
+    if (DeltaOffset < (0x80 >> FlagBits)) {
       os << char(B);
     } else {
       os << char(B | 0x80);
-      encodeULEB128(DeltaOffset >> 4, os);
+      encodeULEB128(DeltaOffset >> (7 - FlagBits), os);
     }
     if (B & 1) {
       encodeSLEB128(static_cast<int32_t>(CurSymidx - Symidx), os);
@@ -976,7 +981,7 @@ static void encodeCrel(ArrayRef<ELFRelocationEntry> Relocs,
       encodeSLEB128(static_cast<int32_t>(Entry.Type - Type), os);
       Type = Entry.Type;
     }
-    if (B & 4) {
+    if (B & 4 & AddendBit) {
       encodeSLEB128(std::make_signed_t<uint>(Entry.Addend - Addend), os);
       Addend = Entry.Addend;
     }
@@ -1032,10 +1037,12 @@ void ELFWriter::writeRelocations(const MCAssembler &Asm, MCSectionELF &RelSec) {
       }
     }
   } else if (TO && TO->Crel) {
+    uint8_t AddendBit =
+        RelaOnlyForCode && !(Sec.getFlags() & ELF::SHF_EXECINSTR) ? 0 : 4;
     if (is64Bit())
-      encodeCrel<uint64_t>(Relocs, os);
+      encodeCrel<uint64_t>(Relocs, AddendBit, os);
     else
-      encodeCrel<uint32_t>(Relocs, os);
+      encodeCrel<uint32_t>(Relocs, AddendBit, os);
   } else {
     for (const ELFRelocationEntry &Entry : Relocs) {
       uint32_t Symidx = Entry.Symbol ? Entry.Symbol->getIndex() : 0;
@@ -1575,7 +1582,8 @@ void ELFObjectWriter::recordRelocation(MCAssembler &Asm,
   FixedValue = !RelocateWithSymbol && SymA && !SymA->isUndefined()
                    ? C + Layout.getSymbolOffset(*SymA)
                    : C;
-  if (hasRelocationAddend() || Ctx.getTargetOptions()->Crel) {
+  if (hasRelocationAddend() &&
+      (!RelaOnlyForCode || (FixupSection.getFlags() & ELF::SHF_EXECINSTR))) {
     Addend = FixedValue;
     FixedValue = 0;
   }
