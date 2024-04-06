@@ -927,25 +927,21 @@ void AsmPrinter::emitDebugValue(const MCExpr *Value, unsigned Size) const {
 
 void AsmPrinter::emitFunctionHeaderComment() {}
 
-void AsmPrinter::emitFunctionPrefix(
-    const SmallVector<const Constant *, 1> &Prefix) {
+void AsmPrinter::emitFunctionPrefix(ArrayRef<const Constant *> Prefix) {
   const Function &F = MF->getFunction();
   if (!MAI->hasSubsectionsViaSymbols()) {
-    for (auto &C : Prefix) {
+    for (auto &C : Prefix)
       emitGlobalConstant(F.getParent()->getDataLayout(), C);
-    }
     return;
   }
   // Preserving prefix data on platforms which use subsections-via-symbols
   // is a bit tricky. Here we introduce a symbol for the prefix data
   // and use the .alt_entry attribute to mark the function's real entry point
   // as an alternative entry point to the prefix-data symbol.
-  MCSymbol *PrefixSym = OutContext.createLinkerPrivateTempSymbol();
-  OutStreamer->emitLabel(PrefixSym);
+  OutStreamer->emitLabel(OutContext.createLinkerPrivateTempSymbol());
 
-  for (auto &C : Prefix) {
+  for (auto &C : Prefix)
     emitGlobalConstant(F.getParent()->getDataLayout(), C);
-  }
 
   // Emit an .alt_entry directive for the actual function symbol.
   OutStreamer->emitSymbolAttribute(CurrentFnSym, MCSA_AltEntry);
