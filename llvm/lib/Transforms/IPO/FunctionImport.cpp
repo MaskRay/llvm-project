@@ -232,7 +232,7 @@ static auto qualifyCalleeCandidates(
         if (!Index.isGlobalValueLive(GVSummary))
           return {FunctionImporter::ImportFailureReason::NotLive, GVSummary};
 
-        if (GlobalValue::isInterposableLinkage(GVSummary->linkage()))
+        if (GlobalValue::isCommonLinkage(GVSummary->linkage()))
           return {FunctionImporter::ImportFailureReason::InterposableLinkage,
                   GVSummary};
 

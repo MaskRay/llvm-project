@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/IR/ModuleSummaryIndex.h"
+#include "llvm/TargetParser/Triple.h"
 
 namespace llvm {
 class Module;
@@ -51,6 +52,8 @@ class FunctionImportGlobalProcessing {
   /// This flag should not be set for -fno-pic or -fpie, which would
   /// unnecessarily disable direct access.
   bool ClearDSOLocalOnDeclarations;
+
+  bool IsELF;
 
   /// Set of llvm.*used values, in order to validate that we don't try
   /// to promote any non-renamable values.
@@ -109,6 +112,9 @@ public:
     // may be exported to another backend compilation.
     if (!GlobalsToImport)
       HasExportedFunctions = ImportIndex.hasExportedFunctions(M);
+
+    Triple TT(M.getTargetTriple());
+    IsELF = TT.isOSBinFormatELF();
 
 #ifndef NDEBUG
     SmallVector<GlobalValue *, 4> Vec;
