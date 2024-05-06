@@ -303,6 +303,7 @@ StringRef llvm::object::getELFSectionTypeName(uint32_t Machine, unsigned Type) {
     STRINGIFY_ENUM_CASE(ELF, SHT_GROUP);
     STRINGIFY_ENUM_CASE(ELF, SHT_SYMTAB_SHNDX);
     STRINGIFY_ENUM_CASE(ELF, SHT_RELR);
+    STRINGIFY_ENUM_CASE(ELF, SHT_CREL);
     STRINGIFY_ENUM_CASE(ELF, SHT_ANDROID_REL);
     STRINGIFY_ENUM_CASE(ELF, SHT_ANDROID_RELA);
     STRINGIFY_ENUM_CASE(ELF, SHT_ANDROID_RELR);
@@ -390,6 +391,59 @@ ELFFile<ELFT>::decode_relrs(Elf_Relr_Range relrs) const {
   }
 
   return Relocs;
+}
+
+template <class ELFT>
+uint64_t ELFFile<ELFT>::crelHeader(ArrayRef<uint8_t> Content) const {
+  DataExtractor Data(Content, true, 8); // endian/class is irrelevant
+  DataExtractor::Cursor Cur(0);
+  uint64_t Hdr = Data.getVU128(Cur);
+  // In case of an error, return 0 and postpone error reporting to decodeCrel.
+  consumeError(Cur.takeError());
+  return Hdr;
+}
+
+template <class ELFT>
+Expected<typename ELFFile<ELFT>::RelsOrRelas>
+ELFFile<ELFT>::decodeCrel(ArrayRef<uint8_t> Content) const {
+  DataExtractor Data(Content, true, 8); // endian/class is irrelevant
+  DataExtractor::Cursor Cur(0);
+  const uint64_t Hdr = Data.getVU128(Cur);
+  const size_t Count = Hdr / 4, Shift = Hdr % 4;
+  std::vector<Elf_Rel> Rels;
+  std::vector<Elf_Rela> Relas;
+  Relas.resize(Count);
+  typename ELFT::uint Offset = 0, Addend = 0;
+  uint32_t Symidx = 0, Type = 0;
+  for (size_t I = 0; I != Count; ++I) {
+    // The delta offset and flags member may be larger than uint64_t. Special
+    // case the first byte (2 or 3 flag bits; the rest are offset bits). Other
+    // ULEB128 bytes encode the remaining delta offset bits.
+    const uint64_t B = Data.getVU128(Cur);
+    Offset += B >> 3;
+    // Delta symidx/type/addend members (SLEB128).
+    if (B & 1)
+      Symidx += Data.getVS128(Cur);
+    if (B & 2)
+      Type += Data.getVS128(Cur);
+    if (B & 4)
+      Addend += Data.getVS128(Cur);
+    Relas[I].r_offset = Offset << Shift;
+    Relas[I].setSymbolAndType(Symidx, Type, false);
+    Relas[I].r_addend = Addend;
+  }
+  if (!Cur)
+    return std::move(Cur.takeError());
+  return std::make_pair(std::move(Rels), std::move(Relas));
+}
+
+template <class ELFT>
+Expected<typename ELFFile<ELFT>::RelsOrRelas>
+ELFFile<ELFT>::crels(const Elf_Shdr &Sec) const {
+  Expected<ArrayRef<uint8_t>> ContentsOrErr = getSectionContents(Sec);
+  if (!ContentsOrErr)
+    return ContentsOrErr.takeError();
+  return decodeCrel(*ContentsOrErr);
 }
 
 template <class ELFT>

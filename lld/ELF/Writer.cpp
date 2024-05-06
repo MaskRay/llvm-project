@@ -388,6 +388,25 @@ static void markUsedLocalSymbolsImpl(ObjFile<ELFT> *file,
   }
 }
 
+static void markUsedLocalSymbolsImplCrel(InputFile *file,
+                                         llvm::ArrayRef<uint8_t> crel) {
+  auto *p = crel.data();
+  const size_t count = readVU128(p) / 4;
+  uint32_t symidx = 0;
+  for (size_t i = 0; i != count; ++i) {
+    const uint64_t b = readVU128(p);
+    if (b & 1)
+      symidx += readVS128(p);
+    if (b & 2)
+      readVS128(p);
+    if (b & 4)
+      readVS128(p);
+    Symbol &sym = file->getSymbol(symidx);
+    if (sym.isLocal())
+      sym.used = true;
+  }
+}
+
 // The function ensures that the "used" field of local symbols reflects the fact
 // that the symbol is used in a relocation from a live section.
 template <class ELFT> static void markUsedLocalSymbols() {
@@ -405,6 +424,8 @@ template <class ELFT> static void markUsedLocalSymbols() {
         markUsedLocalSymbolsImpl(f, isec->getDataAs<typename ELFT::Rel>());
       else if (isec->type == SHT_RELA)
         markUsedLocalSymbolsImpl(f, isec->getDataAs<typename ELFT::Rela>());
+      else if (isec->type == SHT_CREL)
+        markUsedLocalSymbolsImplCrel(f, isec->content());
     }
   }
 }
@@ -778,23 +799,23 @@ void PhdrEntry::add(OutputSection *sec) {
 
 // A statically linked position-dependent executable should only contain
 // IRELATIVE relocations and no other dynamic relocations. Encapsulation symbols
-// __rel[a]_iplt_{start,end} will be defined for .rel[a].dyn, to be
+// __[c]rel[a]_iplt_{start,end} will be defined for .rel[a].dyn, to be
 // processed by the libc runtime. Other executables or DSOs use dynamic tags
 // instead.
 template <class ELFT> void Writer<ELFT>::addRelIpltSymbols() {
   if (config->isPic)
     return;
 
-  // __rela_iplt_{start,end} are initially defined relative to dummy section 0.
-  // We'll override Out::elfHeader with relaDyn later when we are sure that
-  // .rela.dyn will be present in the output.
-  ElfSym::relaIpltStart = addOptionalRegular(
-      config->isRela ? "__rela_iplt_start" : "__rel_iplt_start",
-      Out::elfHeader, 0, STV_HIDDEN);
-
-  ElfSym::relaIpltEnd = addOptionalRegular(
-      config->isRela ? "__rela_iplt_end" : "__rel_iplt_end",
-      Out::elfHeader, 0, STV_HIDDEN);
+  // __[c]rel[a]_iplt_{start,end} are initially defined relative to dummy
+  // section 0.  We'll override Out::elfHeader with relaDyn later when we are
+  // sure that .rela.dyn/.crel.dyn will be present in the output.
+  std::string name = config->zCrel    ? "__crel_iplt_start"
+                     : config->isRela ? "__rela_iplt_start"
+                                      : "__rel_iplt_start";
+  ElfSym::relaIpltStart =
+      addOptionalRegular(name, Out::elfHeader, 0, STV_HIDDEN);
+  name.replace(name.size() - 5, 5, "end");
+  ElfSym::relaIpltEnd = addOptionalRegular(name, Out::elfHeader, 0, STV_HIDDEN);
 }
 
 // This function generates assignments for predefined symbols (e.g. _end or
@@ -1476,6 +1497,8 @@ template <class ELFT> void Writer<ELFT>::finalizeAddressDependentContent() {
         part.relrAuthDyn->relocs.erase(it, part.relrAuthDyn->relocs.end());
       }
       changed |= part.relaDyn->updateAllocSize();
+      if (ElfSym::relaIpltEnd)
+        ElfSym::relaIpltEnd->value = mainPart->relaDyn->getSize();
       if (part.relrDyn)
         changed |= part.relrDyn->updateAllocSize();
       if (part.relrAuthDyn)
@@ -1483,6 +1506,7 @@ template <class ELFT> void Writer<ELFT>::finalizeAddressDependentContent() {
       if (part.memtagGlobalDescriptors)
         changed |= part.memtagGlobalDescriptors->updateAllocSize();
     }
+    changed |= in.relaPlt->updateAllocSize();
 
     const Defined *changedSym = script->assignAddresses();
     if (!changed) {
@@ -2475,11 +2499,12 @@ template <class ELFT> void Writer<ELFT>::assignFileOffsets() {
         lastRX->lastSec == sec)
       off = alignToPowerOf2(off, config->maxPageSize);
   }
-  for (OutputSection *osec : outputSections)
-    if (!(osec->flags & SHF_ALLOC)) {
-      osec->offset = alignToPowerOf2(off, osec->addralign);
-      off = osec->offset + osec->size;
-    }
+  for (OutputSection *osec : outputSections) {
+    if (osec->flags & SHF_ALLOC)
+      continue;
+    osec->offset = alignToPowerOf2(off, osec->addralign);
+    off = osec->offset + osec->size;
+  }
 
   sectionHeaderOff = alignToPowerOf2(off, config->wordsize);
   fileSize = sectionHeaderOff + (outputSections.size() + 1) * sizeof(Elf_Shdr);

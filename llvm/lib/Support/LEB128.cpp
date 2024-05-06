@@ -40,4 +40,10 @@ unsigned getSLEB128Size(int64_t Value) {
   return Size;
 }
 
+unsigned getVU128Size(uint64_t Value) {
+  if (Value < 0xf0)
+    return 1;
+  return 9 - countl_zero(std::max(Value - 0xf0, uint64_t(1))) / 8;
+}
+
 }  // namespace llvm

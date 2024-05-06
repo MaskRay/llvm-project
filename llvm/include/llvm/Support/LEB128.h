@@ -14,6 +14,7 @@
 #ifndef LLVM_SUPPORT_LEB128_H
 #define LLVM_SUPPORT_LEB128_H
 
+#include "llvm/ADT/bit.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace llvm {
@@ -225,6 +226,67 @@ extern unsigned getULEB128Size(uint64_t Value);
 
 /// Utility function to get the size of the SLEB128-encoded value.
 extern unsigned getSLEB128Size(int64_t Value);
+
+inline unsigned encodeVU128(uint64_t V, raw_ostream &OS) {
+  if (V < 0xf0) {
+    OS << char(V);
+    return 1;
+  }
+  V -= 0xf0;
+  unsigned Size = 1;
+  OS << char(0xf0 | (7 ^ countl_zero(V ? V : 1) / 8));
+  do {
+    OS << char(V);
+    ++Size;
+  } while (V >>= 8);
+  return Size;
+}
+
+inline unsigned encodeVU128(uint64_t v, uint8_t *p) {
+  if (v < 0xf0) {
+    *p = uint8_t(v);
+    return 1;
+  }
+  v -= 0xf0;
+  unsigned size = 1;
+  *p++ = 0xf0 | (7 ^ countl_zero(v ? v : 1) / 8);
+  do {
+    *p++ = v;
+    ++size;
+  } while (v >>= 8);
+  return size;
+}
+
+inline unsigned encodeVS128(int64_t V, raw_ostream &OS) {
+  return encodeVU128((uint64_t(V) << 1) ^ ((int64_t)V >> 63), OS);
+}
+
+inline uint64_t decodeVU128(const uint8_t *p, unsigned *n = nullptr,
+                            const uint8_t *end = nullptr,
+                            const char **error = nullptr) {
+  uint8_t b = *p++;
+  if (b < 0xf0) {
+    if (n)
+      *n = 1;
+    return b;
+  }
+  b &= 0x0f;
+  if (n)
+    *n = b + 2;
+  uint64_t v = 0xf0 + *p++;
+  for (unsigned I = 1; I <= b; ++I)
+    v += *p++ << I * 8;
+  return v;
+}
+
+inline int64_t decodeVS128(const uint8_t *p, unsigned *n = nullptr,
+                           const uint8_t *end = nullptr,
+                           const char **error = nullptr) {
+  uint64_t v = decodeVU128(p, n, end, error);
+  return (v >> 1) ^ -(v & 1);
+}
+
+extern unsigned getVU128Size(uint64_t Value);
 
 } // namespace llvm
 

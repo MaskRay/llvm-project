@@ -647,6 +647,11 @@ public:
   /// state, zero is returned.
   uint64_t getULEB128(Cursor &C) const { return getULEB128(&C.Offset, &C.Err); }
 
+  uint64_t getVU128(uint64_t *offset_ptr, llvm::Error *Err = nullptr) const;
+  uint64_t getVU128(Cursor &C) const { return getVU128(&C.Offset, &C.Err); }
+  int64_t getVS128(uint64_t *offset_ptr, llvm::Error *Err = nullptr) const;
+  int64_t getVS128(Cursor &C) const { return getVS128(&C.Offset, &C.Err); }
+
   /// Advance the Cursor position by the given number of bytes. No-op if the
   /// cursor is in an error state.
   void skip(Cursor &C, uint64_t Length) const;

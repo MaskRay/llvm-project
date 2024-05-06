@@ -226,6 +226,14 @@ int64_t DataExtractor::getSLEB128(uint64_t *offset_ptr, Error *Err) const {
   return getLEB128(Data, offset_ptr, Err, decodeSLEB128);
 }
 
+uint64_t DataExtractor::getVU128(uint64_t *offset_ptr, Error *Err) const {
+  return getLEB128(Data, offset_ptr, Err, decodeVU128);
+}
+
+int64_t DataExtractor::getVS128(uint64_t *offset_ptr, Error *Err) const {
+  return getLEB128(Data, offset_ptr, Err, decodeVS128);
+}
+
 void DataExtractor::skip(Cursor &C, uint64_t Length) const {
   ErrorAsOutParameter ErrAsOut(&C.Err);
   if (isError(&C.Err))
