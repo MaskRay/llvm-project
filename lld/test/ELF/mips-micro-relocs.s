@@ -26,33 +26,33 @@
 # RUN: llvm-readelf -h %tel.exe | FileCheck --check-prefix=ELF %s
 
 # ASM: 00038000 l       .got   00000000 .hidden _gp
-# ASM: 00020100 g F     .text  00000000 0x80 foo
-# ASM: 00020110 g       .text  00000000 0x80 __start
+# ASM: 00020000 g F     .text  00000000 0x80 foo
+# ASM: 00020010 g       .text  00000000 0x80 __start
 
 # EB:      Contents of section .data:
-# EB-NEXT:  30000 fffe8111
+# EB-NEXT:  30000 fffe8011
 
 # EB:      Contents of section .debug_info
-# EB-NEXT:  0000 00020111
+# EB-NEXT:  0000 00020011
 
 # EL:      Contents of section .data:
-# EL-NEXT:  30000 1181feff
+# EL-NEXT:  30000 1180feff
 
 # EL:      Contents of section .debug_info
-# EL-NEXT:  0000 11010200
+# EL-NEXT:  0000 11000200
 
 # ASM:      <__start>:
-# ASM-NEXT:      20110:  lui     $3, 1
-# ASM-NEXT:              addiu   $3, $3, 32495
+# ASM-NEXT:      20010:  lui     $3, 1
+# ASM-NEXT:              addiu   $3, $3, 32751
 # ASM-NEXT:              lw      $3, -32744($gp)
 # ASM-NEXT:              lw      $3, -32744($3)
-# ASM-NEXT:              beqz16  $6, 0x20100
+# ASM-NEXT:              beqz16  $6, 0x20000
 # ASM-NEXT:              sll     $3, $fp, 0
-# ASM-NEXT:              b16     0x200fe
+# ASM-NEXT:              b16     0x1fffe
 # ASM-NEXT:              nop
-# ASM-NEXT:              b       0x20100
+# ASM-NEXT:              b       0x20000
 
-# ELF: Entry point address: 0x20111
+# ELF: Entry point address: 0x20011
 
   .text
   .set micromips

@@ -8,8 +8,8 @@
 
 # CHECK:      Segment Sections...
 # CHECK-NEXT:   00     .text
-# CHECK-NEXT:   01     .foo .dynsym .hash .dynstr .dynamic
-# CHECK-NEXT:   02     .foo .dynsym .hash .dynstr .dynamic
+# CHECK-NEXT:   01     .dynsym .hash .dynstr .foo .dynamic
+# CHECK-NEXT:   02     .dynsym .hash .dynstr .foo .dynamic
 
 PHDRS {
   ph_write PT_LOAD FLAGS(2);

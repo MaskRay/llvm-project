@@ -327,7 +327,7 @@ public:
   void addOrphanSections();
   void diagnoseOrphanHandling() const;
   void diagnoseMissingSGSectionAddress() const;
-  void adjustOutputSections();
+  void adjustOutputSections(llvm::function_ref<void()> sortOrphan);
   void adjustSectionsAfterSorting();
 
   SmallVector<PhdrEntry *, 0> createPhdrs();

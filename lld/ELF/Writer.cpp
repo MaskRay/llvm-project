@@ -1211,7 +1211,7 @@ template <class ELFT> void Writer<ELFT>::sortSections() {
   // Don't sort if using -r. It is not necessary and we want to preserve the
   // relative order for SHF_LINK_ORDER sections.
   if (config->relocatable) {
-    script->adjustOutputSections();
+    script->adjustOutputSections([]() {});
     return;
   }
 
@@ -1232,12 +1232,11 @@ template <class ELFT> void Writer<ELFT>::sortSections() {
   // Process INSERT commands and update output section attributes. From this
   // point onwards the order of script->sectionCommands is fixed.
   script->processInsertCommands();
-  script->adjustOutputSections();
-
-  if (script->hasSectionsCommand)
-    sortOrphanSections();
-
-  script->adjustSectionsAfterSorting();
+  script->adjustOutputSections([this]() {
+    if (script->hasSectionsCommand)
+      sortOrphanSections();
+    script->adjustSectionsAfterSorting();
+  });
 }
 
 template <class ELFT> void Writer<ELFT>::sortOrphanSections() {

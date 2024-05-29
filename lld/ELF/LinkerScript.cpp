@@ -1199,7 +1199,7 @@ static void maybePropagatePhdrs(OutputSection &sec,
   }
 }
 
-void LinkerScript::adjustOutputSections() {
+void LinkerScript::adjustOutputSections(function_ref<void()> sortOrphan) {
   // If the output section contains only symbol assignments, create a
   // corresponding output section. The issue is what to do with linker script
   // like ".foo : { symbol = 42; }". One option would be to convert it to
@@ -1271,7 +1271,10 @@ void LinkerScript::adjustOutputSections() {
       discardable = true;
     if (discardable) {
       sec->markDead();
-      cmd = nullptr;
+      // Discardable non-orphan sections might be used as an anchor to place
+      // orphan sections. Defer their removal after orphan section sorting.
+      if (sec->sectionIndex == UINT32_MAX)
+        cmd = nullptr;
     } else {
       seenRelro |=
           sec->relro && !(sec->type == SHT_NOBITS && (sec->flags & SHF_TLS));
@@ -1284,7 +1287,16 @@ void LinkerScript::adjustOutputSections() {
   // clutter the output.
   // We instead remove trivially empty sections. The bfd linker seems even
   // more aggressive at removing them.
-  llvm::erase_if(sectionCommands, [&](SectionCommand *cmd) { return !cmd; });
+  llvm::erase_if(sectionCommands, [](SectionCommand *cmd) { return !cmd; });
+
+  sortOrphan();
+
+  // Discard discardable non-orphan sections ( `sec->markDead()`).
+  llvm::erase_if(sectionCommands, [](SectionCommand *cmd) {
+    if (auto *osd = dyn_cast<OutputDesc>(cmd))
+      return !osd->osec.isLive();
+    return false;
+  });
 }
 
 void LinkerScript::adjustSectionsAfterSorting() {
