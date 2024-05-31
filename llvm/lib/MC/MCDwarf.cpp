@@ -1869,7 +1869,6 @@ void MCDwarfFrameEmitter::Emit(MCObjectStreamer &Streamer, MCAsmBackend *MAB,
   // and fdeStart-cieStart for EmitFDE due to the the performance issue. The
   // label differences will be evaluate at write time.
   assert(Streamer.getUseAssemblerInfoForParsing());
-  Streamer.setUseAssemblerInfoForParsing(false);
   auto Enable = llvm::make_scope_exit(
       [&]() { Streamer.setUseAssemblerInfoForParsing(true); });
 
