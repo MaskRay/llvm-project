@@ -6,6 +6,9 @@
 ; RUN: llc -compile-twice -filetype=obj -mtriple=riscv64 %s -o - \
 ; RUN:     | llvm-objdump --section-headers - \
 ; RUN:     | FileCheck %s
+; RUN: llc -compile-twice -mc-disable-free -filetype=obj -mtriple=riscv64 %s -o - \
+; RUN:     | llvm-objdump --section-headers - \
+; RUN:     | FileCheck %s
 
 ; CHECK:      Sections:
 ; CHECK-NEXT: Idx Name              Size     VMA              Type
