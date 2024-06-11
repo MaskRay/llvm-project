@@ -13,12 +13,15 @@
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCFragment.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <utility>
 
 using namespace llvm;
+
+static cl::opt<bool> MCDisableFree("mc-disable-free", cl::desc(""));
 
 MCSection::MCSection(SectionVariant V, StringRef Name, SectionKind K,
                      MCSymbol *Begin)
@@ -37,9 +40,27 @@ MCSymbol *MCSection::getEndSymbol(MCContext &Ctx) {
 
 bool MCSection::hasEnded() const { return End && End->isInSection(); }
 
+// Use a BuryPointer-like approach to appease leak detectors.
+LLVM_ATTRIBUTE_USED static MCFragment *GraveYard;
+
 MCSection::~MCSection() {
-  for (auto &[_, Chain] : Subsections) {
-    for (MCFragment *X = Chain.Head, *Y; X; X = Y) {
+  if (MCDisableFree) {
+    // Chain lists together in a circular singly linked list.
+    for (auto &[_, List] : Subsections) {
+      if (!List.Head)
+        continue;
+      if (GraveYard) {
+        List.Tail->Next = GraveYard->Next;
+        GraveYard->Next = List.Head;
+      } else {
+        List.Tail->Next = List.Head;
+        GraveYard = List.Head;
+      }
+    }
+    return;
+  }
+  for (auto &[_, List] : Subsections) {
+    for (MCFragment *X = List.Head, *Y; X; X = Y) {
       Y = X->Next;
       X->destroy();
     }
