@@ -29,7 +29,6 @@ MCAsmInfoXCOFF::MCAsmInfoXCOFF() {
   HasPairedDoubleQuoteStringConstants = true;
 
   PrivateGlobalPrefix = "L..";
-  PrivateLabelPrefix = "L..";
   SupportsQuotedNames = false;
   UseDotAlignForAlignment = true;
   UsesDwarfFileAndLocDirectives = false;

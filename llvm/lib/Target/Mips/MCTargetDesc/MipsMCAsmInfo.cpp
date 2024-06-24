@@ -31,7 +31,6 @@ MipsMCAsmInfo::MipsMCAsmInfo(const Triple &TheTriple,
     PrivateGlobalPrefix = "$";
   else if (ABI.IsN32() || ABI.IsN64())
     PrivateGlobalPrefix = ".L";
-  PrivateLabelPrefix = PrivateGlobalPrefix;
 
   AlignmentIsInBytes          = false;
   Data16bitsDirective         = "\t.2byte\t";

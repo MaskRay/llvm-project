@@ -50,7 +50,6 @@ NVPTXMCAsmInfo::NVPTXMCAsmInfo(const Triple &TheTriple,
   SupportsSignedData = false;
 
   PrivateGlobalPrefix = "$L__";
-  PrivateLabelPrefix = PrivateGlobalPrefix;
 
   // @TODO: Can we just disable this?
   WeakDirective = "\t// .weak\t";

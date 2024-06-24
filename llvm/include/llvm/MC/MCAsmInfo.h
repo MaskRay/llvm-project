@@ -626,7 +626,7 @@ public:
   bool useAssignmentForEHBegin() const { return UseAssignmentForEHBegin; }
   bool needsLocalForSize() const { return NeedsLocalForSize; }
   StringRef getPrivateGlobalPrefix() const { return PrivateGlobalPrefix; }
-  StringRef getPrivateLabelPrefix() const { return PrivateLabelPrefix; }
+  StringRef getPrivateLabelPrefix() const { return PrivateGlobalPrefix; }
 
   bool hasLinkerPrivateGlobalPrefix() const {
     return !LinkerPrivateGlobalPrefix.empty();

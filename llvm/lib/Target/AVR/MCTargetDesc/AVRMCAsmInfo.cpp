@@ -22,7 +22,6 @@ AVRMCAsmInfo::AVRMCAsmInfo(const Triple &TT, const MCTargetOptions &Options) {
   CommentString = ";";
   SeparatorString = "$";
   PrivateGlobalPrefix = ".L";
-  PrivateLabelPrefix = ".L";
   UsesELFSectionDirectiveForBSS = true;
   SupportsDebugInformation = true;
 }

@@ -36,7 +36,6 @@ AArch64MCAsmInfoDarwin::AArch64MCAsmInfoDarwin(bool IsILP32) {
   AssemblerDialect = AsmWriterVariant == Default ? Apple : AsmWriterVariant;
 
   PrivateGlobalPrefix = "L";
-  PrivateLabelPrefix = "L";
   SeparatorString = "%%";
   CommentString = ";";
   CalleeSaveStackSlotSize = 8;
@@ -80,7 +79,6 @@ AArch64MCAsmInfoELF::AArch64MCAsmInfoELF(const Triple &T) {
 
   CommentString = "//";
   PrivateGlobalPrefix = ".L";
-  PrivateLabelPrefix = ".L";
   Code32Directive = ".code\t32";
 
   Data16bitsDirective = "\t.hword\t";
@@ -101,7 +99,6 @@ AArch64MCAsmInfoELF::AArch64MCAsmInfoELF(const Triple &T) {
 
 AArch64MCAsmInfoMicrosoftCOFF::AArch64MCAsmInfoMicrosoftCOFF() {
   PrivateGlobalPrefix = ".L";
-  PrivateLabelPrefix = ".L";
 
   Data16bitsDirective = "\t.hword\t";
   Data32bitsDirective = "\t.word\t";
@@ -118,7 +115,6 @@ AArch64MCAsmInfoMicrosoftCOFF::AArch64MCAsmInfoMicrosoftCOFF() {
 
 AArch64MCAsmInfoGNUCOFF::AArch64MCAsmInfoGNUCOFF() {
   PrivateGlobalPrefix = ".L";
-  PrivateLabelPrefix = ".L";
 
   Data16bitsDirective = "\t.hword\t";
   Data32bitsDirective = "\t.word\t";
