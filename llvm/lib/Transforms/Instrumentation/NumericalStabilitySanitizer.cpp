@@ -451,10 +451,7 @@ public:
   Value *getShadow(Value *V) const {
     if (Constant *C = dyn_cast<Constant>(V))
       return getShadowConstant(C);
-    const auto ShadowValIt = Map.find(V);
-    assert(ShadowValIt != Map.end() && "shadow val does not exist");
-    assert(ShadowValIt->second && "shadow val is null");
-    return ShadowValIt->second;
+    return Map.find(V)->second;
   }
 
   bool empty() const { return Map.empty(); }
@@ -572,21 +569,16 @@ private:
 
   std::optional<Regex> CheckFunctionsFilter;
 };
+} // end anonymous namespace
 
-void insertModuleCtor(Module &M) {
+PreservedAnalyses
+NumericalStabilitySanitizerPass::run(Module &M, ModuleAnalysisManager &MAM) {
   getOrCreateSanitizerCtorAndInitFunctions(
       M, kNsanModuleCtorName, kNsanInitName, /*InitArgTypes=*/{},
       /*InitArgs=*/{},
       // This callback is invoked when the functions are created the first
       // time. Hook them into the global ctors list in that case:
       [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(M, Ctor, 0); });
-}
-
-} // end anonymous namespace
-
-PreservedAnalyses
-NumericalStabilitySanitizerPass::run(Module &M, ModuleAnalysisManager &MAM) {
-  insertModuleCtor(M);
 
   NumericalStabilitySanitizer Nsan(M);
   auto &FAM = MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
@@ -1989,7 +1981,7 @@ static void moveFastMathFlags(Function &F,
 
 bool NumericalStabilitySanitizer::sanitizeFunction(
     Function &F, const TargetLibraryInfo &TLI) {
-  if (F.empty() || !F.hasFnAttribute(Attribute::SanitizeNumericalStability))
+  if (!F.hasFnAttribute(Attribute::SanitizeNumericalStability))
     return false;
 
   // This is required to prevent instrumenting call to __nsan_init from within
