@@ -34,11 +34,18 @@
 #include "llvm/MC/MCSymbolELF.h"
 #include "llvm/MC/MCWinCOFFStreamer.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Triple.h"
 
 using namespace llvm;
+
+static cl::opt<bool>
+    InitialMappingForText("aarch64-initial-mapping-for-text", cl::Hidden,
+                          cl::desc("Ensure that sections with instructions "
+                                   "have an initial $x mapping symbol"),
+                          cl::init(true));
 
 namespace {
 
@@ -176,6 +183,7 @@ void AArch64TargetAsmStreamer::emitInst(uint32_t Inst) {
 /// by MachO. Beware!
 class AArch64ELFStreamer : public MCELFStreamer {
 public:
+  friend AArch64TargetELFStreamer;
   AArch64ELFStreamer(MCContext &Context, std::unique_ptr<MCAsmBackend> TAB,
                      std::unique_ptr<MCObjectWriter> OW,
                      std::unique_ptr<MCCodeEmitter> Emitter)
@@ -185,16 +193,16 @@ public:
 
   void changeSection(MCSection *Section, uint32_t Subsection = 0) override {
     // We have to keep track of the mapping symbol state of any sections we use.
-    // Text sections start as EMS_None because the ABI requires that a section
-    // that contains instructions must have a mapping symbol defined at the
-    // beginning. Non-text sections can start as EMS_Data, since they can only
-    // contain instructions in erroneous cases.
+    // The initial state is EMS_A64 for text sections and EMS_Data for the
+    // others.
     LastMappingSymbols[getCurrentSection().first] = LastEMS;
     auto It = LastMappingSymbols.find(Section);
     if (It != LastMappingSymbols.end())
       LastEMS = It->second;
+    else if (Section->isText())
+      LastEMS = InitialMappingForText ? EMS_None : EMS_A64;
     else
-      LastEMS = Section->isText() ? EMS_None : EMS_Data;
+      LastEMS = EMS_Data;
 
     MCELFStreamer::changeSection(Section, Subsection);
   }
@@ -310,6 +318,15 @@ void AArch64TargetELFStreamer::finish() {
   AArch64ELFStreamer &S = getStreamer();
   MCContext &Ctx = S.getContext();
   auto &Asm = S.getAssembler();
+
+  for (MCSection &Sec : Asm) {
+    S.switchSection(&Sec);
+    if (!Sec.isText())
+      S.emitDataMappingSymbol();
+    else if (!InitialMappingForText)
+      S.emitA64MappingSymbol();
+  }
+
   MCSectionELF *MemtagSec = nullptr;
   for (const MCSymbol &Symbol : Asm.symbols()) {
     const auto &Sym = cast<MCSymbolELF>(Symbol);
