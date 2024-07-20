@@ -121,10 +121,8 @@ private:
 
   Expr combine(StringRef op, Expr l, Expr r);
   Expr readExpr();
-  Expr readExpr1(Expr lhs, int minPrec);
   StringRef readParenLiteral();
   Expr readPrimary();
-  Expr readTernary(Expr cond);
   Expr readParenExpr();
 
   // For parsing version script.
@@ -696,6 +694,7 @@ static int precedence(StringRef op) {
       .Case("&&", 3)
       .Case("||", 2)
       .Case("?", 1)
+      .Case(":", 0)
       .Default(-1);
 }
 
@@ -1183,8 +1182,40 @@ Expr ScriptParser::readExpr() {
   // Our lexer is context-aware. Set the in-expression bit so that
   // they apply different tokenization rules.
   SaveAndRestore saved(inExpr, true);
-  Expr e = readExpr1(readPrimary(), 0);
-  return e;
+  SmallVector<std::pair<StringRef, Expr>, 0> s{{"", readPrimary()}};
+  for (;;) {
+    StringRef op = atEOF() ? "" : peek();
+    int prec = precedence(op);
+    while (s.size() > 1 && precedence(s.back().first) >= prec) {
+      if (s.back().first == "?" && prec >= 0)
+        break;
+      auto top = s.pop_back_val();
+      if (top.first == ":") {
+        assert(s.back().first == "?");
+        Expr top2 = s.pop_back_val().second;
+        s.back().second = [cond = s.back().second, l = top2, r = top.second] {
+          return cond().getValue() ? l() : r();
+        };
+      } else {
+        if (top.first == "?") {
+          setError(": expected, but got " + op);
+          break;
+        }
+        s.back().second = combine(top.first, s.back().second, top.second);
+      }
+    }
+    // "" or : without ? is not considered part of the expression.
+    if (prec <= 0 && s.size() == 1)
+      break;
+    skip();
+    if (op == ":" && s.back().first != "?") {
+      setError("unmatched :");
+      break;
+    }
+    s.emplace_back(op, readPrimary());
+  }
+
+  return s[0].second;
 }
 
 Expr ScriptParser::combine(StringRef op, Expr l, Expr r) {
@@ -1239,35 +1270,6 @@ Expr ScriptParser::combine(StringRef op, Expr l, Expr r) {
   if (op == "|")
     return [=] { return bitOr(l(), r()); };
   llvm_unreachable("invalid operator");
-}
-
-// This is a part of the operator-precedence parser. This function
-// assumes that the remaining token stream starts with an operator.
-Expr ScriptParser::readExpr1(Expr lhs, int minPrec) {
-  while (!atEOF() && !errorCount()) {
-    // Read an operator and an expression.
-    StringRef op1 = peek();
-    if (precedence(op1) < minPrec)
-      break;
-    skip();
-    if (op1 == "?")
-      return readTernary(lhs);
-    Expr rhs = readPrimary();
-
-    // Evaluate the remaining part of the expression first if the
-    // next operator has greater precedence than the previous one.
-    // For example, if we have read "+" and "3", and if the next
-    // operator is "*", then we'll evaluate 3 * ... part first.
-    while (!atEOF()) {
-      StringRef op2 = peek();
-      if (precedence(op2) <= precedence(op1))
-        break;
-      rhs = readExpr1(rhs, precedence(op2));
-    }
-
-    lhs = combine(op1, lhs, rhs);
-  }
-  return lhs;
 }
 
 Expr ScriptParser::getPageSize() {
@@ -1609,13 +1611,6 @@ Expr ScriptParser::readPrimary() {
   else
     script->referencedSymbols.push_back(tok);
   return [=] { return script->getSymbolValue(tok, location); };
-}
-
-Expr ScriptParser::readTernary(Expr cond) {
-  Expr l = readExpr();
-  expect(":");
-  Expr r = readExpr();
-  return [=] { return cond().getValue() ? l() : r(); };
 }
 
 Expr ScriptParser::readParenExpr() {
