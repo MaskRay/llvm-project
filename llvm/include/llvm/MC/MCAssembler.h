@@ -65,6 +65,7 @@ private:
 
   bool HasLayout = false;
   bool RelaxAll = false;
+  unsigned RelaxSteps = 0;
 
   SectionListType Sections;
 
@@ -111,21 +112,22 @@ private:
   /// Check whether the given fragment needs relaxation.
   bool fragmentNeedsRelaxation(const MCRelaxableFragment *IF) const;
 
+  void layoutSection(MCSection &Sec);
   /// Perform one layout iteration and return true if any offsets
   /// were adjusted.
   bool layoutOnce();
 
   /// Perform relaxation on a single fragment - returns true if the fragment
   /// changes as a result of relaxation.
-  bool relaxFragment(MCFragment &F);
-  bool relaxInstruction(MCRelaxableFragment &IF);
-  bool relaxLEB(MCLEBFragment &IF);
-  bool relaxBoundaryAlign(MCBoundaryAlignFragment &BF);
-  bool relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF);
-  bool relaxDwarfCallFrameFragment(MCDwarfCallFrameFragment &DF);
-  bool relaxCVInlineLineTable(MCCVInlineLineTableFragment &DF);
-  bool relaxCVDefRange(MCCVDefRangeFragment &DF);
-  bool relaxPseudoProbeAddr(MCPseudoProbeAddrFragment &DF);
+  void relaxFragment(MCFragment &F);
+  void relaxInstruction(MCRelaxableFragment &IF);
+  void relaxLEB(MCLEBFragment &IF);
+  void relaxBoundaryAlign(MCBoundaryAlignFragment &BF);
+  void relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF);
+  void relaxDwarfCallFrameFragment(MCDwarfCallFrameFragment &DF);
+  void relaxCVInlineLineTable(MCCVInlineLineTableFragment &DF);
+  void relaxCVDefRange(MCCVDefRangeFragment &DF);
+  void relaxPseudoProbeAddr(MCPseudoProbeAddrFragment &DF);
 
   std::tuple<MCValue, uint64_t, bool>
   handleFixup(MCFragment &F, const MCFixup &Fixup, const MCSubtargetInfo *STI);
@@ -147,10 +149,9 @@ public:
   uint64_t computeFragmentSize(const MCFragment &F) const;
 
   void layoutBundle(MCFragment *Prev, MCFragment *F) const;
-  void ensureValid(MCSection &Sec) const;
 
   // Get the offset of the given fragment inside its containing section.
-  uint64_t getFragmentOffset(const MCFragment &F) const;
+  uint64_t getFragmentOffset(const MCFragment &F) const { return F.Offset; }
 
   uint64_t getSectionAddressSize(const MCSection &Sec) const;
   uint64_t getSectionFileSize(const MCSection &Sec) const;
