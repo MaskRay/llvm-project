@@ -261,7 +261,11 @@ uint64_t MCAssembler::computeFragmentSize(const MCFragment &F) const {
     }
     int64_t Size = NumValues * FF.getValueSize();
     if (Size < 0) {
-      getContext().reportError(FF.getLoc(), "invalid number of bytes");
+      // The expression might use symbol values which have not yet converged.
+      // Allow the first few iterations to have temporary negative values. The
+      // limit is somewhat arbitrary but allows contrived interdependency.
+      if (RelaxSteps >= 2)
+        getContext().reportError(FF.getLoc(), "invalid number of bytes");
       return 0;
     }
     return Size;
@@ -426,28 +430,6 @@ void MCAssembler::layoutBundle(MCFragment *Prev, MCFragment *F) const {
   if (auto *DF = dyn_cast_or_null<MCDataFragment>(Prev))
     if (DF->getContents().empty())
       DF->Offset = EF->Offset;
-}
-
-void MCAssembler::ensureValid(MCSection &Sec) const {
-  if (Sec.hasLayout())
-    return;
-  Sec.setHasLayout(true);
-  MCFragment *Prev = nullptr;
-  uint64_t Offset = 0;
-  for (MCFragment &F : Sec) {
-    F.Offset = Offset;
-    if (isBundlingEnabled() && F.hasInstructions()) {
-      layoutBundle(Prev, &F);
-      Offset = F.Offset;
-    }
-    Offset += computeFragmentSize(F);
-    Prev = &F;
-  }
-}
-
-uint64_t MCAssembler::getFragmentOffset(const MCFragment &F) const {
-  ensureValid(*F.getParent());
-  return F.Offset;
 }
 
 // Simple getSymbolOffset helper for the non-variable case.
@@ -929,22 +911,22 @@ void MCAssembler::layout() {
 
   // Layout until everything fits.
   this->HasLayout = true;
-  while (layoutOnce()) {
+  for (MCSection &Sec : *this)
+    layoutSection(Sec);
+  while (layoutOnce())
     if (getContext().hadError())
       return;
-    // Size of fragments in one section can depend on the size of fragments in
-    // another. If any fragment has changed size, we have to re-layout (and
-    // as a result possibly further relax) all.
-    for (MCSection &Sec : *this)
-      Sec.setHasLayout(false);
-  }
+  RelaxSteps = UINT_MAX;
 
   DEBUG_WITH_TYPE("mc-dump", {
       errs() << "assembler backend - post-relaxation\n--\n";
       dump(); });
 
-  // Finalize the layout, including fragment lowering.
-  getBackend().finishLayout(*this);
+  // Some targets might want to adjust fragment offsets. If so, perform another
+  // layout loop.
+  if (getBackend().finishLayout(*this))
+    for (MCSection &Sec : *this)
+      layoutSection(Sec);
 
   DEBUG_WITH_TYPE("mc-dump", {
       errs() << "assembler backend - final-layout\n--\n";
@@ -1297,15 +1279,63 @@ bool MCAssembler::relaxFragment(MCFragment &F) {
   }
 }
 
+void MCAssembler::layoutSection(MCSection &Sec) {
+  MCFragment *Prev = nullptr;
+  uint64_t Offset = 0;
+  for (MCFragment &F : Sec) {
+    F.Offset = Offset;
+    if (LLVM_UNLIKELY(isBundlingEnabled())) {
+      if (F.hasInstructions()) {
+        layoutBundle(Prev, &F);
+        Offset = F.Offset;
+      }
+      Prev = &F;
+    }
+    Offset += computeFragmentSize(F);
+  }
+}
+
 bool MCAssembler::layoutOnce() {
   ++stats::RelaxationSteps;
+  ++RelaxSteps;
 
-  bool Changed = false;
-  for (MCSection &Sec : *this)
-    for (MCFragment &Frag : Sec)
-      if (relaxFragment(Frag))
-        Changed = true;
-  return Changed;
+  // Size of fragments in one section can depend on the size of fragments in
+  // another. If any fragment has changed size, we have to re-layout (and
+  // as a result possibly further relax) all.
+  bool ChangedAny = false, Changed;
+  for (MCSection &Sec : *this) {
+    // Assume each iteration finalizes at least one extra fragment. If the
+    // layout does not converge after N+1 iterations, bail out.
+    auto MaxIter = Sec.curFragList()->Tail->getLayoutOrder() + 1;
+    uint64_t OldSize = getSectionAddressSize(Sec);
+    do {
+      Changed = false;
+      MCFragment *Prev = nullptr;
+      uint64_t Offset = 0;
+      for (MCFragment &F : Sec) {
+        relaxFragment(F);
+        if (LLVM_UNLIKELY(isBundlingEnabled())) {
+          F.Offset = Offset;
+          if (F.hasInstructions()) {
+            layoutBundle(Prev, &F);
+            Offset = F.Offset;
+          }
+          Prev = &F;
+        }
+        if (F.Offset != Offset) {
+          F.Offset = Offset;
+          Changed = true;
+        }
+        Offset += computeFragmentSize(F);
+      }
+      Changed |= OldSize != Offset;
+      ChangedAny |= Changed;
+      OldSize = Offset;
+    } while (Changed && --MaxIter);
+    if (MaxIter == 0)
+      return false;
+  }
+  return ChangedAny;
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
