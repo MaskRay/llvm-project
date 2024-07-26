@@ -419,7 +419,7 @@ protected:
   unsigned getMinBucketToReserveForEntries(unsigned NumEntries) {
     // Ensure that "NumEntries * 4 < NumBuckets * 3"
     if (NumEntries == 0)
-      return 0;
+      return 4;
     // +1 is required because of the strict equality.
     // For example if NumEntries is 48, we need to return 401.
     return NextPowerOf2(NumEntries * 4 / 3 + 1);
@@ -636,9 +636,6 @@ private:
   template <typename LookupKeyT> BucketT *doFind(const LookupKeyT &Val) {
     BucketT *BucketsPtr = getBuckets();
     const unsigned NumBuckets = getNumBuckets();
-    if (NumBuckets == 0)
-      return nullptr;
-
     const KeyT EmptyKey = getEmptyKey();
     unsigned BucketNo = getHashValue(Val) & (NumBuckets - 1);
     unsigned ProbeAmt = 1;
@@ -670,11 +667,6 @@ private:
                        const BucketT *&FoundBucket) const {
     const BucketT *BucketsPtr = getBuckets();
     const unsigned NumBuckets = getNumBuckets();
-
-    if (NumBuckets == 0) {
-      FoundBucket = nullptr;
-      return false;
-    }
 
     // FoundTombstone - Keep track of whether we find a tombstone while probing.
     const BucketT *FoundTombstone = nullptr;
@@ -924,11 +916,6 @@ private:
 
   bool allocateBuckets(unsigned Num) {
     NumBuckets = Num;
-    if (NumBuckets == 0) {
-      Buckets = nullptr;
-      return false;
-    }
-
     Buckets = static_cast<BucketT *>(
         allocate_buffer(sizeof(BucketT) * NumBuckets, alignof(BucketT)));
     return true;
