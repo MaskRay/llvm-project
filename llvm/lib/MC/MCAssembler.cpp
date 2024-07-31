@@ -388,28 +388,6 @@ void MCAssembler::layoutBundle(MCFragment *Prev, MCFragment *F) const {
       DF->Offset = EF->Offset;
 }
 
-void MCAssembler::ensureValid(MCSection &Sec) const {
-  if (Sec.hasLayout())
-    return;
-  Sec.setHasLayout(true);
-  MCFragment *Prev = nullptr;
-  uint64_t Offset = 0;
-  for (MCFragment &F : Sec) {
-    F.Offset = Offset;
-    if (isBundlingEnabled() && F.hasInstructions()) {
-      layoutBundle(Prev, &F);
-      Offset = F.Offset;
-    }
-    Offset += computeFragmentSize(F);
-    Prev = &F;
-  }
-}
-
-uint64_t MCAssembler::getFragmentOffset(const MCFragment &F) const {
-  ensureValid(*F.getParent());
-  return F.Offset;
-}
-
 // Simple getSymbolOffset helper for the non-variable case.
 static bool getLabelOffset(const MCAssembler &Asm, const MCSymbol &S,
                            bool ReportError, uint64_t &Val) {
@@ -864,22 +842,22 @@ void MCAssembler::layout() {
 
   // Layout until everything fits.
   this->HasLayout = true;
-  while (layoutOnce()) {
+  for (MCSection &Sec : *this)
+    layoutSection(Sec);
+  while (relaxOnce())
     if (getContext().hadError())
       return;
-    // Size of fragments in one section can depend on the size of fragments in
-    // another. If any fragment has changed size, we have to re-layout (and
-    // as a result possibly further relax) all.
-    for (MCSection &Sec : *this)
-      Sec.setHasLayout(false);
-  }
 
   DEBUG_WITH_TYPE("mc-dump", {
       errs() << "assembler backend - post-relaxation\n--\n";
       dump(); });
 
-  // Finalize the layout, including fragment lowering.
-  getBackend().finishLayout(*this);
+  // Some targets might want to adjust fragment offsets. If so, perform another
+  // relaxation loop.
+  flushPendingErrors();
+  if (getBackend().finishLayout(*this))
+    for (MCSection &Sec : *this)
+      layoutSection(Sec);
 
   flushPendingErrors();
 
@@ -1209,6 +1187,16 @@ bool MCAssembler::relaxFragment(MCFragment &F) {
     assert(!getRelaxAll() &&
            "Did not expect a MCRelaxableFragment in RelaxAll mode");
     return relaxInstruction(cast<MCRelaxableFragment>(F));
+  case MCFragment::FT_Fill: {
+    auto &FF = cast<MCFillFragment>(F);
+    int64_t NumValues = 0;
+    if (!FF.getNumValues().evaluateKnownAbsolute(NumValues, *this))
+      return 0;
+    int64_t Size = NumValues * FF.getValueSize();
+    if (Size < 0)
+      Size = 0;
+    return std::exchange(FF.Size, Size) != uint64_t(Size);
+  } break;
   case MCFragment::FT_Dwarf:
     return relaxDwarfLineAddr(cast<MCDwarfLineAddrFragment>(F));
   case MCFragment::FT_DwarfFrame:
@@ -1226,16 +1214,47 @@ bool MCAssembler::relaxFragment(MCFragment &F) {
   }
 }
 
-bool MCAssembler::layoutOnce() {
+void MCAssembler::layoutSection(MCSection &Sec) {
+  MCFragment *Prev = nullptr;
+  uint64_t Offset = 0;
+  for (MCFragment &F : Sec) {
+    F.Offset = Offset;
+    if (LLVM_UNLIKELY(isBundlingEnabled())) {
+      if (F.hasInstructions()) {
+        layoutBundle(Prev, &F);
+        Offset = F.Offset;
+      }
+      Prev = &F;
+    }
+    Offset += computeFragmentSize(F);
+  }
+}
+
+bool MCAssembler::relaxOnce() {
   ++stats::RelaxationSteps;
   PendingErrors.clear();
 
-  bool Changed = false;
-  for (MCSection &Sec : *this)
-    for (MCFragment &Frag : Sec)
-      if (relaxFragment(Frag))
-        Changed = true;
-  return Changed;
+  // Size of fragments in one section can depend on the size of fragments in
+  // another. If any fragment has changed size, we have to re-layout (and
+  // as a result possibly further relax) all sections.
+  bool ChangedAny = false;
+  for (MCSection &Sec : *this) {
+    // Assume each iteration finalizes at least one extra fragment. If the
+    // layout does not converge after N+1 iterations, bail out.
+    auto MaxIter = Sec.curFragList()->Tail->getLayoutOrder() + 1;
+    for (;;) {
+      bool Changed = false;
+      for (MCFragment &F : Sec)
+        if (relaxFragment(F))
+          Changed = true;
+
+      ChangedAny |= Changed;
+      if (!Changed || --MaxIter == 0)
+        break;
+      layoutSection(Sec);
+    }
+  }
+  return ChangedAny;
 }
 
 void MCAssembler::reportError(SMLoc L, const Twine &Msg) const {

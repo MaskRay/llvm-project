@@ -298,6 +298,7 @@ class MCFillFragment : public MCFragment {
   SMLoc Loc;
 
 public:
+  uint64_t Size = 0;
   MCFillFragment(uint64_t Value, uint8_t VSize, const MCExpr &NumValues,
                  SMLoc Loc)
       : MCFragment(FT_Fill, false), ValueSize(VSize), Value(Value),
