@@ -1207,7 +1207,7 @@ template <class ELFT> void ObjFile<ELFT>::importCmseSymbols() {
 
   for (size_t i = firstGlobal, end = eSyms.size(); i != end; ++i) {
     const Elf_Sym &eSym = eSyms[i];
-    Defined *sym = reinterpret_cast<Defined *>(make<SymbolUnion>());
+    Defined *sym = reinterpret_cast<Defined *>(make<SymbolUnion>(ctx));
 
     // Initialize symbol fields.
     memset(static_cast<void *>(sym), 0, sizeof(Symbol));
@@ -1467,7 +1467,7 @@ template <typename ELFT> void elf::writeARMCmseImportLib(Ctx &ctx) {
   for (auto &p : ctx.symtab->cmseSymMap) {
     Defined *d = cast<Defined>(p.second.sym);
     impSymTab->addSymbol(makeDefined(
-        ctx, ctx.internalFile, d->getName(), d->computeBinding(ctx),
+        ctx, ctx, ctx.internalFile, d->getName(), d->computeBinding(ctx),
         /*stOther=*/0, STT_FUNC, d->getVA(ctx), d->getSize(), nullptr));
   }
 

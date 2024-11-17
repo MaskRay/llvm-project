@@ -556,7 +556,7 @@ static void implementPatch(Ctx &ctx, uint64_t adrpAddr, uint64_t patcheeOffset,
   Log(ctx) << "detected cortex-a53-843419 erratum sequence starting at " <<
       utohexstr(adrpAddr) << " in unpatched output.";
 
-  auto *ps = make<Patch843419Section>(ctx, isec, patcheeOffset);
+  auto *ps = makeC<Patch843419Section>(ctx, isec, patcheeOffset);
   patches.push_back(ps);
 
   auto makeRelToPatch = [](uint64_t offset, Symbol *patchSym) {

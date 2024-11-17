@@ -1314,7 +1314,7 @@ static bool isBitcodeNonCommonDef(MemoryBufferRef mb, StringRef symName,
 template <class ELFT>
 static bool isNonCommonDef(Ctx &ctx, ELFKind ekind, MemoryBufferRef mb,
                            StringRef symName, StringRef archiveName) {
-  ObjFile<ELFT> *obj = make<ObjFile<ELFT>>(ctx, ekind, mb, archiveName);
+  ObjFile<ELFT> *obj = makeC<ObjFile<ELFT>>(ctx, ekind, mb, archiveName);
   obj->init();
   StringRef stringtable = obj->getStringTable();
 
@@ -1826,9 +1826,9 @@ void BitcodeFile::postParse() {
 
 void BinaryFile::parse() {
   ArrayRef<uint8_t> data = arrayRefFromStringRef(mb.getBuffer());
-  auto *section =
-      make<InputSection>(this, ".data", SHT_PROGBITS, SHF_ALLOC | SHF_WRITE,
-                         /*addralign=*/8, /*entsize=*/0, data);
+  auto *section = make<InputSection>(ctx, this, ".data", SHT_PROGBITS,
+                                     SHF_ALLOC | SHF_WRITE,
+                                     /*addralign=*/8, /*entsize=*/0, data);
   sections.push_back(section);
 
   // For each input file foo that is embedded to a result as a binary
@@ -1854,7 +1854,7 @@ void BinaryFile::parse() {
 
 InputFile *elf::createInternalFile(Ctx &ctx, StringRef name) {
   auto *file =
-      make<InputFile>(ctx, InputFile::InternalKind, MemoryBufferRef("", name));
+      makeC<InputFile>(ctx, InputFile::InternalKind, MemoryBufferRef("", name));
   // References from an internal file do not lead to --warn-backrefs
   // diagnostics.
   file->groupId = 0;

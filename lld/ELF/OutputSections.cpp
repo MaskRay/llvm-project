@@ -103,7 +103,7 @@ void OutputSection::recordSection(InputSectionBase *isec) {
   partition = isec->partition;
   isec->parent = this;
   if (commands.empty() || !isa<InputSectionDescription>(commands.back()))
-    commands.push_back(make<InputSectionDescription>(""));
+    commands.push_back(make<InputSectionDescription>(ctx, ""));
   auto *isd = cast<InputSectionDescription>(commands.back());
   isd->sectionBases.push_back(isec);
 }
@@ -184,8 +184,8 @@ static MergeSyntheticSection *createMergeSynthetic(Ctx &ctx, StringRef name,
                                                    uint64_t flags,
                                                    uint32_t addralign) {
   if ((flags & SHF_STRINGS) && ctx.arg.optimize >= 2)
-    return make<MergeTailSection>(ctx, name, type, flags, addralign);
-  return make<MergeNoTailSection>(ctx, name, type, flags, addralign);
+    return makeC<MergeTailSection>(ctx, name, type, flags, addralign);
+  return makeC<MergeNoTailSection>(ctx, name, type, flags, addralign);
 }
 
 // This function scans over the InputSectionBase list sectionBases to create

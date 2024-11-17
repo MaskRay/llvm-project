@@ -667,7 +667,7 @@ void elf::initSymbolAnchors(Ctx &ctx) {
     if (!(osec->flags & SHF_EXECINSTR))
       continue;
     for (InputSection *sec : getInputSections(*osec, storage)) {
-      sec->relaxAux = make<RelaxAux>();
+      sec->relaxAux = make<RelaxAux>(ctx);
       if (sec->relocs().size()) {
         sec->relaxAux->relocDeltas =
             std::make_unique<uint32_t[]>(sec->relocs().size());

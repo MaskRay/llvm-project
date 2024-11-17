@@ -127,13 +127,13 @@ void elf::copySectionsIntoPartitions(Ctx &ctx) {
     for (InputSectionBase *s : ctx.inputSections) {
       if (!(s->flags & SHF_ALLOC) || !s->isLive() || s->type != SHT_NOTE)
         continue;
-      auto *copy = make<InputSection>(cast<InputSection>(*s));
+      auto *copy = make<InputSection>(ctx, cast<InputSection>(*s));
       copy->partition = part;
       newSections.push_back(copy);
     }
     for (size_t i = 0; i != ehSize; ++i) {
       assert(ctx.ehInputSections[i]->isLive());
-      auto *copy = make<EhInputSection>(*ctx.ehInputSections[i]);
+      auto *copy = make<EhInputSection>(ctx, *ctx.ehInputSections[i]);
       copy->partition = part;
       ctx.ehInputSections.push_back(copy);
     }
@@ -544,7 +544,7 @@ template <class ELFT> void Writer<ELFT>::addSectionSymbols() {
     // Set the symbol to be relative to the output section so that its st_value
     // equals the output section address. Note, there may be a gap between the
     // start of the output section and isec.
-    ctx.in.symTab->addSymbol(makeDefined(ctx, isec->file, "", STB_LOCAL,
+    ctx.in.symTab->addSymbol(makeDefined(ctx, ctx, isec->file, "", STB_LOCAL,
                                          /*stOther=*/0, STT_SECTION,
                                          /*value=*/0, /*size=*/0, &osec));
   }

@@ -653,7 +653,7 @@ LinkerScript::computeInputSections(const InputSectionDescription *cmd,
       // Append the spill input section to the list for the input section,
       // creating it if necessary.
       PotentialSpillSection *pss = make<PotentialSpillSection>(
-          *sec, const_cast<InputSectionDescription &>(*cmd));
+          ctx, *sec, const_cast<InputSectionDescription &>(*cmd));
       auto [it, inserted] =
           potentialSpillLists.try_emplace(sec, PotentialSpillList{pss, pss});
       if (!inserted) {

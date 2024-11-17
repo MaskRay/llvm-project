@@ -296,7 +296,7 @@ void ScriptParser::readDefsym() {
   if (!atEOF())
     setError("EOF expected, but got " + next());
   auto *cmd = make<SymbolAssignment>(
-      name, e, 0, getCurrentMB().getBufferIdentifier().str());
+      ctx, name, e, 0, getCurrentMB().getBufferIdentifier().str());
   ctx.script->sectionCommands.push_back(cmd);
 }
 
@@ -609,7 +609,7 @@ SmallVector<SectionCommand *, 0> ScriptParser::readOverlay() {
 
 SectionClassDesc *ScriptParser::readSectionClassDescription() {
   StringRef name = readSectionClassName();
-  SectionClassDesc *desc = make<SectionClassDesc>(name);
+  SectionClassDesc *desc = make<SectionClassDesc>(ctx, name);
   if (!ctx.script->sectionClasses.insert({CachedHashStringRef(name), desc})
            .second)
     setError("section class '" + name + "' already defined");
@@ -814,7 +814,7 @@ InputSectionDescription *
 ScriptParser::readInputSectionRules(StringRef filePattern, uint64_t withFlags,
                                     uint64_t withoutFlags) {
   auto *cmd =
-      make<InputSectionDescription>(filePattern, withFlags, withoutFlags);
+      make<InputSectionDescription>(ctx, filePattern, withFlags, withoutFlags);
   expect("(");
 
   while (peek() != ")" && !atEOF()) {
@@ -861,8 +861,8 @@ ScriptParser::readInputSectionDescription(StringRef tok) {
     tok = next();
     InputSectionDescription *cmd;
     if (tok == "CLASS")
-      cmd = make<InputSectionDescription>(StringRef{}, withFlags, withoutFlags,
-                                          readSectionClassName());
+      cmd = make<InputSectionDescription>(ctx, StringRef{}, withFlags,
+                                          withoutFlags, readSectionClassName());
     else
       cmd = readInputSectionRules(tok, withFlags, withoutFlags);
     expect(")");
@@ -874,8 +874,8 @@ ScriptParser::readInputSectionDescription(StringRef tok) {
     tok = next();
   }
   if (tok == "CLASS")
-    return make<InputSectionDescription>(StringRef{}, withFlags, withoutFlags,
-                                         readSectionClassName());
+    return make<InputSectionDescription>(ctx, StringRef{}, withFlags,
+                                         withoutFlags, readSectionClassName());
   return readInputSectionRules(tok, withFlags, withoutFlags);
 }
 
@@ -1067,7 +1067,7 @@ OutputDesc *ScriptParser::readOutputSectionDescription(StringRef outSec) {
       // FIXME: GNU ld permits INPUT_SECTION_FLAGS to be used here. We do not
       // handle this case here as it will already have been matched by the
       // case above.
-      auto *isd = make<InputSectionDescription>(tok);
+      auto *isd = make<InputSectionDescription>(ctx, tok);
       isd->sectionPatterns.push_back({{}, StringMatcher("*")});
       osec->commands.push_back(isd);
     }
@@ -1155,7 +1155,8 @@ static void squeezeSpaces(std::string &str) {
 SymbolAssignment *ScriptParser::readAssignment(StringRef tok) {
   // Assert expression returns Dot, so this is equal to ".=."
   if (tok == "ASSERT")
-    return make<SymbolAssignment>(".", readAssert(), 0, getCurrentLocation());
+    return make<SymbolAssignment>(ctx, ".", readAssert(), 0,
+                                  getCurrentLocation());
 
   const char *oldS = prevTok.data();
   SymbolAssignment *cmd = nullptr;
@@ -1226,7 +1227,7 @@ SymbolAssignment *ScriptParser::readSymbolAssignment(StringRef name) {
       }
     };
   }
-  return make<SymbolAssignment>(name, e, ctx.scriptSymOrderCounter++,
+  return make<SymbolAssignment>(ctx, name, e, ctx.scriptSymOrderCounter++,
                                 getCurrentLocation());
 }
 
@@ -1390,7 +1391,7 @@ ByteCommand *ScriptParser::readByteCommand(StringRef tok) {
   Expr e = readParenExpr();
   std::string commandString = StringRef(oldS, curBuf.s.data() - oldS).str();
   squeezeSpaces(commandString);
-  return make<ByteCommand>(e, size, std::move(commandString));
+  return make<ByteCommand>(ctx, e, size, std::move(commandString));
 }
 
 static std::optional<uint64_t> parseFlag(StringRef tok) {
@@ -1855,8 +1856,8 @@ void ScriptParser::readMemory() {
     Expr length = readMemoryAssignment("LENGTH", "len", "l");
 
     // Add the memory region to the region map.
-    MemoryRegion *mr = make<MemoryRegion>(tok, origin, length, flags, invFlags,
-                                          negFlags, negInvFlags);
+    MemoryRegion *mr = make<MemoryRegion>(ctx, tok, origin, length, flags,
+                                          invFlags, negFlags, negInvFlags);
     if (!ctx.script->memoryRegions.insert({tok, mr}).second)
       setError("region '" + tok + "' already defined");
   }

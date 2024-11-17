@@ -20,6 +20,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/CachePruning.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Compiler.h"
@@ -688,6 +689,26 @@ struct Ctx : CommonLinkerContext {
 // VER_NDX_GLOBAL. This helper returns other elements.
 static inline ArrayRef<VersionDefinition> namedVersionDefs(Ctx &ctx) {
   return llvm::ArrayRef(ctx.arg.versionDefinitions).slice(2);
+}
+
+template <typename T>
+inline llvm::SpecificBumpPtrAllocator<T> &getSpecificAllocSingleton(Ctx &ctx) {
+  auto &instance = ctx.instances[&SpecificAlloc<T>::tag];
+  if (instance == nullptr) {
+    void *storage = ctx.bAlloc.Allocate(sizeof(SpecificAlloc<T>),
+                                        alignof(SpecificAlloc<T>));
+    instance = new (storage) SpecificAlloc<T>;
+  }
+  return ((SpecificAlloc<T> *)instance)->alloc;
+}
+
+template <typename T, typename... U> T *make(Ctx &ctx, U &&...args) {
+  return new (getSpecificAllocSingleton<T>(ctx).Allocate())
+      T(std::forward<U>(args)...);
+}
+template <typename T, typename... U> T *makeC(Ctx &ctx, U &&...args) {
+  return new (getSpecificAllocSingleton<T>(ctx).Allocate())
+      T(ctx, std::forward<U>(args)...);
 }
 
 struct ELFSyncStream : SyncStream {
