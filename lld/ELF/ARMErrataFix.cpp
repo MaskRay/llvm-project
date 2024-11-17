@@ -452,7 +452,7 @@ static void implementPatch(ScanResult sr, InputSection *isec,
                                 : sr.rel->sym->getVA(ctx);
       destIsARM = (dstSymAddr & 1) == 0;
     }
-    psec = make<Patch657417Section>(ctx, isec, sr.off, sr.instr, destIsARM);
+    psec = makeC<Patch657417Section>(ctx, isec, sr.off, sr.instr, destIsARM);
     if (destIsARM) {
       // The patch will be in ARM state. Use an ARM relocation and account for
       // the larger ARM PC-bias of 8 rather than Thumb's 4.
@@ -471,7 +471,7 @@ static void implementPatch(ScanResult sr, InputSection *isec,
 
     // The destination is ARM if we have a BLX.
     psec =
-        make<Patch657417Section>(ctx, isec, sr.off, sr.instr, isBLX(sr.instr));
+        makeC<Patch657417Section>(ctx, isec, sr.off, sr.instr, isBLX(sr.instr));
     RelType type;
     if (isBcc(sr.instr))
       type = R_ARM_THM_JUMP19;
