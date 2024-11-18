@@ -188,7 +188,8 @@ Result lld::lldMain(llvm::ArrayRef<const char *> args,
           r = unsafeLldMain(args, stdoutOS, stderrOS, drivers,
                             /*exitEarly=*/false);
         }))
-      return {crc.RetCode, /*canRunAgain=*/false};
+      r = crc.RetCode;
+    // return {crc.RetCode, /*canRunAgain=*/false};
   }
 
   // Cleanup memory and reset everything back in pristine condition. This path

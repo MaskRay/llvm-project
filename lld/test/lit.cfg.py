@@ -101,7 +101,7 @@ config.environment["LLD_VERSION"] = "LLD 1.0"
 # correctly (which is important for usage as a library).
 run_lld_main_twice = lit_config.params.get("RUN_LLD_MAIN_TWICE", False)
 if not run_lld_main_twice:
-    config.environment["LLD_IN_TEST"] = "1"
+    config.environment["LLD_IN_TEST"] = "2"
 else:
     config.environment["LLD_IN_TEST"] = "2"
     # Many ELF tests fail in this mode.
