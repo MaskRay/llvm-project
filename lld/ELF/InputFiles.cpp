@@ -1742,9 +1742,11 @@ static void createBitcodeSymbol(Ctx &ctx, Symbol *&sym,
   } else {
     Defined newSym(ctx, &f, StringRef(), binding, visibility, type, 0, 0,
                    nullptr);
-    if (objSym.canBeOmittedFromSymbolTable())
-      newSym.exportDynamic = false;
+    bool ltoCanOmit = objSym.canBeOmittedFromSymbolTable() &&
+                      (!sym->isDefined() || sym->ltoCanOmit);
     sym->resolve(ctx, newSym);
+    if (ltoCanOmit && sym->file == &f)
+      sym->ltoCanOmit = true;
   }
 }
 
