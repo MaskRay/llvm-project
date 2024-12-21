@@ -369,9 +369,6 @@ protected:
   DenseMapBase() = default;
 
   void destroyAll() {
-    if (getNumBuckets() == 0) // Nothing to do.
-      return;
-
     const KeyT EmptyKey = getEmptyKey(), TombstoneKey = getTombstoneKey();
     for (BucketT *P = getBuckets(), *E = getBucketsEnd(); P != E; ++P) {
       if (!KeyInfoT::isEqual(P->getFirst(), EmptyKey) &&
@@ -397,7 +394,7 @@ protected:
   unsigned getMinBucketToReserveForEntries(unsigned NumEntries) {
     // Ensure that "NumEntries * 4 < NumBuckets * 3"
     if (NumEntries == 0)
-      return 0;
+      return 1;
     // +1 is required because of the strict equality.
     // For example if NumEntries is 48, we need to return 401.
     return NextPowerOf2(NumEntries * 4 / 3 + 1);
@@ -599,9 +596,6 @@ private:
   template <typename LookupKeyT> BucketT *doFind(const LookupKeyT &Val) {
     BucketT *BucketsPtr = getBuckets();
     const unsigned NumBuckets = getNumBuckets();
-    if (NumBuckets == 0)
-      return nullptr;
-
     const KeyT EmptyKey = getEmptyKey();
     unsigned BucketNo = getHashValue(Val) & (NumBuckets - 1);
     unsigned ProbeAmt = 1;
@@ -632,12 +626,6 @@ private:
   bool LookupBucketFor(const LookupKeyT &Val, BucketT *&FoundBucket) {
     BucketT *BucketsPtr = getBuckets();
     const unsigned NumBuckets = getNumBuckets();
-
-    if (NumBuckets == 0) {
-      FoundBucket = nullptr;
-      return false;
-    }
-
     // FoundTombstone - Keep track of whether we find a tombstone while probing.
     BucketT *FoundTombstone = nullptr;
     const KeyT EmptyKey = getEmptyKey();
@@ -792,22 +780,14 @@ public:
   void copyFrom(const DenseMap &other) {
     this->destroyAll();
     deallocate_buffer(Buckets, sizeof(BucketT) * NumBuckets, alignof(BucketT));
-    if (allocateBuckets(other.NumBuckets)) {
-      this->BaseT::copyFrom(other);
-    } else {
-      NumEntries = 0;
-      NumTombstones = 0;
-    }
+    allocateBuckets(other.NumBuckets);
+    this->BaseT::copyFrom(other);
   }
 
   void init(unsigned InitNumEntries) {
     auto InitBuckets = BaseT::getMinBucketToReserveForEntries(InitNumEntries);
-    if (allocateBuckets(InitBuckets)) {
-      this->BaseT::initEmpty();
-    } else {
-      NumEntries = 0;
-      NumTombstones = 0;
-    }
+    allocateBuckets(InitBuckets);
+    this->BaseT::initEmpty();
   }
 
   void grow(unsigned AtLeast) {
@@ -835,7 +815,7 @@ public:
     this->destroyAll();
 
     // Reduce the number of buckets.
-    unsigned NewNumBuckets = 0;
+    unsigned NewNumBuckets = 1;
     if (OldNumEntries)
       NewNumBuckets = std::max(64, 1 << (Log2_32_Ceil(OldNumEntries) + 1));
     if (NewNumBuckets == NumBuckets) {
@@ -861,16 +841,11 @@ private:
 
   unsigned getNumBuckets() const { return NumBuckets; }
 
-  bool allocateBuckets(unsigned Num) {
+  void allocateBuckets(unsigned Num) {
     NumBuckets = Num;
-    if (NumBuckets == 0) {
-      Buckets = nullptr;
-      return false;
-    }
 
     Buckets = static_cast<BucketT *>(
         allocate_buffer(sizeof(BucketT) * NumBuckets, alignof(BucketT)));
-    return true;
   }
 };
 
