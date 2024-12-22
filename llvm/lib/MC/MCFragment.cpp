@@ -82,6 +82,35 @@ const MCSymbol *MCFragment::getAtom() const {
   return cast<MCSectionMachO>(Parent)->getAtom(LayoutOrder);
 }
 
+SmallVectorImpl<char> &
+MCEncodedFragmentWithContents::getContentsForAppending() {
+  SmallVectorImpl<char> &CS = getParent()->ContentStorage;
+  if (ContentSize == 0) {
+    ContentStart = CS.size();
+  } else if (ContentStart + ContentSize != CS.size()) {
+    llvm::dbgs() << "slow path, copy fragment contents!\n";
+    size_t NewStart = CS.size();
+    CS.reserve(CS.size() + ContentSize);
+    CS.append(CS.begin() + ContentStart,
+              CS.begin() + ContentStart + ContentSize);
+    ContentStart = NewStart;
+  }
+  return CS;
+}
+
+void MCEncodedFragmentWithContents::doneAppending() {
+  ContentSize = getParent()->ContentStorage.size() - ContentStart;
+}
+
+MutableArrayRef<char> MCEncodedFragmentWithContents::getContents() {
+  return MutableArrayRef(getParent()->ContentStorage)
+      .slice(ContentStart, ContentSize);
+}
+
+ArrayRef<char> MCEncodedFragmentWithContents::getContents() const {
+  return ArrayRef(getParent()->ContentStorage).slice(ContentStart, ContentSize);
+}
+
 // Debugging methods
 
 namespace llvm {
@@ -143,7 +172,7 @@ LLVM_DUMP_METHOD void MCFragment::dump() const {
     const auto *DF = cast<MCDataFragment>(this);
     OS << "\n       ";
     OS << " Contents:[";
-    const SmallVectorImpl<char> &Contents = DF->getContents();
+    ArrayRef<char> Contents = DF->getContents();
     for (unsigned i = 0, e = Contents.size(); i != e; ++i) {
       if (i) OS << ",";
       OS << hexdigit((Contents[i] >> 4) & 0xF) << hexdigit(Contents[i] & 0xF);

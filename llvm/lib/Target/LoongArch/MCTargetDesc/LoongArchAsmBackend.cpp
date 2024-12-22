@@ -317,9 +317,8 @@ bool LoongArchAsmBackend::relaxDwarfLineAddr(const MCAssembler &Asm,
 
   int64_t LineDelta = DF.getLineDelta();
   const MCExpr &AddrDelta = DF.getAddrDelta();
-  SmallVectorImpl<char> &Data = DF.getContents();
   SmallVectorImpl<MCFixup> &Fixups = DF.getFixups();
-  size_t OldSize = Data.size();
+  size_t OldSize = DF.getContents().size();
 
   int64_t Value;
   if (AddrDelta.evaluateAsAbsolute(Value, Asm))
@@ -328,9 +327,9 @@ bool LoongArchAsmBackend::relaxDwarfLineAddr(const MCAssembler &Asm,
   assert(IsAbsolute && "CFA with invalid expression");
   (void)IsAbsolute;
 
-  Data.clear();
+  SmallVector<char> Data;
   Fixups.clear();
-  raw_svector_ostream OS(Data);
+  raw_svector_ostream OS(DF.getContentsForAppending());
 
   // INT64_MAX is a signal that this is actually a DW_LNE_end_sequence.
   if (LineDelta != INT64_MAX) {
@@ -374,6 +373,7 @@ bool LoongArchAsmBackend::relaxDwarfLineAddr(const MCAssembler &Asm,
     OS << uint8_t(dwarf::DW_LNS_copy);
   }
 
+  DF.setContents(Data);
   WasRelaxed = OldSize != Data.size();
   return true;
 }
@@ -382,9 +382,8 @@ bool LoongArchAsmBackend::relaxDwarfCFA(const MCAssembler &Asm,
                                         MCDwarfCallFrameFragment &DF,
                                         bool &WasRelaxed) const {
   const MCExpr &AddrDelta = DF.getAddrDelta();
-  SmallVectorImpl<char> &Data = DF.getContents();
   SmallVectorImpl<MCFixup> &Fixups = DF.getFixups();
-  size_t OldSize = Data.size();
+  size_t OldSize = DF.getContents().size();
 
   int64_t Value;
   if (AddrDelta.evaluateAsAbsolute(Value, Asm))
@@ -393,14 +392,13 @@ bool LoongArchAsmBackend::relaxDwarfCFA(const MCAssembler &Asm,
   assert(IsAbsolute && "CFA with invalid expression");
   (void)IsAbsolute;
 
-  Data.clear();
+  DF.clearContents();
   Fixups.clear();
-  raw_svector_ostream OS(Data);
 
   assert(Asm.getContext().getAsmInfo()->getMinInstAlignment() == 1 &&
          "expected 1-byte alignment");
   if (Value == 0) {
-    WasRelaxed = OldSize != Data.size();
+    WasRelaxed = OldSize != DF.getContents().size();
     return true;
   }
 
@@ -412,6 +410,7 @@ bool LoongArchAsmBackend::relaxDwarfCFA(const MCAssembler &Asm,
     Fixups.push_back(MCFixup::create(Offset, MBE.getRHS(), std::get<1>(FK)));
   };
 
+  raw_svector_ostream OS(DF.getContentsForAppending());
   if (isUIntN(6, Value)) {
     OS << uint8_t(dwarf::DW_CFA_advance_loc);
     AddFixups(0, getRelocPairForSize(6));
@@ -430,8 +429,9 @@ bool LoongArchAsmBackend::relaxDwarfCFA(const MCAssembler &Asm,
   } else {
     llvm_unreachable("unsupported CFA encoding");
   }
+  DF.doneAppending();
 
-  WasRelaxed = OldSize != Data.size();
+  WasRelaxed = OldSize != DF.getContents().size();
   return true;
 }
 
