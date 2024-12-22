@@ -114,6 +114,11 @@ private:
   // subsections.
   SmallVector<std::pair<unsigned, FragList>, 1> Subsections;
 
+  // FIXME: temporary hack for MCFragment access
+public:
+  // Content storage for fragments
+  SmallVector<char, 0> ContentStorage;
+
 protected:
   // TODO Make Name private when possible.
   StringRef Name;
