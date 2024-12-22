@@ -79,6 +79,34 @@ const MCSymbol *MCFragment::getAtom() const {
   return cast<MCSectionMachO>(Parent)->getAtom(LayoutOrder);
 }
 
+SmallVectorImpl<char> &
+MCEncodedFragmentWithContents::getContentsForAppending() {
+  SmallVectorImpl<char> &CS = getParent()->ContentStorage;
+  if (ContentSize == 0) {
+    ContentStart = CS.size();
+  } else if (ContentStart + ContentSize != CS.size()) {
+    llvm::dbgs() << "slow path, copy fragment contents!\n";
+    size_t NewStart = CS.size();
+    CS.reserve(CS.size() + ContentSize);
+    CS.append(CS.begin() + ContentStart,
+              CS.begin() + ContentStart + ContentSize);
+    ContentStart = NewStart;
+  }
+  return CS;
+}
+
+void MCEncodedFragmentWithContents::doneAppending() {
+  ContentSize = getParent()->ContentStorage.size() - ContentStart;
+}
+
+MutableArrayRef<char> MCEncodedFragmentWithContents::getContents() {
+  return MutableArrayRef(getParent()->ContentStorage)
+      .slice(ContentStart, ContentSize);
+}
+
+ArrayRef<char> MCEncodedFragmentWithContents::getContents() const {
+  return ArrayRef(getParent()->ContentStorage).slice(ContentStart, ContentSize);
+}
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void MCFragment::dump() const {
@@ -132,7 +160,7 @@ LLVM_DUMP_METHOD void MCFragment::dump() const {
     const auto *F = cast<MCDataFragment>(this);
     if (F->isLinkerRelaxable())
       OS << " LinkerRelaxable";
-    const SmallVectorImpl<char> &Contents = F->getContents();
+    auto Contents = F->getContents();
     OS << " Size:" << Contents.size() << " [";
     for (unsigned i = 0, e = Contents.size(); i != e; ++i) {
       if (i) OS << ",";
