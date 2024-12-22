@@ -20,65 +20,103 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
+#include <type_traits>
 #include <utility>
 
 using namespace llvm;
+
+static_assert(std::is_trivially_destructible_v<MCDataFragment>,
+              "fragment classes must be trivially destructible");
 
 MCFragment::MCFragment(FragmentType Kind, bool HasInstructions)
     : Kind(Kind), HasInstructions(HasInstructions), AlignToBundleEnd(false),
       LinkerRelaxable(false), AllowAutoPadding(false) {}
 
-void MCFragment::destroy() {
-  switch (Kind) {
-    case FT_Align:
-      cast<MCAlignFragment>(this)->~MCAlignFragment();
-      return;
-    case FT_Data:
-      cast<MCDataFragment>(this)->~MCDataFragment();
-      return;
-    case FT_Fill:
-      cast<MCFillFragment>(this)->~MCFillFragment();
-      return;
-    case FT_Nops:
-      cast<MCNopsFragment>(this)->~MCNopsFragment();
-      return;
-    case FT_Relaxable:
-      cast<MCRelaxableFragment>(this)->~MCRelaxableFragment();
-      return;
-    case FT_Org:
-      cast<MCOrgFragment>(this)->~MCOrgFragment();
-      return;
-    case FT_Dwarf:
-      cast<MCDwarfLineAddrFragment>(this)->~MCDwarfLineAddrFragment();
-      return;
-    case FT_DwarfFrame:
-      cast<MCDwarfCallFrameFragment>(this)->~MCDwarfCallFrameFragment();
-      return;
-    case FT_LEB:
-      cast<MCLEBFragment>(this)->~MCLEBFragment();
-      return;
-    case FT_BoundaryAlign:
-      cast<MCBoundaryAlignFragment>(this)->~MCBoundaryAlignFragment();
-      return;
-    case FT_SymbolId:
-      cast<MCSymbolIdFragment>(this)->~MCSymbolIdFragment();
-      return;
-    case FT_CVInlineLines:
-      cast<MCCVInlineLineTableFragment>(this)->~MCCVInlineLineTableFragment();
-      return;
-    case FT_CVDefRange:
-      cast<MCCVDefRangeFragment>(this)->~MCCVDefRangeFragment();
-      return;
-    case FT_PseudoProbe:
-      cast<MCPseudoProbeAddrFragment>(this)->~MCPseudoProbeAddrFragment();
-      return;
-  }
-}
-
 const MCSymbol *MCFragment::getAtom() const {
   return cast<MCSectionMachO>(Parent)->getAtom(LayoutOrder);
 }
 
+SmallVectorImpl<char> &MCEncodedFragment::getContentsForAppending() {
+  SmallVectorImpl<char> &S = getParent()->ContentStorage;
+  if (LLVM_UNLIKELY(ContentEnd != S.size())) {
+    // If not at the storage end, move to the storage end.
+    auto Size = ContentEnd - ContentStart;
+    auto I = std::exchange(ContentStart, S.size());
+    S.reserve(S.size() + Size);
+    S.append(S.begin() + I, S.begin() + I + Size);
+    ContentEnd = S.size();
+  }
+  return S;
+}
+
+void MCEncodedFragment::doneAppending() {
+  ContentEnd = getParent()->ContentStorage.size();
+}
+
+void MCEncodedFragment::appendContents(ArrayRef<char> Contents) {
+  getContentsForAppending().append(Contents.begin(), Contents.end());
+  doneAppending();
+}
+
+void MCEncodedFragment::appendContents(size_t Num, char Elt) {
+  getContentsForAppending().append(Num, Elt);
+  doneAppending();
+}
+
+void MCEncodedFragment::setContents(ArrayRef<char> Contents) {
+  auto &S = getParent()->ContentStorage;
+  if (Contents.size() > ContentEnd - ContentStart) {
+    ContentStart = S.size();
+    S.resize_for_overwrite(S.size() + Contents.size());
+  }
+  ContentEnd = ContentStart + Contents.size();
+  llvm::copy(Contents, S.begin() + ContentStart);
+}
+
+MutableArrayRef<char> MCEncodedFragment::getContents() {
+  return MutableArrayRef(getParent()->ContentStorage)
+      .slice(ContentStart, ContentEnd - ContentStart);
+}
+
+ArrayRef<char> MCEncodedFragment::getContents() const {
+  return ArrayRef(getParent()->ContentStorage)
+      .slice(ContentStart, ContentEnd - ContentStart);
+}
+
+void MCEncodedFragment::addFixup(MCFixup Fixup) { appendFixups({Fixup}); }
+
+void MCEncodedFragment::appendFixups(ArrayRef<MCFixup> Fixups) {
+  auto &S = getParent()->FixupStorage;
+  if (LLVM_UNLIKELY(FixupEnd != S.size())) {
+    // If not at the storage end, move to the storage end.
+    auto Size = FixupEnd - FixupStart;
+    auto I = std::exchange(FixupStart, S.size());
+    S.reserve(S.size() + Size);
+    S.append(S.begin() + I, S.begin() + I + Size);
+  }
+  S.append(Fixups.begin(), Fixups.end());
+  FixupEnd = S.size();
+}
+
+void MCEncodedFragment::setFixups(ArrayRef<MCFixup> Fixups) {
+  auto &S = getParent()->FixupStorage;
+  if (Fixups.size() > FixupEnd - FixupStart) {
+    FixupStart = S.size();
+    S.resize_for_overwrite(S.size() + Fixups.size());
+  }
+  FixupEnd = FixupStart + Fixups.size();
+  llvm::copy(Fixups, S.begin() + FixupStart);
+}
+
+MutableArrayRef<MCFixup> MCEncodedFragment::getFixups() {
+  return MutableArrayRef(getParent()->FixupStorage)
+      .slice(FixupStart, FixupEnd - FixupStart);
+}
+
+ArrayRef<MCFixup> MCEncodedFragment::getFixups() const {
+  return ArrayRef(getParent()->FixupStorage)
+      .slice(FixupStart, FixupEnd - FixupStart);
+}
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void MCFragment::dump() const {
@@ -132,7 +170,7 @@ LLVM_DUMP_METHOD void MCFragment::dump() const {
     const auto *F = cast<MCDataFragment>(this);
     if (F->isLinkerRelaxable())
       OS << " LinkerRelaxable";
-    const SmallVectorImpl<char> &Contents = F->getContents();
+    auto Contents = F->getContents();
     OS << " Size:" << Contents.size() << " [";
     for (unsigned i = 0, e = Contents.size(); i != e; ++i) {
       if (i) OS << ",";
