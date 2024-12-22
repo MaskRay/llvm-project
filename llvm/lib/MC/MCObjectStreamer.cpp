@@ -71,13 +71,13 @@ void MCObjectStreamer::resolvePendingFixups() {
     case MCFragment::FT_Relaxable:
     case MCFragment::FT_Dwarf:
     case MCFragment::FT_PseudoProbe:
-      cast<MCEncodedFragmentWithFixups<8, 1>>(SymFragment)
+      cast<MCEncodedFragmentWithFixups<1>>(SymFragment)
           ->getFixups()
           .push_back(PendingFixup.Fixup);
       break;
     case MCFragment::FT_Data:
     case MCFragment::FT_CVDefRange:
-      cast<MCEncodedFragmentWithFixups<32, 4>>(SymFragment)
+      cast<MCEncodedFragmentWithFixups<4>>(SymFragment)
           ->getFixups()
           .push_back(PendingFixup.Fixup);
       break;
@@ -264,6 +264,8 @@ void MCObjectStreamer::emitULEB128Value(const MCExpr *Value) {
     emitULEB128IntValue(IntValue);
     return;
   }
+  if (getCurrentSectionOnly()->ContentStorage.empty())
+    getCurrentSectionOnly()->ContentStorage.push_back(0);
   insert(getContext().allocFragment<MCLEBFragment>(*Value, false));
 }
 
@@ -273,6 +275,8 @@ void MCObjectStreamer::emitSLEB128Value(const MCExpr *Value) {
     emitSLEB128IntValue(IntValue);
     return;
   }
+  if (getCurrentSectionOnly()->ContentStorage.empty())
+    getCurrentSectionOnly()->ContentStorage.push_back(0);
   insert(getContext().allocFragment<MCLEBFragment>(*Value, true));
 }
 
@@ -393,8 +397,9 @@ void MCObjectStreamer::emitInstToFragment(const MCInst &Inst,
       getContext().allocFragment<MCRelaxableFragment>(Inst, STI);
   insert(IF);
 
-  getAssembler().getEmitter().encodeInstruction(Inst, IF->getContents(),
-                                                IF->getFixups(), STI);
+  getAssembler().getEmitter().encodeInstruction(
+      Inst, IF->getContentsForAppending(), IF->getFixups(), STI);
+  IF->doneAppending();
 }
 
 #ifndef NDEBUG

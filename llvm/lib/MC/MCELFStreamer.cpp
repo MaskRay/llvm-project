@@ -547,8 +547,9 @@ void MCELFStreamer::emitInstToData(const MCInst &Inst,
   // Emit instruction directly into data fragment.
   size_t FixupStartIndex = DF->getFixups().size();
   size_t CodeOffset = DF->getContents().size();
-  Assembler.getEmitter().encodeInstruction(Inst, DF->getContents(),
+  Assembler.getEmitter().encodeInstruction(Inst, DF->getContentsForAppending(),
                                            DF->getFixups(), STI);
+  DF->doneAppending();
 
   auto Fixups = MutableArrayRef(DF->getFixups()).slice(FixupStartIndex);
   for (auto &Fixup : Fixups) {

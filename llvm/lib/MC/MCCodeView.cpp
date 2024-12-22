@@ -607,11 +607,11 @@ void CodeViewContext::encodeInlineLineTable(const MCAssembler &Asm,
 void CodeViewContext::encodeDefRange(const MCAssembler &Asm,
                                      MCCVDefRangeFragment &Frag) {
   MCContext &Ctx = Asm.getContext();
-  SmallVectorImpl<char> &Contents = Frag.getContents();
-  Contents.clear();
+  Frag.clearContents();
   SmallVectorImpl<MCFixup> &Fixups = Frag.getFixups();
   Fixups.clear();
-  raw_svector_ostream OS(Contents);
+  raw_svector_ostream OS(Frag.getContentsForAppending());
+  size_t StartByte = OS.tell();
 
   // Compute all the sizes up front.
   SmallVector<std::pair<unsigned, unsigned>, 4> GapAndRangeSizes;
@@ -664,10 +664,10 @@ void CodeViewContext::encodeDefRange(const MCAssembler &Asm,
       OS << FixedSizePortion;
       // Make space for a fixup that will eventually have a section relative
       // relocation pointing at the offset where the variable becomes live.
-      Fixups.push_back(MCFixup::create(Contents.size(), BE, FK_SecRel_4));
+      Fixups.push_back(MCFixup::create(OS.tell() - StartByte, BE, FK_SecRel_4));
       LEWriter.write<uint32_t>(0); // Fixup for code start.
       // Make space for a fixup that will record the section index for the code.
-      Fixups.push_back(MCFixup::create(Contents.size(), BE, FK_SecRel_2));
+      Fixups.push_back(MCFixup::create(OS.tell() - StartByte, BE, FK_SecRel_2));
       LEWriter.write<uint16_t>(0); // Fixup for section index.
       // Write down the range's extent.
       LEWriter.write<uint16_t>(Chunk);
@@ -690,4 +690,6 @@ void CodeViewContext::encodeDefRange(const MCAssembler &Asm,
       GapStartOffset += GapSize + RangeSize;
     }
   }
+
+  Frag.doneAppending();
 }
