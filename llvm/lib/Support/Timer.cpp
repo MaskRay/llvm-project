@@ -207,6 +207,12 @@ void Timer::clear() {
   Time = StartTime = TimeRecord();
 }
 
+void Timer::yieldTo(Timer &O) {
+  assert(Running && "Cannot stop a paused timer");
+  stopTimer();
+  O.startTimer();
+}
+
 static void printVal(double Val, double Total, raw_ostream &OS) {
   if (Total < 1e-7)   // Avoid dividing by zero.
     OS << "        -----     ";

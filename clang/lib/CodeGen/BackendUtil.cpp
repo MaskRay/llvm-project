@@ -16,6 +16,7 @@
 #include "clang/Frontend/FrontendDiagnostic.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Lex/HeaderSearchOptions.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Analysis/GlobalsModRef.h"
@@ -129,6 +130,7 @@ std::string getDefaultProfileGenName() {
 }
 
 class EmitAssemblyHelper {
+  const CompilerInstance &CI;
   DiagnosticsEngine &Diags;
   const HeaderSearchOptions &HSOpts;
   const CodeGenOptions &CodeGenOpts;
@@ -136,8 +138,6 @@ class EmitAssemblyHelper {
   const LangOptions &LangOpts;
   llvm::Module *TheModule;
   IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS;
-
-  Timer CodeGenerationTime;
 
   std::unique_ptr<raw_pwrite_stream> OS;
 
@@ -203,15 +203,14 @@ class EmitAssemblyHelper {
   }
 
 public:
-  EmitAssemblyHelper(DiagnosticsEngine &_Diags,
+  EmitAssemblyHelper(const CompilerInstance &CI, DiagnosticsEngine &_Diags,
                      const HeaderSearchOptions &HeaderSearchOpts,
                      const CodeGenOptions &CGOpts,
                      const clang::TargetOptions &TOpts,
                      const LangOptions &LOpts, llvm::Module *M,
                      IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS)
-      : Diags(_Diags), HSOpts(HeaderSearchOpts), CodeGenOpts(CGOpts),
+      : CI(CI), Diags(_Diags), HSOpts(HeaderSearchOpts), CodeGenOpts(CGOpts),
         TargetOpts(TOpts), LangOpts(LOpts), TheModule(M), VFS(std::move(VFS)),
-        CodeGenerationTime("codegen", "Code Generation Time"),
         TargetTriple(TheModule->getTargetTriple()) {}
 
   ~EmitAssemblyHelper() {
@@ -222,7 +221,7 @@ public:
   std::unique_ptr<TargetMachine> TM;
 
   // Emit output using the new pass manager for the optimization pipeline.
-  void EmitAssembly(BackendAction Action, std::unique_ptr<raw_pwrite_stream> OS,
+  void emitAssembly(BackendAction Action, std::unique_ptr<raw_pwrite_stream> OS,
                     BackendConsumer *BC);
 };
 } // namespace
@@ -1165,7 +1164,14 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
   {
     PrettyStackTraceString CrashInfo("Optimizer");
     llvm::TimeTraceScope TimeScope("Optimizer");
+    Timer timer;
+    if (CI.getCodeGenOpts().TimePasses) {
+      timer.init("optimizer", "Optimizer", CI.getTimerGroup());
+      CI.getFrontendTimer().yieldTo(timer);
+    }
     MPM.run(*TheModule, MAM);
+    if (CI.getCodeGenOpts().TimePasses)
+      timer.yieldTo(CI.getFrontendTimer());
   }
 }
 
@@ -1208,14 +1214,20 @@ void EmitAssemblyHelper::RunCodegenPipeline(
   {
     PrettyStackTraceString CrashInfo("Code generation");
     llvm::TimeTraceScope TimeScope("CodeGenPasses");
+    Timer timer;
+    if (CI.getCodeGenOpts().TimePasses) {
+      timer.init("codegen", "CodeGen", CI.getTimerGroup());
+      CI.getFrontendTimer().yieldTo(timer);
+    }
     CodeGenPasses.run(*TheModule);
+    if (CI.getCodeGenOpts().TimePasses)
+      timer.yieldTo(CI.getFrontendTimer());
   }
 }
 
-void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
+void EmitAssemblyHelper::emitAssembly(BackendAction Action,
                                       std::unique_ptr<raw_pwrite_stream> OS,
                                       BackendConsumer *BC) {
-  TimeRegion Region(CodeGenOpts.TimePasses ? &CodeGenerationTime : nullptr);
   setCommandLineOpts(CodeGenOpts);
 
   bool RequiresCodeGen = actionRequiresCodeGen(Action);
@@ -1346,14 +1358,17 @@ static void runThinLTOBackend(
   }
 }
 
-void clang::EmitBackendOutput(
-    DiagnosticsEngine &Diags, const HeaderSearchOptions &HeaderOpts,
-    const CodeGenOptions &CGOpts, const clang::TargetOptions &TOpts,
-    const LangOptions &LOpts, StringRef TDesc, llvm::Module *M,
-    BackendAction Action, IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-    std::unique_ptr<raw_pwrite_stream> OS, BackendConsumer *BC) {
-
+void clang::emitBackendOutput(CompilerInstance &CI, StringRef TDesc,
+                              llvm::Module *M, BackendAction Action,
+                              IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+                              std::unique_ptr<raw_pwrite_stream> OS,
+                              BackendConsumer *BC) {
   llvm::TimeTraceScope TimeScope("Backend");
+  DiagnosticsEngine &Diags = CI.getDiagnostics();
+  const auto &HeaderOpts = CI.getHeaderSearchOpts();
+  const auto &CGOpts = CI.getCodeGenOpts();
+  const auto &TOpts = CI.getTargetOpts();
+  const auto &LOpts = CI.getLangOpts();
 
   std::unique_ptr<llvm::Module> EmptyModule;
   if (!CGOpts.ThinLTOIndexFile.empty()) {
@@ -1393,8 +1408,9 @@ void clang::EmitBackendOutput(
     }
   }
 
-  EmitAssemblyHelper AsmHelper(Diags, HeaderOpts, CGOpts, TOpts, LOpts, M, VFS);
-  AsmHelper.EmitAssembly(Action, std::move(OS), BC);
+  EmitAssemblyHelper AsmHelper(CI, Diags, HeaderOpts, CGOpts, TOpts, LOpts, M,
+                               VFS);
+  AsmHelper.emitAssembly(Action, std::move(OS), BC);
 
   // Verify clang's TargetInfo DataLayout against the LLVM TargetMachine's
   // DataLayout.
