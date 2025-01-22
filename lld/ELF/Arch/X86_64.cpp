@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "OutputSections.h"
+#include "RelocScan.h"
 #include "Relocations.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
@@ -36,6 +37,9 @@ public:
   void writePltHeader(uint8_t *buf) const override;
   void writePlt(uint8_t *buf, const Symbol &sym,
                 uint64_t pltEntryAddr) const override;
+  template <class RelTy>
+  void scanImpl(InputSectionBase &sec, Relocs<RelTy> rels) const;
+  void scan(InputSectionBase &sec) const override;
   void relocate(uint8_t *loc, const Relocation &rel,
                 uint64_t val) const override;
   int64_t getImplicitAddend(const uint8_t *buf, RelType type) const override;
@@ -852,6 +856,45 @@ int64_t X86_64::getImplicitAddend(const uint8_t *buf, RelType type) const {
 }
 
 static void relaxGot(uint8_t *loc, const Relocation &rel, uint64_t val);
+
+template <class RelTy>
+void X86_64::scanImpl(InputSectionBase &sec, Relocs<RelTy> rels) const {
+  RelocScan rs(ctx);
+  sec.relocations.reserve(rels.size());
+  // OffsetGetter getter(sec);
+  auto *file = sec.getFile<ELF64LE>();
+  for (auto i = rels.begin(); i != rels.end(); ++i) {
+    rs.scanOne<ELF64LE, RelTy>(i);
+    // const RelTy &rel = *i;
+    // Symbol &sym = file->getSymbol(symIndex);
+    // RelType type = rel.getType(false);
+    //
+    // uint64_t offset = rel.r_offset;
+    // RelExpr expr = getRelExpr(type, sym, sec.content().data() + offset);
+    // // Ignore R_*_NONE and other marker relocations.
+    // if (expr == R_NONE)
+    //   return;
+    // int64_t addend = RelTy::HasAddend
+    //                      ? getAddend<ELF64LE>(rel)
+    //                      : ctx.target->getImplicitAddend(
+    //                            sec.content().data() + rel.r_offset, type);
+    // Error if the target symbol is undefined. Symbol index 0 may be used by
+    // marker relocations, e.g. R_*_NONE and R_ARM_V4BX. Don't error on them.
+    // if (sym.isUndefined() && symIndex != 0 &&
+    //     maybeReportUndefined(ctx, cast<Undefined>(sym), sec, offset))
+    //   return;
+  }
+}
+
+void X86_64::scan(InputSectionBase &sec) const {
+  const RelsOrRelas<ELF64LE> rels = sec.template relsOrRelas<ELF64LE>(true);
+  if (rels.areRelocsCrel())
+    scanImpl(sec, rels.crels);
+  else if (rels.areRelocsRel())
+    scanImpl(sec, rels.rels);
+  else
+    scanImpl(sec, rels.relas);
+}
 
 void X86_64::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   switch (rel.type) {

@@ -73,8 +73,8 @@ static void printDefinedLocation(ELFSyncStream &s, const Symbol &sym) {
 // >>> defined in /home/alice/src/foo.o
 // >>> referenced by bar.c:12 (/home/alice/src/bar.c:12)
 // >>>               /home/alice/src/bar.o:(.text+0x1)
-static void printLocation(ELFSyncStream &s, InputSectionBase &sec,
-                          const Symbol &sym, uint64_t off) {
+void elf::printLocation(ELFSyncStream &s, InputSectionBase &sec,
+                        const Symbol &sym, uint64_t off) {
   printDefinedLocation(s, sym);
   s << "\n>>> referenced by ";
   auto tell = s.tell();
@@ -788,8 +788,8 @@ void elf::reportUndefinedSymbols(Ctx &ctx) {
 
 // Report an undefined symbol if necessary.
 // Returns true if the undefined symbol will produce an error message.
-static bool maybeReportUndefined(Ctx &ctx, Undefined &sym,
-                                 InputSectionBase &sec, uint64_t offset) {
+bool elf::maybeReportUndefined(Ctx &ctx, Undefined &sym, InputSectionBase &sec,
+                               uint64_t offset) {
   std::lock_guard<std::mutex> lock(ctx.relocMutex);
   // If versioned, issue an error (even if the symbol is weak) because we don't
   // know the defining filename which is required to construct a Verneed entry.
@@ -839,10 +839,10 @@ RelType RelocationScanner::getMipsN32RelType(RelTy *&rel) const {
   return type;
 }
 
-template <bool shard = false>
-static void addRelativeReloc(Ctx &ctx, InputSectionBase &isec,
-                             uint64_t offsetInSec, Symbol &sym, int64_t addend,
-                             RelExpr expr, RelType type) {
+template <bool shard>
+void lld::elf::addRelativeReloc(Ctx &ctx, InputSectionBase &isec,
+                                uint64_t offsetInSec, Symbol &sym,
+                                int64_t addend, RelExpr expr, RelType type) {
   Partition &part = isec.getPartition(ctx);
 
   if (sym.isTagged()) {
@@ -2588,3 +2588,8 @@ template void elf::checkNoCrossRefs<ELF32LE>(Ctx &);
 template void elf::checkNoCrossRefs<ELF32BE>(Ctx &);
 template void elf::checkNoCrossRefs<ELF64LE>(Ctx &);
 template void elf::checkNoCrossRefs<ELF64BE>(Ctx &);
+
+template void elf::addRelativeReloc<false>(Ctx &, InputSectionBase &, uint64_t,
+                                           Symbol &, int64_t, RelExpr, RelType);
+template void elf::addRelativeReloc<true>(Ctx &, InputSectionBase &, uint64_t,
+                                          Symbol &, int64_t, RelExpr, RelType);
