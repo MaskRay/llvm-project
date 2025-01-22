@@ -24,6 +24,7 @@ namespace elf {
 class Defined;
 class InputFile;
 class Symbol;
+template <class RelTy> struct Relocs;
 
 std::string toStr(Ctx &, RelType type);
 
@@ -86,6 +87,12 @@ public:
   // Return true if we can reach dst from src with RelType type.
   virtual bool inBranchRange(RelType type, uint64_t src,
                              uint64_t dst) const;
+
+  template <class ELFT, class RelTy>
+  void scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels);
+  template <class ELFT> void scanSectionAux(InputSectionBase &sec);
+  virtual void scanSection(InputSectionBase &sec);
+  void scanEhSection(EhInputSection &s);
 
   virtual void relocate(uint8_t *loc, const Relocation &rel,
                         uint64_t val) const = 0;

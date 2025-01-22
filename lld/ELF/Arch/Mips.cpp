@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "InputFiles.h"
+#include "RelocScan.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
 #include "Target.h"
@@ -31,6 +32,9 @@ public:
   void writePltHeader(uint8_t *buf) const override;
   void writePlt(uint8_t *buf, const Symbol &sym,
                 uint64_t pltEntryAddr) const override;
+  template <class RelTy>
+  void scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels);
+  void scanSection(InputSectionBase &sec) override;
   bool needsThunk(RelExpr expr, RelType type, const InputFile *file,
                   uint64_t branchAddr, const Symbol &s,
                   int64_t a) const override;
@@ -568,6 +572,49 @@ static uint64_t fixupCrossModeJump(Ctx &ctx, uint8_t *loc, RelType type,
       << "unsupported jump/branch instruction between ISA modes referenced by "
       << type << " relocation";
   return val;
+}
+
+template <class RelTy>
+static RelType getMipsN32RelType(Ctx &ctx, RelTy *&rel, RelTy *end) {
+  uint32_t type = 0;
+  uint64_t offset = rel->r_offset;
+  int n = 0;
+  while (rel != end && rel->r_offset == offset)
+    type |= (rel++)->getType(ctx.arg.isMips64EL) << (8 * n++);
+  return type;
+}
+
+template <class ELFT>
+template <class RelTy>
+void MIPS<ELFT>::scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels) {
+  RelocScan rs(ctx, sec);
+  auto relEnd = rels.end();
+  rs.end = relEnd;
+  sec.relocations.reserve(rels.size());
+  RelType type;
+  for (auto it = rels.begin(); it != rels.end();) {
+    auto it0 = it;
+    if constexpr (ELFT::Is64Bits) {
+      type = it->getType(ctx.arg.isMips64EL);
+      ++it;
+    } else {
+      if (ctx.arg.mipsN32Abi) {
+        type = getMipsN32RelType(ctx, it, relEnd);
+      } else {
+        type = it->getType(ctx.arg.isMips64EL);
+        ++it;
+      }
+    }
+    rs.scan<ELFT, RelTy>(it0, type);
+  }
+}
+
+template <class ELFT> void MIPS<ELFT>::scanSection(InputSectionBase &sec) {
+  auto relocs = sec.template relsOrRelas<ELFT>();
+  if (relocs.areRelocsRel())
+    scanSectionImpl(sec, relocs.rels);
+  else
+    scanSectionImpl(sec, relocs.relas);
 }
 
 template <class ELFT>

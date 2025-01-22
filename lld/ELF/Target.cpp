@@ -26,6 +26,7 @@
 #include "Target.h"
 #include "InputFiles.h"
 #include "OutputSections.h"
+#include "RelocScan.h"
 #include "SymbolTable.h"
 #include "Symbols.h"
 #include "lld/Common/ErrorHandler.h"
@@ -146,6 +147,126 @@ RelExpr TargetInfo::adjustTlsExpr(RelType type, RelExpr expr) const {
 RelExpr TargetInfo::adjustGotPcExpr(RelType type, int64_t addend,
                                     const uint8_t *data) const {
   return R_GOT_PC;
+}
+
+template <class ELFT, class RelTy>
+void TargetInfo::scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels) {
+  RelocScan rs(ctx, sec);
+  // Many relocations end up in sec.relocations.
+  sec.relocations.reserve(rels.size());
+
+  // On SystemZ, all sections need to be sorted by r_offset, to allow TLS
+  // relaxation to be handled correctly - see SystemZ::getTlsGdRelaxSkip.
+  SmallVector<RelTy, 0> storage;
+  if (ctx.arg.emachine == EM_S390)
+    rels = sortRels(rels, storage);
+
+  if constexpr (RelTy::IsCrel) {
+    for (auto i = rels.begin(); i != rels.end(); ++i)
+      rs.scan<ELFT, RelTy>(i, i->getType(false));
+  } else {
+    // The non-CREL code path has additional check for PPC64 TLS.
+    rs.end = static_cast<const void *>(rels.end());
+    for (auto i = rels.begin(); i != rs.end; ++i)
+      rs.scan<ELFT, RelTy>(i, i->getType(false));
+  }
+
+  // Sort relocations by offset for more efficient searching for
+  // R_RISCV_PCREL_HI20, ALIGN relocations, R_PPC64_ADDR64 and the
+  // branch-to-branch optimization.
+  if (is_contained({EM_RISCV, EM_LOONGARCH}, ctx.arg.emachine) ||
+      (ctx.arg.emachine == EM_PPC64 && sec.name == ".toc") ||
+      ctx.arg.branchToBranch)
+    llvm::stable_sort(sec.relocs(),
+                      [](const Relocation &lhs, const Relocation &rhs) {
+                        return lhs.offset < rhs.offset;
+                      });
+}
+
+template <class ELFT> void TargetInfo::scanSectionAux(InputSectionBase &sec) {
+  const RelsOrRelas<ELFT> rels = sec.template relsOrRelas<ELFT>();
+  if (rels.areRelocsCrel())
+    scanSectionImpl<ELFT>(sec, rels.crels);
+  else if (rels.areRelocsRel())
+    scanSectionImpl<ELFT>(sec, rels.rels);
+  else
+    scanSectionImpl<ELFT>(sec, rels.relas);
+}
+
+void TargetInfo::scanSection(InputSectionBase &sec) {
+  invokeELFT(scanSectionAux, sec);
+}
+
+// .eh_frame sections are mergeable input sections, so their input
+// offsets are not linearly mapped to output section. For each input
+// offset, we need to find a section piece containing the offset and
+// add the piece's base address to the input offset to compute the
+// output offset. That isn't cheap.
+//
+// This class is to speed up the offset computation. When we process
+// relocations, we access offsets in the monotonically increasing
+// order. So we can optimize for that access pattern.
+//
+// For sections other than .eh_frame, this class doesn't do anything.
+namespace {
+class OffsetGetter {
+public:
+  OffsetGetter() = default;
+  explicit OffsetGetter(EhInputSection &sec) {
+    cies = sec.cies;
+    fdes = sec.fdes;
+    i = cies.begin();
+    j = fdes.begin();
+  }
+
+  // Translates offsets in input sections to offsets in output sections.
+  // Given offset must increase monotonically. We assume that Piece is
+  // sorted by inputOff.
+  uint64_t get(Ctx &ctx, uint64_t off) {
+    while (j != fdes.end() && j->inputOff <= off)
+      ++j;
+    auto it = j;
+    if (j == fdes.begin() || j[-1].inputOff + j[-1].size <= off) {
+      while (i != cies.end() && i->inputOff <= off)
+        ++i;
+      if (i == cies.begin() || i[-1].inputOff + i[-1].size <= off) {
+        Err(ctx) << ".eh_frame: relocation is not in any piece";
+        return 0;
+      }
+      it = i;
+    }
+
+    // Offset -1 means that the piece is dead (i.e. garbage collected).
+    if (it[-1].outputOff == -1)
+      return -1;
+    return it[-1].outputOff + (off - it[-1].inputOff);
+  }
+
+private:
+  ArrayRef<EhSectionPiece> cies, fdes;
+  ArrayRef<EhSectionPiece>::iterator i, j;
+};
+} // namespace
+
+void TargetInfo::scanEhSection(EhInputSection &sec) {
+  RelocScan rs(ctx, sec);
+  OffsetGetter getter(sec);
+  auto rels = sec.rels;
+  sec.relocations.reserve(rels.size());
+  for (auto &r : rels) {
+    // Ignore R_*_NONE and other marker relocations.
+    if (r.expr == R_NONE)
+      continue;
+    uint64_t offset = getter.get(ctx, r.offset);
+    // Skip if the relocation offset is within a dead piece.
+    if (offset == uint64_t(-1))
+      continue;
+    Symbol *sym = r.sym;
+    if (sym->isUndefined() &&
+        maybeReportUndefined(ctx, cast<Undefined>(*sym), sec, offset))
+      continue;
+    rs.process(r.expr, r.type, offset, *sym, r.addend);
+  }
 }
 
 static void relocateImpl(const TargetInfo &target, InputSectionBase &sec,
