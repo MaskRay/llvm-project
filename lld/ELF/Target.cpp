@@ -26,6 +26,7 @@
 #include "Target.h"
 #include "InputFiles.h"
 #include "OutputSections.h"
+#include "RelocScan.h"
 #include "SymbolTable.h"
 #include "Symbols.h"
 #include "lld/Common/ErrorHandler.h"
@@ -146,6 +147,54 @@ RelExpr TargetInfo::adjustTlsExpr(RelType type, RelExpr expr) const {
 RelExpr TargetInfo::adjustGotPcExpr(RelType type, int64_t addend,
                                     const uint8_t *data) const {
   return R_GOT_PC;
+}
+
+template <class ELFT, class RelTy>
+void TargetInfo::scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels) {
+  RelocScan rs(ctx, sec);
+  // Not all relocations end up in Sec->Relocations, but a lot do.
+  sec.relocations.reserve(rels.size());
+
+  // On SystemZ, all sections need to be sorted by r_offset, to allow TLS
+  // relaxation to be handled correctly - see SystemZ::getTlsGdRelaxSkip.
+  SmallVector<RelTy, 0> storage;
+  if (ctx.arg.emachine == EM_S390)
+    rels = sortRels(rels, storage);
+
+  if constexpr (RelTy::IsCrel) {
+    for (auto i = rels.begin(); i != rels.end();)
+      rs.scan<ELFT, RelTy>(i);
+  } else {
+    // The non-CREL code path has additional check for PPC64 TLS.
+    rs.end = static_cast<const void *>(rels.end());
+    for (auto i = rels.begin(); i != rs.end;)
+      rs.scan<ELFT, RelTy>(i);
+  }
+
+  // Sort relocations by offset for more efficient searching for
+  // R_RISCV_PCREL_HI20, ALIGN relocations, R_PPC64_ADDR64 and the
+  // branch-to-branch optimization.
+  if (is_contained({EM_RISCV, EM_LOONGARCH}, ctx.arg.emachine) ||
+      (ctx.arg.emachine == EM_PPC64 && sec.name == ".toc") ||
+      ctx.arg.branchToBranch)
+    llvm::stable_sort(sec.relocs(),
+                      [](const Relocation &lhs, const Relocation &rhs) {
+                        return lhs.offset < rhs.offset;
+                      });
+}
+
+template <class ELFT> void TargetInfo::scanSectionAux(InputSectionBase &sec) {
+  const RelsOrRelas<ELFT> rels = sec.template relsOrRelas<ELFT>();
+  if (rels.areRelocsCrel())
+    scanSectionImpl<ELFT>(sec, rels.crels);
+  else if (rels.areRelocsRel())
+    scanSectionImpl<ELFT>(sec, rels.rels);
+  else
+    scanSectionImpl<ELFT>(sec, rels.relas);
+}
+
+void TargetInfo::scanSection(InputSectionBase &sec) {
+  invokeELFT(scanSectionAux, sec);
 }
 
 static void relocateImpl(const TargetInfo &target, InputSectionBase &sec,

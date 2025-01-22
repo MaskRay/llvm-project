@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "InputFiles.h"
+#include "RelocScan.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
 #include "Target.h"
@@ -31,6 +32,9 @@ public:
   void writePltHeader(uint8_t *buf) const override;
   void writePlt(uint8_t *buf, const Symbol &sym,
                 uint64_t pltEntryAddr) const override;
+  // template <class RelTy>
+  // void scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels);
+  // void scanSection(InputSectionBase &sec) override;
   bool needsThunk(RelExpr expr, RelType type, const InputFile *file,
                   uint64_t branchAddr, const Symbol &s,
                   int64_t a) const override;
@@ -569,6 +573,25 @@ static uint64_t fixupCrossModeJump(Ctx &ctx, uint8_t *loc, RelType type,
       << type << " relocation";
   return val;
 }
+
+// template <class ELFT>
+// template <class RelTy>
+// void MIPS<ELFT>::scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels) {
+//   RelocScan rs(ctx, sec);
+//   sec.relocations.reserve(rels.size());
+//   for (auto i = rels.begin(); i != rels.end(); ++i)
+//     rs.scan<ELFT, RelTy>(i);
+// }
+//
+// template <class ELFT> void MIPS<ELFT>::scanSection(InputSectionBase &sec) {
+//   auto relocs = sec.template relsOrRelas<ELFT>();
+//   if (relocs.areRelocsCrel())
+//     scanSectionImpl(sec, relocs.crels);
+//   else if (relocs.areRelocsRel())
+//     scanSectionImpl(sec, relocs.rels);
+//   else
+//     scanSectionImpl(sec, relocs.relas);
+// }
 
 template <class ELFT>
 void MIPS<ELFT>::relocate(uint8_t *loc, const Relocation &rel,
