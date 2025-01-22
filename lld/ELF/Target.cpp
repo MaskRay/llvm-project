@@ -148,6 +148,18 @@ RelExpr TargetInfo::adjustGotPcExpr(RelType type, int64_t addend,
   return R_GOT_PC;
 }
 
+void TargetInfo::scan(InputSectionBase &sec) const {
+  // sec = &s;
+  // getter = OffsetGetter(s);
+  // const RelsOrRelas<ELFT> rels = sec.template relsOrRelas<ELFT>(!isEH);
+  // if (rels.areRelocsCrel())
+  //   scan<ELFT>(rels.crels);
+  // else if (rels.areRelocsRel())
+  //   scan<ELFT>(rels.rels);
+  // else
+  //   scan<ELFT>(rels.relas);
+}
+
 static void relocateImpl(const TargetInfo &target, InputSectionBase &sec,
                          uint64_t secAddr, uint8_t *buf) {
   auto &ctx = target.ctx;
