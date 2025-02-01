@@ -371,7 +371,8 @@ void elf::parseVersionAndComputeIsPreemptible(Ctx &ctx) {
       continue;
     }
     if (!sym->isDefined() && !sym->isCommon()) {
-      sym->isPreemptible = computeIsPreemptible(ctx, *sym);
+      sym->isPreemptible = (ctx.sharedFiles.size() || ctx.arg.shared) &&
+                           computeIsPreemptible(ctx, *sym);
     } else if (ctx.arg.exportDynamic &&
                (sym->isUsedInRegularObj || !sym->ltoCanOmit)) {
       sym->isExported = true;

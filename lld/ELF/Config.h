@@ -292,7 +292,6 @@ struct Config {
   bool gdbIndex;
   bool gnuHash = false;
   bool gnuUnique;
-  bool hasDynSymTab;
   bool ignoreDataAddressEquality;
   bool ignoreFunctionAddressEquality;
   bool ltoCSProfileGenerate;

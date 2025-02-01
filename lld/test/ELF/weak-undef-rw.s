@@ -3,7 +3,7 @@
 # RUN: ld.lld %t.o -o %t --export-dynamic
 # RUN: llvm-readelf -r --hex-dump=.data %t | FileCheck %s --check-prefix=NOPIC
 # RUN: ld.lld %t.o -o %t.pie -pie
-# RUN: llvm-readobj -r %t.pie | FileCheck %s --check-prefix=PIC
+# RUN: llvm-readelf -r --hex-dump=.data %t.pie | FileCheck %s --check-prefix=NOPIC
 # RUN: ld.lld %t.o -o %t.so -shared
 # RUN: llvm-readobj -r %t.so | FileCheck %s --check-prefix=PIC
 

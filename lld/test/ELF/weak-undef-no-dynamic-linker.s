@@ -1,7 +1,7 @@
 # REQUIRES: x86
 # RUN: llvm-mc -filetype=obj -triple=x86_64 %s -o %t.o
 # RUN: ld.lld -pie %t.o -o %t
-# RUN: llvm-readobj --dyn-syms %t | FileCheck %s
+# RUN: llvm-readobj --dyn-syms %t | FileCheck --check-prefix=NO %s
 # RUN: ld.lld -pie --no-dynamic-linker %t.o -o %t
 # RUN: llvm-readobj --dyn-syms %t | FileCheck --check-prefix=NO %s
 

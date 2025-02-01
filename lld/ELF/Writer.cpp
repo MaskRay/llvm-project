@@ -300,7 +300,8 @@ static void demoteSymbolsAndComputeIsPreemptible(Ctx &ctx) {
     }
 
     if (hasDynsym)
-      sym->isPreemptible = (sym->isUndefined() || sym->isExported) &&
+      sym->isPreemptible = (ctx.sharedFiles.size() || ctx.arg.shared) &&
+                           (sym->isUndefined() || sym->isExported) &&
                            computeIsPreemptible(ctx, *sym);
   }
 }
@@ -1931,7 +1932,7 @@ template <class ELFT> void Writer<ELFT>::finalizeSections() {
 
       // computeBinding might localize a linker-synthesized hidden symbol
       // (e.g. __global_pointer$) that was considered exported.
-      if (ctx.hasDynsym && (sym->isUndefined() || sym->isExported) &&
+      if (ctx.hasDynsym && (sym->isPreemptible || sym->isExported) &&
           !sym->isLocal()) {
         ctx.partitions[sym->partition - 1].dynSymTab->addSymbol(sym);
         if (auto *file = dyn_cast<SharedFile>(sym->file))

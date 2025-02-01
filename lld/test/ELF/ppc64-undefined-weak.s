@@ -4,7 +4,7 @@
 # RUN: ld.lld %t.o -o %t
 # RUN: llvm-objdump -d --no-show-raw-insn %t | FileCheck %s --check-prefix=PDE
 # RUN: ld.lld -pie %t.o -o %t
-# RUN: llvm-objdump -d --no-show-raw-insn %t | FileCheck %s --check-prefix=PIC
+# RUN: llvm-objdump -d --no-show-raw-insn %t | FileCheck %s --check-prefix=PDE
 # RUN: ld.lld -shared %t.o -o %t.so
 # RUN: llvm-objdump -d --no-show-raw-insn %t.so | FileCheck %s --check-prefix=PIC
 

@@ -14,6 +14,9 @@
 # SEC32: {{0*}}000039c0 0 NOTYPE GLOBAL DEFAULT [[#SDATA]] __global_pointer$
 
 # SEC64: [ [[#SDATA:]]] .sdata PROGBITS {{0*}}000032e0
+# SEC64:     '.dynsym'
+# SEC64-NOT: __global_pointer$
+# SEC64:     '.symtab'
 # SEC64: {{0*}}00003ae0 0 NOTYPE GLOBAL DEFAULT [[#SDATA]] __global_pointer$
 
 # ERR: error: relocation R_RISCV_PCREL_HI20 cannot be used against symbol '__global_pointer$'; recompile with -fPIC
@@ -22,7 +25,7 @@
 # RUN: llvm-readelf -s %t.64e | FileCheck %s --check-prefix=STATICPIE
 
 # STATICPIE:     '.dynsym'
-# STATICPIE-NOT: __global_pointer$
+# STATICPIE:     __global_pointer$
 # STATICPIE:     '.symtab'
 # STATICPIE:     __global_pointer$
 
