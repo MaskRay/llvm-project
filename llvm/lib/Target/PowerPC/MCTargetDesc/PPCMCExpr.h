@@ -18,7 +18,16 @@ namespace llvm {
 class PPCMCExpr : public MCTargetExpr {
 public:
   enum VariantKind {
-    VK_PPC_None,
+    VK_None,
+
+    VK_DTPREL,
+    VK_GOT,
+    VK_PCREL,
+    VK_PLT,
+    VK_TLSGD,
+    VK_TLSLD,
+    VK_TPREL,
+
     // We currently use both MCSymbolRefExpr::VariantKind and
     // PPCMCExpr::VariantKind. Start at a larger number to avoid conflicts.
     VK_PPC_LO = 200,
@@ -29,7 +38,68 @@ public:
     VK_PPC_HIGHER,
     VK_PPC_HIGHERA,
     VK_PPC_HIGHEST,
-    VK_PPC_HIGHESTA
+    VK_PPC_HIGHESTA,
+
+    VK_PPC_L,               // symbol@l
+    VK_PPC_U,               // symbol@u
+    VK_PPC_AIX_TLSGD,       // symbol@gd
+    VK_PPC_AIX_TLSGDM,      // symbol@m
+    VK_PPC_AIX_TLSIE,       // symbol@ie
+    VK_PPC_AIX_TLSLD,       // symbol@ld
+    VK_PPC_AIX_TLSLE,       // symbol@le
+    VK_PPC_AIX_TLSML,       // symbol@ml
+    VK_PPC_DTPMOD,          // symbol@dtpmod
+    VK_PPC_DTPREL_HA,       // symbol@dtprel@ha
+    VK_PPC_DTPREL_HI,       // symbol@dtprel@h
+    VK_PPC_DTPREL_HIGH,     // symbol@dtprel@high
+    VK_PPC_DTPREL_HIGHA,    // symbol@dtprel@higha
+    VK_PPC_DTPREL_HIGHER,   // symbol@dtprel@higher
+    VK_PPC_DTPREL_HIGHERA,  // symbol@dtprel@highera
+    VK_PPC_DTPREL_HIGHEST,  // symbol@dtprel@highest
+    VK_PPC_DTPREL_HIGHESTA, // symbol@dtprel@highesta
+    VK_PPC_DTPREL_LO,       // symbol@dtprel@l
+    VK_PPC_GOT_DTPREL,      // symbol@got@dtprel
+    VK_PPC_GOT_DTPREL_HA,   // symbol@got@dtprel@ha
+    VK_PPC_GOT_DTPREL_HI,   // symbol@got@dtprel@h
+    VK_PPC_GOT_DTPREL_LO,   // symbol@got@dtprel@l
+    VK_PPC_GOT_HA,          // symbol@got@ha
+    VK_PPC_GOT_HI,          // symbol@got@h
+    VK_PPC_GOT_LO,          // symbol@got@l
+    VK_PPC_GOT_PCREL,       // symbol@got@pcrel
+    VK_PPC_GOT_TLSGD,       // symbol@got@tlsgd
+    VK_PPC_GOT_TLSGD_HA,    // symbol@got@tlsgd@ha
+    VK_PPC_GOT_TLSGD_HI,    // symbol@got@tlsgd@h
+    VK_PPC_GOT_TLSGD_LO,    // symbol@got@tlsgd@l
+    VK_PPC_GOT_TLSGD_PCREL, // symbol@got@tlsgd@pcrel
+    VK_PPC_GOT_TLSLD,       // symbol@got@tlsld
+    VK_PPC_GOT_TLSLD_HA,    // symbol@got@tlsld@ha
+    VK_PPC_GOT_TLSLD_HI,    // symbol@got@tlsld@h
+    VK_PPC_GOT_TLSLD_LO,    // symbol@got@tlsld@l
+    VK_PPC_GOT_TLSLD_PCREL, // symbol@got@tlsld@pcrel
+    VK_PPC_GOT_TPREL,       // symbol@got@tprel
+    VK_PPC_GOT_TPREL_HA,    // symbol@got@tprel@ha
+    VK_PPC_GOT_TPREL_HI,    // symbol@got@tprel@h
+    VK_PPC_GOT_TPREL_LO,    // symbol@got@tprel@l
+    VK_PPC_GOT_TPREL_PCREL, // symbol@got@tprel@pcrel
+    VK_PPC_LOCAL,           // symbol@local
+    VK_PPC_NOTOC,           // symbol@notoc
+    VK_PPC_PCREL_OPT,       // .reloc expr, R_PPC64_PCREL_OPT, expr
+    VK_PPC_TLS,             // symbol@tls
+    VK_PPC_TLS_PCREL,       // symbol@tls@pcrel
+    VK_PPC_TOC,             // symbol@toc
+    VK_PPC_TOCBASE,         // symbol@tocbase
+    VK_PPC_TOC_HA,          // symbol@toc@ha
+    VK_PPC_TOC_HI,          // symbol@toc@h
+    VK_PPC_TOC_LO,          // symbol@toc@l
+    VK_PPC_TPREL_HA,        // symbol@tprel@ha
+    VK_PPC_TPREL_HI,        // symbol@tprel@h
+    VK_PPC_TPREL_HIGH,      // symbol@tprel@high
+    VK_PPC_TPREL_HIGHA,     // symbol@tprel@higha
+    VK_PPC_TPREL_HIGHER,    // symbol@tprel@higher
+    VK_PPC_TPREL_HIGHERA,   // symbol@tprel@highera
+    VK_PPC_TPREL_HIGHEST,   // symbol@tprel@highest
+    VK_PPC_TPREL_HIGHESTA,  // symbol@tprel@highesta
+    VK_PPC_TPREL_LO,        // symbol@tprel@l
   };
 
 private:
@@ -80,8 +150,7 @@ public:
     return getSubExpr()->findAssociatedFragment();
   }
 
-  // There are no TLS PPCMCExprs at the moment.
-  void fixELFSymbolsInTLSFixups(MCAssembler &Asm) const override {}
+  void fixELFSymbolsInTLSFixups(MCAssembler &Asm) const override;
 
   bool evaluateAsConstant(int64_t &Res) const;
 
@@ -89,6 +158,12 @@ public:
     return E->getKind() == MCExpr::Target;
   }
 };
+
+static inline PPCMCExpr::VariantKind
+getVariantKind(const MCSymbolRefExpr *SRE) {
+  return PPCMCExpr::VariantKind(SRE->getKind());
+}
+
 } // end namespace llvm
 
 #endif
