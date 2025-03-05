@@ -12,6 +12,7 @@
 
 #include "PPCMCCodeEmitter.h"
 #include "MCTargetDesc/PPCFixupKinds.h"
+#include "PPCMCExpr.h"
 #include "PPCMCTargetDesc.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -328,11 +329,11 @@ PPCMCCodeEmitter::getDispRI34PCRelEncoding(const MCInst &MI, unsigned OpNo,
     const MCSymbolRefExpr *SRE = cast<MCSymbolRefExpr>(Expr);
     (void)SRE;
     // Currently these are the only valid PCRelative Relocations.
-    assert((SRE->getKind() == MCSymbolRefExpr::VK_PCREL ||
-            SRE->getKind() == MCSymbolRefExpr::VK_PPC_GOT_PCREL ||
-            SRE->getKind() == MCSymbolRefExpr::VK_PPC_GOT_TLSGD_PCREL ||
-            SRE->getKind() == MCSymbolRefExpr::VK_PPC_GOT_TLSLD_PCREL ||
-            SRE->getKind() == MCSymbolRefExpr::VK_PPC_GOT_TPREL_PCREL) &&
+    assert((getVariantKind(SRE) == PPCMCExpr::VK_PCREL ||
+            getVariantKind(SRE) == PPCMCExpr::VK_PPC_GOT_PCREL ||
+            getVariantKind(SRE) == PPCMCExpr::VK_PPC_GOT_TLSGD_PCREL ||
+            getVariantKind(SRE) == PPCMCExpr::VK_PPC_GOT_TLSLD_PCREL ||
+            getVariantKind(SRE) == PPCMCExpr::VK_PPC_GOT_TPREL_PCREL) &&
            "VariantKind must be VK_PCREL or VK_PPC_GOT_PCREL or "
            "VK_PPC_GOT_TLSGD_PCREL or VK_PPC_GOT_TLSLD_PCREL or "
            "VK_PPC_GOT_TPREL_PCREL.");
@@ -368,7 +369,7 @@ PPCMCCodeEmitter::getDispRI34PCRelEncoding(const MCInst &MI, unsigned OpNo,
 
     // Currently these are the only valid PCRelative Relocations.
     assert((SRE->getKind() == MCSymbolRefExpr::VK_PCREL ||
-            SRE->getKind() == MCSymbolRefExpr::VK_PPC_GOT_PCREL) &&
+            getVariantKind(SRE) == PPCMCExpr::VK_PPC_GOT_PCREL) &&
            "VariantKind must be VK_PCREL or VK_PPC_GOT_PCREL");
     // Generate the fixup for the relocation.
     Fixups.push_back(
@@ -432,7 +433,7 @@ unsigned PPCMCCodeEmitter::getTLSRegEncoding(const MCInst &MI, unsigned OpNo,
   // if using PC relative memops.
   const MCExpr *Expr = MO.getExpr();
   const MCSymbolRefExpr *SRE = cast<MCSymbolRefExpr>(Expr);
-  bool IsPCRel = SRE->getKind() == MCSymbolRefExpr::VK_PPC_TLS_PCREL;
+  bool IsPCRel = getVariantKind(SRE) == PPCMCExpr::VK_PPC_TLS_PCREL;
   Fixups.push_back(MCFixup::create(IsPCRel ? 1 : 0, Expr,
                                    (MCFixupKind)PPC::fixup_ppc_nofixup));
   const Triple &TT = STI.getTargetTriple();

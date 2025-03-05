@@ -8,10 +8,13 @@
 
 #include "PPCMCExpr.h"
 #include "PPCFixupKinds.h"
+#include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCObjectStreamer.h"
+#include "llvm/MC/MCSymbolELF.h"
+#include "llvm/Support/Casting.h"
 
 using namespace llvm;
 
@@ -24,6 +27,11 @@ const PPCMCExpr *PPCMCExpr::create(VariantKind Kind, const MCExpr *Expr,
 
 void PPCMCExpr::printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {
   getSubExpr()->print(OS, MAI);
+
+  if (MAI) {
+    OS << '@' << MAI->getVariantKindName(Kind);
+    return;
+  }
 
   switch (Kind) {
   default:
@@ -130,4 +138,81 @@ bool PPCMCExpr::evaluateAsRelocatableImpl(MCValue &Res, const MCAssembler *Asm,
 
 void PPCMCExpr::visitUsedExpr(MCStreamer &Streamer) const {
   Streamer.visitUsedExpr(*getSubExpr());
+}
+
+static void fixELFSymbolsInTLSFixupsImpl(const MCExpr *Expr, MCAssembler &Asm) {
+  switch (Expr->getKind()) {
+  case MCExpr::Target:
+    llvm_unreachable("Can't handle nested target expression");
+    break;
+  case MCExpr::Constant:
+    break;
+
+  case MCExpr::Binary: {
+    const MCBinaryExpr *BE = cast<MCBinaryExpr>(Expr);
+    fixELFSymbolsInTLSFixupsImpl(BE->getLHS(), Asm);
+    fixELFSymbolsInTLSFixupsImpl(BE->getRHS(), Asm);
+    break;
+  }
+
+  case MCExpr::SymbolRef: {
+    // We're known to be under a TLS fixup, so any symbol should be
+    // modified. There should be only one.
+    const MCSymbolRefExpr &SymRef = *cast<MCSymbolRefExpr>(Expr);
+    cast<MCSymbolELF>(SymRef.getSymbol()).setType(ELF::STT_TLS);
+    break;
+  }
+
+  case MCExpr::Unary:
+    fixELFSymbolsInTLSFixupsImpl(cast<MCUnaryExpr>(Expr)->getSubExpr(), Asm);
+    break;
+  }
+}
+
+void PPCMCExpr::fixELFSymbolsInTLSFixups(MCAssembler &Asm) const {
+  switch (getKind()) {
+  case PPCMCExpr::VK_PPC_DTPMOD:
+  case PPCMCExpr::VK_PPC_TPREL_LO:
+  case PPCMCExpr::VK_PPC_TPREL_HI:
+  case PPCMCExpr::VK_PPC_TPREL_HA:
+  case PPCMCExpr::VK_PPC_TPREL_HIGH:
+  case PPCMCExpr::VK_PPC_TPREL_HIGHA:
+  case PPCMCExpr::VK_PPC_TPREL_HIGHER:
+  case PPCMCExpr::VK_PPC_TPREL_HIGHERA:
+  case PPCMCExpr::VK_PPC_TPREL_HIGHEST:
+  case PPCMCExpr::VK_PPC_TPREL_HIGHESTA:
+  case PPCMCExpr::VK_PPC_DTPREL_LO:
+  case PPCMCExpr::VK_PPC_DTPREL_HI:
+  case PPCMCExpr::VK_PPC_DTPREL_HA:
+  case PPCMCExpr::VK_PPC_DTPREL_HIGH:
+  case PPCMCExpr::VK_PPC_DTPREL_HIGHA:
+  case PPCMCExpr::VK_PPC_DTPREL_HIGHER:
+  case PPCMCExpr::VK_PPC_DTPREL_HIGHERA:
+  case PPCMCExpr::VK_PPC_DTPREL_HIGHEST:
+  case PPCMCExpr::VK_PPC_DTPREL_HIGHESTA:
+  case PPCMCExpr::VK_PPC_GOT_TPREL:
+  case PPCMCExpr::VK_PPC_GOT_TPREL_LO:
+  case PPCMCExpr::VK_PPC_GOT_TPREL_HI:
+  case PPCMCExpr::VK_PPC_GOT_TPREL_HA:
+  case PPCMCExpr::VK_PPC_GOT_TPREL_PCREL:
+  case PPCMCExpr::VK_PPC_GOT_DTPREL:
+  case PPCMCExpr::VK_PPC_GOT_DTPREL_LO:
+  case PPCMCExpr::VK_PPC_GOT_DTPREL_HI:
+  case PPCMCExpr::VK_PPC_GOT_DTPREL_HA:
+  case PPCMCExpr::VK_PPC_TLS:
+  case PPCMCExpr::VK_PPC_TLS_PCREL:
+  case PPCMCExpr::VK_PPC_GOT_TLSGD:
+  case PPCMCExpr::VK_PPC_GOT_TLSGD_LO:
+  case PPCMCExpr::VK_PPC_GOT_TLSGD_HI:
+  case PPCMCExpr::VK_PPC_GOT_TLSGD_HA:
+  case PPCMCExpr::VK_PPC_GOT_TLSGD_PCREL:
+  case PPCMCExpr::VK_PPC_GOT_TLSLD:
+  case PPCMCExpr::VK_PPC_GOT_TLSLD_LO:
+  case PPCMCExpr::VK_PPC_GOT_TLSLD_HI:
+  case PPCMCExpr::VK_PPC_GOT_TLSLD_HA:
+    fixELFSymbolsInTLSFixupsImpl(getSubExpr(), Asm);
+    break;
+  default:
+    break;
+  }
 }
