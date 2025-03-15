@@ -9,6 +9,7 @@
 #include "MCTargetDesc/X86BaseInfo.h"
 #include "MCTargetDesc/X86EncodingOptimization.h"
 #include "MCTargetDesc/X86FixupKinds.h"
+#include "MCTargetDesc/X86MCExpr.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/BinaryFormat/MachO.h"
@@ -364,7 +365,7 @@ static bool hasVariantSymbol(const MCInst &MI) {
       continue;
     const MCExpr &Expr = *Operand.getExpr();
     if (Expr.getKind() == MCExpr::SymbolRef &&
-        cast<MCSymbolRefExpr>(Expr).getKind() != MCSymbolRefExpr::VK_None)
+        getVariantKind(cast<MCSymbolRefExpr>(&Expr)) != X86MCExpr::VK_None)
       return true;
   }
   return false;

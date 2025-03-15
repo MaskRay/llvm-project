@@ -15,6 +15,7 @@
 #include "MCTargetDesc/X86BaseInfo.h"
 #include "MCTargetDesc/X86EncodingOptimization.h"
 #include "MCTargetDesc/X86InstComments.h"
+#include "MCTargetDesc/X86MCExpr.h"
 #include "MCTargetDesc/X86ShuffleDecode.h"
 #include "MCTargetDesc/X86TargetStreamer.h"
 #include "X86AsmPrinter.h"
@@ -232,7 +233,7 @@ MCOperand X86MCInstLower::LowerSymbolOperand(const MachineOperand &MO,
   // FIXME: We would like an efficient form for this, so we don't have to do a
   // lot of extra uniquing.
   const MCExpr *Expr = nullptr;
-  MCSymbolRefExpr::VariantKind RefKind = MCSymbolRefExpr::VK_None;
+  auto RefKind = X86MCExpr::VK_None;
 
   switch (MO.getTargetFlags()) {
   default:
@@ -245,61 +246,61 @@ MCOperand X86MCInstLower::LowerSymbolOperand(const MachineOperand &MO,
     break;
 
   case X86II::MO_TLVP:
-    RefKind = MCSymbolRefExpr::VK_TLVP;
+    RefKind = X86MCExpr::VK_TLVP;
     break;
   case X86II::MO_TLVP_PIC_BASE:
-    Expr = MCSymbolRefExpr::create(Sym, MCSymbolRefExpr::VK_TLVP, Ctx);
+    Expr = MCSymbolRefExpr::create(Sym, X86MCExpr::VK_TLVP, Ctx);
     // Subtract the pic base.
     Expr = MCBinaryExpr::createSub(
         Expr, MCSymbolRefExpr::create(MF.getPICBaseSymbol(), Ctx), Ctx);
     break;
   case X86II::MO_SECREL:
-    RefKind = MCSymbolRefExpr::VK_SECREL;
+    RefKind = X86MCExpr::VK_SECREL;
     break;
   case X86II::MO_TLSGD:
-    RefKind = MCSymbolRefExpr::VK_TLSGD;
+    RefKind = X86MCExpr::VK_TLSGD;
     break;
   case X86II::MO_TLSLD:
-    RefKind = MCSymbolRefExpr::VK_TLSLD;
+    RefKind = X86MCExpr::VK_TLSLD;
     break;
   case X86II::MO_TLSLDM:
-    RefKind = MCSymbolRefExpr::VK_TLSLDM;
+    RefKind = X86MCExpr::VK_TLSLDM;
     break;
   case X86II::MO_GOTTPOFF:
-    RefKind = MCSymbolRefExpr::VK_GOTTPOFF;
+    RefKind = X86MCExpr::VK_GOTTPOFF;
     break;
   case X86II::MO_INDNTPOFF:
-    RefKind = MCSymbolRefExpr::VK_INDNTPOFF;
+    RefKind = X86MCExpr::VK_INDNTPOFF;
     break;
   case X86II::MO_TPOFF:
-    RefKind = MCSymbolRefExpr::VK_TPOFF;
+    RefKind = X86MCExpr::VK_TPOFF;
     break;
   case X86II::MO_DTPOFF:
-    RefKind = MCSymbolRefExpr::VK_DTPOFF;
+    RefKind = X86MCExpr::VK_DTPOFF;
     break;
   case X86II::MO_NTPOFF:
-    RefKind = MCSymbolRefExpr::VK_NTPOFF;
+    RefKind = X86MCExpr::VK_NTPOFF;
     break;
   case X86II::MO_GOTNTPOFF:
-    RefKind = MCSymbolRefExpr::VK_GOTNTPOFF;
+    RefKind = X86MCExpr::VK_GOTNTPOFF;
     break;
   case X86II::MO_GOTPCREL:
-    RefKind = MCSymbolRefExpr::VK_GOTPCREL;
+    RefKind = X86MCExpr::VK_GOTPCREL;
     break;
   case X86II::MO_GOTPCREL_NORELAX:
-    RefKind = MCSymbolRefExpr::VK_GOTPCREL_NORELAX;
+    RefKind = X86MCExpr::VK_GOTPCREL_NORELAX;
     break;
   case X86II::MO_GOT:
-    RefKind = MCSymbolRefExpr::VK_GOT;
+    RefKind = X86MCExpr::VK_GOT;
     break;
   case X86II::MO_GOTOFF:
-    RefKind = MCSymbolRefExpr::VK_GOTOFF;
+    RefKind = X86MCExpr::VK_GOTOFF;
     break;
   case X86II::MO_PLT:
-    RefKind = MCSymbolRefExpr::VK_PLT;
+    RefKind = X86MCExpr::VK_PLT;
     break;
   case X86II::MO_ABS8:
-    RefKind = MCSymbolRefExpr::VK_X86_ABS8;
+    RefKind = X86MCExpr::VK_X86_ABS8;
     break;
   case X86II::MO_PIC_BASE_OFFSET:
   case X86II::MO_DARWIN_NONLAZY_PIC_BASE:
@@ -535,23 +536,23 @@ void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
   bool Is64BitsLP64 = getSubtarget().isTarget64BitLP64();
   MCContext &Ctx = OutStreamer->getContext();
 
-  MCSymbolRefExpr::VariantKind SRVK;
+  X86MCExpr::VariantKind SRVK;
   switch (MI.getOpcode()) {
   case X86::TLS_addr32:
   case X86::TLS_addr64:
   case X86::TLS_addrX32:
-    SRVK = MCSymbolRefExpr::VK_TLSGD;
+    SRVK = X86MCExpr::VK_TLSGD;
     break;
   case X86::TLS_base_addr32:
-    SRVK = MCSymbolRefExpr::VK_TLSLDM;
+    SRVK = X86MCExpr::VK_TLSLDM;
     break;
   case X86::TLS_base_addr64:
   case X86::TLS_base_addrX32:
-    SRVK = MCSymbolRefExpr::VK_TLSLD;
+    SRVK = X86MCExpr::VK_TLSLD;
     break;
   case X86::TLS_desc32:
   case X86::TLS_desc64:
-    SRVK = MCSymbolRefExpr::VK_TLSDESC;
+    SRVK = X86MCExpr::VK_TLSDESC;
     break;
   default:
     llvm_unreachable("unexpected opcode");
@@ -568,10 +569,10 @@ void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
   bool UseGot = MMI->getModule()->getRtLibUseGOT() &&
                 Ctx.getTargetOptions()->X86RelaxRelocations;
 
-  if (SRVK == MCSymbolRefExpr::VK_TLSDESC) {
+  if (SRVK == X86MCExpr::VK_TLSDESC) {
     const MCSymbolRefExpr *Expr = MCSymbolRefExpr::create(
         MCInstLowering.GetSymbolFromOperand(MI.getOperand(3)),
-        MCSymbolRefExpr::VK_TLSCALL, Ctx);
+        X86MCExpr::VK_TLSCALL, Ctx);
     EmitAndCountInstruction(
         MCInstBuilder(Is64BitsLP64 ? X86::LEA64r : X86::LEA32r)
             .addReg(Is64BitsLP64 ? X86::RAX : X86::EAX)
@@ -588,7 +589,7 @@ void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
             .addExpr(Expr)
             .addReg(0));
   } else if (Is64Bits) {
-    bool NeedsPadding = SRVK == MCSymbolRefExpr::VK_TLSGD;
+    bool NeedsPadding = SRVK == X86MCExpr::VK_TLSGD;
     if (NeedsPadding && Is64BitsLP64)
       EmitAndCountInstruction(MCInstBuilder(X86::DATA16_PREFIX));
     EmitAndCountInstruction(MCInstBuilder(X86::LEA64r)
@@ -606,8 +607,8 @@ void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
       EmitAndCountInstruction(MCInstBuilder(X86::REX64_PREFIX));
     }
     if (UseGot) {
-      const MCExpr *Expr = MCSymbolRefExpr::create(
-          TlsGetAddr, MCSymbolRefExpr::VK_GOTPCREL, Ctx);
+      const MCExpr *Expr =
+          MCSymbolRefExpr::create(TlsGetAddr, X86MCExpr::VK_GOTPCREL, Ctx);
       EmitAndCountInstruction(MCInstBuilder(X86::CALL64m)
                                   .addReg(X86::RIP)
                                   .addImm(1)
@@ -615,13 +616,12 @@ void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
                                   .addExpr(Expr)
                                   .addReg(0));
     } else {
-      EmitAndCountInstruction(
-          MCInstBuilder(X86::CALL64pcrel32)
-              .addExpr(MCSymbolRefExpr::create(TlsGetAddr,
-                                               MCSymbolRefExpr::VK_PLT, Ctx)));
+      EmitAndCountInstruction(MCInstBuilder(X86::CALL64pcrel32)
+                                  .addExpr(MCSymbolRefExpr::create(
+                                      TlsGetAddr, X86MCExpr::VK_PLT, Ctx)));
     }
   } else {
-    if (SRVK == MCSymbolRefExpr::VK_TLSGD && !UseGot) {
+    if (SRVK == X86MCExpr::VK_TLSGD && !UseGot) {
       EmitAndCountInstruction(MCInstBuilder(X86::LEA32r)
                                   .addReg(X86::EAX)
                                   .addReg(0)
@@ -642,7 +642,7 @@ void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
     const MCSymbol *TlsGetAddr = Ctx.getOrCreateSymbol("___tls_get_addr");
     if (UseGot) {
       const MCExpr *Expr =
-          MCSymbolRefExpr::create(TlsGetAddr, MCSymbolRefExpr::VK_GOT, Ctx);
+          MCSymbolRefExpr::create(TlsGetAddr, X86MCExpr::VK_GOT, Ctx);
       EmitAndCountInstruction(MCInstBuilder(X86::CALL32m)
                                   .addReg(X86::EBX)
                                   .addImm(1)
@@ -650,10 +650,9 @@ void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
                                   .addExpr(Expr)
                                   .addReg(0));
     } else {
-      EmitAndCountInstruction(
-          MCInstBuilder(X86::CALLpcrel32)
-              .addExpr(MCSymbolRefExpr::create(TlsGetAddr,
-                                               MCSymbolRefExpr::VK_PLT, Ctx)));
+      EmitAndCountInstruction(MCInstBuilder(X86::CALLpcrel32)
+                                  .addExpr(MCSymbolRefExpr::create(
+                                      TlsGetAddr, X86MCExpr::VK_PLT, Ctx)));
     }
   }
 }

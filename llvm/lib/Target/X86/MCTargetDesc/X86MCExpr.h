@@ -31,6 +31,38 @@ private:
   explicit X86MCExpr(MCRegister R) : Reg(R) {}
 
 public:
+  enum VariantKind {
+    VK_None,
+
+    VK_X86_ABS8 = 100,
+    VK_DTPOFF,
+    VK_DTPREL,
+    VK_GOT,
+    VK_GOTENT,
+    VK_GOTNTPOFF,
+    VK_GOTOFF,
+    VK_GOTPCREL,
+    VK_GOTPCREL_NORELAX,
+    VK_GOTREL,
+    VK_GOTTPOFF,
+    VK_INDNTPOFF,
+    VK_NTPOFF,
+    VK_PCREL,
+    VK_PLT,
+    VK_X86_PLTOFF,
+    VK_SECREL,
+    VK_SIZE,
+    VK_TLSCALL,
+    VK_TLSDESC,
+    VK_TLSGD,
+    VK_TLSLD,
+    VK_TLSLDM,
+    VK_TLVP,
+    VK_TLVPPAGE,
+    VK_TLVPPAGEOFF,
+    VK_TPOFF,
+  };
+
   /// @name Construction
   /// @{
 
@@ -75,6 +107,10 @@ public:
   }
 };
 
+static inline X86MCExpr::VariantKind
+getVariantKind(const MCSymbolRefExpr *SRE) {
+  return X86MCExpr::VariantKind(SRE->getKind());
+}
 } // end namespace llvm
 
 #endif
