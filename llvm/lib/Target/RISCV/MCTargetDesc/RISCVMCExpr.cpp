@@ -119,14 +119,15 @@ RISCVMCExpr::getSpecifierForName(StringRef name) {
       .Case("tlsdesc_load_lo", VK_TLSDESC_LOAD_LO)
       .Case("tlsdesc_add_lo", VK_TLSDESC_ADD_LO)
       .Case("tlsdesc_call", VK_TLSDESC_CALL)
+      // Used in data directives
+      .Case("plt", VK_PLT)
+      .Case("gotpcrel", VK_GOTPCREL)
       .Default(std::nullopt);
 }
 
 StringRef RISCVMCExpr::getSpecifierName(Specifier S) {
   switch (S) {
   case VK_None:
-  case VK_PLT:
-  case VK_GOTPCREL:
     llvm_unreachable("not used as %specifier()");
   case VK_LO:
     return "lo";
@@ -162,6 +163,10 @@ StringRef RISCVMCExpr::getSpecifierName(Specifier S) {
     return "call_plt";
   case VK_32_PCREL:
     return "32_pcrel";
+  case VK_PLT:
+    return "plt";
+  case VK_GOTPCREL:
+    return "gotpcrel";
   }
   llvm_unreachable("Invalid ELF symbol kind");
 }

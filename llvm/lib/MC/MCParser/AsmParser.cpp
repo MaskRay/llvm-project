@@ -273,6 +273,7 @@ public:
                         AsmTypeInfo *TypeInfo) override;
   bool parseParenExpression(const MCExpr *&Res, SMLoc &EndLoc) override;
   bool parseAbsoluteExpression(int64_t &Res) override;
+  bool parseDataExpr(const MCExpr *&Res);
 
   /// Parse a floating point expression using the float \p Semantics
   /// and set \p Res to the value.
@@ -1506,6 +1507,10 @@ bool AsmParser::parseAbsoluteExpression(int64_t &Res) {
     return Error(StartLoc, "expected absolute expression");
 
   return false;
+}
+
+bool AsmParser::parseDataExpr(const MCExpr *&Res) {
+  return getTargetParser().parseDataExpr(Res);
 }
 
 static unsigned getDarwinBinOpPrecedence(AsmToken::TokenKind K,
@@ -3144,7 +3149,7 @@ bool AsmParser::parseDirectiveValue(StringRef IDVal, unsigned Size) {
   auto parseOp = [&]() -> bool {
     const MCExpr *Value;
     SMLoc ExprLoc = getLexer().getLoc();
-    if (checkForValidSection() || parseExpression(Value))
+    if (checkForValidSection() || parseDataExpr(Value))
       return true;
     // Special case constant expressions to match code generator.
     if (const MCConstantExpr *MCE = dyn_cast<MCConstantExpr>(Value)) {

@@ -366,7 +366,7 @@ def TPRelAddSymbol : AsmOperandClass {
   let RenderMethod = "addImmOperands";
   let DiagnosticType = "InvalidTPRelAddSymbol";
   let DiagnosticString = "operand must be a symbol with %tprel_add modifier";
-  let ParserMethod = "parseOperandWithModifier";
+  let ParserMethod = "parseOperandWithSpecifier";
 }
 
 // A bare symbol with the %tprel_add variant.
@@ -1793,7 +1793,7 @@ def TLSDESCCallSymbol : AsmOperandClass {
   let RenderMethod = "addImmOperands";
   let DiagnosticType = "InvalidTLSDESCCallSymbol";
   let DiagnosticString = "operand must be a symbol with %tlsdesc_call modifier";
-  let ParserMethod = "parseOperandWithModifier";
+  let ParserMethod = "parseOperandWithSpecifier";
 }
 
 // A bare symbol with the %tlsdesc_call variant.

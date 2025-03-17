@@ -3,9 +3,9 @@
 
         .section .data
 this:
-        .word this@GOTPCREL
-        .word extern_sym@GOTPCREL+4
-        .word negative_offset@GOTPCREL-4
+.word %gotpcrel(this)
+.word %gotpcrel(extern_sym+4)
+.word %gotpcrel(negative_offset-4)
 
 // CHECK:      Section ({{.*}}) .rela.data
 // CHECK-NEXT:   0x0 R_RISCV_GOT32_PCREL this 0x0

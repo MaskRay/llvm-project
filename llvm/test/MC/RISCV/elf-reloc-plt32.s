@@ -7,8 +7,8 @@
 func:
 
 .data
-.word extern_func@PLT - . + 4
-.word func@PLT - . + 8
+.word %plt(extern_func - . + 4)
+.word %plt(func - . + 8)
 
 # CHECK:      Section ({{.*}}) .rela.data {
 # CHECK-NEXT:   0x0 R_RISCV_PLT32 extern_func 0x4
