@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AArch64MCAsmInfo.h"
+#include "MCTargetDesc/AArch64MCExpr.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCStreamer.h"
@@ -32,17 +33,17 @@ static cl::opt<AsmWriterVariantTy> AsmWriterVariant(
 
 const MCAsmInfo::VariantKindDesc variantKindDescs[] = {
     {MCSymbolRefExpr::VK_COFF_IMGREL32, "IMGREL"},
-    {MCSymbolRefExpr::VK_GOT, "GOT"},
-    {MCSymbolRefExpr::VK_GOTPAGE, "GOTPAGE"},
-    {MCSymbolRefExpr::VK_GOTPAGEOFF, "GOTPAGEOFF"},
-    {MCSymbolRefExpr::VK_GOTPCREL, "GOTPCREL"},
-    {MCSymbolRefExpr::VK_PAGE, "PAGE"},
-    {MCSymbolRefExpr::VK_PAGEOFF, "PAGEOFF"},
-    {MCSymbolRefExpr::VK_PLT, "PLT"},
-    {MCSymbolRefExpr::VK_TLVP, "TLVP"},
-    {MCSymbolRefExpr::VK_TLVPPAGE, "TLVPPAGE"},
-    {MCSymbolRefExpr::VK_TLVPPAGEOFF, "TLVPPAGEOFF"},
     {MCSymbolRefExpr::VK_WEAKREF, "WEAKREF"},
+    {AArch64MCExpr::VK_GOT, "GOT"},
+    {AArch64MCExpr::VK_GOTPCREL, "GOTPCREL"},
+    {AArch64MCExpr::VK_PLT, "PLT"},
+    {AArch64MCExpr::M_GOTPAGE, "GOTPAGE"},
+    {AArch64MCExpr::M_GOTPAGEOFF, "GOTPAGEOFF"},
+    {AArch64MCExpr::M_PAGE, "PAGE"},
+    {AArch64MCExpr::M_PAGEOFF, "PAGEOFF"},
+    {AArch64MCExpr::M_TLVP, "TLVP"},
+    {AArch64MCExpr::M_TLVPPAGE, "TLVPPAGE"},
+    {AArch64MCExpr::M_TLVPPAGEOFF, "TLVPPAGEOFF"},
 };
 
 AArch64MCAsmInfoDarwin::AArch64MCAsmInfoDarwin(bool IsILP32) {
@@ -75,7 +76,7 @@ const MCExpr *AArch64MCAsmInfoDarwin::getExprForPersonalitySymbol(
   // version.
   MCContext &Context = Streamer.getContext();
   const MCExpr *Res =
-      MCSymbolRefExpr::create(Sym, MCSymbolRefExpr::VK_GOT, Context);
+      MCSymbolRefExpr::create(Sym, AArch64MCExpr::VK_GOT, Context);
   MCSymbol *PCSym = Context.createTempSymbol();
   Streamer.emitLabel(PCSym);
   const MCExpr *PC = MCSymbolRefExpr::create(PCSym, Context);

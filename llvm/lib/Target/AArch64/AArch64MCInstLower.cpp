@@ -151,29 +151,29 @@ MCOperand AArch64MCInstLower::lowerSymbolOperandMachO(const MachineOperand &MO,
                                                       MCSymbol *Sym) const {
   // FIXME: We would like an efficient form for this, so we don't have to do a
   // lot of extra uniquing.
-  MCSymbolRefExpr::VariantKind RefKind = MCSymbolRefExpr::VK_None;
+  auto RefKind = AArch64MCExpr::None;
   if ((MO.getTargetFlags() & AArch64II::MO_GOT) != 0) {
     if ((MO.getTargetFlags() & AArch64II::MO_FRAGMENT) == AArch64II::MO_PAGE)
-      RefKind = MCSymbolRefExpr::VK_GOTPAGE;
+      RefKind = AArch64MCExpr::M_GOTPAGE;
     else if ((MO.getTargetFlags() & AArch64II::MO_FRAGMENT) ==
              AArch64II::MO_PAGEOFF)
-      RefKind = MCSymbolRefExpr::VK_GOTPAGEOFF;
+      RefKind = AArch64MCExpr::M_GOTPAGEOFF;
     else
       llvm_unreachable("Unexpected target flags with MO_GOT on GV operand");
   } else if ((MO.getTargetFlags() & AArch64II::MO_TLS) != 0) {
     if ((MO.getTargetFlags() & AArch64II::MO_FRAGMENT) == AArch64II::MO_PAGE)
-      RefKind = MCSymbolRefExpr::VK_TLVPPAGE;
+      RefKind = AArch64MCExpr::M_TLVPPAGE;
     else if ((MO.getTargetFlags() & AArch64II::MO_FRAGMENT) ==
              AArch64II::MO_PAGEOFF)
-      RefKind = MCSymbolRefExpr::VK_TLVPPAGEOFF;
+      RefKind = AArch64MCExpr::M_TLVPPAGEOFF;
     else
       llvm_unreachable("Unexpected target flags with MO_TLS on GV operand");
   } else {
     if ((MO.getTargetFlags() & AArch64II::MO_FRAGMENT) == AArch64II::MO_PAGE)
-      RefKind = MCSymbolRefExpr::VK_PAGE;
+      RefKind = AArch64MCExpr::VK_PAGE;
     else if ((MO.getTargetFlags() & AArch64II::MO_FRAGMENT) ==
              AArch64II::MO_PAGEOFF)
-      RefKind = MCSymbolRefExpr::VK_PAGEOFF;
+      RefKind = AArch64MCExpr::VK_PAGEOFF;
   }
   const MCExpr *Expr = MCSymbolRefExpr::create(Sym, RefKind, Ctx);
   if (!MO.isJTI() && MO.getOffset())
