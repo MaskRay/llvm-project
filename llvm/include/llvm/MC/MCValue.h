@@ -43,6 +43,9 @@ public:
   int64_t getConstant() const { return Cst; }
   const MCSymbolRefExpr *getSymA() const { return SymA; }
   const MCSymbolRefExpr *getSymB() const { return SymB; }
+  const MCSymbol *getSubSym() const {
+    return SymB ? &SymB->getSymbol() : nullptr;
+  }
   uint32_t getRefKind() const { return RefKind; }
 
   /// Is this an absolute (as opposed to relocatable) value.

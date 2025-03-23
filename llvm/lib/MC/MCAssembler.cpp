@@ -122,7 +122,7 @@ bool MCAssembler::isThumbFunc(const MCSymbol *Symbol) const {
   if (!Expr->evaluateAsRelocatable(V, nullptr))
     return false;
 
-  if (V.getSymB() || V.getRefKind() != MCSymbolRefExpr::VK_None)
+  if (V.getSubSym() || V.getRefKind() != MCSymbolRefExpr::VK_None)
     return false;
 
   const MCSymbolRefExpr *Ref = V.getSymA();
