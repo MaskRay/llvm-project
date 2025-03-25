@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/WebAssemblyFixupKinds.h"
+#include "MCTargetDesc/WebAssemblyMCExpr.h"
 #include "MCTargetDesc/WebAssemblyMCTargetDesc.h"
 #include "llvm/BinaryFormat/Wasm.h"
 #include "llvm/MC/MCAsmBackend.h"
@@ -66,31 +67,33 @@ unsigned WebAssemblyWasmObjectWriter::getRelocType(
     const MCValue &Target, const MCFixup &Fixup,
     const MCSectionWasm &FixupSection, bool IsLocRel) const {
   auto &SymA = cast<MCSymbolWasm>(*Target.getAddSym());
-  auto Spec = Target.getSymSpecifier();
+  auto Spec = WebAssemblyMCExpr::Specifier(Target.getSpecifier());
   switch (Spec) {
-  case MCSymbolRefExpr::VK_GOT:
-  case MCSymbolRefExpr::VK_WASM_GOT_TLS:
+  case WebAssemblyMCExpr::VK_GOT:
+    SymA.setUsedInGOT();
     return wasm::R_WASM_GLOBAL_INDEX_LEB;
-  case MCSymbolRefExpr::VK_WASM_TBREL:
+  case WebAssemblyMCExpr::VK_GOT_TLS:
+    SymA.setUsedInGOT();
+    SymA.setTLS();
+    return wasm::R_WASM_GLOBAL_INDEX_LEB;
+  case WebAssemblyMCExpr::VK_TBREL:
     assert(SymA.isFunction());
     return is64Bit() ? wasm::R_WASM_TABLE_INDEX_REL_SLEB64
                      : wasm::R_WASM_TABLE_INDEX_REL_SLEB;
-  case MCSymbolRefExpr::VK_WASM_TLSREL:
+  case WebAssemblyMCExpr::VK_TLSREL:
+    SymA.setTLS();
     return is64Bit() ? wasm::R_WASM_MEMORY_ADDR_TLS_SLEB64
                      : wasm::R_WASM_MEMORY_ADDR_TLS_SLEB;
-  case MCSymbolRefExpr::VK_WASM_MBREL:
+  case WebAssemblyMCExpr::VK_MBREL:
     assert(SymA.isData());
     return is64Bit() ? wasm::R_WASM_MEMORY_ADDR_REL_SLEB64
                      : wasm::R_WASM_MEMORY_ADDR_REL_SLEB;
-  case MCSymbolRefExpr::VK_WASM_TYPEINDEX:
+  case WebAssemblyMCExpr::VK_TYPEINDEX:
     return wasm::R_WASM_TYPE_INDEX_LEB;
-  case MCSymbolRefExpr::VK_None:
+  case WebAssemblyMCExpr::VK_None:
     break;
-  case MCSymbolRefExpr::VK_WASM_FUNCINDEX:
+  case WebAssemblyMCExpr::VK_FUNCINDEX:
     return wasm::R_WASM_FUNCTION_INDEX_I32;
-  default:
-    report_fatal_error("unknown VariantKind");
-    break;
   }
 
   switch (unsigned(Fixup.getKind())) {
