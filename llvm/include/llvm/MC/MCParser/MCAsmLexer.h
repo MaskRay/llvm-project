@@ -148,7 +148,9 @@ public:
   void setSkipSpace(bool val) { SkipSpace = val; }
 
   bool getAllowAtInIdentifier() { return AllowAtInIdentifier; }
-  void setAllowAtInIdentifier(bool v) { AllowAtInIdentifier = v; }
+  bool setAllowAtInIdentifier(bool v) {
+    return std::exchange(AllowAtInIdentifier, v);
+  }
 
   void setAllowHashInIdentifier(bool V) { AllowHashInIdentifier = V; }
 

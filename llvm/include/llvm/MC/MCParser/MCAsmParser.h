@@ -136,8 +136,10 @@ private:
   MCTargetAsmParser *TargetParser = nullptr;
 
 protected: // Can only create subclasses.
-  MCAsmParser();
+  MCAsmParser(MCContext &, const MCAsmInfo &);
 
+  MCContext &Ctx;
+  const MCAsmInfo &MAI;
   SmallVector<MCPendingError, 0> PendingErrors;
 
   /// Flag tracking whether any errors have been encountered.
@@ -333,6 +335,9 @@ public:
 
   /// Parse a .gnu_attribute.
   bool parseGNUAttribute(SMLoc L, int64_t &Tag, int64_t &IntegerValue);
+
+  bool parseAtSpecifier(const MCExpr *&Res, SMLoc &EndLoc);
+  const MCExpr *applySpecifier(const MCExpr *E, uint32_t Variant);
 };
 
 /// Create an MCAsmParser instance for parsing assembly similar to gas syntax

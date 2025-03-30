@@ -376,9 +376,7 @@ FieldInitializer &FieldInitializer::operator=(FieldInitializer &&Initializer) {
 class MasmParser : public MCAsmParser {
 private:
   AsmLexer Lexer;
-  MCContext &Ctx;
   MCStreamer &Out;
-  const MCAsmInfo &MAI;
   SourceMgr &SrcMgr;
   SourceMgr::DiagHandlerTy SavedDiagHandler;
   void *SavedDiagContext;
@@ -973,7 +971,7 @@ enum { DEFAULT_ADDRSPACE = 0 };
 
 MasmParser::MasmParser(SourceMgr &SM, MCContext &Ctx, MCStreamer &Out,
                        const MCAsmInfo &MAI, struct tm TM, unsigned CB)
-    : Lexer(MAI), Ctx(Ctx), Out(Out), MAI(MAI), SrcMgr(SM),
+    : MCAsmParser(Ctx, MAI), Lexer(MAI), Out(Out), SrcMgr(SM),
       CurBuffer(CB ? CB : SM.getMainFileID()), TM(TM) {
   HadError = false;
   // Save the old handler.
