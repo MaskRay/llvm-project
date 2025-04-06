@@ -215,14 +215,13 @@ bool MCExpr::isSymbolUsedInExpression(const MCSymbol *Sym) const {
 /* *** */
 
 const MCBinaryExpr *MCBinaryExpr::create(Opcode Opc, const MCExpr *LHS,
-                                         const MCExpr *RHS, MCContext &Ctx,
-                                         SMLoc Loc) {
-  return new (Ctx) MCBinaryExpr(Opc, LHS, RHS, Loc);
+                                         const MCExpr *RHS, MCContext &Ctx) {
+  return new (Ctx) MCBinaryExpr(Opc, LHS, RHS);
 }
 
 const MCUnaryExpr *MCUnaryExpr::create(Opcode Opc, const MCExpr *Expr,
-                                       MCContext &Ctx, SMLoc Loc) {
-  return new (Ctx) MCUnaryExpr(Opc, Expr, Loc);
+                                       MCContext &Ctx) {
+  return new (Ctx) MCUnaryExpr(Opc, Expr);
 }
 
 const MCConstantExpr *MCConstantExpr::create(int64_t Value, MCContext &Ctx,
@@ -234,15 +233,14 @@ const MCConstantExpr *MCConstantExpr::create(int64_t Value, MCContext &Ctx,
 /* *** */
 
 MCSymbolRefExpr::MCSymbolRefExpr(const MCSymbol *Symbol, VariantKind Kind,
-                                 const MCAsmInfo *MAI, SMLoc Loc)
-    : MCExpr(MCExpr::SymbolRef, Loc, Kind), Symbol(Symbol) {
+                                 const MCAsmInfo *MAI)
+    : MCExpr(MCExpr::SymbolRef, Kind), Symbol(Symbol) {
   assert(Symbol);
 }
 
-const MCSymbolRefExpr *MCSymbolRefExpr::create(const MCSymbol *Sym,
-                                               VariantKind Kind,
-                                               MCContext &Ctx, SMLoc Loc) {
-  return new (Ctx) MCSymbolRefExpr(Sym, Kind, Ctx.getAsmInfo(), Loc);
+const MCSymbolRefExpr *
+MCSymbolRefExpr::create(const MCSymbol *Sym, VariantKind Kind, MCContext &Ctx) {
+  return new (Ctx) MCSymbolRefExpr(Sym, Kind, Ctx.getAsmInfo());
 }
 
 /* *** */

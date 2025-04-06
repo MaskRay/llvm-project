@@ -1145,7 +1145,7 @@ bool AsmParser::parsePrimaryExpr(const MCExpr *&Res, SMLoc &EndLoc,
     Lex(); // Eat the operator.
     if (parsePrimaryExpr(Res, EndLoc, TypeInfo))
       return true;
-    Res = MCUnaryExpr::createLNot(Res, getContext(), FirstTokenLoc);
+    Res = MCUnaryExpr::createLNot(Res, getContext());
     return false;
   case AsmToken::Dollar:
   case AsmToken::Star:
@@ -1245,7 +1245,7 @@ bool AsmParser::parsePrimaryExpr(const MCExpr *&Res, SMLoc &EndLoc,
     }
 
     // Otherwise create a symbol ref.
-    Res = MCSymbolRefExpr::create(Sym, Variant, getContext(), FirstTokenLoc);
+    Res = MCSymbolRefExpr::create(Sym, Variant, getContext());
     return false;
   }
   case AsmToken::BigNum:
@@ -1315,19 +1315,19 @@ bool AsmParser::parsePrimaryExpr(const MCExpr *&Res, SMLoc &EndLoc,
     Lex(); // Eat the operator.
     if (parsePrimaryExpr(Res, EndLoc, TypeInfo))
       return true;
-    Res = MCUnaryExpr::createMinus(Res, getContext(), FirstTokenLoc);
+    Res = MCUnaryExpr::createMinus(Res, getContext());
     return false;
   case AsmToken::Plus:
     Lex(); // Eat the operator.
     if (parsePrimaryExpr(Res, EndLoc, TypeInfo))
       return true;
-    Res = MCUnaryExpr::createPlus(Res, getContext(), FirstTokenLoc);
+    Res = MCUnaryExpr::createPlus(Res, getContext());
     return false;
   case AsmToken::Tilde:
     Lex(); // Eat the operator.
     if (parsePrimaryExpr(Res, EndLoc, TypeInfo))
       return true;
-    Res = MCUnaryExpr::createNot(Res, getContext(), FirstTokenLoc);
+    Res = MCUnaryExpr::createNot(Res, getContext());
     return false;
   }
 }
@@ -1680,7 +1680,6 @@ unsigned AsmParser::getBinOpPrecedence(AsmToken::TokenKind K,
 /// Res contains the LHS of the expression on input.
 bool AsmParser::parseBinOpRHS(unsigned Precedence, const MCExpr *&Res,
                               SMLoc &EndLoc) {
-  SMLoc StartLoc = Lexer.getLoc();
   while (true) {
     MCBinaryExpr::Opcode Kind = MCBinaryExpr::Add;
     unsigned TokPrec = getBinOpPrecedence(Lexer.getKind(), Kind);
@@ -1705,7 +1704,7 @@ bool AsmParser::parseBinOpRHS(unsigned Precedence, const MCExpr *&Res,
       return true;
 
     // Merge LHS and RHS according to operator.
-    Res = MCBinaryExpr::create(Kind, Res, RHS, getContext(), StartLoc);
+    Res = MCBinaryExpr::create(Kind, Res, RHS, getContext());
   }
 }
 

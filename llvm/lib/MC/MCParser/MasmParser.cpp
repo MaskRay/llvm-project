@@ -1399,7 +1399,7 @@ bool MasmParser::parsePrimaryExpr(const MCExpr *&Res, SMLoc &EndLoc,
     Lex(); // Eat the operator.
     if (parsePrimaryExpr(Res, EndLoc, nullptr))
       return true;
-    Res = MCUnaryExpr::createLNot(Res, getContext(), FirstTokenLoc);
+    Res = MCUnaryExpr::createLNot(Res, getContext());
     return false;
   case AsmToken::Dollar:
   case AsmToken::At:
@@ -1425,7 +1425,7 @@ bool MasmParser::parsePrimaryExpr(const MCExpr *&Res, SMLoc &EndLoc,
     if (Identifier.equals_insensitive("not")) {
       if (parsePrimaryExpr(Res, EndLoc, nullptr))
         return true;
-      Res = MCUnaryExpr::createNot(Res, getContext(), FirstTokenLoc);
+      Res = MCUnaryExpr::createNot(Res, getContext());
       return false;
     }
     // Parse directional local label references.
@@ -1500,8 +1500,7 @@ bool MasmParser::parsePrimaryExpr(const MCExpr *&Res, SMLoc &EndLoc,
     }
 
     // Otherwise create a symbol ref.
-    const MCExpr *SymRef =
-        MCSymbolRefExpr::create(Sym, getContext(), FirstTokenLoc);
+    const MCExpr *SymRef = MCSymbolRefExpr::create(Sym, getContext());
     if (Info.Offset) {
       Res = MCBinaryExpr::create(
           MCBinaryExpr::Add, SymRef,
@@ -1574,19 +1573,19 @@ bool MasmParser::parsePrimaryExpr(const MCExpr *&Res, SMLoc &EndLoc,
     Lex(); // Eat the operator.
     if (parsePrimaryExpr(Res, EndLoc, nullptr))
       return true;
-    Res = MCUnaryExpr::createMinus(Res, getContext(), FirstTokenLoc);
+    Res = MCUnaryExpr::createMinus(Res, getContext());
     return false;
   case AsmToken::Plus:
     Lex(); // Eat the operator.
     if (parsePrimaryExpr(Res, EndLoc, nullptr))
       return true;
-    Res = MCUnaryExpr::createPlus(Res, getContext(), FirstTokenLoc);
+    Res = MCUnaryExpr::createPlus(Res, getContext());
     return false;
   case AsmToken::Tilde:
     Lex(); // Eat the operator.
     if (parsePrimaryExpr(Res, EndLoc, nullptr))
       return true;
-    Res = MCUnaryExpr::createNot(Res, getContext(), FirstTokenLoc);
+    Res = MCUnaryExpr::createNot(Res, getContext());
     return false;
   }
 }
@@ -1764,7 +1763,6 @@ unsigned MasmParser::getBinOpPrecedence(AsmToken::TokenKind K,
 /// Res contains the LHS of the expression on input.
 bool MasmParser::parseBinOpRHS(unsigned Precedence, const MCExpr *&Res,
                                SMLoc &EndLoc) {
-  SMLoc StartLoc = Lexer.getLoc();
   while (true) {
     AsmToken::TokenKind TokKind = Lexer.getKind();
     if (Lexer.getKind() == AsmToken::Identifier) {
@@ -1806,7 +1804,7 @@ bool MasmParser::parseBinOpRHS(unsigned Precedence, const MCExpr *&Res,
       return true;
 
     // Merge LHS and RHS according to operator.
-    Res = MCBinaryExpr::create(Kind, Res, RHS, getContext(), StartLoc);
+    Res = MCBinaryExpr::create(Kind, Res, RHS, getContext());
   }
 }
 

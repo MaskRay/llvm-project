@@ -8207,8 +8207,7 @@ bool AArch64AsmParser::parseDataExpr(const MCExpr *&Res) {
   if (Spec == AArch64MCExpr::None)
     return Error(Loc, "invalid relocation specifier");
   if (auto *SRE = dyn_cast<MCSymbolRefExpr>(Res))
-    Res = MCSymbolRefExpr::create(&SRE->getSymbol(), Spec, getContext(),
-                                  SRE->getLoc());
+    Res = MCSymbolRefExpr::create(&SRE->getSymbol(), Spec, getContext());
   else
     return Error(Loc, "@ specifier only allowed after a symbol");
 
