@@ -362,7 +362,7 @@ void MCELFStreamer::finalizeCGProfileEntry(const MCSymbolRefExpr *&SRE,
     }
     S = S->getSection().getBeginSymbol();
     S->setUsedInReloc();
-    SRE = MCSymbolRefExpr::create(S, getContext(), SRE->getLoc());
+    SRE = MCSymbolRefExpr::create(S, getContext());
   }
   const MCConstantExpr *MCOffset = MCConstantExpr::create(Offset, getContext());
   if (std::optional<std::pair<bool, std::string>> Err =

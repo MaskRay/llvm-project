@@ -51,14 +51,13 @@ private:
   ExprKind Kind;
   /// Field reserved for use by MCExpr subclasses.
   unsigned SubclassData : NumSubclassDataBits;
-  SMLoc Loc;
 
   bool evaluateAsAbsolute(int64_t &Res, const MCAssembler *Asm,
                           const SectionAddrMap *Addrs, bool InSet) const;
 
 protected:
-  explicit MCExpr(ExprKind Kind, SMLoc Loc, unsigned SubclassData = 0)
-      : Kind(Kind), SubclassData(SubclassData), Loc(Loc) {
+  explicit MCExpr(ExprKind Kind, unsigned SubclassData = 0)
+      : Kind(Kind), SubclassData(SubclassData) {
     assert(SubclassData < (1 << NumSubclassDataBits) &&
            "Subclass data too large");
   }
@@ -76,7 +75,7 @@ public:
   /// @{
 
   ExprKind getKind() const { return Kind; }
-  SMLoc getLoc() const { return Loc; }
+  SMLoc getLoc() const { return {}; }
 
   /// @}
   /// \name Utility Methods
@@ -157,8 +156,8 @@ class MCConstantExpr : public MCExpr {
   }
 
   MCConstantExpr(int64_t Value, bool PrintInHex, unsigned SizeInBytes)
-      : MCExpr(MCExpr::Constant, SMLoc(),
-               encodeSubclassData(PrintInHex, SizeInBytes)), Value(Value) {}
+      : MCExpr(MCExpr::Constant, encodeSubclassData(PrintInHex, SizeInBytes)),
+        Value(Value) {}
 
 public:
   /// \name Construction
@@ -237,22 +236,22 @@ private:
   }
 
   explicit MCSymbolRefExpr(const MCSymbol *Symbol, VariantKind Kind,
-                           const MCAsmInfo *MAI, SMLoc Loc = SMLoc());
+                           const MCAsmInfo *MAI);
 
 public:
   /// \name Construction
   /// @{
 
   static const MCSymbolRefExpr *create(const MCSymbol *Symbol, MCContext &Ctx,
-                                       SMLoc Loc = SMLoc()) {
-    return MCSymbolRefExpr::create(Symbol, VK_None, Ctx, Loc);
+                                       SMLoc Loc = {}) {
+    return MCSymbolRefExpr::create(Symbol, VK_None, Ctx);
   }
 
   static const MCSymbolRefExpr *create(const MCSymbol *Symbol, VariantKind Kind,
-                                       MCContext &Ctx, SMLoc Loc = SMLoc());
+                                       MCContext &Ctx);
   static const MCSymbolRefExpr *create(const MCSymbol *Symbol, uint16_t Kind,
-                                       MCContext &Ctx, SMLoc Loc = SMLoc()) {
-    return MCSymbolRefExpr::create(Symbol, VariantKind(Kind), Ctx, Loc);
+                                       MCContext &Ctx) {
+    return MCSymbolRefExpr::create(Symbol, VariantKind(Kind), Ctx);
   }
 
   /// @}
@@ -295,30 +294,34 @@ public:
 private:
   const MCExpr *Expr;
 
-  MCUnaryExpr(Opcode Op, const MCExpr *Expr, SMLoc Loc)
-      : MCExpr(MCExpr::Unary, Loc, Op), Expr(Expr) {}
+  MCUnaryExpr(Opcode Op, const MCExpr *Expr)
+      : MCExpr(MCExpr::Unary, Op), Expr(Expr) {}
 
 public:
   /// \name Construction
   /// @{
 
   static const MCUnaryExpr *create(Opcode Op, const MCExpr *Expr,
-                                   MCContext &Ctx, SMLoc Loc = SMLoc());
-
-  static const MCUnaryExpr *createLNot(const MCExpr *Expr, MCContext &Ctx, SMLoc Loc = SMLoc()) {
-    return create(LNot, Expr, Ctx, Loc);
+                                   MCContext &Ctx);
+  static const MCUnaryExpr *create(Opcode Op, const MCExpr *Expr,
+                                   MCContext &Ctx, SMLoc) {
+    return create(Op, Expr, Ctx);
   }
 
-  static const MCUnaryExpr *createMinus(const MCExpr *Expr, MCContext &Ctx, SMLoc Loc = SMLoc()) {
-    return create(Minus, Expr, Ctx, Loc);
+  static const MCUnaryExpr *createLNot(const MCExpr *Expr, MCContext &Ctx) {
+    return create(LNot, Expr, Ctx);
   }
 
-  static const MCUnaryExpr *createNot(const MCExpr *Expr, MCContext &Ctx, SMLoc Loc = SMLoc()) {
-    return create(Not, Expr, Ctx, Loc);
+  static const MCUnaryExpr *createMinus(const MCExpr *Expr, MCContext &Ctx) {
+    return create(Minus, Expr, Ctx);
   }
 
-  static const MCUnaryExpr *createPlus(const MCExpr *Expr, MCContext &Ctx, SMLoc Loc = SMLoc()) {
-    return create(Plus, Expr, Ctx, Loc);
+  static const MCUnaryExpr *createNot(const MCExpr *Expr, MCContext &Ctx) {
+    return create(Not, Expr, Ctx);
+  }
+
+  static const MCUnaryExpr *createPlus(const MCExpr *Expr, MCContext &Ctx) {
+    return create(Plus, Expr, Ctx);
   }
 
   /// @}
@@ -371,17 +374,19 @@ public:
 private:
   const MCExpr *LHS, *RHS;
 
-  MCBinaryExpr(Opcode Op, const MCExpr *LHS, const MCExpr *RHS,
-               SMLoc Loc = SMLoc())
-      : MCExpr(MCExpr::Binary, Loc, Op), LHS(LHS), RHS(RHS) {}
+  MCBinaryExpr(Opcode Op, const MCExpr *LHS, const MCExpr *RHS)
+      : MCExpr(MCExpr::Binary, Op), LHS(LHS), RHS(RHS) {}
 
 public:
   /// \name Construction
   /// @{
 
   static const MCBinaryExpr *create(Opcode Op, const MCExpr *LHS,
-                                    const MCExpr *RHS, MCContext &Ctx,
-                                    SMLoc Loc = SMLoc());
+                                    const MCExpr *RHS, MCContext &Ctx);
+  static const MCBinaryExpr *create(Opcode Op, const MCExpr *LHS,
+                                    const MCExpr *RHS, MCContext &Ctx, SMLoc) {
+    return create(Op, LHS, RHS, Ctx);
+  }
 
   static const MCBinaryExpr *createAdd(const MCExpr *LHS, const MCExpr *RHS,
                                        MCContext &Ctx) {
@@ -509,7 +514,7 @@ class MCTargetExpr : public MCExpr {
   virtual void anchor();
 
 protected:
-  MCTargetExpr() : MCExpr(Target, SMLoc()) {}
+  MCTargetExpr() : MCExpr(Target) {}
   virtual ~MCTargetExpr() = default;
 
 public:
