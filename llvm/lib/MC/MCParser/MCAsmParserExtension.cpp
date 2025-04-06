@@ -26,7 +26,6 @@ void MCAsmParserExtension::Initialize(MCAsmParser &Parser) {
 ///  ::= .cg_profile identifier, identifier, <number>
 bool MCAsmParserExtension::parseDirectiveCGProfile(StringRef, SMLoc) {
   StringRef From;
-  SMLoc FromLoc = getLexer().getLoc();
   if (getParser().parseIdentifier(From))
     return TokError("expected identifier in directive");
 
@@ -35,7 +34,6 @@ bool MCAsmParserExtension::parseDirectiveCGProfile(StringRef, SMLoc) {
   Lex();
 
   StringRef To;
-  SMLoc ToLoc = getLexer().getLoc();
   if (getParser().parseIdentifier(To))
     return TokError("expected identifier in directive");
 
@@ -54,8 +52,8 @@ bool MCAsmParserExtension::parseDirectiveCGProfile(StringRef, SMLoc) {
   MCSymbol *ToSym = getContext().getOrCreateSymbol(To);
 
   getStreamer().emitCGProfileEntry(
-      MCSymbolRefExpr::create(FromSym, getContext(), FromLoc),
-      MCSymbolRefExpr::create(ToSym, getContext(), ToLoc), Count);
+      MCSymbolRefExpr::create(FromSym, getContext()),
+      MCSymbolRefExpr::create(ToSym, getContext()), Count);
   return false;
 }
 

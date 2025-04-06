@@ -664,8 +664,7 @@ static const MCExpr *tryFoldHelper(const MCExpr *Expr, KnownBitsMap &KBM,
     const MCExpr *NewLHS = tryFoldHelper(LHS, KBM, Ctx);
     const MCExpr *NewRHS = tryFoldHelper(RHS, KBM, Ctx);
     if (NewLHS != LHS || NewRHS != RHS)
-      return MCBinaryExpr::create(BExpr->getOpcode(), NewLHS, NewRHS, Ctx,
-                                  BExpr->getLoc());
+      return MCBinaryExpr::create(BExpr->getOpcode(), NewLHS, NewRHS, Ctx);
     return Expr;
   }
   case MCExpr::ExprKind::Unary: {
@@ -673,8 +672,7 @@ static const MCExpr *tryFoldHelper(const MCExpr *Expr, KnownBitsMap &KBM,
     const MCExpr *SubExpr = UExpr->getSubExpr();
     const MCExpr *NewSubExpr = tryFoldHelper(SubExpr, KBM, Ctx);
     if (SubExpr != NewSubExpr)
-      return MCUnaryExpr::create(UExpr->getOpcode(), NewSubExpr, Ctx,
-                                 UExpr->getLoc());
+      return MCUnaryExpr::create(UExpr->getOpcode(), NewSubExpr, Ctx);
     return Expr;
   }
   case MCExpr::ExprKind::Target: {
