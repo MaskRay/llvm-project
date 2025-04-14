@@ -138,7 +138,7 @@ bool MCAssembler::isThumbFunc(const MCSymbol *Symbol) const {
 
 bool MCAssembler::evaluateFixup(const MCFixup &Fixup, const MCFragment *DF,
                                 MCValue &Target, const MCSubtargetInfo *STI,
-                                uint64_t &Value, bool RecordReloc) const {
+                                uint64_t &Value) const {
   ++stats::evaluateFixup;
 
   // FIXME: This code has some duplication with recordRelocation. We should
@@ -193,23 +193,6 @@ bool MCAssembler::evaluateFixup(const MCFixup &Fixup, const MCFragment *DF,
     }
   }
 
-  if (!RecordReloc)
-    return IsResolved;
-
-  // .reloc directive and the backend might force the relocation.
-  // Backends that customize shouldForceRelocation generally just need the fixup
-  // kind. AVR needs the fixup value to bypass the assembly time overflow with a
-  // relocation.
-  if (IsResolved) {
-    auto TargetVal = Target;
-    TargetVal.Cst = Value;
-    if (Fixup.getKind() >= FirstLiteralRelocationKind ||
-        getBackend().shouldForceRelocation(*this, Fixup, TargetVal, STI))
-      IsResolved = false;
-  }
-  if (!IsResolved)
-    getWriter().recordRelocation(const_cast<MCAssembler &>(*this), DF, Fixup,
-                                 Target, Value);
   return IsResolved;
 }
 
@@ -848,6 +831,30 @@ void MCAssembler::writeSectionData(raw_ostream &OS,
          OS.tell() - Start == getSectionAddressSize(*Sec));
 }
 
+void MCAssembler::handleFixup(MCFragment &F, const MCFixup &Fixup,
+                              const MCSubtargetInfo *STI,
+                              MutableArrayRef<char> Contents) {
+  uint64_t FixedValue;
+  MCValue Target;
+  bool IsResolved = evaluateFixup(Fixup, &F, Target, STI, FixedValue);
+  // .reloc directive and the backend might force the relocation.
+  // Backends that customize shouldForceRelocation generally just need the fixup
+  // kind. AVR needs the fixup value to bypass the assembly time overflow with a
+  // relocation.
+  if (IsResolved) {
+    auto TargetVal = Target;
+    TargetVal.Cst = FixedValue;
+    if (Fixup.getKind() >= FirstLiteralRelocationKind ||
+        getBackend().shouldForceRelocation(*this, Fixup, TargetVal, STI))
+      IsResolved = false;
+  }
+
+  if (!IsResolved)
+    getWriter().recordRelocation(*this, &F, Fixup, Target, FixedValue);
+  getBackend().applyFixup(*this, Fixup, Target, Contents, FixedValue,
+                          IsResolved, STI);
+}
+
 void MCAssembler::layout() {
   assert(getBackendPtr() && "Expected assembler backend");
   DEBUG_WITH_TYPE("mc-dump", {
@@ -971,14 +978,8 @@ void MCAssembler::layout() {
         break;
       }
       }
-      for (const MCFixup &Fixup : Fixups) {
-        uint64_t FixedValue;
-        MCValue Target;
-        bool IsResolved = evaluateFixup(Fixup, &Frag, Target, STI, FixedValue,
-                                        /*RecordReloc=*/true);
-        getBackend().applyFixup(*this, Fixup, Target, Contents, FixedValue,
-                                IsResolved, STI);
-      }
+      for (const MCFixup &Fixup : Fixups)
+        handleFixup(Frag, Fixup, STI, Contents);
     }
   }
 }
@@ -997,8 +998,8 @@ bool MCAssembler::fixupNeedsRelaxation(const MCFixup &Fixup,
   assert(getBackendPtr() && "Expected assembler backend");
   MCValue Target;
   uint64_t Value;
-  bool Resolved = evaluateFixup(Fixup, DF, Target, DF->getSubtargetInfo(),
-                                Value, /*RecordReloc=*/false);
+  bool Resolved =
+      evaluateFixup(Fixup, DF, Target, DF->getSubtargetInfo(), Value);
   return getBackend().fixupNeedsRelaxationAdvanced(*this, *DF, Fixup, Target,
                                                    Value, Resolved);
 }

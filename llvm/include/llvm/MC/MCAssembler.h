@@ -95,11 +95,10 @@ private:
   /// evaluates to.
   /// \param Value [out] On return, the value of the fixup as currently laid
   /// out.
-  /// \param RecordReloc Record relocation if needed.
   /// relocation.
   bool evaluateFixup(const MCFixup &Fixup, const MCFragment *DF,
                      MCValue &Target, const MCSubtargetInfo *STI,
-                     uint64_t &Value, bool RecordReloc) const;
+                     uint64_t &Value) const;
 
   /// Check whether a fixup can be satisfied, or whether it needs to be relaxed
   /// (increased in size, in order to hold its value correctly).
@@ -123,6 +122,9 @@ private:
   bool relaxCVInlineLineTable(MCCVInlineLineTableFragment &DF);
   bool relaxCVDefRange(MCCVDefRangeFragment &DF);
   bool relaxPseudoProbeAddr(MCPseudoProbeAddrFragment &DF);
+
+  void handleFixup(MCFragment &F, const MCFixup &Fixup,
+                   const MCSubtargetInfo *STI, MutableArrayRef<char> Contents);
 
 public:
   /// Construct a new assembler instance.
