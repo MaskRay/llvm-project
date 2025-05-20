@@ -897,6 +897,8 @@ void MCAssembler::layout() {
   // example, to set the index fields in the symbol data).
   getWriter().executePostLayoutBinding(*this);
 
+  this->HasFinalLayout = true;
+
   // Evaluate and apply the fixups, generating relocation entries as necessary.
   for (MCSection &Sec : *this) {
     for (MCFragment &Frag : Sec) {
