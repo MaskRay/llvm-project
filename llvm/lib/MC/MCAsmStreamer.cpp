@@ -566,6 +566,7 @@ void MCAsmStreamer::emitELFSymverDirective(const MCSymbol *OriginalSym,
 
 void MCAsmStreamer::emitLabel(MCSymbol *Symbol, SMLoc Loc) {
   MCStreamer::emitLabel(Symbol, Loc);
+  Symbol->setOffset(0);
 
   Symbol->print(OS, MAI);
   OS << MAI->getLabelSuffix();
