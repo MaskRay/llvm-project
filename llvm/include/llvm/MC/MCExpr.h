@@ -518,7 +518,7 @@ public:
   Spec getSpecifier() const { return specifier; }
   const MCExpr *getSubExpr() const { return Expr; }
 
-  virtual void printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const = 0;
+  virtual void printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {}
   virtual bool evaluateAsRelocatableImpl(MCValue &Res,
                                          const MCAssembler *Asm) const;
 

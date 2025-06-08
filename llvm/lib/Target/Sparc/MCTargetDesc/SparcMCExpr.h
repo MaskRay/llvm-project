@@ -22,15 +22,12 @@ namespace llvm {
 class StringRef;
 class SparcMCExpr : public MCSpecifierExpr {
 private:
-  explicit SparcMCExpr(uint16_t S, const MCExpr *Expr)
-      : MCSpecifierExpr(Expr, S) {}
+  explicit SparcMCExpr(const MCExpr *Expr, Spec S) : MCSpecifierExpr(Expr, S) {}
 
 public:
   static const SparcMCExpr *create(uint16_t S, const MCExpr *Expr,
                                    MCContext &Ctx);
   uint16_t getFixupKind() const;
-
-  void printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const override;
 
   static uint16_t parseSpecifier(StringRef name);
   static StringRef getSpecifierName(uint16_t S);

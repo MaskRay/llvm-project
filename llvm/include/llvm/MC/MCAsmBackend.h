@@ -27,6 +27,7 @@ class MCRelaxableFragment;
 class MCSymbol;
 class MCAssembler;
 class MCContext;
+class MCSpecifierExpr;
 struct MCDwarfFrameInfo;
 struct MCFixupKindInfo;
 class MCInst;
@@ -81,6 +82,10 @@ public:
 
   virtual std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const = 0;
+
+  virtual void printExpr(raw_ostream &, const MCSpecifierExpr &) const {
+    llvm_unreachable("Need to implement hook if target uses MCSpecifierExpr");
+  }
 
   /// \name Target Fixup Interfaces
   /// @{

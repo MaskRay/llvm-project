@@ -24,16 +24,7 @@ using namespace llvm;
 
 const SparcMCExpr *SparcMCExpr::create(uint16_t S, const MCExpr *Expr,
                                        MCContext &Ctx) {
-  return new (Ctx) SparcMCExpr(S, Expr);
-}
-
-void SparcMCExpr::printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {
-  StringRef S = getSpecifierName(specifier);
-  if (!S.empty())
-    OS << '%' << S << '(';
-  getSubExpr()->print(OS, MAI);
-  if (!S.empty())
-    OS << ')';
+  return new (Ctx) SparcMCExpr(Expr, S);
 }
 
 StringRef SparcMCExpr::getSpecifierName(uint16_t S) {
