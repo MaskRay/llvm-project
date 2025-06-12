@@ -509,7 +509,7 @@ protected:
   // Target-specific relocation specifier code
   const Spec specifier;
 
-protected:
+public:
   explicit MCSpecifierExpr(const MCExpr *Expr, Spec S)
       : MCExpr(Specifier, SMLoc()), Expr(Expr), specifier(S) {}
   virtual ~MCSpecifierExpr() = default;
@@ -518,7 +518,7 @@ public:
   Spec getSpecifier() const { return specifier; }
   const MCExpr *getSubExpr() const { return Expr; }
 
-  virtual void printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const = 0;
+  virtual void printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {}
   virtual bool evaluateAsRelocatableImpl(MCValue &Res,
                                          const MCAssembler *Asm) const;
 

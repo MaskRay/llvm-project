@@ -10,6 +10,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/MC/MCAsmInfo.h"
+#include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
@@ -36,6 +37,8 @@ void llvm::dumpBytes(ArrayRef<uint8_t> bytes, raw_ostream &OS) {
 }
 
 MCInstPrinter::~MCInstPrinter() = default;
+
+MCAsmBackend &MCInstPrinter::getBackend() const { return Asm->getBackend(); }
 
 /// getOpcodeName - Return the name of the specified opcode enum (e.g.
 /// "MOV32ri") or empty if we can't resolve it.

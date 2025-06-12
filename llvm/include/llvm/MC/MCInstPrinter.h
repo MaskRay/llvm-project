@@ -18,6 +18,8 @@
 namespace llvm {
 
 class MCAsmInfo;
+class MCAssembler;
+class MCAsmBackend;
 class MCInst;
 class MCInstrAnalysis;
 class MCInstrInfo;
@@ -53,6 +55,7 @@ protected:
   const MCInstrInfo &MII;
   const MCRegisterInfo &MRI;
   const MCInstrAnalysis *MIA = nullptr;
+  MCAssembler *Asm = nullptr;
 
   /// True if we are printing marked up assembly.
   bool UseMarkup = false;
@@ -122,6 +125,9 @@ public:
     bool EnableMarkup;
     bool EnableColor;
   };
+
+  void setAssembler(MCAssembler *A) { Asm = A; }
+  MCAsmBackend &getBackend() const;
 
   /// Customize the printer according to a command line option.
   /// @return true if the option is recognized and applied.

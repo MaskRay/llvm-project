@@ -12,6 +12,7 @@
 
 #include "SparcInstPrinter.h"
 #include "Sparc.h"
+#include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -142,7 +143,7 @@ void SparcInstPrinter::printOperand(const MCInst *MI, int opNum,
   }
 
   assert(MO.isExpr() && "Unknown operand kind in printOperand");
-  MO.getExpr()->print(O, &MAI);
+  getBackend().printExpr(O, *MO.getExpr());
 }
 
 void SparcInstPrinter::printMemOperand(const MCInst *MI, int opNum,

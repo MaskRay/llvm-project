@@ -8,6 +8,7 @@
 
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCDXContainerWriter.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCFixupKindInfo.h"
@@ -80,6 +81,13 @@ MCAsmBackend::createDwoObjectWriter(raw_pwrite_stream &OS,
   default:
     report_fatal_error("dwo only supported with COFF, ELF, and Wasm");
   }
+}
+
+void MCAsmBackend::printExpr(raw_ostream &OS, const MCExpr &Expr) const {
+  if (auto *SE = dyn_cast<MCSpecifierExpr>(&Expr))
+    printSpecifierExpr(OS, *SE);
+  else
+    Expr.print(OS, getContext().getAsmInfo());
 }
 
 std::optional<MCFixupKind> MCAsmBackend::getFixupKind(StringRef Name) const {

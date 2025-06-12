@@ -85,6 +85,7 @@ public:
                          : nullptr)),
         CommentStream(CommentToEmit) {
     assert(InstPrinter);
+    InstPrinter->setAssembler(Assembler.get());
     if (Assembler->getBackendPtr())
       setAllowAutoPadding(Assembler->getBackend().allowAutoPadding());
 
@@ -113,6 +114,7 @@ public:
 
   MCAssembler &getAssembler() { return *Assembler; }
   MCAssembler *getAssemblerPtr() override { return nullptr; }
+  MCAsmBackend &getBackend() const { return Assembler->getBackend(); }
 
   inline void EmitEOL() {
     // Dump Explicit Comments here.
@@ -1399,7 +1401,7 @@ void MCAsmStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
   if (MCTargetStreamer *TS = getTargetStreamer()) {
     TS->emitValue(Value);
   } else {
-    Value->print(OS, MAI);
+    getBackend().printExpr(OS, *Value);
     EmitEOL();
   }
 }
@@ -1411,7 +1413,7 @@ void MCAsmStreamer::emitULEB128Value(const MCExpr *Value) {
     return;
   }
   OS << "\t.uleb128 ";
-  Value->print(OS, MAI);
+  getBackend().printExpr(OS, *Value);
   EmitEOL();
 }
 
@@ -1422,7 +1424,7 @@ void MCAsmStreamer::emitSLEB128Value(const MCExpr *Value) {
     return;
   }
   OS << "\t.sleb128 ";
-  Value->print(OS, MAI);
+  getBackend().printExpr(OS, *Value);
   EmitEOL();
 }
 

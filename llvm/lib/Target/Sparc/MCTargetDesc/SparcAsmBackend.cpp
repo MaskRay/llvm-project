@@ -7,9 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/SparcFixupKinds.h"
+#include "MCTargetDesc/SparcMCExpr.h"
 #include "MCTargetDesc/SparcMCTargetDesc.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/MC/MCAsmBackend.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCFixupKindInfo.h"
@@ -125,6 +127,9 @@ public:
         Is64Bit(STI.getTargetTriple().isArch64Bit()),
         IsV8Plus(STI.hasFeature(Sparc::FeatureV8Plus)) {}
 
+  void printSpecifierExpr(raw_ostream &OS,
+                          const MCSpecifierExpr &Expr) const override;
+
   std::optional<MCFixupKind> getFixupKind(StringRef Name) const override;
   MCFixupKindInfo getFixupKindInfo(MCFixupKind Kind) const override;
   void applyFixup(const MCFragment &, const MCFixup &, const MCValue &Target,
@@ -161,6 +166,16 @@ public:
   }
 };
 } // end anonymous namespace
+
+void SparcAsmBackend::printSpecifierExpr(raw_ostream &OS,
+                                         const MCSpecifierExpr &Expr) const {
+  StringRef S = Sparc::getSpecifierName(Expr.getSpecifier());
+  if (!S.empty())
+    OS << '%' << S << '(';
+  printExpr(OS, *Expr.getSubExpr());
+  if (!S.empty())
+    OS << ')';
+}
 
 std::optional<MCFixupKind> SparcAsmBackend::getFixupKind(StringRef Name) const {
   unsigned Type;
