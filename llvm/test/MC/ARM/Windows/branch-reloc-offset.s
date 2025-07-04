@@ -65,7 +65,7 @@ err:
 // Test errors, if referencing a symbol with an offset
 
     b .Lerr_target+4
-// ERR: [[#@LINE-1]]:5: error: cannot perform a PC-relative fixup with a non-zero symbol offset
+// ERR: [[#@LINE-1]]:7: error: cannot perform a PC-relative fixup with a non-zero symbol offset
     bl .Lerr_target+4
 // ERR: [[#@LINE-1]]:5: error: cannot perform a PC-relative fixup with a non-zero symbol offset
     blx .Lerr_target+4

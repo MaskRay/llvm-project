@@ -128,7 +128,7 @@ public:
     }
   }
 
-  SMLoc getLoc() const { return Loc; }
+  SMLoc getLoc() const;
 };
 
 namespace mc {
