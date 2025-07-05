@@ -115,7 +115,7 @@ private:
   void layoutSection(MCSection &Sec);
   /// Perform one layout iteration and return true if any offsets
   /// were adjusted.
-  bool relaxOnce();
+  bool relaxOnce(unsigned &MaxIter);
 
   /// Perform relaxation on a single fragment.
   bool relaxFragment(MCFragment &F);

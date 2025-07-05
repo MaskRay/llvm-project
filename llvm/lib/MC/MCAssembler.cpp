@@ -795,9 +795,13 @@ void MCAssembler::layout() {
   this->HasLayout = true;
   for (MCSection &Sec : *this)
     layoutSection(Sec);
-  while (relaxOnce())
+  unsigned Iter = 0, MaxIter = 0;
+  while (relaxOnce(MaxIter)) {
     if (getContext().hadError())
       return;
+    if (++Iter >= MaxIter)
+      break;
+  }
 
   // Some targets might want to adjust fragment offsets. If so, perform another
   // layout iteration.
@@ -1127,7 +1131,7 @@ void MCAssembler::layoutSection(MCSection &Sec) {
   }
 }
 
-bool MCAssembler::relaxOnce() {
+bool MCAssembler::relaxOnce(unsigned &MaxIter) {
   ++stats::RelaxationSteps;
   PendingErrors.clear();
 
@@ -1138,18 +1142,15 @@ bool MCAssembler::relaxOnce() {
   for (MCSection &Sec : *this) {
     // Assume each iteration finalizes at least one extra fragment. If the
     // layout does not converge after N+1 iterations, bail out.
-    auto MaxIter = Sec.curFragList()->Tail->getLayoutOrder() + 1;
-    for (;;) {
-      bool Changed = false;
-      for (MCFragment &F : Sec)
-        if (relaxFragment(F))
-          Changed = true;
+    MaxIter = std::max(MaxIter, Sec.curFragList()->Tail->getLayoutOrder() + 1);
+    bool Changed = false;
+    for (MCFragment &F : Sec)
+      if (relaxFragment(F))
+        Changed = true;
 
-      ChangedAny |= Changed;
-      if (!Changed || --MaxIter == 0)
-        break;
+    ChangedAny |= Changed;
+    if (Changed)
       layoutSection(Sec);
-    }
   }
   return ChangedAny;
 }
