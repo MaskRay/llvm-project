@@ -885,20 +885,13 @@ bool MCAssembler::relaxInstruction(MCRelaxableFragment &F) {
     return false;
 
   ++stats::RelaxedInstructions;
-
-  // FIXME-PERF: We could immediately lower out instructions if we can tell
-  // they are fully resolved, to avoid retesting on later passes.
-
-  // Relax the fragment.
-
-  MCInst Relaxed = F.getInst();
-  getBackend().relaxInstruction(Relaxed, *F.getSubtargetInfo());
+  getBackend().relaxInstruction(F);
 
   // Encode the new instruction.
-  F.setInst(Relaxed);
   SmallVector<char, 16> Data;
   SmallVector<MCFixup, 1> Fixups;
-  getEmitter().encodeInstruction(Relaxed, Data, Fixups, *F.getSubtargetInfo());
+  getEmitter().encodeInstruction(F.getInst(), Data, Fixups,
+                                 *F.getSubtargetInfo());
   F.setContents(Data);
   F.setFixups(Fixups);
   return true;

@@ -180,8 +180,7 @@ public:
   bool fixupNeedsRelaxationAdvanced(const MCFixup &, const MCValue &, uint64_t,
                                     bool) const override;
 
-  void relaxInstruction(MCInst &Inst,
-                        const MCSubtargetInfo &STI) const override;
+  void relaxInstruction(MCRelaxableFragment &F) const override;
 
   bool padInstructionViaRelaxation(MCRelaxableFragment &RF,
                                    MCCodeEmitter &Emitter,
@@ -218,8 +217,7 @@ static unsigned getRelaxedOpcodeBranch(unsigned Opcode,
   }
 }
 
-static unsigned getRelaxedOpcode(const MCInst &MI, bool Is16BitMode) {
-  unsigned Opcode = MI.getOpcode();
+static unsigned getRelaxedOpcode(unsigned Opcode, bool Is16BitMode) {
   return isRelaxableBranch(Opcode) ? getRelaxedOpcodeBranch(Opcode, Is16BitMode)
                                    : X86::getOpcodeForLongImmediateForm(Opcode);
 }
@@ -749,13 +747,12 @@ bool X86AsmBackend::fixupNeedsRelaxationAdvanced(const MCFixup &Fixup,
 
 // FIXME: Can tblgen help at all here to verify there aren't other instructions
 // we can relax?
-void X86AsmBackend::relaxInstruction(MCInst &Inst,
-                                     const MCSubtargetInfo &STI) const {
+void X86AsmBackend::relaxInstruction(MCRelaxableFragment &F) const {
   // The only relaxations X86 does is from a 1byte pcrel to a 4byte pcrel.
   bool Is16BitMode = STI.hasFeature(X86::Is16Bit);
-  unsigned RelaxedOp = getRelaxedOpcode(Inst, Is16BitMode);
-  assert(RelaxedOp != Inst.getOpcode());
-  Inst.setOpcode(RelaxedOp);
+  unsigned RelaxedOp = getRelaxedOpcode(F.getOpcode(), Is16BitMode);
+  assert(RelaxedOp != F.getOpcode());
+  F.setOpcode(RelaxedOp);
 }
 
 bool X86AsmBackend::padInstructionViaPrefix(MCRelaxableFragment &RF,
@@ -819,8 +816,8 @@ bool X86AsmBackend::padInstructionViaRelaxation(MCRelaxableFragment &RF,
     // encoding size without impacting performance.
     return false;
 
+  relaxInstruction(RF);
   MCInst Relaxed = RF.getInst();
-  relaxInstruction(Relaxed, *RF.getSubtargetInfo());
 
   SmallVector<MCFixup, 4> Fixups;
   SmallString<15> Code;
@@ -831,7 +828,6 @@ bool X86AsmBackend::padInstructionViaRelaxation(MCRelaxableFragment &RF,
   unsigned Delta = NewSize - OldSize;
   if (Delta > RemainingSize)
     return false;
-  RF.setInst(Relaxed);
   RF.setContents(Code);
   RF.setFixups(Fixups);
   RemainingSize -= Delta;

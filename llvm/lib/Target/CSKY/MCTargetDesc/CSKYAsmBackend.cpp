@@ -281,11 +281,10 @@ bool CSKYAsmBackend::fixupNeedsRelaxation(const MCFixup &Fixup,
   return false;
 }
 
-void CSKYAsmBackend::relaxInstruction(MCInst &Inst,
-                                      const MCSubtargetInfo &STI) const {
+void CSKYAsmBackend::relaxInstruction(MCRelaxableFragment &F) const {
   MCInst Res;
-
-  switch (Inst.getOpcode()) {
+  auto Inst = F.getInst();
+  switch (F.getOpcode()) {
   default:
     LLVM_DEBUG(Inst.dump());
     llvm_unreachable("Opcode not expected!");
@@ -333,7 +332,7 @@ void CSKYAsmBackend::relaxInstruction(MCInst &Inst,
     Res.addOperand(Inst.getOperand(2));
     break;
   }
-  Inst = std::move(Res);
+  F.setInst(Res);
 }
 
 bool CSKYAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,

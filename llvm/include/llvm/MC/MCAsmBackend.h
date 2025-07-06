@@ -173,8 +173,7 @@ public:
   /// \param [out] Inst The instruction to relax, which is also the relaxed
   /// instruction.
   /// \param STI the subtarget information for the associated instruction.
-  virtual void relaxInstruction(MCInst &Inst,
-                                const MCSubtargetInfo &STI) const {
+  virtual void relaxInstruction(MCRelaxableFragment &F) const {
     llvm_unreachable(
         "Needed if fixupNeedsRelaxation/fixupNeedsRelaxationAdvanced may "
         "return true");

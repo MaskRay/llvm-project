@@ -36,18 +36,6 @@ MCSymbol *MCSection::getEndSymbol(MCContext &Ctx) {
 
 bool MCSection::hasEnded() const { return End && End->isInSection(); }
 
-MCSection::~MCSection() {
-  // If ~MCRelaxableFragment becomes trivial (no longer store a MCInst member),
-  // this dtor can be made empty.
-  for (auto &[_, Chain] : Subsections) {
-    for (MCFragment *X = Chain.Head, *Y; X; X = Y) {
-      Y = X->Next;
-      if (auto *F = dyn_cast<MCRelaxableFragment>(X))
-        F->~MCRelaxableFragment();
-    }
-  }
-}
-
 void MCSection::setBundleLockState(BundleLockStateType NewState) {
   if (NewState == NotBundleLocked) {
     if (BundleLockNestingDepth == 0) {
@@ -127,4 +115,21 @@ void MCEncodedFragment::setFixups(ArrayRef<MCFixup> Fixups) {
   }
   FixupEnd = FixupStart + Fixups.size();
   llvm::copy(Fixups, S.begin() + FixupStart);
+}
+
+void MCRelaxableFragment::addOperand(MCOperand Operand) {
+  appendOperands({Operand});
+}
+
+void MCRelaxableFragment::appendOperands(ArrayRef<MCOperand> Operands) {
+  auto &S = getParent()->MCOperandStorage;
+  if (LLVM_UNLIKELY(OperandStart + OperandSize != S.size())) {
+    // Move the elements to the end. Reserve space to avoid invalidating
+    // S.begin()+I for `append`.
+    auto I = std::exchange(OperandStart, S.size());
+    S.reserve(S.size() + OperandSize);
+    S.append(S.begin() + I, S.begin() + I + OperandSize);
+  }
+  S.append(Operands.begin(), Operands.end());
+  OperandSize += Operands.size();
 }

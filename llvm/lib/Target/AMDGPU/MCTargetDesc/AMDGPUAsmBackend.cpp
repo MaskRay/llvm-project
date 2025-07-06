@@ -37,8 +37,7 @@ public:
   bool fixupNeedsRelaxation(const MCFixup &Fixup,
                             uint64_t Value) const override;
 
-  void relaxInstruction(MCInst &Inst,
-                        const MCSubtargetInfo &STI) const override;
+  void relaxInstruction(MCRelaxableFragment &F) const override;
 
   bool mayNeedRelaxation(const MCInst &Inst,
                          const MCSubtargetInfo &STI) const override;
@@ -53,13 +52,11 @@ public:
 
 } //End anonymous namespace
 
-void AMDGPUAsmBackend::relaxInstruction(MCInst &Inst,
-                                        const MCSubtargetInfo &STI) const {
+void AMDGPUAsmBackend::relaxInstruction(MCRelaxableFragment &F) const {
   MCInst Res;
-  unsigned RelaxedOpcode = AMDGPU::getSOPPWithRelaxation(Inst.getOpcode());
-  Res.setOpcode(RelaxedOpcode);
-  Res.addOperand(Inst.getOperand(0));
-  Inst = std::move(Res);
+  unsigned RelaxedOpcode = AMDGPU::getSOPPWithRelaxation(F.getOpcode());
+  F.setOpcode(RelaxedOpcode);
+  F.addOperand(F.getOperand(0));
 }
 
 bool AMDGPUAsmBackend::fixupNeedsRelaxation(const MCFixup &Fixup,

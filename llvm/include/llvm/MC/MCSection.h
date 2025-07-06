@@ -39,8 +39,8 @@ class raw_ostream;
 class Triple;
 
 // Represents a contiguous piece of code or data within a section. Its size is
-// determined by MCAssembler::layout. All subclasses (except
-// MCRelaxableFragment, which stores a MCInst) must have trivial destructors.
+// determined by MCAssembler::layout. All subclasses must have trivial
+// destructors.
 //
 // Declaration order: MCFragment, MCSection, then MCFragment's derived classes.
 // This allows MCSection's inline functions to access MCFragment members and
@@ -133,6 +133,7 @@ public:
   friend MCAssembler;
   friend MCObjectStreamer;
   friend class MCEncodedFragment;
+  friend class MCRelaxableFragment;
   static constexpr unsigned NonUniqueID = ~0U;
 
   enum SectionVariant {
@@ -213,6 +214,7 @@ private:
   // Content and fixup storage for fragments
   SmallVector<char, 0> ContentStorage;
   SmallVector<MCFixup, 0> FixupStorage;
+  SmallVector<MCOperand, 0> MCOperandStorage;
 
 protected:
   // TODO Make Name private when possible.
@@ -221,7 +223,8 @@ protected:
 
   MCSection(SectionVariant V, StringRef Name, bool IsText, bool IsVirtual,
             MCSymbol *Begin);
-  ~MCSection();
+  // Protected non-virtual dtor prevents destroy through a base class pointer.
+  ~MCSection() {}
 
 public:
   MCSection(const MCSection &) = delete;
@@ -431,16 +434,46 @@ public:
 ///
 class MCRelaxableFragment : public MCEncodedFragment {
   /// The instruction this is a fragment for.
-  MCInst Inst;
+  unsigned Opcode = 0;
+  uint32_t OperandStart = 0;
+  uint32_t OperandSize = 0;
 
 public:
-  MCRelaxableFragment(const MCInst &Inst, const MCSubtargetInfo &STI)
-      : MCEncodedFragment(FT_Relaxable, true), Inst(Inst) {
+  MCRelaxableFragment(const MCSubtargetInfo &STI)
+      : MCEncodedFragment(FT_Relaxable, true) {
     this->STI = &STI;
   }
 
-  const MCInst &getInst() const { return Inst; }
-  void setInst(const MCInst &Value) { Inst = Value; }
+  unsigned getOpcode() const { return Opcode; }
+  void setOpcode(unsigned Op) { Opcode = Op; }
+
+  MCOperand getOperand(size_t I) const {
+    assert(I < OperandSize);
+    return getParent()->MCOperandStorage[OperandStart + I];
+  }
+  void addOperand(MCOperand Operand);
+  void appendOperands(ArrayRef<MCOperand> Operands);
+  void setOperands(ArrayRef<MCOperand> Operands) {
+    auto &S = getParent()->MCOperandStorage;
+    if (Operands.size() > OperandSize) {
+      OperandStart = S.size();
+      S.resize_for_overwrite(S.size() + Operands.size());
+    }
+    OperandSize = Operands.size();
+    llvm::copy(Operands, S.begin() + OperandStart);
+  }
+
+  MCInst getInst() const {
+    MCInst Inst;
+    Inst.setOpcode(Opcode);
+    Inst.setOperands(ArrayRef(getParent()->MCOperandStorage)
+                         .slice(OperandStart, OperandSize));
+    return Inst;
+  }
+  void setInst(const MCInst &Inst) {
+    Opcode = Inst.getOpcode();
+    setOperands(ArrayRef<MCOperand>(Inst.begin(), Inst.end()));
+  }
 
   bool getAllowAutoPadding() const { return AllowAutoPadding; }
   void setAllowAutoPadding(bool V) { AllowAutoPadding = V; }

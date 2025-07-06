@@ -70,8 +70,7 @@ public:
   bool mayNeedRelaxation(const MCInst &Inst,
                          const MCSubtargetInfo &STI) const override;
 
-  void relaxInstruction(MCInst &Inst,
-                        const MCSubtargetInfo &STI) const override;
+  void relaxInstruction(MCRelaxableFragment &F) const override;
 
   bool relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
                           bool &WasRelaxed) const override;

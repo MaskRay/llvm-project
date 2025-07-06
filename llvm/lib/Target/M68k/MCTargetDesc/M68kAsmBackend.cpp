@@ -62,8 +62,7 @@ public:
   bool fixupNeedsRelaxation(const MCFixup &Fixup,
                             uint64_t Value) const override;
 
-  void relaxInstruction(MCInst &Inst,
-                        const MCSubtargetInfo &STI) const override;
+  void relaxInstruction(MCRelaxableFragment &F) const override;
 
   /// Returns the minimum size of a nop in bytes on this target. The assembler
   /// will use this to emit excess padding in situations where the padding
@@ -219,11 +218,10 @@ bool M68kAsmBackend::fixupNeedsRelaxation(const MCFixup &Fixup,
 
 // NOTE Can tblgen help at all here to verify there aren't other instructions
 // we can relax?
-void M68kAsmBackend::relaxInstruction(MCInst &Inst,
-                                      const MCSubtargetInfo &STI) const {
-  unsigned RelaxedOp = getRelaxedOpcode(Inst.getOpcode());
-  assert(RelaxedOp != Inst.getOpcode());
-  Inst.setOpcode(RelaxedOp);
+void M68kAsmBackend::relaxInstruction(MCRelaxableFragment &F) const {
+  unsigned RelaxedOp = getRelaxedOpcode(F.getOpcode());
+  assert(RelaxedOp != F.getOpcode());
+  F.setOpcode(RelaxedOp);
 }
 
 bool M68kAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,

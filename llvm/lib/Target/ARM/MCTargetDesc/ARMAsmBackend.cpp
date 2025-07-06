@@ -326,27 +326,23 @@ bool ARMAsmBackend::fixupNeedsRelaxationAdvanced(const MCFixup &Fixup,
   return reasonForFixupRelaxation(Fixup, Value);
 }
 
-void ARMAsmBackend::relaxInstruction(MCInst &Inst,
-                                     const MCSubtargetInfo &STI) const {
-  unsigned RelaxedOp = getRelaxedOpcode(Inst.getOpcode(), STI);
-  assert(RelaxedOp != Inst.getOpcode());
+void ARMAsmBackend::relaxInstruction(MCRelaxableFragment &F) const {
+  unsigned RelaxedOp = getRelaxedOpcode(F.getOpcode(), *F.getSubtargetInfo());
+  assert(RelaxedOp != F.getOpcode());
 
   // If we are changing Thumb CBZ or CBNZ instruction to a NOP, aka tHINT, we
   // have to change the operands too.
-  if ((Inst.getOpcode() == ARM::tCBZ || Inst.getOpcode() == ARM::tCBNZ) &&
+  if ((F.getOpcode() == ARM::tCBZ || F.getOpcode() == ARM::tCBNZ) &&
       RelaxedOp == ARM::tHINT) {
-    MCInst Res;
-    Res.setOpcode(RelaxedOp);
-    Res.addOperand(MCOperand::createImm(0));
-    Res.addOperand(MCOperand::createImm(14));
-    Res.addOperand(MCOperand::createReg(0));
-    Inst = std::move(Res);
+    F.setOpcode(RelaxedOp);
+    F.setOperands({MCOperand::createImm(0), MCOperand::createImm(14),
+                   MCOperand::createReg(0)});
     return;
   }
 
   // The rest of instructions we're relaxing have the same operands.
   // We just need to update to the proper opcode.
-  Inst.setOpcode(RelaxedOp);
+  F.setOpcode(RelaxedOp);
 }
 
 bool ARMAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,

@@ -208,11 +208,12 @@ static unsigned getRelaxedOpcode(const MCInst &Inst,
   return Inst.getOpcode();
 }
 
-void RISCVAsmBackend::relaxInstruction(MCInst &Inst,
-                                       const MCSubtargetInfo &STI) const {
+void RISCVAsmBackend::relaxInstruction(MCRelaxableFragment &F) const {
   if (STI.hasFeature(RISCV::FeatureExactAssembly))
     return;
 
+  auto Inst = F.getInst();
+  auto STI = *F.getSubtargetInfo();
   MCInst Res;
   switch (Inst.getOpcode()) {
   default:
@@ -263,7 +264,7 @@ void RISCVAsmBackend::relaxInstruction(MCInst &Inst,
     Res.addOperand(Inst.getOperand(2));
     break;
   }
-  Inst = std::move(Res);
+  F.setInst(Res);
 }
 
 bool RISCVAsmBackend::relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
