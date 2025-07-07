@@ -183,14 +183,13 @@ public:
   void relaxInstruction(MCInst &Inst,
                         const MCSubtargetInfo &STI) const override;
 
-  bool padInstructionViaRelaxation(MCRelaxableFragment &RF,
-                                   MCCodeEmitter &Emitter,
+  bool padInstructionViaRelaxation(MCFragment &RF, MCCodeEmitter &Emitter,
                                    unsigned &RemainingSize) const;
 
-  bool padInstructionViaPrefix(MCRelaxableFragment &RF, MCCodeEmitter &Emitter,
+  bool padInstructionViaPrefix(MCFragment &RF, MCCodeEmitter &Emitter,
                                unsigned &RemainingSize) const;
 
-  bool padInstructionEncoding(MCRelaxableFragment &RF, MCCodeEmitter &Emitter,
+  bool padInstructionEncoding(MCFragment &RF, MCCodeEmitter &Emitter,
                               unsigned &RemainingSize) const;
 
   bool finishLayout(const MCAssembler &Asm) const override;
@@ -421,11 +420,7 @@ isRightAfterData(MCFragment *CurrentFragment,
 static size_t getSizeForInstFragment(const MCFragment *F) {
   if (!F || !F->hasInstructions())
     return 0;
-  // MCEncodedFragmentWithContents being templated makes this tricky.
-  if (auto *DF = dyn_cast<MCEncodedFragment>(F))
-    return DF->getContents().size();
-  else
-    llvm_unreachable("Unknown fragment with instructions!");
+  return F->getContents().size();
 }
 
 /// Return true if we can insert NOP or prefixes automatically before the
@@ -551,8 +546,8 @@ void X86AsmBackend::emitInstructionBegin(MCObjectStreamer &OS,
 void X86AsmBackend::emitInstructionEnd(MCObjectStreamer &OS,
                                        const MCInst &Inst) {
   MCFragment *CF = OS.getCurrentFragment();
-  if (auto *F = dyn_cast_or_null<MCRelaxableFragment>(CF))
-    F->setAllowAutoPadding(canPadInst(Inst, OS));
+  if (CF->getKind() == MCFragment::FT_Relaxable)
+    CF->setAllowAutoPadding(canPadInst(Inst, OS));
 
   // Update PrevInstOpcode here, canPadInst() reads that.
   PrevInstOpcode = Inst.getOpcode();
@@ -785,7 +780,7 @@ void X86AsmBackend::relaxInstruction(MCInst &Inst,
   Inst.setOpcode(RelaxedOp);
 }
 
-bool X86AsmBackend::padInstructionViaPrefix(MCRelaxableFragment &RF,
+bool X86AsmBackend::padInstructionViaPrefix(MCFragment &RF,
                                             MCCodeEmitter &Emitter,
                                             unsigned &RemainingSize) const {
   if (!RF.getAllowAutoPadding())
@@ -828,10 +823,10 @@ bool X86AsmBackend::padInstructionViaPrefix(MCRelaxableFragment &RF,
   SmallString<256> Code;
   Code.append(PrefixBytesToAdd, Prefix);
   Code.append(RF.getContents().begin(), RF.getContents().end());
-  RF.setContents(Code);
+  RF.setVarContents(Code);
 
   // Adjust the fixups for the change in offsets
-  for (auto &F : RF.getFixups()) {
+  for (auto &F : RF.getVarFixups()) {
     F.setOffset(F.getOffset() + PrefixBytesToAdd);
   }
 
@@ -839,7 +834,7 @@ bool X86AsmBackend::padInstructionViaPrefix(MCRelaxableFragment &RF,
   return true;
 }
 
-bool X86AsmBackend::padInstructionViaRelaxation(MCRelaxableFragment &RF,
+bool X86AsmBackend::padInstructionViaRelaxation(MCFragment &RF,
                                                 MCCodeEmitter &Emitter,
                                                 unsigned &RemainingSize) const {
   if (!mayNeedRelaxation(RF.getOpcode(), RF.getOperands(),
@@ -854,20 +849,20 @@ bool X86AsmBackend::padInstructionViaRelaxation(MCRelaxableFragment &RF,
   SmallVector<MCFixup, 4> Fixups;
   SmallString<15> Code;
   Emitter.encodeInstruction(Relaxed, Code, Fixups, *RF.getSubtargetInfo());
-  const unsigned OldSize = RF.getContents().size();
+  const unsigned OldSize = RF.getVarContents().size();
   const unsigned NewSize = Code.size();
   assert(NewSize >= OldSize && "size decrease during relaxation?");
   unsigned Delta = NewSize - OldSize;
   if (Delta > RemainingSize)
     return false;
   RF.setInst(Relaxed);
-  RF.setContents(Code);
-  RF.setFixups(Fixups);
+  RF.setVarContents(Code);
+  RF.setVarFixups(Fixups);
   RemainingSize -= Delta;
   return true;
 }
 
-bool X86AsmBackend::padInstructionEncoding(MCRelaxableFragment &RF,
+bool X86AsmBackend::padInstructionEncoding(MCFragment &RF,
                                            MCCodeEmitter &Emitter,
                                            unsigned &RemainingSize) const {
   bool Changed = false;
@@ -900,7 +895,7 @@ bool X86AsmBackend::finishLayout(const MCAssembler &Asm) const {
     if (!Sec.isText())
       continue;
 
-    SmallVector<MCRelaxableFragment *, 4> Relaxable;
+    SmallVector<MCFragment *, 4> Relaxable;
     for (MCSection::iterator I = Sec.begin(), IE = Sec.end(); I != IE; ++I) {
       MCFragment &F = *I;
 
@@ -911,7 +906,7 @@ bool X86AsmBackend::finishLayout(const MCAssembler &Asm) const {
         continue;
 
       if (F.getKind() == MCFragment::FT_Relaxable) {
-        auto &RF = cast<MCRelaxableFragment>(*I);
+        auto &RF = cast<MCFragment>(*I);
         Relaxable.push_back(&RF);
         continue;
       }

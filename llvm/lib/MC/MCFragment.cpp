@@ -59,15 +59,14 @@ LLVM_DUMP_METHOD void MCFragment::dump() const {
     // clang-format on
   }
 
-  if (const auto *EF = dyn_cast<MCEncodedFragment>(this))
-    if (auto Pad = static_cast<unsigned>(EF->getBundlePadding()))
-      OS << " BundlePadding:" << Pad;
+  if (auto Pad = static_cast<unsigned>(getBundlePadding()))
+    OS << " BundlePadding:" << Pad;
 
-  auto printFixups = [&](llvm::ArrayRef<MCFixup> Fixups) {
+  auto printFixups = [&](uint64_t StartOffset, llvm::ArrayRef<MCFixup> Fixups) {
     if (Fixups.empty())
       return;
     for (auto [I, F] : llvm::enumerate(Fixups)) {
-      OS << "\n  Fixup @" << F.getOffset() << " Value:";
+      OS << "\n  Fixup @" << (StartOffset + F.getOffset()) << " Value:";
       F.getValue()->print(OS, nullptr);
       OS << " Kind:" << F.getKind();
     }
@@ -83,18 +82,32 @@ LLVM_DUMP_METHOD void MCFragment::dump() const {
       OS << " Nops";
     break;
   }
-  case MCFragment::FT_Data:  {
-    const auto *F = cast<MCDataFragment>(this);
-    if (F->isLinkerRelaxable())
+  case MCFragment::FT_Data:
+  case MCFragment::FT_Relaxable: {
+    if (isLinkerRelaxable())
       OS << " LinkerRelaxable";
-    auto Contents = F->getContents();
-    OS << " Size:" << Contents.size() << " [";
-    for (unsigned i = 0, e = Contents.size(); i != e; ++i) {
+    auto Fixed = getContents();
+    auto Var = getVarContents();
+    OS << " Size:" << Fixed.size();
+    if (getKind() == MCFragment::FT_Relaxable)
+      OS << '+' << Var.size();
+    OS << " [";
+    for (unsigned i = 0, e = Fixed.size(); i != e; ++i) {
       if (i) OS << ",";
-      OS << format("%02x", uint8_t(Contents[i]));
+      OS << format("%02x", uint8_t(Fixed[i]));
+    }
+    for (unsigned i = 0, e = Var.size(); i != e; ++i) {
+      if (Fixed.size() || i)
+        OS << ",";
+      OS << format("%02x", uint8_t(Var[i]));
     }
     OS << ']';
-    printFixups(F->getFixups());
+    if (getKind() == MCFragment::FT_Relaxable) {
+      OS << ' ';
+      getInst().dump_pretty(OS);
+    }
+    printFixups(0, getFixups());
+    printFixups(Fixed.size(), getVarFixups());
     break;
   }
   case MCFragment::FT_Fill:  {
@@ -109,13 +122,6 @@ LLVM_DUMP_METHOD void MCFragment::dump() const {
     const auto *NF = cast<MCNopsFragment>(this);
     OS << " NumBytes:" << NF->getNumBytes()
        << " ControlledNopLength:" << NF->getControlledNopLength();
-    break;
-  }
-  case MCFragment::FT_Relaxable:  {
-    const auto *F = cast<MCRelaxableFragment>(this);
-    OS << " Size:" << F->getContents().size() << ' ';
-    F->getInst().dump_pretty(OS);
-    printFixups(F->getFixups());
     break;
   }
   case MCFragment::FT_Org:  {

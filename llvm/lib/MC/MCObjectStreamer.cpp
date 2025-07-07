@@ -66,8 +66,8 @@ void MCObjectStreamer::resolvePendingFixups() {
     // If the location symbol to relocate is in MCEncodedFragment,
     // put the Fixup into location symbol's fragment. Otherwise
     // put into PendingFixup.DF
-    MCFragment *SymFragment = PendingFixup.Sym->getFragment();
-    if (auto *F = dyn_cast<MCEncodedFragment>(SymFragment))
+    MCFragment *F = PendingFixup.Sym->getFragment();
+    if (F->isEncoded())
       F->addFixup(PendingFixup.Fixup);
     else
       PendingFixup.DF->addFixup(PendingFixup.Fixup);
@@ -130,7 +130,7 @@ void MCObjectStreamer::emitFrames(MCAsmBackend *MAB) {
     MCDwarfFrameEmitter::Emit(*this, MAB, false);
 }
 
-static bool canReuseDataFragment(const MCDataFragment &F,
+static bool canReuseDataFragment(const MCFragment &F,
                                  const MCAssembler &Assembler,
                                  const MCSubtargetInfo *STI) {
   if (!F.hasInstructions())
@@ -151,12 +151,13 @@ static bool canReuseDataFragment(const MCDataFragment &F,
 
 MCDataFragment *
 MCObjectStreamer::getOrCreateDataFragment(const MCSubtargetInfo *STI) {
-  auto *F = dyn_cast<MCDataFragment>(getCurrentFragment());
-  if (!F || !canReuseDataFragment(*F, *Assembler, STI)) {
+  auto *F = getCurrentFragment();
+  if (F->getKind() != MCFragment::FT_Data ||
+      !canReuseDataFragment(*F, *Assembler, STI)) {
     F = getContext().allocFragment<MCDataFragment>();
     insert(F);
   }
-  return F;
+  return static_cast<MCDataFragment *>(F);
 }
 
 void MCObjectStreamer::visitUsedSymbol(const MCSymbol &Sym) {
@@ -373,7 +374,6 @@ void MCObjectStreamer::emitInstructionImpl(const MCInst &Inst,
     return;
   }
 
-  // Otherwise emit to a separate fragment.
   emitInstToFragment(Inst, STI);
 }
 
@@ -395,18 +395,19 @@ void MCObjectStreamer::emitInstToData(const MCInst &Inst,
 
 void MCObjectStreamer::emitInstToFragment(const MCInst &Inst,
                                           const MCSubtargetInfo &STI) {
-  // Always create a new, separate fragment here, because its size can change
-  // during relaxation.
-  MCRelaxableFragment *IF =
-      getContext().allocFragment<MCRelaxableFragment>(STI);
-  insert(IF);
-  IF->setInst(Inst);
-
+  auto *F = getOrCreateDataFragment();
+  SmallVector<char, 16> Data;
   SmallVector<MCFixup, 1> Fixups;
-  getAssembler().getEmitter().encodeInstruction(
-      Inst, IF->getContentsForAppending(), Fixups, STI);
-  IF->doneAppending();
-  IF->appendFixups(Fixups);
+  getAssembler().getEmitter().encodeInstruction(Inst, Data, Fixups, STI);
+
+  F->Kind = MCFragment::FT_Relaxable;
+  F->STI = &STI;
+  F->setVarContents(Data);
+  for (auto &Fixup : Fixups) {
+    Fixup.setOffset(Fixup.getOffset() + F->getContents().size());
+  }
+  F->setVarFixups(Fixups);
+  F->setInst(Inst);
 }
 
 #ifndef NDEBUG
