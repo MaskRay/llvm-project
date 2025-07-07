@@ -138,9 +138,7 @@ bool MCAsmBackend::isDarwinCanonicalPersonality(const MCSymbol *Sym) const {
 
 const MCSubtargetInfo *MCAsmBackend::getSubtargetInfo(const MCFragment &F) {
   const MCSubtargetInfo *STI = nullptr;
-  if (auto *DF = dyn_cast<MCEncodedFragment>(&F)) {
-    STI = DF->getSubtargetInfo();
-    assert(!DF->hasInstructions() || STI != nullptr);
-  }
+  STI = F.getSubtargetInfo();
+  assert(!F.hasInstructions() || STI != nullptr);
   return STI;
 }
