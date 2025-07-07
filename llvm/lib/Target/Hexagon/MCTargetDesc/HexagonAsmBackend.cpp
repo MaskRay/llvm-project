@@ -46,16 +46,15 @@ class HexagonAsmBackend : public MCAsmBackend {
   MCInst * Extender;
   unsigned MaxPacketSize;
 
-  void ReplaceInstruction(MCCodeEmitter &E, MCRelaxableFragment &RF,
-                          MCInst &HMB) const {
+  void ReplaceInstruction(MCCodeEmitter &E, MCFragment &RF, MCInst &HMB) const {
     SmallVector<MCFixup, 4> Fixups;
     SmallString<256> Code;
     E.encodeInstruction(HMB, Code, Fixups, *RF.getSubtargetInfo());
 
     // Update the fragment.
     RF.setInst(HMB);
-    RF.setContents(Code);
-    RF.getFixups() = Fixups;
+    RF.setVarContents(Code);
+    RF.setVarFixups(Fixups);
   }
 
 public:
@@ -595,7 +594,7 @@ public:
             }
             case MCFragment::FT_Relaxable: {
               MCContext &Context = getContext();
-              auto &RF = cast<MCRelaxableFragment>(*Frags[K]);
+              auto &RF = *Frags[K];
               MCInst Inst = RF.getInst();
 
               const bool WouldTraverseLabel = llvm::any_of(

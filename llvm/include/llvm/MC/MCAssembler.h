@@ -36,11 +36,10 @@ class MCCVDefRangeFragment;
 class MCCVInlineLineTableFragment;
 class MCDwarfCallFrameFragment;
 class MCDwarfLineAddrFragment;
-class MCEncodedFragment;
+class MCFragment;
 class MCFixup;
 class MCLEBFragment;
 class MCPseudoProbeAddrFragment;
-class MCRelaxableFragment;
 class MCSymbolRefExpr;
 class raw_ostream;
 class MCAsmBackend;
@@ -107,7 +106,7 @@ private:
 
   /// Check whether a fixup can be satisfied, or whether it needs to be relaxed
   /// (increased in size, in order to hold its value correctly).
-  bool fixupNeedsRelaxation(const MCRelaxableFragment &, const MCFixup &) const;
+  bool fixupNeedsRelaxation(const MCFragment &, const MCFixup &) const;
 
   void layoutSection(MCSection &Sec);
   /// Perform one layout iteration and return the index of the first stable
@@ -116,7 +115,7 @@ private:
 
   /// Perform relaxation on a single fragment.
   bool relaxFragment(MCFragment &F);
-  bool relaxInstruction(MCRelaxableFragment &IF);
+  bool relaxInstruction(MCFragment &F);
   bool relaxLEB(MCLEBFragment &IF);
   bool relaxBoundaryAlign(MCBoundaryAlignFragment &BF);
   bool relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF);
@@ -228,8 +227,7 @@ public:
 
   /// Write the necessary bundle padding to \p OS.
   /// Expects a fragment \p F containing instructions and its size \p FSize.
-  LLVM_ABI void writeFragmentPadding(raw_ostream &OS,
-                                     const MCEncodedFragment &F,
+  LLVM_ABI void writeFragmentPadding(raw_ostream &OS, const MCFragment &F,
                                      uint64_t FSize) const;
 
   LLVM_ABI void reportError(SMLoc L, const Twine &Msg) const;

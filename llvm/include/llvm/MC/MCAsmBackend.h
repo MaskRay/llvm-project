@@ -23,7 +23,7 @@ class MCDwarfCallFrameFragment;
 class MCDwarfLineAddrFragment;
 class MCFragment;
 class MCLEBFragment;
-class MCRelaxableFragment;
+class MCEncodedFragment;
 class MCSymbol;
 class MCAssembler;
 class MCContext;
