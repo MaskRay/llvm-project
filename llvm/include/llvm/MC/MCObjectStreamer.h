@@ -78,9 +78,6 @@ public:
 
 protected:
   bool changeSectionImpl(MCSection *Section, uint32_t Subsection);
-  MCAlignFragment *createAlignFragment(Align Alignment, int64_t Fill,
-                                       uint8_t FillLen,
-                                       unsigned MaxBytesToEmit);
 
 public:
   void visitUsedSymbol(const MCSymbol &Sym) override;
