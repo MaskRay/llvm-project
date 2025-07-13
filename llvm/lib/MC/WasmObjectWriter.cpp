@@ -696,14 +696,14 @@ static void addData(SmallVectorImpl<char> &DataBytes,
     if (Frag.hasInstructions())
       report_fatal_error("only data supported in data sections");
 
-    if (auto *Align = dyn_cast<MCAlignFragment>(&Frag)) {
-      if (Align->getFillLen() != 1)
+    if (Frag.getKind() == MCFragment::FT_Align) {
+      if (Frag.getAlignFillLen() != 1)
         report_fatal_error("only byte values supported for alignment");
       // If nops are requested, use zeros, as this is the data section.
-      uint8_t Value = Align->hasEmitNops() ? 0 : Align->getFill();
+      uint8_t Value = Frag.hasAlignEmitNops() ? 0 : Frag.getAlignFill();
       uint64_t Size =
-          std::min<uint64_t>(alignTo(DataBytes.size(), Align->getAlignment()),
-                             DataBytes.size() + Align->getMaxBytesToEmit());
+          std::min<uint64_t>(alignTo(DataBytes.size(), Frag.getAlignment()),
+                             DataBytes.size() + Frag.getAlignMaxBytesToEmit());
       DataBytes.resize(Size, Value);
     } else if (auto *Fill = dyn_cast<MCFillFragment>(&Frag)) {
       int64_t NumValues;
@@ -1863,8 +1863,7 @@ uint64_t WasmObjectWriter::writeOneObject(MCAssembler &Asm,
       const MCFragment &AlignFrag = *nextFrag;
       if (AlignFrag.getKind() != MCFragment::FT_Align)
         report_fatal_error(".init_array section should be aligned");
-      if (cast<MCAlignFragment>(AlignFrag).getAlignment() !=
-          Align(is64Bit() ? 8 : 4))
+      if (AlignFrag.getAlignment() != Align(is64Bit() ? 8 : 4))
         report_fatal_error(
             ".init_array section should be aligned for pointers");
 
