@@ -29,11 +29,19 @@ GOFFObjectWriter &MCGOFFStreamer::getWriter() {
 void MCGOFFStreamer::changeSection(MCSection *Section, uint32_t Subsection) {
   // Make sure that all section are registered in the correct order.
   SmallVector<MCSectionGOFF *> Sections;
-  for (auto *S = static_cast<MCSectionGOFF *>(Section); S; S = S->getParent())
+  for (auto *S = static_cast<MCSectionGOFF *>(Section); (S = S->getParent());)
     Sections.push_back(S);
-  while (!Sections.empty()) {
-    auto *S = Sections.pop_back_val();
-    MCObjectStreamer::changeSection(S, Sections.empty() ? Subsection : 0);
+  while (!Sections.empty())
+    MCObjectStreamer::changeSection(Sections.pop_back_val(), 0);
+
+  bool Registered = Section->isRegistered();
+  MCObjectStreamer::changeSection(Section, Subsection);
+  if (!Registered) {
+    MCSymbol *Sym = Section->getBeginSymbol();
+    if (Sym) {
+      Sym->setFragment(nullptr);
+      emitLabel(Sym);
+    }
   }
 }
 

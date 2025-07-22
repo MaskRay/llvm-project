@@ -1358,9 +1358,6 @@ void MCStreamer::switchSection(MCSection *Section, uint32_t Subsection) {
     changeSection(Section, Subsection);
     SectionStack.back().first = MCSectionSubPair(Section, Subsection);
     assert(!Section->hasEnded() && "Section already ended");
-    MCSymbol *Sym = Section->getBeginSymbol();
-    if (Sym && !Sym->isInSection())
-      emitLabel(Sym);
   }
 }
 
@@ -1387,9 +1384,6 @@ void MCStreamer::switchSectionNoPrint(MCSection *Section) {
   SectionStack.back().second = SectionStack.back().first;
   SectionStack.back().first = MCSectionSubPair(Section, 0);
   changeSection(Section, 0);
-  MCSymbol *Sym = Section->getBeginSymbol();
-  if (Sym && !Sym->isInSection())
-    emitLabel(Sym);
 }
 
 MCSymbol *MCStreamer::endSection(MCSection *Section) {

@@ -60,6 +60,7 @@ class MCAsmStreamer final : public MCStreamer {
   bool ShowInst = false;
   bool UseDwarfDirectory = false;
 
+  void changeSection(MCSection *, uint32_t) override;
   void EmitRegisterName(int64_t Register);
   void PrintQuotedString(StringRef Data, raw_ostream &OS) const;
   void printDwarfFileDirective(unsigned FileNo, StringRef Directory,
@@ -2427,6 +2428,12 @@ void MCAsmStreamer::AddEncodingComment(const MCInst &Inst,
     }
     OS << '\n';
   }
+}
+
+void MCAsmStreamer::changeSection(MCSection *Sec, uint32_t) {
+  CurFrag = &Sec->getDummyFragment();
+  if (auto *Sym = Sec->getBeginSymbol())
+    Sym->setFragment(&Sec->getDummyFragment());
 }
 
 void MCAsmStreamer::emitInstruction(const MCInst &Inst,

@@ -566,8 +566,6 @@ void ELFWriter::computeSymbolTable(const RevGroupMapTy &RevGroupMap) {
       // And if these sections were not really defined in the code, but were
       // referenced, we simply error out.
       if (!Section.isRegistered()) {
-        assert(static_cast<const MCSymbolELF &>(Symbol).getType() ==
-               ELF::STT_SECTION);
         Ctx.reportError(SMLoc(),
                         "Undefined section reference: " + Symbol.getName());
         continue;
