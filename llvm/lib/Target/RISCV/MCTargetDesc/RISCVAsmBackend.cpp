@@ -306,11 +306,14 @@ void RISCVAsmBackend::relaxInstruction(MCInst &Inst,
 // If conditions are met, compute the padding size and create a fixup encoding
 // the padding size in the addend.
 bool RISCVAsmBackend::relaxAlign(MCFragment &F, unsigned &Size) {
-  // Use default handling unless linker relaxation is enabled and the alignment
-  // is larger than the nop size.
-  const MCSubtargetInfo *STI = F.getSubtargetInfo();
-  if (!STI->hasFeature(RISCV::FeatureRelax))
+  // Alignments before the first linker-relaxable instruction have fixed sizes,
+  // requiring no relocations.
+  auto *Sec = F.getParent();
+  if (F.getLayoutOrder() < Sec->firstLinkerRelaxable())
     return false;
+
+  // Use default handling unless the alignment is larger than the nop size.
+  const MCSubtargetInfo *STI = F.getSubtargetInfo();
   unsigned MinNopLen = STI->hasFeature(RISCV::FeatureStdExtZca) ? 2 : 4;
   if (F.getAlignment() <= MinNopLen)
     return false;
@@ -321,7 +324,8 @@ bool RISCVAsmBackend::relaxAlign(MCFragment &F, unsigned &Size) {
       MCFixup::create(0, Expr, FirstLiteralRelocationKind + ELF::R_RISCV_ALIGN);
   F.setVarFixups({Fixup});
   F.setLinkerRelaxable();
-  F.getParent()->setLinkerRelaxable();
+  if (!F.getParent()->isLinkerRelaxable())
+    F.getParent()->setFirstLinkerRelaxable(F.getLayoutOrder());
   return true;
 }
 
