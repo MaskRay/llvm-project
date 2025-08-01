@@ -283,9 +283,8 @@ static bool shouldForceRelocation(const MCFixup &Fixup) {
 /// data fragment, at the offset specified by the fixup and following the
 /// fixup kind as appropriate.
 void MipsAsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
-                                const MCValue &Target,
-                                MutableArrayRef<char> Data, uint64_t Value,
-                                bool IsResolved) {
+                                const MCValue &Target, char *Data,
+                                uint64_t Value, bool IsResolved) {
   if (shouldForceRelocation(Fixup))
     IsResolved = false;
   maybeAddReloc(F, Fixup, Target, Value, IsResolved);

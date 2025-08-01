@@ -79,8 +79,7 @@ public:
   }
 
   void applyFixup(const MCFragment &, const MCFixup &, const MCValue &Target,
-                  MutableArrayRef<char> Data, uint64_t Value,
-                  bool IsResolved) override;
+                  char *Data, uint64_t Value, bool IsResolved) override;
 
   bool fixupNeedsRelaxation(const MCFixup &Fixup,
                             uint64_t Value) const override;
@@ -421,9 +420,8 @@ static bool shouldForceRelocation(const MCFixup &Fixup) {
 }
 
 void AArch64AsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
-                                   const MCValue &Target,
-                                   MutableArrayRef<char> Data, uint64_t Value,
-                                   bool IsResolved) {
+                                   const MCValue &Target, char *Data,
+                                   uint64_t Value, bool IsResolved) {
   if (shouldForceRelocation(Fixup))
     IsResolved = false;
   maybeAddReloc(F, Fixup, Target, Value, IsResolved);
@@ -475,7 +473,7 @@ void AArch64AsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
     }
   } else {
     // Handle as big-endian
-    assert((Offset + FulleSizeInBytes) <= Data.size() && "Invalid fixup size!");
+    assert(Offset + FulleSizeInBytes <= F.getSize() && "Invalid fixup size!");
     assert(NumBytes <= FulleSizeInBytes && "Invalid fixup size!");
     for (unsigned i = 0; i != NumBytes; ++i) {
       unsigned Idx = FulleSizeInBytes - 1 - i;

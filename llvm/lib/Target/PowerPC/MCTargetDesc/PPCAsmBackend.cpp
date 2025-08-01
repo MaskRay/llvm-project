@@ -93,8 +93,8 @@ public:
   MCFixupKindInfo getFixupKindInfo(MCFixupKind Kind) const override;
 
   void applyFixup(const MCFragment &, const MCFixup &Fixup,
-                  const MCValue &Target, MutableArrayRef<char> Data,
-                  uint64_t Value, bool IsResolved) override;
+                  const MCValue &Target, char *Data, uint64_t Value,
+                  bool IsResolved) override;
 
   bool shouldForceRelocation(const MCFixup &Fixup, const MCValue &Target) {
     // If there is a @ specifier, unless it is optimized out (e.g. constant @l),
@@ -185,9 +185,8 @@ MCFixupKindInfo PPCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
 }
 
 void PPCAsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
-                               const MCValue &TargetVal,
-                               MutableArrayRef<char> Data, uint64_t Value,
-                               bool IsResolved) {
+                               const MCValue &TargetVal, char *Data,
+                               uint64_t Value, bool IsResolved) {
   // In PPC64 ELFv1, .quad .TOC.@tocbase in the .opd section is expected to
   // reference the null symbol.
   auto Target = TargetVal;

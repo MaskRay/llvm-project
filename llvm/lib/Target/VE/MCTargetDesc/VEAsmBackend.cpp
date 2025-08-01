@@ -152,8 +152,8 @@ public:
 } // end anonymous namespace
 
 void VEAsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
-                              const MCValue &Target, MutableArrayRef<char> Data,
-                              uint64_t Value, bool IsResolved) {
+                              const MCValue &Target, char *Data, uint64_t Value,
+                              bool IsResolved) {
   switch (Fixup.getKind()) {
   case VE::fixup_ve_tls_gd_hi32:
   case VE::fixup_ve_tls_gd_lo32:
