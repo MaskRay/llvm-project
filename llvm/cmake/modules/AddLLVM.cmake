@@ -53,6 +53,7 @@ function(llvm_update_compile_flags name)
       list(APPEND LLVM_COMPILE_FLAGS "-qnoeh")
     endif()
   endif()
+  list(APPEND LLVM_COMPILE_FLAGS "-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer")
 
   # LLVM_REQUIRES_RTTI is an internal flag that individual
   # targets can use to force RTTI
