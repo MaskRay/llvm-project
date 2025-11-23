@@ -123,9 +123,9 @@ void MCAsmBackend::maybeAddReloc(const MCFragment &F, const MCFixup &Fixup,
 }
 
 bool MCAsmBackend::isDarwinCanonicalPersonality(const MCSymbol *Sym) const {
-  assert(getContext().isMachO());
-  // Consider a NULL personality (ie., no personality encoding) to be canonical
-  // because it's always at 0.
+  // assert(getContext().isMachO());
+  //  Consider a NULL personality (ie., no personality encoding) to be canonical
+  //  because it's always at 0.
   if (!Sym)
     return true;
 

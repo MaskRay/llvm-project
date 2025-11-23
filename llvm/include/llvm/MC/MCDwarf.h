@@ -771,6 +771,7 @@ struct MCDwarfFrameInfo {
   unsigned PersonalityEncoding = 0;
   unsigned LsdaEncoding = 0;
   uint64_t CompactUnwindEncoding = 0;
+  bool ElfCompactUnwindEligible = false;
   bool IsSignalFrame = false;
   bool IsSimple = false;
   unsigned RAReg = static_cast<unsigned>(INT_MAX);

@@ -458,8 +458,15 @@ template <endianness e> void EhFrameSection::addRecords(EhInputSection *sec) {
 
     if (!isFdeLive(fde, rels))
       continue;
-    rec->fdes.push_back(&fde);
-    numFdes++;
+    // If --eh-frame-hdr is given and the CIE has an unwind descriptor,
+    // emit it as an inline entry in .eh_frame_hdr
+    if (ctx.arg.ehFrameHdr && elf::hasUnwindDescriptor(*rec->cie)) {
+      rec->compactFdes.push_back(&fde);
+      ++numDescriptors;
+    } else {
+      rec->fdes.push_back(&fde);
+      ++numFdes;
+    }
   }
 }
 
@@ -529,6 +536,9 @@ void EhFrameSection::finalizeContents() {
       fde->outputOff = off;
       off += fde->size;
     }
+    int64_t id = -1;
+    for (EhSectionPiece *fde : rec->compactFdes)
+      fde->outputOff = --id;
   }
 
   // The LSB standard does not allow a .eh_frame section with zero
@@ -558,8 +568,9 @@ void EhFrameSection::writeTo(uint8_t *buf) {
 
   // Apply relocations to .eh_frame entries. This includes CIE personality
   // pointers, FDE initial_location fields, and LSDA pointers.
+  SmallVector<uint64_t, 0> compactFdePcs(numDescriptors);
   for (EhInputSection *s : sections)
-    ctx.target->relocateEh(*s, buf);
+    ctx.target->relocateEh(*s, buf, compactFdePcs);
 
   EhFrameHeader *hdr = getPartition(ctx).ehFrameHdr.get();
   if (!hdr || !hdr->getParent())
@@ -567,29 +578,44 @@ void EhFrameSection::writeTo(uint8_t *buf) {
 
   // Write the .eh_frame_hdr section using cached FDE data from updateAllocSize.
   bool large = hdr->large;
+  bool hasDescriptors = numDescriptors > 0;
   int64_t ehFramePtr = getParent()->addr - hdr->getVA() - 4;
   auto writeField = [&](uint8_t *buf, uint64_t val) {
     large ? write64(ctx, buf, val) : write32(ctx, buf, val);
   };
 
   uint8_t *hdrBuf = ctx.bufferStart + hdr->getParent()->offset + hdr->outSecOff;
-  // version
-  hdrBuf[0] = 1;
-  // eh_frame_ptr_enc
-  hdrBuf[1] = DW_EH_PE_pcrel | (large ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4);
-  // fde_count_enc
-  hdrBuf[2] = DW_EH_PE_udata4;
-  // table_enc
-  hdrBuf[3] = DW_EH_PE_datarel | (large ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4);
-  hdrBuf += 4;
-  writeField(hdrBuf, ehFramePtr);
-  hdrBuf += large ? 8 : 4;
-  write32(ctx, hdrBuf, hdr->fdes.size());
-  hdrBuf += 4;
-  for (const FdeData &fde : hdr->fdes) {
-    writeField(hdrBuf, fde.pcRel);
-    writeField(hdrBuf + (large ? 8 : 4), fde.fdeVARel);
-    hdrBuf += large ? 16 : 8;
+  if (hasDescriptors) {
+    // Version 2: compact unwind with 12-byte entries (4-byte pcRel + 8-byte
+    // value which is either an FDE VA offset or a compact unwind descriptor).
+    hdrBuf[0] = 2;
+    hdrBuf[1] = DW_EH_PE_pcrel | DW_EH_PE_sdata4;
+    hdrBuf[2] = DW_EH_PE_udata4;
+    hdrBuf[3] = DW_EH_PE_datarel | DW_EH_PE_sdata8;
+    write32(ctx, hdrBuf + 4, ehFramePtr);
+    write32(ctx, hdrBuf + 8, hdr->fdes.size());
+    hdrBuf += 12;
+    for (const FdeData &fde : hdr->fdes) {
+      write32(ctx, hdrBuf, fde.pcRel);
+      write64(ctx, hdrBuf + 4, fde.value);
+      hdrBuf += 12;
+    }
+  } else {
+    // Version 1: standard format with sdata4 or sdata8 encoding.
+    hdrBuf[0] = 1;
+    hdrBuf[1] = DW_EH_PE_pcrel | (large ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4);
+    hdrBuf[2] = DW_EH_PE_udata4;
+    hdrBuf[3] = DW_EH_PE_datarel | (large ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4);
+    hdrBuf += 4;
+    writeField(hdrBuf, ehFramePtr);
+    hdrBuf += large ? 8 : 4;
+    write32(ctx, hdrBuf, hdr->fdes.size());
+    hdrBuf += 4;
+    for (const FdeData &fde : hdr->fdes) {
+      writeField(hdrBuf, fde.pcRel);
+      writeField(hdrBuf + (large ? 8 : 4), fde.value);
+      hdrBuf += large ? 16 : 8;
+    }
   }
 }
 
@@ -605,11 +631,20 @@ bool EhFrameHeader::isNeeded() const {
 }
 
 void EhFrameHeader::finalizeContents() {
-  // Compute size: 4-byte header + eh_frame_ptr + fde_count + FDE table.
+  // Compute size: header + eh_frame_ptr + fde_count + FDE table.
   // Initially `large` is false; updateAllocSize may set it to true if addresses
   // exceed the 32-bit range, then call finalizeContents again.
-  auto numFdes = getPartition(ctx).ehFrame->numFdes;
-  size = 4 + (large ? 8 : 4) + 4 + numFdes * (large ? 16 : 8);
+  auto *ehFrame = getPartition(ctx).ehFrame.get();
+  auto numFdes = ehFrame->numFdes;
+  auto numDescriptors = ehFrame->numDescriptors;
+  if (numDescriptors) {
+    // Version 2: 12-byte header + 12-byte entries (4-byte pcRel + 8-byte
+    // value).
+    size = 12 + (numFdes + numDescriptors) * 12;
+  } else {
+    // Version 1: 4-byte fields + variable-size eh_frame_ptr + FDE table.
+    size = 4 + (large ? 8 : 4) + 4 + numFdes * (large ? 16 : 8);
+  }
 }
 
 bool EhFrameHeader::updateAllocSize(Ctx &ctx) {
@@ -641,6 +676,15 @@ bool EhFrameHeader::updateAllocSize(Ctx &ctx) {
       int64_t fdeVARel = ehFrame->getParent()->addr + fde->outputOff - hdrVA;
       fdes.push_back({pcRel, fdeVARel});
       newLarge |= !isInt<32>(pcRel) || !isInt<32>(fdeVARel);
+    }
+    for (EhSectionPiece *fde : rec->compactFdes) {
+      auto *isec = cast<EhInputSection>(fde->sec);
+      auto &reloc = isec->rels[fde->firstRelocation];
+      assert(isa<Defined>(reloc.sym) && "isFdeLive should have checked this");
+      int64_t pcRel = reloc.sym->getVA(ctx) + reloc.addend - hdrVA;
+      int64_t desc = getUnwindDescriptor(*rec->cie, *fde);
+      fdes.push_back({pcRel, desc});
+      newLarge |= !isInt<32>(pcRel);
     }
   }
 

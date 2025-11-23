@@ -161,17 +161,21 @@ void FDE::dump(raw_ostream &OS, DIDumpOptions DumpOpts) const {
   OS << "  Format:       " << FormatString(IsDWARF64) << "\n";
   if (LSDAAddress)
     OS << format("  LSDA Address: %016" PRIx64 "\n", *LSDAAddress);
-  printCFIProgram(CFIs, OS, DumpOpts, /*IndentLevel=*/1, InitialLocation);
-  OS << "\n";
-
-  if (Expected<UnwindTable> RowsOrErr = createUnwindTable(this))
-    printUnwindTable(*RowsOrErr, OS, DumpOpts, 1);
-  else {
-    DumpOpts.RecoverableErrorHandler(joinErrors(
-        createStringError(errc::invalid_argument,
-                          "decoding the FDE opcodes into rows failed"),
-        RowsOrErr.takeError()));
+  if (UnwindDescriptor) {
+    OS << format("  Descriptor: %016" PRIx64 "\n", UnwindDescriptor);
+  } else {
+    printCFIProgram(CFIs, OS, DumpOpts, /*IndentLevel=*/1, InitialLocation);
+    OS << "\n";
+    if (Expected<UnwindTable> RowsOrErr = createUnwindTable(this))
+      printUnwindTable(*RowsOrErr, OS, DumpOpts, 1);
+    else {
+      DumpOpts.RecoverableErrorHandler(joinErrors(
+          createStringError(errc::invalid_argument,
+                            "decoding the FDE opcodes into rows failed"),
+          RowsOrErr.takeError()));
+    }
   }
+
   OS << "\n";
 }
 
@@ -209,7 +213,7 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
     if (Length == 0) {
       auto Cie = std::make_unique<CIE>(
           IsDWARF64, StartOffset, 0, 0, SmallString<8>(), 0, 0, 0, 0, 0,
-          SmallString<8>(), 0, 0, std::nullopt, std::nullopt, Arch);
+          SmallString<8>(), 0, 0, std::nullopt, std::nullopt, false, Arch);
       CIEs[StartOffset] = Cie.get();
       Entries.push_back(std::move(Cie));
       break;
@@ -229,7 +233,9 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
     if (Err)
       return Err;
 
-    if (Id == getCIEId(IsDWARF64, IsEH)) {
+    bool IsCIE = Id == getCIEId(IsDWARF64, IsEH);
+    bool CompactUnwind = false;
+    if (IsCIE) {
       uint8_t Version = Data.getU8(&Offset);
       const char *Augmentation = Data.getCStr(&Offset);
       StringRef AugmentationString(Augmentation ? Augmentation : "");
@@ -300,6 +306,9 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
             // untagged on unwind.
           case 'G':
             break;
+          case 'C':
+            CompactUnwind = true;
+            break;
           }
         }
 
@@ -319,7 +328,7 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
           AddressSize, SegmentDescriptorSize, CodeAlignmentFactor,
           DataAlignmentFactor, ReturnAddressRegister, AugmentationData,
           FDEPointerEncoding, LSDAPointerEncoding, Personality,
-          PersonalityEncoding, Arch);
+          PersonalityEncoding, CompactUnwind, Arch);
       CIEs[StartOffset] = Cie.get();
       Entries.emplace_back(std::move(Cie));
     } else {
@@ -327,6 +336,7 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
       uint64_t CIEPointer = Id;
       uint64_t InitialLocation = 0;
       uint64_t AddressRange = 0;
+      uint64_t UnwindDescriptor = 0;
       std::optional<uint64_t> LSDAAddress;
       CIE *Cie = CIEs[IsEH ? (StartStructureOffset - CIEPointer) : CIEPointer];
 
@@ -367,24 +377,34 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
                                      " failed",
                                      StartOffset);
         }
+        CompactUnwind = Cie->getCompactUnwind();
+        if (CompactUnwind) {
+          UnwindDescriptor =
+              Data.getU64(&Offset); // Skip the compact unwind encoding
+          Offset = alignTo(Offset, 4);
+        }
       } else {
         InitialLocation = Data.getRelocatedAddress(&Offset);
         AddressRange = Data.getRelocatedAddress(&Offset);
       }
 
       Entries.emplace_back(new FDE(IsDWARF64, StartOffset, Length, CIEPointer,
-                                   InitialLocation, AddressRange, Cie,
-                                   LSDAAddress, Arch));
+                                   InitialLocation, AddressRange,
+                                   UnwindDescriptor, Cie, LSDAAddress, Arch));
     }
 
-    if (Error E =
-            Entries.back()->cfis().parse(Data, &Offset, EndStructureOffset))
-      return E;
+    if (IsCIE || !CompactUnwind) {
+      if (Error E =
+              Entries.back()->cfis().parse(Data, &Offset, EndStructureOffset))
+        return E;
 
-    if (Offset != EndStructureOffset)
-      return createStringError(
-          errc::invalid_argument,
-          "parsing entry instructions at 0x%" PRIx64 " failed", StartOffset);
+      if (Offset != EndStructureOffset)
+        return createStringError(
+            errc::invalid_argument,
+            "parsing entry instructions at 0x%" PRIx64 " failed", StartOffset);
+    } else {
+      Offset = EndStructureOffset;
+    }
   }
 
   return Error::success();

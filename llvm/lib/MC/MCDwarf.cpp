@@ -1362,8 +1362,8 @@ public:
   /// Emit the unwind information in a compact way.
   void EmitCompactUnwind(const MCDwarfFrameInfo &frame);
 
-  const MCSymbol &EmitCIE(const MCDwarfFrameInfo &F);
-  void EmitFDE(const MCSymbol &cieStart, const MCDwarfFrameInfo &frame,
+  const MCSymbol &emitCIE(const MCDwarfFrameInfo &F, bool ELFCompactUnwind);
+  void emitFDE(const MCSymbol &cieStart, const MCDwarfFrameInfo &frame,
                bool LastInSection, const MCSymbol &SectionStart);
   void emitCFIInstructions(ArrayRef<MCCFIInstruction> Instrs,
                            MCSymbol *BaseLabel);
@@ -1646,7 +1646,8 @@ static unsigned getCIEVersion(bool IsEH, unsigned DwarfVersion) {
   llvm_unreachable("Unknown version");
 }
 
-const MCSymbol &FrameEmitterImpl::EmitCIE(const MCDwarfFrameInfo &Frame) {
+const MCSymbol &FrameEmitterImpl::emitCIE(const MCDwarfFrameInfo &Frame,
+                                          bool ElfCompactUnwindEligible) {
   MCContext &context = Streamer.getContext();
   const MCRegisterInfo *MRI = context.getRegisterInfo();
   const MCObjectFileInfo *MOFI = context.getObjectFileInfo();
@@ -1693,6 +1694,8 @@ const MCSymbol &FrameEmitterImpl::EmitCIE(const MCDwarfFrameInfo &Frame) {
       Augmentation += "B";
     if (Frame.IsMTETaggedFrame)
       Augmentation += "G";
+    if (ElfCompactUnwindEligible)
+      Augmentation += "C";
     Streamer.emitBytes(Augmentation);
   }
   Streamer.emitInt8(0);
@@ -1774,7 +1777,7 @@ const MCSymbol &FrameEmitterImpl::EmitCIE(const MCDwarfFrameInfo &Frame) {
   return *sectionStart;
 }
 
-void FrameEmitterImpl::EmitFDE(const MCSymbol &cieStart,
+void FrameEmitterImpl::emitFDE(const MCSymbol &cieStart,
                                const MCDwarfFrameInfo &frame,
                                bool LastInSection,
                                const MCSymbol &SectionStart) {
@@ -1838,8 +1841,15 @@ void FrameEmitterImpl::EmitFDE(const MCSymbol &cieStart,
       emitFDESymbol(Streamer, *frame.Lsda, frame.LsdaEncoding, true);
   }
 
-  // Call Frame Instructions
-  emitCFIInstructions(frame.Instructions, frame.Begin);
+  if (frame.ElfCompactUnwindEligible) {
+    // Emit the compact unwind descriptor.
+    // TODO: CompactUnwindEncoding is currently 32-bit. Extend it to 64-bit for
+    // information like prologue_start/epilogue_end/personality.
+    Streamer.emitInt64((frame.CompactUnwindEncoding << 32) | 1);
+  } else {
+    // Call Frame Instructions
+    emitCFIInstructions(frame.Instructions, frame.Begin);
+  }
 
   // Padding
   // The size of a .eh_frame section has to be a multiple of the alignment
@@ -1862,7 +1872,8 @@ struct CIEKey {
         LsdaEncoding(Frame.LsdaEncoding), IsSignalFrame(Frame.IsSignalFrame),
         IsSimple(Frame.IsSimple), RAReg(Frame.RAReg),
         IsBKeyFrame(Frame.IsBKeyFrame),
-        IsMTETaggedFrame(Frame.IsMTETaggedFrame) {}
+        IsMTETaggedFrame(Frame.IsMTETaggedFrame),
+        ElfCompactUnwindEligible(Frame.ElfCompactUnwindEligible) {}
 
   StringRef PersonalityName() const {
     if (!Personality)
@@ -1873,11 +1884,12 @@ struct CIEKey {
   bool operator<(const CIEKey &Other) const {
     return std::make_tuple(PersonalityName(), PersonalityEncoding, LsdaEncoding,
                            IsSignalFrame, IsSimple, RAReg, IsBKeyFrame,
-                           IsMTETaggedFrame) <
+                           IsMTETaggedFrame, ElfCompactUnwindEligible) <
            std::make_tuple(Other.PersonalityName(), Other.PersonalityEncoding,
                            Other.LsdaEncoding, Other.IsSignalFrame,
                            Other.IsSimple, Other.RAReg, Other.IsBKeyFrame,
-                           Other.IsMTETaggedFrame);
+                           Other.IsMTETaggedFrame,
+                           Other.ElfCompactUnwindEligible);
   }
 
   bool operator==(const CIEKey &Other) const {
@@ -1886,7 +1898,8 @@ struct CIEKey {
            LsdaEncoding == Other.LsdaEncoding &&
            IsSignalFrame == Other.IsSignalFrame && IsSimple == Other.IsSimple &&
            RAReg == Other.RAReg && IsBKeyFrame == Other.IsBKeyFrame &&
-           IsMTETaggedFrame == Other.IsMTETaggedFrame;
+           IsMTETaggedFrame == Other.IsMTETaggedFrame &&
+           ElfCompactUnwindEligible == Other.ElfCompactUnwindEligible;
   }
   bool operator!=(const CIEKey &Other) const { return !(*this == Other); }
 
@@ -1898,6 +1911,7 @@ struct CIEKey {
   unsigned RAReg = UINT_MAX;
   bool IsBKeyFrame = false;
   bool IsMTETaggedFrame = false;
+  bool ElfCompactUnwindEligible = false;
 };
 
 } // end anonymous namespace
@@ -1908,11 +1922,16 @@ void MCDwarfFrameEmitter::emit(MCObjectStreamer &Streamer, bool IsEH) {
   const MCAsmInfo *AsmInfo = Context.getAsmInfo();
   FrameEmitterImpl Emitter(IsEH, Streamer);
   ArrayRef<MCDwarfFrameInfo> FrameArray = Streamer.getDwarfFrameInfos();
+  MCSection &Section =
+      IsEH ? *const_cast<MCObjectFileInfo *>(MOFI)->getEHFrameSection()
+           : *MOFI->getDwarfFrameSection();
 
   // Emit the compact unwind info if available.
   bool NeedsEHFrameSection = !MOFI->getSupportsCompactUnwindWithoutEHFrame();
-  if (IsEH && MOFI->getCompactUnwindSection()) {
+  bool ELFCompactUnwind = IsEH && MOFI->usesELFCompactUnwind();
+  if (IsEH && (MOFI->getCompactUnwindSection() || ELFCompactUnwind))
     Streamer.generateCompactUnwindEncodings();
+  if (IsEH && MOFI->getCompactUnwindSection()) {
     bool SectionEmitted = false;
     for (const MCDwarfFrameInfo &Frame : FrameArray) {
       if (Frame.CompactUnwindEncoding == 0) continue;
@@ -1921,9 +1940,8 @@ void MCDwarfFrameEmitter::emit(MCObjectStreamer &Streamer, bool IsEH) {
         Streamer.emitValueToAlignment(Align(AsmInfo->getCodePointerSize()));
         SectionEmitted = true;
       }
-      NeedsEHFrameSection |=
-        Frame.CompactUnwindEncoding ==
-          MOFI->getCompactUnwindDwarfEHFrameOnly();
+      NeedsEHFrameSection |= Frame.CompactUnwindEncoding !=
+                             MOFI->getCompactUnwindDwarfEHFrameOnly();
       Emitter.EmitCompactUnwind(Frame);
     }
   }
@@ -1933,10 +1951,6 @@ void MCDwarfFrameEmitter::emit(MCObjectStreamer &Streamer, bool IsEH) {
   // doesn't need an eh_frame section and the emission location is the eh_frame
   // section.
   if (!NeedsEHFrameSection && IsEH) return;
-
-  MCSection &Section =
-      IsEH ? *const_cast<MCObjectFileInfo *>(MOFI)->getEHFrameSection()
-           : *MOFI->getDwarfFrameSection();
 
   Streamer.switchSection(&Section);
   MCSymbol *SectionStart = Context.createTempSymbol();
@@ -1970,10 +1984,10 @@ void MCDwarfFrameEmitter::emit(MCObjectStreamer &Streamer, bool IsEH) {
     CIEKey Key(Frame);
     if (!LastCIEStart || (IsEH && Key != LastKey)) {
       LastKey = Key;
-      LastCIEStart = &Emitter.EmitCIE(Frame);
+      LastCIEStart = &Emitter.emitCIE(Frame, Key.ElfCompactUnwindEligible);
     }
 
-    Emitter.EmitFDE(*LastCIEStart, Frame, I == E, *SectionStart);
+    Emitter.emitFDE(*LastCIEStart, Frame, I == E, *SectionStart);
   }
 }
 

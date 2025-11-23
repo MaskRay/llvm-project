@@ -184,9 +184,15 @@ void MCObjectStreamer::reset() {
 
 void MCObjectStreamer::generateCompactUnwindEncodings() {
   auto &Backend = getAssembler().getBackend();
-  for (auto &FI : DwarfFrameInfos)
+  const MCObjectFileInfo *MOFI = getContext().getObjectFileInfo();
+  bool ElfCompactUnwind = MOFI->usesELFCompactUnwind();
+  for (auto &FI : DwarfFrameInfos) {
     FI.CompactUnwindEncoding =
         Backend.generateCompactUnwindEncoding(&FI, &getContext());
+    FI.ElfCompactUnwindEligible =
+        ElfCompactUnwind &&
+        FI.CompactUnwindEncoding != MOFI->getCompactUnwindDwarfEHFrameOnly();
+  }
 }
 
 void MCObjectStreamer::emitFrames() {

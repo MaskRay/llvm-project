@@ -381,7 +381,7 @@ struct EhSectionPiece {
   }
 
   size_t inputOff;
-  ssize_t outputOff = -1;
+  int64_t outputOff = -1;
   InputSectionBase *sec;
   uint32_t size;
   unsigned firstRelocation;
