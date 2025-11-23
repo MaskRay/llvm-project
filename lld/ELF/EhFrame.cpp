@@ -22,6 +22,7 @@
 #include "Relocations.h"
 #include "Target.h"
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/Support/LEB128.h"
 
 using namespace llvm;
 using namespace llvm::ELF;
@@ -36,8 +37,8 @@ public:
   EhReader(InputSectionBase *s, ArrayRef<uint8_t> d) : isec(s), d(d) {}
   uint8_t getFdeEncoding();
   bool hasLSDA();
+  bool hasUnwindDescriptor();
 
-private:
   template <class P> void errOn(const P *loc, const Twine &msg) {
     Ctx &ctx = isec->file->ctx;
     Err(ctx) << "corrupted .eh_frame: " << msg << "\n>>> defined in "
@@ -48,6 +49,7 @@ private:
   void skipBytes(size_t count);
   StringRef readString();
   void skipLeb128();
+  uint64_t readULeb128();
   void skipAugP();
   StringRef getAugmentation();
 
@@ -101,6 +103,17 @@ void EhReader::skipLeb128() {
   errOn(errPos, "corrupted CIE (failed to read LEB128)");
 }
 
+uint64_t EhReader::readULeb128() {
+  const char *err = nullptr;
+  const uint8_t *p = d.data();
+  uint64_t ret = decodeULEB128AndInc(p, d.end(), &err);
+  if (err)
+    errOn(p, "corrupted .eh_frame (failed to read LEB128)");
+  else
+    d = d.slice(p - d.data());
+  return ret;
+}
+
 static size_t getAugPSize(Ctx &ctx, unsigned enc) {
   switch (enc & 0x0f) {
   case DW_EH_PE_absptr:
@@ -137,6 +150,10 @@ uint8_t elf::getFdeEncoding(EhSectionPiece *p) {
 
 bool elf::hasLSDA(const EhSectionPiece &p) {
   return EhReader(p.sec, p.data()).hasLSDA();
+}
+
+bool elf::hasUnwindDescriptor(const EhSectionPiece &p) {
+  return EhReader(p.sec, p.data()).hasUnwindDescriptor();
 }
 
 StringRef EhReader::getAugmentation() {
@@ -177,7 +194,7 @@ uint8_t EhReader::getFdeEncoding() {
       readByte();
     else if (c == 'P')
       skipAugP();
-    else if (c != 'B' && c != 'S' && c != 'G') {
+    else if (c != 'B' && c != 'C' && c != 'S' && c != 'G') {
       errOn(aug.data(), "unknown .eh_frame augmentation string: " + aug);
       break;
     }
@@ -196,10 +213,32 @@ bool EhReader::hasLSDA() {
       skipAugP();
     else if (c == 'R')
       readByte();
-    else if (c != 'B' && c != 'S' && c != 'G') {
+    else if (c != 'B' && c != 'C' && c != 'S' && c != 'G') {
       errOn(aug.data(), "unknown .eh_frame augmentation string: " + aug);
       break;
     }
   }
   return false;
+}
+
+bool EhReader::hasUnwindDescriptor() { return getAugmentation().contains('C'); }
+
+uint64_t elf::getUnwindDescriptor(const EhSectionPiece &cie,
+                                  const EhSectionPiece &fde) {
+  Ctx &ctx = cie.sec->getCtx();
+  EhReader cieR(cie.sec, cie.data());
+  auto fdeEnc = EhReader(cieR).getFdeEncoding();
+
+  EhReader fdeR(fde.sec, fde.data());
+  // Skip length, cie_pointer, initial_location, address_range.
+  fdeR.skipBytes(8 + getAugPSize(ctx, fdeEnc) * 2);
+  // Skip augmentation length and data.
+  auto augLen = fdeR.readULeb128();
+  fdeR.skipBytes(augLen);
+
+  if (fdeR.d.size() < 8) {
+    fdeR.errOn(fdeR.d.data(), "unexpected end of compact FDE");
+    return 0;
+  }
+  return read64(ctx, fdeR.d.data());
 }

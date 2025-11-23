@@ -122,9 +122,16 @@ void MCStreamer::addExplicitComment(const Twine &T) {}
 void MCStreamer::emitExplicitComments() {}
 
 void MCStreamer::generateCompactUnwindEncodings(MCAsmBackend *MAB) {
-  for (auto &FI : DwarfFrameInfos)
+  MCContext &Ctx = getContext();
+  const MCObjectFileInfo *MOFI = Ctx.getObjectFileInfo();
+  bool ElfCompactUnwind = MOFI->usesELFCompactUnwind();
+  for (auto &FI : DwarfFrameInfos) {
     FI.CompactUnwindEncoding =
-        (MAB ? MAB->generateCompactUnwindEncoding(&FI, &Context) : 0);
+        MAB->generateCompactUnwindEncoding(&FI, &Context);
+    FI.ElfCompactUnwindEligible =
+        ElfCompactUnwind &&
+        FI.CompactUnwindEncoding != MOFI->getCompactUnwindDwarfEHFrameOnly();
+  }
 }
 
 /// EmitIntValue - Special case of EmitValue that avoids the client having to

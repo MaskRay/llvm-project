@@ -38,6 +38,8 @@ protected:
   /// dwarf unwind.
   bool OmitDwarfIfHaveCompactUnwind = false;
 
+  bool UsesELFCompactUnwind = false;
+
   /// FDE CFI encoding. Controls the encoding of the begin label in the
   /// .eh_frame section. Unlike the LSDA encoding, personality encoding, and
   /// type encodings, this is something that the assembler just "knows" about
@@ -262,6 +264,7 @@ public:
   bool getOmitDwarfIfHaveCompactUnwind() const {
     return OmitDwarfIfHaveCompactUnwind;
   }
+  bool usesELFCompactUnwind() const { return UsesELFCompactUnwind; }
 
   unsigned getFDEEncoding() const { return FDECFIEncoding; }
 

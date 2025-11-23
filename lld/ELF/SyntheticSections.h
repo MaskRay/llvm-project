@@ -44,12 +44,13 @@ class SymbolTableBaseSection;
 
 struct CieRecord {
   EhSectionPiece *cie = nullptr;
-  SmallVector<EhSectionPiece *, 0> fdes;
+  SmallVector<EhSectionPiece *, 0> fdes, compactFdes;
 };
 
 // Section for .eh_frame.
 class EhFrameSection final : public SyntheticSection {
 public:
+  friend class CompactUnwind;
   EhFrameSection(Ctx &);
   void writeTo(uint8_t *buf) override;
   void finalizeContents() override;
@@ -62,10 +63,11 @@ public:
 
   SmallVector<EhInputSection *, 0> sections;
   size_t numFdes = 0;
+  size_t numDescriptors = 0;
 
   struct FdeData {
     uint32_t pcRel;
-    uint32_t fdeVARel;
+    uint64_t value;
   };
 
   ArrayRef<CieRecord *> getCieRecords() const { return cieRecords; }

@@ -177,9 +177,22 @@ void TargetInfo::relocateAlloc(InputSection &sec, uint8_t *buf) const {
 }
 
 // A variant of relocateAlloc that processes an EhInputSection.
-void TargetInfo::relocateEh(EhInputSection &sec, uint8_t *buf) const {
+void TargetInfo::relocateEh(EhInputSection &sec, uint8_t *buf,
+                            SmallVector<uint64_t, 0> &compactFdePcs) const {
   uint64_t secAddr = sec.getOutputSection()->addr + sec.getParent()->outSecOff;
-  relocateImpl(*this, sec, secAddr, buf);
+  const unsigned bits = ctx.arg.is64 ? 64 : 32;
+  for (const Relocation &rel : sec.relocs()) {
+    uint8_t *loc = buf + rel.offset;
+    const uint64_t val = SignExtend64(
+        sec.getRelocTargetVA(ctx, rel, secAddr + rel.offset), bits);
+    if (rel.expr == R_RELAX_HINT)
+      continue;
+    // -2 - output_offset gives the index into compactFdePcs.
+    if ((int64_t)rel.offset < 0)
+      relocate((uint8_t *)&compactFdePcs[-2 - rel.offset], rel, val);
+    else
+      relocate(loc, rel, val);
+  }
 }
 
 uint64_t TargetInfo::getImageBase() const {

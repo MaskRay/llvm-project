@@ -116,8 +116,38 @@ cl::opt<bool> X86PadForBranchAlign(
     "x86-pad-for-branch-align", cl::init(true), cl::Hidden,
     cl::desc("Pad previous instructions to implement branch alignment"));
 
+namespace CU {
+
+/// Compact unwind encoding values.
+enum CompactUnwindEncodings {
+  /// [RE]BP based frame where [RE]BP is pused on the stack immediately after
+  /// the return address, then [RE]SP is moved to [RE]BP.
+  UNWIND_MODE_BP_FRAME = 0x01000000,
+
+  /// A frameless function with a small constant stack size.
+  UNWIND_MODE_STACK_IMMD = 0x02000000,
+
+  /// A frameless function with a large constant stack size.
+  UNWIND_MODE_STACK_IND = 0x03000000,
+
+  /// No compact unwind encoding is available.
+  UNWIND_MODE_DWARF = 0x04000000,
+
+  /// Mask for encoding the frame registers.
+  UNWIND_BP_FRAME_REGISTERS = 0x00007FFF,
+
+  /// Mask for encoding the frameless registers.
+  UNWIND_FRAMELESS_STACK_REG_PERMUTATION = 0x000003FF
+};
+
+} // namespace CU
+
 class X86AsmBackend : public MCAsmBackend {
+protected:
   const MCSubtargetInfo &STI;
+  const MCRegisterInfo &MRI;
+
+private:
   std::unique_ptr<const MCInstrInfo> MCII;
   X86AlignBranchKind AlignBranchType;
   Align AlignBoundary;
@@ -135,9 +165,10 @@ class X86AsmBackend : public MCAsmBackend {
   bool canPadInst(const MCInst &Inst, MCObjectStreamer &OS) const;
 
 public:
-  X86AsmBackend(const Target &T, const MCSubtargetInfo &STI)
-      : MCAsmBackend(llvm::endianness::little), STI(STI),
-        MCII(T.createMCInstrInfo()) {
+  X86AsmBackend(const Target &T, const MCSubtargetInfo &STI,
+                const MCRegisterInfo &MRI)
+      : MCAsmBackend(llvm::endianness::little), STI(STI), MRI(MRI),
+        MCII(T.createMCInstrInfo()), Is64Bit(STI.getTargetTriple().isX86_64()) {
     if (X86AlignBranchWithin32BBoundaries) {
       // At the moment, this defaults to aligning fused branches, unconditional
       // jumps, and (unfused) conditional jumps with nops.  Both the
@@ -160,6 +191,11 @@ public:
         AlignBoundary != Align(1) && AlignBranchType != X86::AlignBranchNone;
     AllowEnhancedRelaxation =
         AllowAutoPadding && TargetPrefixMax != 0 && X86PadForBranchAlign;
+
+    memset(SavedRegs, 0, sizeof(SavedRegs));
+    OffsetSize = Is64Bit ? 8 : 4;
+    MoveInstrSize = Is64Bit ? 3 : 2;
+    StackDivide = Is64Bit ? 8 : 4;
   }
 
   void emitInstructionBegin(MCObjectStreamer &OS, const MCInst &Inst,
@@ -201,6 +237,317 @@ public:
 
   bool writeNopData(raw_ostream &OS, uint64_t Count,
                     const MCSubtargetInfo *STI) const override;
+
+protected:
+  bool Is64Bit;
+
+  unsigned OffsetSize;    ///< Offset of a "push" instruction.
+  unsigned MoveInstrSize; ///< Size of a "move" instruction.
+  unsigned StackDivide;   ///< Amount to adjust stack size by.
+
+  /// Number of registers that can be saved in a compact unwind encoding.
+  enum { CU_NUM_SAVED_REGS = 6 };
+
+  mutable unsigned SavedRegs[CU_NUM_SAVED_REGS];
+
+protected:
+  /// Size of a "push" instruction for the given register.
+  unsigned PushInstrSize(MCRegister Reg) const {
+    switch (Reg.id()) {
+    case X86::EBX:
+    case X86::ECX:
+    case X86::EDX:
+    case X86::EDI:
+    case X86::ESI:
+    case X86::EBP:
+    case X86::RBX:
+    case X86::RBP:
+      return 1;
+    case X86::R12:
+    case X86::R13:
+    case X86::R14:
+    case X86::R15:
+      return 2;
+    }
+    return 1;
+  }
+
+private:
+  /// Get the compact unwind number for a given register. The number
+  /// corresponds to the enum lists in compact_unwind_encoding.h.
+  int getCompactUnwindRegNum(unsigned Reg) const {
+    static const MCPhysReg CU32BitRegs[7] = {
+        X86::EBX, X86::ECX, X86::EDX, X86::EDI, X86::ESI, X86::EBP, 0};
+    static const MCPhysReg CU64BitRegs[] = {
+        X86::RBX, X86::R12, X86::R13, X86::R14, X86::R15, X86::RBP, 0};
+    const MCPhysReg *CURegs = Is64Bit ? CU64BitRegs : CU32BitRegs;
+    for (int Idx = 1; *CURegs; ++CURegs, ++Idx)
+      if (*CURegs == Reg)
+        return Idx;
+
+    return -1;
+  }
+
+  /// Return the registers encoded for a compact encoding with a frame
+  /// pointer.
+  uint32_t encodeCompactUnwindRegistersWithFrame() const {
+    // Encode the registers in the order they were saved --- 3-bits per
+    // register. The list of saved registers is assumed to be in reverse
+    // order. The registers are numbered from 1 to CU_NUM_SAVED_REGS.
+    uint32_t RegEnc = 0;
+    for (int i = 0, Idx = 0; i != CU_NUM_SAVED_REGS; ++i) {
+      unsigned Reg = SavedRegs[i];
+      if (Reg == 0)
+        break;
+
+      int CURegNum = getCompactUnwindRegNum(Reg);
+      if (CURegNum == -1)
+        return ~0U;
+
+      // Encode the 3-bit register number in order, skipping over 3-bits for
+      // each register.
+      RegEnc |= (CURegNum & 0x7) << (Idx++ * 3);
+    }
+
+    assert((RegEnc & 0x3FFFF) == RegEnc &&
+           "Invalid compact register encoding!");
+    return RegEnc;
+  }
+
+  /// Create the permutation encoding used with frameless stacks. It is
+  /// passed the number of registers to be saved and an array of the registers
+  /// saved.
+  uint32_t encodeCompactUnwindRegistersWithoutFrame(unsigned RegCount) const {
+    // The saved registers are numbered from 1 to 6. In order to encode the
+    // order in which they were saved, we re-number them according to their
+    // place in the register order. The re-numbering is relative to the last
+    // re-numbered register. E.g., if we have registers {6, 2, 4, 5} saved in
+    // that order:
+    //
+    //    Orig  Re-Num
+    //    ----  ------
+    //     6       6
+    //     2       2
+    //     4       3
+    //     5       3
+    //
+    for (unsigned i = 0; i < RegCount; ++i) {
+      int CUReg = getCompactUnwindRegNum(SavedRegs[i]);
+      if (CUReg == -1)
+        return ~0U;
+      SavedRegs[i] = CUReg;
+    }
+
+    // Reverse the list.
+    std::reverse(&SavedRegs[0], &SavedRegs[CU_NUM_SAVED_REGS]);
+
+    uint32_t RenumRegs[CU_NUM_SAVED_REGS];
+    for (unsigned i = CU_NUM_SAVED_REGS - RegCount; i < CU_NUM_SAVED_REGS;
+         ++i) {
+      unsigned Countless = 0;
+      for (unsigned j = CU_NUM_SAVED_REGS - RegCount; j < i; ++j)
+        if (SavedRegs[j] < SavedRegs[i])
+          ++Countless;
+
+      RenumRegs[i] = SavedRegs[i] - Countless - 1;
+    }
+
+    // Take the renumbered values and encode them into a 10-bit number.
+    uint32_t permutationEncoding = 0;
+    switch (RegCount) {
+    case 6:
+      permutationEncoding |= 120 * RenumRegs[0] + 24 * RenumRegs[1] +
+                             6 * RenumRegs[2] + 2 * RenumRegs[3] + RenumRegs[4];
+      break;
+    case 5:
+      permutationEncoding |= 120 * RenumRegs[1] + 24 * RenumRegs[2] +
+                             6 * RenumRegs[3] + 2 * RenumRegs[4] + RenumRegs[5];
+      break;
+    case 4:
+      permutationEncoding |= 60 * RenumRegs[2] + 12 * RenumRegs[3] +
+                             3 * RenumRegs[4] + RenumRegs[5];
+      break;
+    case 3:
+      permutationEncoding |=
+          20 * RenumRegs[3] + 4 * RenumRegs[4] + RenumRegs[5];
+      break;
+    case 2:
+      permutationEncoding |= 5 * RenumRegs[4] + RenumRegs[5];
+      break;
+    case 1:
+      permutationEncoding |= RenumRegs[5];
+      break;
+    }
+
+    assert((permutationEncoding & 0x3FF) == permutationEncoding &&
+           "Invalid compact register encoding!");
+    return permutationEncoding;
+  }
+
+  /// Implementation of algorithm to generate the compact unwind encoding
+  /// for the CFI instructions.
+  uint64_t generateCompactUnwindEncoding(const MCDwarfFrameInfo *FI,
+                                         const MCContext *Ctxt) const override {
+    ArrayRef<MCCFIInstruction> Instrs = FI->Instructions;
+    if (Instrs.empty())
+      return 0;
+    if (!isDarwinCanonicalPersonality(FI->Personality) &&
+        !Ctxt->emitCompactUnwindNonCanonical())
+      return CU::UNWIND_MODE_DWARF;
+
+    // Reset the saved registers.
+    unsigned SavedRegIdx = 0;
+    memset(SavedRegs, 0, sizeof(SavedRegs));
+
+    bool HasFP = false;
+
+    // Encode that we are using EBP/RBP as the frame pointer.
+    uint64_t CompactUnwindEncoding = 0;
+
+    unsigned SubtractInstrIdx = Is64Bit ? 3 : 2;
+    unsigned InstrOffset = 0;
+    unsigned StackAdjust = 0;
+    uint64_t StackSize = 0;
+    int64_t MinAbsOffset = std::numeric_limits<int64_t>::max();
+
+    for (const MCCFIInstruction &Inst : Instrs) {
+      switch (Inst.getOperation()) {
+      default:
+        // Any other CFI directives indicate a frame that we aren't prepared
+        // to represent via compact unwind, so just bail out.
+        return CU::UNWIND_MODE_DWARF;
+      case MCCFIInstruction::OpDefCfaRegister: {
+        // Defines a frame pointer. E.g.
+        //
+        //     movq %rsp, %rbp
+        //  L0:
+        //     .cfi_def_cfa_register %rbp
+        //
+        HasFP = true;
+
+        // If the frame pointer is other than esp/rsp, we do not have a way to
+        // generate a compact unwinding representation, so bail out.
+        if (*MRI.getLLVMRegNum(Inst.getRegister(), true) !=
+            (Is64Bit ? X86::RBP : X86::EBP))
+          return CU::UNWIND_MODE_DWARF;
+
+        // Reset the counts.
+        memset(SavedRegs, 0, sizeof(SavedRegs));
+        StackAdjust = 0;
+        SavedRegIdx = 0;
+        MinAbsOffset = std::numeric_limits<int64_t>::max();
+        InstrOffset += MoveInstrSize;
+        break;
+      }
+      case MCCFIInstruction::OpDefCfaOffset: {
+        // Defines a new offset for the CFA. E.g.
+        //
+        //  With frame:
+        //
+        //     pushq %rbp
+        //  L0:
+        //     .cfi_def_cfa_offset 16
+        //
+        //  Without frame:
+        //
+        //     subq $72, %rsp
+        //  L0:
+        //     .cfi_def_cfa_offset 80
+        //
+        StackSize = Inst.getOffset() / StackDivide;
+        break;
+      }
+      case MCCFIInstruction::OpOffset: {
+        // Defines a "push" of a callee-saved register. E.g.
+        //
+        //     pushq %r15
+        //     pushq %r14
+        //     pushq %rbx
+        //  L0:
+        //     subq $120, %rsp
+        //  L1:
+        //     .cfi_offset %rbx, -40
+        //     .cfi_offset %r14, -32
+        //     .cfi_offset %r15, -24
+        //
+        if (SavedRegIdx == CU_NUM_SAVED_REGS)
+          // If there are too many saved registers, we cannot use a compact
+          // unwind encoding.
+          return CU::UNWIND_MODE_DWARF;
+
+        MCRegister Reg = *MRI.getLLVMRegNum(Inst.getRegister(), true);
+        SavedRegs[SavedRegIdx++] = Reg.id();
+        StackAdjust += OffsetSize;
+        MinAbsOffset = std::min(MinAbsOffset, std::abs(Inst.getOffset()));
+        InstrOffset += PushInstrSize(Reg);
+        break;
+      }
+      }
+    }
+
+    StackAdjust /= StackDivide;
+
+    if (HasFP) {
+      if ((StackAdjust & 0xFF) != StackAdjust)
+        // Offset was too big for a compact unwind encoding.
+        return CU::UNWIND_MODE_DWARF;
+
+      // We don't attempt to track a real StackAdjust, so if the saved registers
+      // aren't adjacent to rbp we can't cope.
+      if (SavedRegIdx != 0 && MinAbsOffset != 3 * (int)OffsetSize)
+        return CU::UNWIND_MODE_DWARF;
+
+      // Get the encoding of the saved registers when we have a frame pointer.
+      uint32_t RegEnc = encodeCompactUnwindRegistersWithFrame();
+      if (RegEnc == ~0U)
+        return CU::UNWIND_MODE_DWARF;
+
+      CompactUnwindEncoding |= CU::UNWIND_MODE_BP_FRAME;
+      CompactUnwindEncoding |= (StackAdjust & 0xFF) << 16;
+      CompactUnwindEncoding |= RegEnc & CU::UNWIND_BP_FRAME_REGISTERS;
+    } else {
+      SubtractInstrIdx += InstrOffset;
+      ++StackAdjust;
+
+      if ((StackSize & 0xFF) == StackSize) {
+        // Frameless stack with a small stack size.
+        CompactUnwindEncoding |= CU::UNWIND_MODE_STACK_IMMD;
+
+        // Encode the stack size.
+        CompactUnwindEncoding |= (StackSize & 0xFF) << 16;
+      } else {
+        if ((StackAdjust & 0x7) != StackAdjust)
+          // The extra stack adjustments are too big for us to handle.
+          return CU::UNWIND_MODE_DWARF;
+
+        // Frameless stack with an offset too large for us to encode compactly.
+        CompactUnwindEncoding |= CU::UNWIND_MODE_STACK_IND;
+
+        // Encode the offset to the nnnnnn value in the 'subl $nnnnnn, ESP'
+        // instruction.
+        CompactUnwindEncoding |= (SubtractInstrIdx & 0xFF) << 16;
+
+        // Encode any extra stack adjustments (done via push instructions).
+        CompactUnwindEncoding |= (StackAdjust & 0x7) << 13;
+      }
+
+      // Encode the number of registers saved. (Reverse the list first.)
+      std::reverse(&SavedRegs[0], &SavedRegs[SavedRegIdx]);
+      CompactUnwindEncoding |= (SavedRegIdx & 0x7) << 10;
+
+      // Get the encoding of the saved registers when we don't have a frame
+      // pointer.
+      uint32_t RegEnc = encodeCompactUnwindRegistersWithoutFrame(SavedRegIdx);
+      if (RegEnc == ~0U)
+        return CU::UNWIND_MODE_DWARF;
+
+      // Encode the register encoding.
+      CompactUnwindEncoding |=
+          RegEnc & CU::UNWIND_FRAMELESS_STACK_REG_PERMUTATION;
+    }
+
+    return CompactUnwindEncoding;
+  }
 };
 } // end anonymous namespace
 
@@ -1031,15 +1378,16 @@ namespace {
 class ELFX86AsmBackend : public X86AsmBackend {
 public:
   uint8_t OSABI;
-  ELFX86AsmBackend(const Target &T, uint8_t OSABI, const MCSubtargetInfo &STI)
-      : X86AsmBackend(T, STI), OSABI(OSABI) {}
+  ELFX86AsmBackend(const Target &T, uint8_t OSABI, const MCSubtargetInfo &STI,
+                   const MCRegisterInfo &MRI)
+      : X86AsmBackend(T, STI, MRI), OSABI(OSABI) {}
 };
 
 class ELFX86_32AsmBackend : public ELFX86AsmBackend {
 public:
   ELFX86_32AsmBackend(const Target &T, uint8_t OSABI,
-                      const MCSubtargetInfo &STI)
-    : ELFX86AsmBackend(T, OSABI, STI) {}
+                      const MCSubtargetInfo &STI, const MCRegisterInfo &MRI)
+      : ELFX86AsmBackend(T, OSABI, STI, MRI) {}
 
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override {
@@ -1050,8 +1398,8 @@ public:
 class ELFX86_X32AsmBackend : public ELFX86AsmBackend {
 public:
   ELFX86_X32AsmBackend(const Target &T, uint8_t OSABI,
-                       const MCSubtargetInfo &STI)
-      : ELFX86AsmBackend(T, OSABI, STI) {}
+                       const MCSubtargetInfo &STI, const MCRegisterInfo &MRI)
+      : ELFX86AsmBackend(T, OSABI, STI, MRI) {}
 
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override {
@@ -1063,8 +1411,8 @@ public:
 class ELFX86_IAMCUAsmBackend : public ELFX86AsmBackend {
 public:
   ELFX86_IAMCUAsmBackend(const Target &T, uint8_t OSABI,
-                         const MCSubtargetInfo &STI)
-      : ELFX86AsmBackend(T, OSABI, STI) {}
+                         const MCSubtargetInfo &STI, const MCRegisterInfo &MRI)
+      : ELFX86AsmBackend(T, OSABI, STI, MRI) {}
 
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override {
@@ -1076,8 +1424,8 @@ public:
 class ELFX86_64AsmBackend : public ELFX86AsmBackend {
 public:
   ELFX86_64AsmBackend(const Target &T, uint8_t OSABI,
-                      const MCSubtargetInfo &STI)
-    : ELFX86AsmBackend(T, OSABI, STI) {}
+                      const MCSubtargetInfo &STI, const MCRegisterInfo &MRI)
+      : ELFX86AsmBackend(T, OSABI, STI, MRI) {}
 
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override {
@@ -1090,10 +1438,8 @@ class WindowsX86AsmBackend : public X86AsmBackend {
 
 public:
   WindowsX86AsmBackend(const Target &T, bool is64Bit,
-                       const MCSubtargetInfo &STI)
-    : X86AsmBackend(T, STI)
-    , Is64Bit(is64Bit) {
-  }
+                       const MCSubtargetInfo &STI, const MCRegisterInfo &MRI)
+      : X86AsmBackend(T, STI, MRI), Is64Bit(is64Bit) {}
 
   std::optional<MCFixupKind> getFixupKind(StringRef Name) const override {
     return StringSwitch<std::optional<MCFixupKind>>(Name)
@@ -1109,357 +1455,19 @@ public:
   }
 };
 
-namespace CU {
-
-  /// Compact unwind encoding values.
-  enum CompactUnwindEncodings {
-    /// [RE]BP based frame where [RE]BP is pused on the stack immediately after
-    /// the return address, then [RE]SP is moved to [RE]BP.
-    UNWIND_MODE_BP_FRAME                   = 0x01000000,
-
-    /// A frameless function with a small constant stack size.
-    UNWIND_MODE_STACK_IMMD                 = 0x02000000,
-
-    /// A frameless function with a large constant stack size.
-    UNWIND_MODE_STACK_IND                  = 0x03000000,
-
-    /// No compact unwind encoding is available.
-    UNWIND_MODE_DWARF                      = 0x04000000,
-
-    /// Mask for encoding the frame registers.
-    UNWIND_BP_FRAME_REGISTERS              = 0x00007FFF,
-
-    /// Mask for encoding the frameless registers.
-    UNWIND_FRAMELESS_STACK_REG_PERMUTATION = 0x000003FF
-  };
-
-} // namespace CU
-
 class DarwinX86AsmBackend : public X86AsmBackend {
-  const MCRegisterInfo &MRI;
-
-  /// Number of registers that can be saved in a compact unwind encoding.
-  enum { CU_NUM_SAVED_REGS = 6 };
-
-  mutable unsigned SavedRegs[CU_NUM_SAVED_REGS];
   Triple TT;
-  bool Is64Bit;
-
-  unsigned OffsetSize;                   ///< Offset of a "push" instruction.
-  unsigned MoveInstrSize;                ///< Size of a "move" instruction.
-  unsigned StackDivide;                  ///< Amount to adjust stack size by.
-protected:
-  /// Size of a "push" instruction for the given register.
-  unsigned PushInstrSize(MCRegister Reg) const {
-    switch (Reg.id()) {
-      case X86::EBX:
-      case X86::ECX:
-      case X86::EDX:
-      case X86::EDI:
-      case X86::ESI:
-      case X86::EBP:
-      case X86::RBX:
-      case X86::RBP:
-        return 1;
-      case X86::R12:
-      case X86::R13:
-      case X86::R14:
-      case X86::R15:
-        return 2;
-    }
-    return 1;
-  }
-
-private:
-  /// Get the compact unwind number for a given register. The number
-  /// corresponds to the enum lists in compact_unwind_encoding.h.
-  int getCompactUnwindRegNum(unsigned Reg) const {
-    static const MCPhysReg CU32BitRegs[7] = {
-      X86::EBX, X86::ECX, X86::EDX, X86::EDI, X86::ESI, X86::EBP, 0
-    };
-    static const MCPhysReg CU64BitRegs[] = {
-      X86::RBX, X86::R12, X86::R13, X86::R14, X86::R15, X86::RBP, 0
-    };
-    const MCPhysReg *CURegs = Is64Bit ? CU64BitRegs : CU32BitRegs;
-    for (int Idx = 1; *CURegs; ++CURegs, ++Idx)
-      if (*CURegs == Reg)
-        return Idx;
-
-    return -1;
-  }
-
-  /// Return the registers encoded for a compact encoding with a frame
-  /// pointer.
-  uint32_t encodeCompactUnwindRegistersWithFrame() const {
-    // Encode the registers in the order they were saved --- 3-bits per
-    // register. The list of saved registers is assumed to be in reverse
-    // order. The registers are numbered from 1 to CU_NUM_SAVED_REGS.
-    uint32_t RegEnc = 0;
-    for (int i = 0, Idx = 0; i != CU_NUM_SAVED_REGS; ++i) {
-      unsigned Reg = SavedRegs[i];
-      if (Reg == 0) break;
-
-      int CURegNum = getCompactUnwindRegNum(Reg);
-      if (CURegNum == -1) return ~0U;
-
-      // Encode the 3-bit register number in order, skipping over 3-bits for
-      // each register.
-      RegEnc |= (CURegNum & 0x7) << (Idx++ * 3);
-    }
-
-    assert((RegEnc & 0x3FFFF) == RegEnc &&
-           "Invalid compact register encoding!");
-    return RegEnc;
-  }
-
-  /// Create the permutation encoding used with frameless stacks. It is
-  /// passed the number of registers to be saved and an array of the registers
-  /// saved.
-  uint32_t encodeCompactUnwindRegistersWithoutFrame(unsigned RegCount) const {
-    // The saved registers are numbered from 1 to 6. In order to encode the
-    // order in which they were saved, we re-number them according to their
-    // place in the register order. The re-numbering is relative to the last
-    // re-numbered register. E.g., if we have registers {6, 2, 4, 5} saved in
-    // that order:
-    //
-    //    Orig  Re-Num
-    //    ----  ------
-    //     6       6
-    //     2       2
-    //     4       3
-    //     5       3
-    //
-    for (unsigned i = 0; i < RegCount; ++i) {
-      int CUReg = getCompactUnwindRegNum(SavedRegs[i]);
-      if (CUReg == -1) return ~0U;
-      SavedRegs[i] = CUReg;
-    }
-
-    // Reverse the list.
-    std::reverse(&SavedRegs[0], &SavedRegs[CU_NUM_SAVED_REGS]);
-
-    uint32_t RenumRegs[CU_NUM_SAVED_REGS];
-    for (unsigned i = CU_NUM_SAVED_REGS - RegCount; i < CU_NUM_SAVED_REGS; ++i){
-      unsigned Countless = 0;
-      for (unsigned j = CU_NUM_SAVED_REGS - RegCount; j < i; ++j)
-        if (SavedRegs[j] < SavedRegs[i])
-          ++Countless;
-
-      RenumRegs[i] = SavedRegs[i] - Countless - 1;
-    }
-
-    // Take the renumbered values and encode them into a 10-bit number.
-    uint32_t permutationEncoding = 0;
-    switch (RegCount) {
-    case 6:
-      permutationEncoding |= 120 * RenumRegs[0] + 24 * RenumRegs[1]
-                             + 6 * RenumRegs[2] +  2 * RenumRegs[3]
-                             +     RenumRegs[4];
-      break;
-    case 5:
-      permutationEncoding |= 120 * RenumRegs[1] + 24 * RenumRegs[2]
-                             + 6 * RenumRegs[3] +  2 * RenumRegs[4]
-                             +     RenumRegs[5];
-      break;
-    case 4:
-      permutationEncoding |=  60 * RenumRegs[2] + 12 * RenumRegs[3]
-                             + 3 * RenumRegs[4] +      RenumRegs[5];
-      break;
-    case 3:
-      permutationEncoding |=  20 * RenumRegs[3] +  4 * RenumRegs[4]
-                             +     RenumRegs[5];
-      break;
-    case 2:
-      permutationEncoding |=   5 * RenumRegs[4] +      RenumRegs[5];
-      break;
-    case 1:
-      permutationEncoding |=       RenumRegs[5];
-      break;
-    }
-
-    assert((permutationEncoding & 0x3FF) == permutationEncoding &&
-           "Invalid compact register encoding!");
-    return permutationEncoding;
-  }
 
 public:
   DarwinX86AsmBackend(const Target &T, const MCRegisterInfo &MRI,
                       const MCSubtargetInfo &STI)
-      : X86AsmBackend(T, STI), MRI(MRI), TT(STI.getTargetTriple()),
-        Is64Bit(TT.isX86_64()) {
-    memset(SavedRegs, 0, sizeof(SavedRegs));
-    OffsetSize = Is64Bit ? 8 : 4;
-    MoveInstrSize = Is64Bit ? 3 : 2;
-    StackDivide = Is64Bit ? 8 : 4;
-  }
+      : X86AsmBackend(T, STI, MRI), TT(STI.getTargetTriple()) {}
 
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override {
     uint32_t CPUType = cantFail(MachO::getCPUType(TT));
     uint32_t CPUSubType = cantFail(MachO::getCPUSubType(TT));
     return createX86MachObjectWriter(Is64Bit, CPUType, CPUSubType);
-  }
-
-  /// Implementation of algorithm to generate the compact unwind encoding
-  /// for the CFI instructions.
-  uint64_t generateCompactUnwindEncoding(const MCDwarfFrameInfo *FI,
-                                         const MCContext *Ctxt) const override {
-    ArrayRef<MCCFIInstruction> Instrs = FI->Instructions;
-    if (Instrs.empty()) return 0;
-    if (!isDarwinCanonicalPersonality(FI->Personality) &&
-        !Ctxt->emitCompactUnwindNonCanonical())
-      return CU::UNWIND_MODE_DWARF;
-
-    // Reset the saved registers.
-    unsigned SavedRegIdx = 0;
-    memset(SavedRegs, 0, sizeof(SavedRegs));
-
-    bool HasFP = false;
-
-    // Encode that we are using EBP/RBP as the frame pointer.
-    uint64_t CompactUnwindEncoding = 0;
-
-    unsigned SubtractInstrIdx = Is64Bit ? 3 : 2;
-    unsigned InstrOffset = 0;
-    unsigned StackAdjust = 0;
-    uint64_t StackSize = 0;
-    int64_t MinAbsOffset = std::numeric_limits<int64_t>::max();
-
-    for (const MCCFIInstruction &Inst : Instrs) {
-      switch (Inst.getOperation()) {
-      default:
-        // Any other CFI directives indicate a frame that we aren't prepared
-        // to represent via compact unwind, so just bail out.
-        return CU::UNWIND_MODE_DWARF;
-      case MCCFIInstruction::OpDefCfaRegister: {
-        // Defines a frame pointer. E.g.
-        //
-        //     movq %rsp, %rbp
-        //  L0:
-        //     .cfi_def_cfa_register %rbp
-        //
-        HasFP = true;
-
-        // If the frame pointer is other than esp/rsp, we do not have a way to
-        // generate a compact unwinding representation, so bail out.
-        if (*MRI.getLLVMRegNum(Inst.getRegister(), true) !=
-            (Is64Bit ? X86::RBP : X86::EBP))
-          return CU::UNWIND_MODE_DWARF;
-
-        // Reset the counts.
-        memset(SavedRegs, 0, sizeof(SavedRegs));
-        StackAdjust = 0;
-        SavedRegIdx = 0;
-        MinAbsOffset = std::numeric_limits<int64_t>::max();
-        InstrOffset += MoveInstrSize;
-        break;
-      }
-      case MCCFIInstruction::OpDefCfaOffset: {
-        // Defines a new offset for the CFA. E.g.
-        //
-        //  With frame:
-        //
-        //     pushq %rbp
-        //  L0:
-        //     .cfi_def_cfa_offset 16
-        //
-        //  Without frame:
-        //
-        //     subq $72, %rsp
-        //  L0:
-        //     .cfi_def_cfa_offset 80
-        //
-        StackSize = Inst.getOffset() / StackDivide;
-        break;
-      }
-      case MCCFIInstruction::OpOffset: {
-        // Defines a "push" of a callee-saved register. E.g.
-        //
-        //     pushq %r15
-        //     pushq %r14
-        //     pushq %rbx
-        //  L0:
-        //     subq $120, %rsp
-        //  L1:
-        //     .cfi_offset %rbx, -40
-        //     .cfi_offset %r14, -32
-        //     .cfi_offset %r15, -24
-        //
-        if (SavedRegIdx == CU_NUM_SAVED_REGS)
-          // If there are too many saved registers, we cannot use a compact
-          // unwind encoding.
-          return CU::UNWIND_MODE_DWARF;
-
-        MCRegister Reg = *MRI.getLLVMRegNum(Inst.getRegister(), true);
-        SavedRegs[SavedRegIdx++] = Reg.id();
-        StackAdjust += OffsetSize;
-        MinAbsOffset = std::min(MinAbsOffset, std::abs(Inst.getOffset()));
-        InstrOffset += PushInstrSize(Reg);
-        break;
-      }
-      }
-    }
-
-    StackAdjust /= StackDivide;
-
-    if (HasFP) {
-      if ((StackAdjust & 0xFF) != StackAdjust)
-        // Offset was too big for a compact unwind encoding.
-        return CU::UNWIND_MODE_DWARF;
-
-      // We don't attempt to track a real StackAdjust, so if the saved registers
-      // aren't adjacent to rbp we can't cope.
-      if (SavedRegIdx != 0 && MinAbsOffset != 3 * (int)OffsetSize)
-        return CU::UNWIND_MODE_DWARF;
-
-      // Get the encoding of the saved registers when we have a frame pointer.
-      uint32_t RegEnc = encodeCompactUnwindRegistersWithFrame();
-      if (RegEnc == ~0U) return CU::UNWIND_MODE_DWARF;
-
-      CompactUnwindEncoding |= CU::UNWIND_MODE_BP_FRAME;
-      CompactUnwindEncoding |= (StackAdjust & 0xFF) << 16;
-      CompactUnwindEncoding |= RegEnc & CU::UNWIND_BP_FRAME_REGISTERS;
-    } else {
-      SubtractInstrIdx += InstrOffset;
-      ++StackAdjust;
-
-      if ((StackSize & 0xFF) == StackSize) {
-        // Frameless stack with a small stack size.
-        CompactUnwindEncoding |= CU::UNWIND_MODE_STACK_IMMD;
-
-        // Encode the stack size.
-        CompactUnwindEncoding |= (StackSize & 0xFF) << 16;
-      } else {
-        if ((StackAdjust & 0x7) != StackAdjust)
-          // The extra stack adjustments are too big for us to handle.
-          return CU::UNWIND_MODE_DWARF;
-
-        // Frameless stack with an offset too large for us to encode compactly.
-        CompactUnwindEncoding |= CU::UNWIND_MODE_STACK_IND;
-
-        // Encode the offset to the nnnnnn value in the 'subl $nnnnnn, ESP'
-        // instruction.
-        CompactUnwindEncoding |= (SubtractInstrIdx & 0xFF) << 16;
-
-        // Encode any extra stack adjustments (done via push instructions).
-        CompactUnwindEncoding |= (StackAdjust & 0x7) << 13;
-      }
-
-      // Encode the number of registers saved. (Reverse the list first.)
-      std::reverse(&SavedRegs[0], &SavedRegs[SavedRegIdx]);
-      CompactUnwindEncoding |= (SavedRegIdx & 0x7) << 10;
-
-      // Get the encoding of the saved registers when we don't have a frame
-      // pointer.
-      uint32_t RegEnc = encodeCompactUnwindRegistersWithoutFrame(SavedRegIdx);
-      if (RegEnc == ~0U) return CU::UNWIND_MODE_DWARF;
-
-      // Encode the register encoding.
-      CompactUnwindEncoding |=
-        RegEnc & CU::UNWIND_FRAMELESS_STACK_REG_PERMUTATION;
-    }
-
-    return CompactUnwindEncoding;
   }
 };
 
@@ -1474,14 +1482,14 @@ MCAsmBackend *llvm::createX86_32AsmBackend(const Target &T,
     return new DarwinX86AsmBackend(T, MRI, STI);
 
   if (TheTriple.isOSWindows() && TheTriple.isOSBinFormatCOFF())
-    return new WindowsX86AsmBackend(T, false, STI);
+    return new WindowsX86AsmBackend(T, false, STI, MRI);
 
   uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(TheTriple.getOS());
 
   if (TheTriple.isOSIAMCU())
-    return new ELFX86_IAMCUAsmBackend(T, OSABI, STI);
+    return new ELFX86_IAMCUAsmBackend(T, OSABI, STI, MRI);
 
-  return new ELFX86_32AsmBackend(T, OSABI, STI);
+  return new ELFX86_32AsmBackend(T, OSABI, STI, MRI);
 }
 
 MCAsmBackend *llvm::createX86_64AsmBackend(const Target &T,
@@ -1493,19 +1501,19 @@ MCAsmBackend *llvm::createX86_64AsmBackend(const Target &T,
     return new DarwinX86AsmBackend(T, MRI, STI);
 
   if (TheTriple.isOSWindows() && TheTriple.isOSBinFormatCOFF())
-    return new WindowsX86AsmBackend(T, true, STI);
+    return new WindowsX86AsmBackend(T, true, STI, MRI);
 
   if (TheTriple.isUEFI()) {
     assert(TheTriple.isOSBinFormatCOFF() &&
          "Only COFF format is supported in UEFI environment.");
-    return new WindowsX86AsmBackend(T, true, STI);
+    return new WindowsX86AsmBackend(T, true, STI, MRI);
   }
 
   uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(TheTriple.getOS());
 
   if (TheTriple.isX32())
-    return new ELFX86_X32AsmBackend(T, OSABI, STI);
-  return new ELFX86_64AsmBackend(T, OSABI, STI);
+    return new ELFX86_X32AsmBackend(T, OSABI, STI, MRI);
+  return new ELFX86_64AsmBackend(T, OSABI, STI, MRI);
 }
 
 namespace {

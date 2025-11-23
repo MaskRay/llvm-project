@@ -16,6 +16,9 @@ struct EhSectionPiece;
 
 uint8_t getFdeEncoding(EhSectionPiece *p);
 bool hasLSDA(const EhSectionPiece &p);
+bool hasUnwindDescriptor(const EhSectionPiece &p);
+uint64_t getUnwindDescriptor(const EhSectionPiece &cie,
+                             const EhSectionPiece &fde);
 }
 
 #endif

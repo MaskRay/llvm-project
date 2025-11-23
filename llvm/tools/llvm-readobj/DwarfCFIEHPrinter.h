@@ -122,10 +122,10 @@ void PrinterContext<ELFT>::printEHFrameHdr(const Elf_Phdr *EHFramePHdr) const {
 
   auto Version = DE.getU8(&Offset);
   W.printNumber("version", Version);
-  if (Version != 1)
-    reportError(
-        object::createError("only version 1 of .eh_frame_hdr is supported"),
-        ObjF.getFileName());
+  if (Version != 1 && Version != 2)
+    reportError(object::createError(
+                    "only version 1 or 2 of .eh_frame_hdr is supported"),
+                ObjF.getFileName());
 
   uint64_t EHFramePtrEnc = DE.getU8(&Offset);
   W.startLine() << format("eh_frame_ptr_enc: 0x%" PRIx64 "\n", EHFramePtrEnc);
@@ -141,7 +141,8 @@ void PrinterContext<ELFT>::printEHFrameHdr(const Elf_Phdr *EHFramePHdr) const {
 
   uint64_t TableEnc = DE.getU8(&Offset);
   W.startLine() << format("table_enc: 0x%" PRIx64 "\n", TableEnc);
-  if (TableEnc != (dwarf::DW_EH_PE_datarel | dwarf::DW_EH_PE_sdata4))
+  if (TableEnc != (dwarf::DW_EH_PE_datarel | dwarf::DW_EH_PE_sdata4) &&
+      TableEnc != (dwarf::DW_EH_PE_datarel | dwarf::DW_EH_PE_sdata8))
     reportError(object::createError("unexpected encoding table_enc"),
                 ObjF.getFileName());
 
@@ -158,8 +159,17 @@ void PrinterContext<ELFT>::printEHFrameHdr(const Elf_Phdr *EHFramePHdr) const {
 
     auto InitialPC = DE.getSigned(&Offset, 4) + EHFrameHdrAddress;
     W.startLine() << format("initial_location: 0x%" PRIx64 "\n", InitialPC);
-    auto Address = DE.getSigned(&Offset, 4) + EHFrameHdrAddress;
-    W.startLine() << format("address: 0x%" PRIx64 "\n", Address);
+    if (Version == 1) {
+      auto Address = DE.getSigned(&Offset, 4) + EHFrameHdrAddress;
+      W.startLine() << format("address: 0x%" PRIx64 "\n", Address);
+    } else {
+      auto V = DE.getSigned(&Offset, 8);
+      if (V & 1)
+        W.startLine() << format("descriptor: 0x%" PRIx64 "\n", V);
+      else
+        W.startLine() << format("address: 0x%" PRIx64 "\n",
+                                V + EHFrameHdrAddress);
+    }
 
     if (InitialPC < PrevPC)
       reportError(object::createError("initial_location is out of order"),
@@ -197,6 +207,7 @@ void PrinterContext<ELFT>::printEHFrame(const Elf_Shdr *EHFrameShdr) const {
 
   for (const dwarf::FrameEntry &Entry : EHFrame) {
     std::optional<uint64_t> InitialLocation;
+    bool UnwindDescriptor = false;
     if (const dwarf::CIE *CIE = dyn_cast<dwarf::CIE>(&Entry)) {
       W.startLine() << format("[0x%" PRIx64 "] CIE length=%" PRIu64 "\n",
                               Address + CIE->getOffset(), CIE->getLength());
@@ -222,16 +233,22 @@ void PrinterContext<ELFT>::printEHFrame(const Elf_Shdr *EHFrameShdr) const {
           "address_range: 0x%" PRIx64 " (end : 0x%" PRIx64 ")\n",
           FDE->getAddressRange(),
           FDE->getInitialLocation() + FDE->getAddressRange());
+      if (auto Desc = FDE->getUnwindDescriptor()) {
+        W.startLine() << format("unwind_descriptor: 0x%" PRIx64 "\n", Desc);
+        UnwindDescriptor = true;
+      }
     }
 
-    W.getOStream() << "\n";
-    W.startLine() << "Program:\n";
-    W.indent();
-    auto DumpOpts = DIDumpOptions();
-    DumpOpts.IsEH = true;
-    printCFIProgram(Entry.cfis(), W.getOStream(), DumpOpts, W.getIndentLevel(),
-                    InitialLocation);
-    W.unindent();
+    if (!UnwindDescriptor) {
+      W.getOStream() << "\n";
+      W.startLine() << "Program:\n";
+      W.indent();
+      auto DumpOpts = DIDumpOptions();
+      DumpOpts.IsEH = true;
+      printCFIProgram(Entry.cfis(), W.getOStream(), DumpOpts,
+                      W.getIndentLevel(), InitialLocation);
+      W.unindent();
+    }
     W.unindent();
     W.getOStream() << "\n";
   }

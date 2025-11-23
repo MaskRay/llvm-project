@@ -368,8 +368,10 @@ public:
     }
 
     // Offset -1 means that the piece is dead (i.e. garbage collected).
-    if (it[-1].outputOff == -1)
-      return -1;
+    // Other negative values indicate the FDE contains an unwind descriptor
+    // instead of instructions.
+    if (it[-1].outputOff < 0)
+      return it[-1].outputOff;
     return it[-1].outputOff + (off - it[-1].inputOff);
   }
 
