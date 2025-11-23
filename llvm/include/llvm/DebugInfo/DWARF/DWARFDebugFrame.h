@@ -100,7 +100,8 @@ public:
       int64_t DataAlignmentFactor, uint64_t ReturnAddressRegister,
       SmallString<8> AugmentationData, uint32_t FDEPointerEncoding,
       uint32_t LSDAPointerEncoding, std::optional<uint64_t> Personality,
-      std::optional<uint32_t> PersonalityEnc, Triple::ArchType Arch)
+      std::optional<uint32_t> PersonalityEnc, bool CompactUnwind,
+      Triple::ArchType Arch)
       : FrameEntry(FK_CIE, IsDWARF64, Offset, Length, CodeAlignmentFactor,
                    DataAlignmentFactor, Arch),
         Version(Version), Augmentation(std::move(Augmentation)),
@@ -111,7 +112,7 @@ public:
         AugmentationData(std::move(AugmentationData)),
         FDEPointerEncoding(FDEPointerEncoding),
         LSDAPointerEncoding(LSDAPointerEncoding), Personality(Personality),
-        PersonalityEnc(PersonalityEnc) {}
+        PersonalityEnc(PersonalityEnc), CompactUnwind(CompactUnwind) {}
 
   static bool classof(const FrameEntry *FE) { return FE->getKind() == FK_CIE; }
 
@@ -124,6 +125,7 @@ public:
   std::optional<uint32_t> getPersonalityEncoding() const {
     return PersonalityEnc;
   }
+  bool getCompactUnwind() const { return CompactUnwind; }
 
   StringRef getAugmentationData() const { return AugmentationData; }
 
@@ -149,19 +151,24 @@ private:
   const uint32_t LSDAPointerEncoding;
   const std::optional<uint64_t> Personality;
   const std::optional<uint32_t> PersonalityEnc;
+
+  // This entry uses a compact unwind descriptor instead of CFI instructions.
+  bool CompactUnwind;
 };
 
 /// DWARF Frame Description Entry (FDE)
 class LLVM_ABI FDE : public FrameEntry {
 public:
   FDE(bool IsDWARF64, uint64_t Offset, uint64_t Length, uint64_t CIEPointer,
-      uint64_t InitialLocation, uint64_t AddressRange, CIE *Cie,
-      std::optional<uint64_t> LSDAAddress, Triple::ArchType Arch)
+      uint64_t InitialLocation, uint64_t AddressRange,
+      uint64_t UnwindDescriptor, CIE *Cie, std::optional<uint64_t> LSDAAddress,
+      Triple::ArchType Arch)
       : FrameEntry(FK_FDE, IsDWARF64, Offset, Length,
                    Cie ? Cie->getCodeAlignmentFactor() : 0,
                    Cie ? Cie->getDataAlignmentFactor() : 0, Arch),
         CIEPointer(CIEPointer), InitialLocation(InitialLocation),
-        AddressRange(AddressRange), LinkedCIE(Cie), LSDAAddress(LSDAAddress) {}
+        AddressRange(AddressRange), UnwindDescriptor(UnwindDescriptor),
+        LinkedCIE(Cie), LSDAAddress(LSDAAddress) {}
 
   ~FDE() override = default;
 
@@ -169,6 +176,7 @@ public:
   uint64_t getCIEPointer() const { return CIEPointer; }
   uint64_t getInitialLocation() const { return InitialLocation; }
   uint64_t getAddressRange() const { return AddressRange; }
+  uint64_t getUnwindDescriptor() const { return UnwindDescriptor; }
   std::optional<uint64_t> getLSDAAddress() const { return LSDAAddress; }
 
   void dump(raw_ostream &OS, DIDumpOptions DumpOpts) const override;
@@ -183,6 +191,8 @@ private:
   const uint64_t CIEPointer;
   const uint64_t InitialLocation;
   const uint64_t AddressRange;
+  // 64-bit descriptor for the compact unwind extension
+  const uint64_t UnwindDescriptor;
   const CIE *LinkedCIE;
   const std::optional<uint64_t> LSDAAddress;
 };

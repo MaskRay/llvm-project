@@ -103,7 +103,8 @@ public:
     relocate(loc, Relocation{R_NONE, type, 0, 0, nullptr}, val);
   }
   virtual void relocateAlloc(InputSection &sec, uint8_t *buf) const;
-  void relocateEh(EhInputSection &sec, uint8_t *buf) const;
+  void relocateEh(EhInputSection &sec, uint8_t *buf,
+                  SmallVector<uint64_t, 0> &compactFdePcs) const;
 
   // Do a linker relaxation pass and return true if we changed something.
   virtual bool relaxOnce(int pass) const { return false; }

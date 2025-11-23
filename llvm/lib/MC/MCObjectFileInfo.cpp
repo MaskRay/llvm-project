@@ -24,14 +24,19 @@
 #include "llvm/MC/MCSectionSPIRV.h"
 #include "llvm/MC/MCSectionWasm.h"
 #include "llvm/MC/MCSectionXCOFF.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/TargetParser/Triple.h"
 
 using namespace llvm;
 
+static cl::opt<bool> ELFCompactUnwind(
+    "elf-compact-unwind", cl::Hidden,
+    cl::desc("Use the experimental compact unwind information"));
+
 static bool useCompactUnwind(const Triple &T) {
   // Only on darwin.
   if (!T.isOSDarwin())
-    return false;
+    return ELFCompactUnwind;
 
   // aarch64 always has it.
   if (T.getArch() == Triple::aarch64 || T.getArch() == Triple::aarch64_32)
@@ -560,6 +565,9 @@ void MCObjectFileInfo::initELFMCObjectFileInfo(const Triple &T, bool Large) {
       Ctx->getELFSection(".pseudo_probe_desc", DebugSecType, 0);
 
   LLVMStatsSection = Ctx->getELFSection(".llvm_stats", ELF::SHT_PROGBITS, 0);
+
+  if (ELFCompactUnwind && T.getArch() == Triple::x86_64)
+    UsesELFCompactUnwind = true;
 }
 
 void MCObjectFileInfo::initGOFFMCObjectFileInfo(const Triple &T) {

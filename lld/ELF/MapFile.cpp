@@ -130,7 +130,7 @@ static void printEhFrame(Ctx &ctx, raw_ostream &os, const EhFrameSection *sec) {
     pieces.push_back(p);
   };
 
-  // Gather section pieces.
+  // Gather CIE and FDE pieces. Compact FDEs are ignored.
   for (const CieRecord *rec : sec->getCieRecords()) {
     add(*rec->cie);
     for (const EhSectionPiece *fde : rec->fdes)
