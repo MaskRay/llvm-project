@@ -24,14 +24,19 @@
 #include "llvm/MC/MCSectionSPIRV.h"
 #include "llvm/MC/MCSectionWasm.h"
 #include "llvm/MC/MCSectionXCOFF.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/TargetParser/Triple.h"
 
 using namespace llvm;
 
+static cl::opt<bool> ELFCompactUnwind(
+    "elf-compact-unwind", cl::Hidden,
+    cl::desc("Use the experimental compact unwind information"));
+
 static bool useCompactUnwind(const Triple &T) {
   // Only on darwin.
   if (!T.isOSDarwin())
-    return false;
+    return ELFCompactUnwind;
 
   // aarch64 always has it.
   if (T.getArch() == Triple::aarch64 || T.getArch() == Triple::aarch64_32)
@@ -59,6 +64,8 @@ static bool useCompactUnwind(const Triple &T) {
 
   return false;
 }
+
+constexpr uint32_t UNWIND_X86_64_MODE_DWARF = 0x04000000;
 
 void MCObjectFileInfo::initMachOMCObjectFileInfo(const Triple &T) {
   EHFrameSection = Ctx->getMachOSection(
@@ -213,7 +220,7 @@ void MCObjectFileInfo::initMachOMCObjectFileInfo(const Triple &T) {
                              SectionKind::getReadOnly());
 
     if (T.isX86())
-      CompactUnwindDwarfEHFrameOnly = 0x04000000;  // UNWIND_X86_64_MODE_DWARF
+      CompactUnwindDwarfEHFrameOnly = UNWIND_X86_64_MODE_DWARF;
     else if (T.getArch() == Triple::aarch64 || T.getArch() == Triple::aarch64_32)
       CompactUnwindDwarfEHFrameOnly = 0x03000000;  // UNWIND_ARM64_MODE_DWARF
     else if (T.getArch() == Triple::arm || T.getArch() == Triple::thumb)
@@ -560,6 +567,12 @@ void MCObjectFileInfo::initELFMCObjectFileInfo(const Triple &T, bool Large) {
       Ctx->getELFSection(".pseudo_probe_desc", DebugSecType, 0);
 
   LLVMStatsSection = Ctx->getELFSection(".llvm_stats", ELF::SHT_PROGBITS, 0);
+
+  if (ELFCompactUnwind && T.getArch() == Triple::x86_64) {
+    UsesELFCompactUnwind = true;
+    if (T.isX86())
+      CompactUnwindDwarfEHFrameOnly = UNWIND_X86_64_MODE_DWARF;
+  }
 }
 
 void MCObjectFileInfo::initGOFFMCObjectFileInfo(const Triple &T) {

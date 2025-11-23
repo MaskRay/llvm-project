@@ -33,6 +33,7 @@
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Target/TargetOptions.h"
 #include <cstdlib>
@@ -45,6 +46,10 @@ STATISTIC(NumFrameExtraProbe,
 STATISTIC(NumFunctionUsingPush2Pop2, "Number of functions using push2/pop2");
 
 using namespace llvm;
+
+static cl::opt<bool> EpilogCfi("x86-epilog-cfi",
+                               cl::desc("Emit DWARF CFI for epilog"),
+                               cl::init(true), cl::Hidden);
 
 X86FrameLowering::X86FrameLowering(const X86Subtarget &STI,
                                    MaybeAlign StackAlignOverride)
@@ -2432,7 +2437,8 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   bool HasFP = hasFP(MF);
   uint64_t NumBytes = 0;
 
-  bool NeedsDwarfCFI = (!MF.getTarget().getTargetTriple().isOSDarwin() &&
+  bool NeedsDwarfCFI = EpilogCfi &&
+                       (!MF.getTarget().getTargetTriple().isOSDarwin() &&
                         !MF.getTarget().getTargetTriple().isOSWindows() &&
                         !MF.getTarget().getTargetTriple().isUEFI()) &&
                        MF.needsFrameMoves();
