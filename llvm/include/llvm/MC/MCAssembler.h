@@ -103,15 +103,16 @@ private:
   bool fixupNeedsRelaxation(const MCFragment &, const MCFixup &) const;
 
   void layoutSection(MCSection &Sec);
+  void layoutAlignFragment(MCFragment &F, uint64_t &Offset);
   /// Perform one layout iteration and return the index of the first stable
   /// section for subsequent optimization.
   unsigned relaxOnce(unsigned FirstStable);
 
   /// Perform relaxation on a single fragment.
-  bool relaxFragment(MCFragment &F);
+  bool relaxFragment(MCFragment &F, uint64_t &Offset);
   void relaxInstruction(MCFragment &F);
   void relaxLEB(MCFragment &F);
-  void relaxBoundaryAlign(MCBoundaryAlignFragment &BF);
+  void relaxBoundaryAlign(MCBoundaryAlignFragment &BF, uint64_t Offset);
   void relaxDwarfLineAddr(MCFragment &F);
   void relaxDwarfCallFrameFragment(MCFragment &F);
   void relaxSFrameFragment(MCFragment &DF);

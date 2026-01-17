@@ -858,13 +858,14 @@ static bool needPadding(uint64_t StartAddr, uint64_t Size,
          isAgainstBoundary(StartAddr, Size, BoundaryAlignment);
 }
 
-void MCAssembler::relaxBoundaryAlign(MCBoundaryAlignFragment &BF) {
+void MCAssembler::relaxBoundaryAlign(MCBoundaryAlignFragment &BF,
+                                     uint64_t Offset) {
   // BoundaryAlignFragment that doesn't need to align any fragment should not be
   // relaxed.
   if (!BF.getLastFragment())
     return;
 
-  uint64_t AlignedOffset = getFragmentOffset(BF);
+  uint64_t AlignedOffset = Offset;
   uint64_t AlignedSize = 0;
   for (const MCFragment *F = BF.getNext();; F = F->getNext()) {
     AlignedSize += computeFragmentSize(*F);
@@ -935,10 +936,11 @@ void MCAssembler::relaxSFrameFragment(MCFragment &F) {
   F.clearVarFixups();
 }
 
-bool MCAssembler::relaxFragment(MCFragment &F) {
+bool MCAssembler::relaxFragment(MCFragment &F, uint64_t &Offset) {
   auto Size = computeFragmentSize(F);
   switch (F.getKind()) {
   default:
+    Offset += Size;
     return false;
   case MCFragment::FT_Relaxable:
     assert(!getRelaxAll() && "Did not expect a FT_Relaxable in RelaxAll mode");
@@ -957,7 +959,7 @@ bool MCAssembler::relaxFragment(MCFragment &F) {
     relaxSFrameFragment(F);
     break;
   case MCFragment::FT_BoundaryAlign:
-    relaxBoundaryAlign(static_cast<MCBoundaryAlignFragment &>(F));
+    relaxBoundaryAlign(static_cast<MCBoundaryAlignFragment &>(F), Offset);
     break;
   case MCFragment::FT_CVInlineLines:
     getContext().getCVContext().encodeInlineLineTable(
@@ -969,46 +971,53 @@ bool MCAssembler::relaxFragment(MCFragment &F) {
     break;
   case MCFragment::FT_Fill:
   case MCFragment::FT_Org:
+    Offset += F.getNext()->Offset - F.Offset;
     return F.getNext()->Offset - F.Offset != Size;
   }
-  return computeFragmentSize(F) != Size;
+  auto NewSize = computeFragmentSize(F);
+  Offset += NewSize;
+  return NewSize != Size;
 }
 
 void MCAssembler::layoutSection(MCSection &Sec) {
   uint64_t Offset = 0;
   for (MCFragment &F : Sec) {
     F.Offset = Offset;
-    if (F.getKind() == MCFragment::FT_Align) {
-      Offset += F.getFixedSize();
-      unsigned Size = offsetToAlignment(Offset, F.getAlignment());
-      // In the nops mode, RISC-V style linker relaxation might adjust the size
-      // and add a fixup, even if `Size` is originally 0.
-      bool AlignFixup = false;
-      if (F.hasAlignEmitNops()) {
-        AlignFixup = getBackend().relaxAlign(F, Size);
-        // If the backend does not handle the fragment specially, pad with nops,
-        // but ensure that the padding is larger than the minimum nop size.
-        if (!AlignFixup)
-          while (Size % getBackend().getMinimumNopSize())
-            Size += F.getAlignment().value();
-      }
-      if (!AlignFixup && Size > F.getAlignMaxBytesToEmit())
-        Size = 0;
-      // Update the variable tail size, offset by FixedSize to prevent ubsan
-      // pointer-overflow in evaluateFixup. The content is ignored.
-      F.VarContentStart = F.getFixedSize();
-      F.VarContentEnd = F.VarContentStart + Size;
-      if (F.VarContentEnd > F.getParent()->ContentStorage.size())
-        F.getParent()->ContentStorage.resize(F.VarContentEnd);
-      Offset += Size;
-    } else {
+    if (F.getKind() == MCFragment::FT_Align)
+      layoutAlignFragment(F, Offset);
+    else
       Offset += computeFragmentSize(F);
-    }
   }
 }
 
+void MCAssembler::layoutAlignFragment(MCFragment &F, uint64_t &Offset) {
+  assert(F.getKind() == MCFragment::FT_Align);
+  Offset += F.getFixedSize();
+  unsigned Size = offsetToAlignment(Offset, F.getAlignment());
+  // In the nops mode, RISC-V style linker relaxation might adjust the size
+  // and add a fixup, even if `Size` is originally 0.
+  bool AlignFixup = false;
+  if (F.hasAlignEmitNops()) {
+    AlignFixup = getBackend().relaxAlign(F, Size);
+    // If the backend does not handle the fragment specially, pad with nops,
+    // but ensure that the padding is larger than the minimum nop size.
+    if (!AlignFixup)
+      while (Size % getBackend().getMinimumNopSize())
+        Size += F.getAlignment().value();
+  }
+  if (!AlignFixup && Size > F.getAlignMaxBytesToEmit())
+    Size = 0;
+  // Update the variable tail size, offset by FixedSize to prevent ubsan
+  // pointer-overflow in evaluateFixup. The content is ignored.
+  F.VarContentStart = F.getFixedSize();
+  F.VarContentEnd = F.VarContentStart + Size;
+  if (F.VarContentEnd > F.getParent()->ContentStorage.size())
+    F.getParent()->ContentStorage.resize(F.VarContentEnd);
+  Offset += Size;
+}
+
 unsigned MCAssembler::relaxOnce(unsigned FirstStable) {
-  ++stats::RelaxationSteps;
+  uint64_t MaxIterations = 0;
   PendingErrors.clear();
 
   unsigned Res = 0;
@@ -1016,12 +1025,17 @@ unsigned MCAssembler::relaxOnce(unsigned FirstStable) {
     // Assume each iteration finalizes at least one extra fragment. If the
     // layout does not converge after N+1 iterations, bail out.
     auto &Sec = *Sections[I];
-    auto MaxIter = Sec.curFragList()->Tail->getLayoutOrder() + 1;
+    auto Limit = Sec.curFragList()->Tail->getLayoutOrder() + 1;
+    auto MaxIter = Limit;
     for (;;) {
       bool Changed = false;
-      for (MCFragment &F : Sec)
-        if (F.getKind() != MCFragment::FT_Data && relaxFragment(F))
-          Changed = true;
+      uint64_t Offset = 0;
+      for (MCFragment &F : Sec) {
+        if (F.getKind() == MCFragment::FT_Align)
+          layoutAlignFragment(F, Offset);
+        else
+          Changed |= relaxFragment(F, Offset);
+      }
 
       if (!Changed)
         break;
@@ -1033,7 +1047,10 @@ unsigned MCAssembler::relaxOnce(unsigned FirstStable) {
         break;
       layoutSection(Sec);
     }
+    uint64_t Iterations = Limit - MaxIter;
+    MaxIterations = std::max(MaxIterations, Iterations);
   }
+  stats::RelaxationSteps += MaxIterations;
   // The subsequent relaxOnce call only needs to visit Sections [0,Res) if no
   // change occurred.
   return Res;
