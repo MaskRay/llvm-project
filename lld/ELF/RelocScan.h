@@ -60,6 +60,11 @@ public:
 
   template <class ELFT, class RelTy>
   int64_t getAddend(const RelTy &r, RelType type);
+  // Call target.getRelExpr and check for R_NONE/undefined. Returns R_NONE if
+  // the relocation should be skipped.
+  template <class Target, class ELFT>
+  RelExpr scanOne(Target &target, uint32_t symIdx, Symbol &sym, uint64_t offset,
+                  RelType type);
   bool maybeReportUndefined(Undefined &sym, uint64_t offset);
   bool checkTlsLe(uint64_t offset, Symbol &sym, RelType type);
   bool isStaticLinkTimeConstant(RelExpr e, RelType type, const Symbol &sym,
@@ -68,6 +73,67 @@ public:
                int64_t addend) const;
   unsigned handleTlsRelocation(RelExpr expr, RelType type, uint64_t offset,
                                Symbol &sym, int64_t addend);
+
+  // Handle TLS Initial-Exec relocation.
+  void handleTlsIe(RelExpr ieExpr, RelType type, uint64_t offset,
+                   int64_t addend, Symbol &sym, bool isShared) {
+    ctx.hasTlsIe.store(true, std::memory_order_relaxed);
+    if (!isShared && !sym.isPreemptible) {
+      sec->addReloc({R_TPREL, type, offset, addend, &sym});
+    } else {
+      sym.setFlags(NEEDS_TLSIE);
+      sec->addReloc({ieExpr, type, offset, addend, &sym});
+    }
+  }
+
+  // Handle TLS Local-Dynamic relocation. Returns true if the __tls_get_addr
+  // call should be skipped (i.e., caller should ++it).
+  bool handleTlsLd(RelExpr sharedExpr, RelType type, uint64_t offset,
+                   int64_t addend, Symbol &sym, bool isShared) {
+    if (isShared) {
+      ctx.needsTlsLd.store(true, std::memory_order_relaxed);
+      sec->addReloc({sharedExpr, type, offset, addend, &sym});
+      return false;
+    }
+    sec->addReloc({R_TPREL, type, offset, addend, &sym});
+    return true;
+  }
+
+  // Handle TLS General-Dynamic relocation. Returns true if the __tls_get_addr
+  // call should be skipped (i.e., caller should ++it).
+  bool handleTlsGd(RelExpr sharedExpr, RelExpr ieExpr, RelExpr leExpr,
+                   RelType type, uint64_t offset, int64_t addend, Symbol &sym,
+                   bool isShared) {
+    if (isShared) {
+      sym.setFlags(NEEDS_TLSGD);
+      sec->addReloc({sharedExpr, type, offset, addend, &sym});
+      return false;
+    }
+    if (sym.isPreemptible) {
+      ctx.hasTlsIe.store(true, std::memory_order_relaxed);
+      sym.setFlags(NEEDS_TLSIE);
+      sec->addReloc({ieExpr, type, offset, addend, &sym});
+    } else {
+      sec->addReloc({leExpr, type, offset, addend, &sym});
+    }
+    return true;
+  }
+
+  // Handle TLSDESC relocation.
+  void handleTlsDesc(RelExpr sharedExpr, RelExpr ieExpr, RelType type,
+                     uint64_t offset, int64_t addend, Symbol &sym,
+                     bool isShared) {
+    if (isShared) {
+      sym.setFlags(NEEDS_TLSDESC);
+      sec->addReloc({sharedExpr, type, offset, addend, &sym});
+    } else if (sym.isPreemptible) {
+      ctx.hasTlsIe.store(true, std::memory_order_relaxed);
+      sym.setFlags(NEEDS_TLSIE);
+      sec->addReloc({ieExpr, type, offset, addend, &sym});
+    } else {
+      sec->addReloc({R_TPREL, type, offset, addend, &sym});
+    }
+  }
 };
 
 template <class ELFT, class RelTy>
@@ -75,6 +141,18 @@ int64_t RelocScan::getAddend(const RelTy &r, RelType type) {
   return RelTy::HasAddend ? elf::getAddend<ELFT>(r)
                           : ctx.target->getImplicitAddend(
                                 sec->content().data() + r.r_offset, type);
+}
+
+template <class Target, class ELFT>
+RelExpr RelocScan::scanOne(Target &target, uint32_t symIdx, Symbol &sym,
+                           uint64_t offset, RelType type) {
+  RelExpr expr = target.getRelExpr(type, sym, sec->content().data() + offset);
+  if (expr == R_NONE)
+    return R_NONE;
+  if (sym.isUndefined() && symIdx != 0 &&
+      maybeReportUndefined(cast<Undefined>(sym), offset))
+    return R_NONE;
+  return expr;
 }
 
 template <class ELFT, class RelTy>
@@ -99,8 +177,7 @@ void RelocScan::scan(typename Relocs<RelTy>::const_iterator &it, RelType type,
 
   // Ensure GOT or GOTPLT is created for relocations that reference their base
   // addresses without directly creating entries.
-  if (oneof<R_GOTPLTONLY_PC, R_GOTPLTREL, R_GOTPLT, R_PLT_GOTPLT,
-            R_TLSDESC_GOTPLT, R_TLSGD_GOTPLT>(expr)) {
+  if (oneof<R_GOTPLTREL, R_GOTPLT, R_TLSGD_GOTPLT>(expr)) {
     ctx.in.gotPlt->hasGotPltOffRel.store(true, std::memory_order_relaxed);
   } else if (oneof<R_GOTONLY_PC, R_GOTREL, RE_PPC32_PLTREL>(expr)) {
     ctx.in.got->hasGotOffRel.store(true, std::memory_order_relaxed);

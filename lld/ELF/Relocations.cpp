@@ -1310,7 +1310,7 @@ unsigned RelocScan::handleTlsRelocation(RelExpr expr, RelType type,
       sec->addReloc({R_RELAX_TLS_IE_TO_LE, type, offset, addend, &sym});
     } else if (expr != R_TLSIE_HINT) {
       sym.setFlags(NEEDS_TLSIE);
-      // R_GOT needs a relative relocation for PIC on i386 and Hexagon.
+      // R_GOT needs a relative relocation for PIC on Hexagon.
       if (expr == R_GOT && ctx.arg.isPic &&
           !ctx.target->usesOnlyLowPageBits(type))
         addRelativeReloc<true>(ctx, *sec, offset, sym, addend, expr, type);

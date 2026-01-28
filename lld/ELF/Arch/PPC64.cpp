@@ -1311,11 +1311,8 @@ void PPC64::scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels) {
     uint32_t symIdx = rel.getSymbol(false);
     Symbol &sym = sec.getFile<ELFT>()->getSymbol(symIdx);
     RelType type = rel.getType(false);
-    RelExpr expr = getRelExpr(type, sym, sec.content().data() + offset);
+    RelExpr expr = rs.scanOne<PPC64, ELFT>(*this, symIdx, sym, offset, type);
     if (expr == R_NONE)
-      continue;
-    if (sym.isUndefined() && symIdx != 0 &&
-        rs.maybeReportUndefined(cast<Undefined>(sym), offset))
       continue;
 
     auto addend = getAddend<ELFT>(rel);

@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "OutputSections.h"
+#include "RelocScan.h"
 #include "Relocations.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
@@ -27,9 +28,8 @@ namespace {
 class X86_64 : public TargetInfo {
 public:
   X86_64(Ctx &);
-  int getTlsGdRelaxSkip(RelType type) const override;
   RelExpr getRelExpr(RelType type, const Symbol &s,
-                     const uint8_t *loc) const override;
+                     const uint8_t *loc) const final;
   RelType getDynRel(RelType type) const override;
   void writeGotPltHeader(uint8_t *buf) const override;
   void writeGotPlt(uint8_t *buf, const Symbol &s) const override;
@@ -51,6 +51,9 @@ public:
                              InputSection *nextIS) const override;
   bool relaxOnce(int pass) const override;
   void applyBranchToBranchOpt() const override;
+  template <class ELFT, class RelTy>
+  void scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels);
+  void scanSection(InputSectionBase &sec) override;
 
 private:
   void relaxTlsGdToLe(uint8_t *loc, const Relocation &rel, uint64_t val) const;
@@ -96,15 +99,6 @@ X86_64::X86_64(Ctx &ctx) : TargetInfo(ctx) {
   // Align to the large page size (known as a superpage or huge page).
   // FreeBSD automatically promotes large, superpage-aligned allocations.
   defaultImageBase = 0x200000;
-}
-
-int X86_64::getTlsGdRelaxSkip(RelType type) const {
-  // TLSDESC relocations are processed separately. See relaxTlsGdToLe below.
-  return type == R_X86_64_GOTPC32_TLSDESC ||
-                 type == R_X86_64_CODE_4_GOTPC32_TLSDESC ||
-                 type == R_X86_64_TLSDESC_CALL
-             ? 1
-             : 2;
 }
 
 // Opcodes for the different X86_64 jmp instructions.
@@ -558,11 +552,6 @@ void X86_64::relaxTlsGdToIe(uint8_t *loc, const Relocation &rel,
     }
     loc[-2] = 0x8b;
     write32le(loc, val);
-  } else {
-    // Convert call *x@tlsdesc(%rax) to xchg ax, ax.
-    assert(rel.type == R_X86_64_TLSDESC_CALL);
-    loc[0] = 0x66;
-    loc[1] = 0x90;
   }
 }
 
@@ -915,9 +904,9 @@ void X86_64::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   case R_X86_64_CODE_4_GOTPC32_TLSDESC:
   case R_X86_64_TLSDESC_CALL:
   case R_X86_64_TLSGD:
-    if (rel.expr == R_RELAX_TLS_GD_TO_LE) {
+    if (rel.expr == R_TPREL) {
       relaxTlsGdToLe(loc, rel, val);
-    } else if (rel.expr == R_RELAX_TLS_GD_TO_IE) {
+    } else if (rel.expr == R_GOT_PC) {
       relaxTlsGdToIe(loc, rel, val);
     } else {
       checkInt(ctx, loc, val, 32, rel);
@@ -925,7 +914,7 @@ void X86_64::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
     }
     break;
   case R_X86_64_TLSLD:
-    if (rel.expr == R_RELAX_TLS_LD_TO_LE) {
+    if (rel.expr == R_TPREL) {
       relaxTlsLdToLe(loc, rel, val);
     } else {
       checkInt(ctx, loc, val, 32, rel);
@@ -935,7 +924,7 @@ void X86_64::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   case R_X86_64_GOTTPOFF:
   case R_X86_64_CODE_4_GOTTPOFF:
   case R_X86_64_CODE_6_GOTTPOFF:
-    if (rel.expr == R_RELAX_TLS_IE_TO_LE) {
+    if (rel.expr == R_TPREL) {
       relaxTlsIeToLe(loc, rel, val);
     } else {
       checkInt(ctx, loc, val, 32, rel);
@@ -1394,6 +1383,90 @@ void RetpolineZNow::writePlt(uint8_t *buf, const Symbol &sym,
 
   write32le(buf + 3, sym.getGotPltVA(ctx) - pltEntryAddr - 7);
   write32le(buf + 8, ctx.in.plt->getVA() - pltEntryAddr - 12);
+}
+
+template <class ELFT, class RelTy>
+void X86_64::scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels) {
+  RelocScan rs(ctx, &sec);
+  sec.relocations.reserve(rels.size());
+  bool isShared = ctx.arg.shared;
+
+  for (auto it = rels.begin(); it != rels.end(); ++it) {
+    const RelTy &rel = *it;
+    uint32_t symIdx = rel.getSymbol(false);
+    Symbol &sym = sec.getFile<ELFT>()->getSymbol(symIdx);
+    uint64_t offset = rel.r_offset;
+    RelType type = rel.getType(false);
+    RelExpr expr = getRelExpr(type, sym, sec.content().data() + offset);
+    if (sym.isUndefined() && symIdx != 0 &&
+        rs.maybeReportUndefined(cast<Undefined>(sym), offset))
+      continue;
+    int64_t addend = rs.getAddend<ELFT>(rel, type);
+    switch (type) {
+    case R_X86_64_NONE:
+      continue;
+
+      // .got.plt related relocations:
+    case R_X86_64_GOTPC32:
+    case R_X86_64_GOTPC64:
+    case R_X86_64_GOTOFF64:
+    case R_X86_64_GOT32:
+    case R_X86_64_GOT64:
+    case R_X86_64_PLTOFF64:
+      ctx.in.gotPlt->hasGotPltOffRel.store(true, std::memory_order_relaxed);
+      break;
+
+      // TLS relocations (LE, IE, GD, LD, TLSDESC):
+    case R_X86_64_TPOFF32:
+    case R_X86_64_TPOFF64:
+      if (rs.checkTlsLe(offset, sym, type))
+        continue;
+      break;
+    case R_X86_64_GOTTPOFF:
+    case R_X86_64_CODE_4_GOTTPOFF:
+    case R_X86_64_CODE_6_GOTTPOFF:
+      rs.handleTlsIe(R_GOT_PC, type, offset, addend, sym, isShared);
+      continue;
+    case R_X86_64_TLSGD:
+      if (rs.handleTlsGd(R_TLSGD_PC, R_GOT_PC, R_TPREL, type, offset, addend,
+                         sym, isShared))
+        ++it;
+      continue;
+    case R_X86_64_TLSLD:
+      if (rs.handleTlsLd(R_TLSLD_PC, type, offset, addend, sym, isShared))
+        ++it;
+      continue;
+    case R_X86_64_DTPOFF32:
+    case R_X86_64_DTPOFF64:
+      sec.addReloc({isShared ? R_DTPREL : R_TPREL, type, offset, addend, &sym});
+      continue;
+    case R_X86_64_TLSDESC_CALL:
+      // For executables, TLSDESC is optimized to IE or LE. Use R_TPREL as the
+      // rewrites for this relocation are identical.
+      if (!isShared)
+        sec.addReloc({R_TPREL, type, offset, addend, &sym});
+      continue;
+    case R_X86_64_GOTPC32_TLSDESC:
+    case R_X86_64_CODE_4_GOTPC32_TLSDESC:
+      rs.handleTlsDesc(R_TLSDESC_PC, R_GOT_PC, type, offset, addend, sym,
+                       isShared);
+      continue;
+    default:
+      break;
+    }
+    rs.process(expr, type, offset, sym, addend);
+  }
+
+  if (ctx.arg.branchToBranch)
+    llvm::stable_sort(sec.relocs(),
+                      [](auto &l, auto &r) { return l.offset < r.offset; });
+}
+
+void X86_64::scanSection(InputSectionBase &sec) {
+  if (ctx.arg.is64)
+    elf::scanSection1<X86_64, ELF64LE>(*this, sec);
+  else // ilp32
+    elf::scanSection1<X86_64, ELF32LE>(*this, sec);
 }
 
 void elf::setX86_64TargetInfo(Ctx &ctx) {

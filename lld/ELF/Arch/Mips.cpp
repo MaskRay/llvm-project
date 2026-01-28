@@ -632,11 +632,9 @@ void MIPS<ELFT>::scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels) {
 
     uint32_t symIdx = rel.getSymbol(ctx.arg.isMips64EL);
     Symbol &sym = sec.getFile<ELFT>()->getSymbol(symIdx);
-    RelExpr expr = getRelExpr(type, sym, sec.content().data() + rel.r_offset);
+    RelExpr expr =
+        rs.scanOne<MIPS<ELFT>, ELFT>(*this, symIdx, sym, offset, type);
     if (expr == R_NONE)
-      continue;
-    if (sym.isUndefined() && symIdx != 0 &&
-        rs.maybeReportUndefined(cast<Undefined>(sym), offset))
       continue;
 
     auto addend = rs.getAddend<ELFT>(rel, type);

@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "OutputSections.h"
+#include "RelocScan.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
 #include "Target.h"
@@ -22,9 +23,8 @@ namespace {
 class X86 : public TargetInfo {
 public:
   X86(Ctx &);
-  int getTlsGdRelaxSkip(RelType type) const override;
   RelExpr getRelExpr(RelType type, const Symbol &s,
-                     const uint8_t *loc) const override;
+                     const uint8_t *loc) const final;
   int64_t getImplicitAddend(const uint8_t *buf, RelType type) const override;
   void writeGotPltHeader(uint8_t *buf) const override;
   RelType getDynRel(RelType type) const override;
@@ -35,8 +35,9 @@ public:
                 uint64_t pltEntryAddr) const override;
   void relocate(uint8_t *loc, const Relocation &rel,
                 uint64_t val) const override;
-
-  RelExpr adjustTlsExpr(RelType type, RelExpr expr) const override;
+  template <class ELFT, class RelTy>
+  void scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels);
+  void scanSection(InputSectionBase &sec) override;
   void relocateAlloc(InputSection &sec, uint8_t *buf) const override;
 
 private:
@@ -67,11 +68,6 @@ X86::X86(Ctx &ctx) : TargetInfo(ctx) {
   // Align to the non-PAE large page size (known as a superpage or huge page).
   // FreeBSD automatically promotes large, superpage-aligned allocations.
   defaultImageBase = 0x400000;
-}
-
-int X86::getTlsGdRelaxSkip(RelType type) const {
-  // TLSDESC relocations are processed separately. See relaxTlsGdToLe below.
-  return type == R_386_TLS_GOTDESC || type == R_386_TLS_DESC_CALL ? 1 : 2;
 }
 
 RelExpr X86::getRelExpr(RelType type, const Symbol &s,
@@ -153,18 +149,6 @@ RelExpr X86::getRelExpr(RelType type, const Symbol &s,
     Err(ctx) << getErrorLoc(ctx, loc) << "unknown relocation (" << type.v
              << ") against symbol " << &s;
     return R_NONE;
-  }
-}
-
-RelExpr X86::adjustTlsExpr(RelType type, RelExpr expr) const {
-  switch (expr) {
-  default:
-    return expr;
-  case R_RELAX_TLS_GD_TO_IE:
-    return R_RELAX_TLS_GD_TO_IE_GOTPLT;
-  case R_RELAX_TLS_GD_TO_LE:
-    return type == R_386_TLS_GD ? R_RELAX_TLS_GD_TO_LE_NEG
-                                : R_RELAX_TLS_GD_TO_LE;
   }
 }
 
@@ -411,11 +395,6 @@ void X86::relaxTlsGdToIe(uint8_t *loc, const Relocation &rel,
     }
     loc[-2] = 0x8b;
     write32le(loc, val);
-  } else {
-    // Convert call *x@tlsdesc(%eax) to xchg ax, ax.
-    assert(rel.type == R_386_TLS_DESC_CALL);
-    loc[0] = 0x66;
-    loc[1] = 0x90;
   }
 }
 
@@ -497,25 +476,131 @@ void X86::relocateAlloc(InputSection &sec, uint8_t *buf) const {
     uint8_t *loc = buf + rel.offset;
     const uint64_t val =
         SignExtend64(sec.getRelocTargetVA(ctx, rel, secAddr + rel.offset), 32);
-    switch (rel.expr) {
-    case R_RELAX_TLS_GD_TO_IE_GOTPLT:
-      relaxTlsGdToIe(loc, rel, val);
+    switch (rel.type) {
+    case R_386_TLS_GD:
+    case R_386_TLS_GOTDESC:
+    case R_386_TLS_DESC_CALL:
+      if (rel.expr == R_TPREL || rel.expr == R_TPREL_NEG)
+        relaxTlsGdToLe(loc, rel, val);
+      else if (rel.expr == R_GOTPLT)
+        relaxTlsGdToIe(loc, rel, val);
+      else
+        relocate(loc, rel, val);
       continue;
-    case R_RELAX_TLS_GD_TO_LE:
-    case R_RELAX_TLS_GD_TO_LE_NEG:
-      relaxTlsGdToLe(loc, rel, val);
+    case R_386_TLS_LDM:
+    case R_386_TLS_LDO_32:
+      if (rel.expr == R_TPREL)
+        relaxTlsLdToLe(loc, rel, val);
+      else
+        relocate(loc, rel, val);
       continue;
-    case R_RELAX_TLS_LD_TO_LE:
-      relaxTlsLdToLe(loc, rel, val);
-      break;
-    case R_RELAX_TLS_IE_TO_LE:
-      relaxTlsIeToLe(loc, rel, val);
+    case R_386_TLS_IE:
+    case R_386_TLS_GOTIE:
+      if (rel.expr == R_TPREL)
+        relaxTlsIeToLe(loc, rel, val);
+      else
+        relocate(loc, rel, val);
       continue;
     default:
       relocate(loc, rel, val);
       break;
     }
   }
+}
+
+template <class ELFT, class RelTy>
+void X86::scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels) {
+  RelocScan rs(ctx, &sec);
+  sec.relocations.reserve(rels.size());
+  bool isShared = ctx.arg.shared;
+
+  for (auto it = rels.begin(); it != rels.end(); ++it) {
+    const RelTy &rel = *it;
+    uint32_t symIdx = rel.getSymbol(false);
+    Symbol &sym = sec.getFile<ELFT>()->getSymbol(symIdx);
+    uint64_t offset = rel.r_offset;
+    RelType type = rel.getType(false);
+    RelExpr expr = getRelExpr(type, sym, sec.content().data() + offset);
+    if (sym.isUndefined() && symIdx != 0 &&
+        rs.maybeReportUndefined(cast<Undefined>(sym), offset))
+      continue;
+    int64_t addend = rs.getAddend<ELFT>(rel, type);
+    switch (type) {
+    case R_386_NONE:
+      continue;
+
+      // .got.plt related relocations:
+    case R_386_GOTPC:
+    case R_386_GOTOFF:
+      ctx.in.gotPlt->hasGotPltOffRel.store(true, std::memory_order_relaxed);
+      break;
+    case R_386_GOT32:
+    case R_386_GOT32X:
+      // These relocations return R_GOT or R_GOTPLT depending on instruction
+      // encoding (see getRelExpr). Set hasGotPltOffRel for R_GOTPLT.
+      if (expr == R_GOTPLT)
+        ctx.in.gotPlt->hasGotPltOffRel.store(true, std::memory_order_relaxed);
+      break;
+
+      // TLS relocations (LE, IE, GD, LD, TLSDESC):
+    case R_386_TLS_LE:
+    case R_386_TLS_LE_32:
+      if (rs.checkTlsLe(offset, sym, type))
+        continue;
+      break;
+    case R_386_TLS_IE:
+      ctx.hasTlsIe.store(true, std::memory_order_relaxed);
+      if (!isShared && !sym.isPreemptible) {
+        sec.addReloc({R_TPREL, type, offset, addend, &sym});
+      } else {
+        sym.setFlags(NEEDS_TLSIE);
+        // In PIC, the absolute GOT address needs a RELATIVE dynamic relocation.
+        if (ctx.arg.isPic)
+          sec.getPartition(ctx).relaDyn->addRelativeReloc(
+              ctx.target->relativeRel, sec, offset, sym, addend, type, R_GOT);
+        else
+          sec.addReloc({R_GOT, type, offset, addend, &sym});
+      }
+      continue;
+    case R_386_TLS_GOTIE:
+      ctx.in.gotPlt->hasGotPltOffRel.store(true, std::memory_order_relaxed);
+      rs.handleTlsIe(R_GOTPLT, type, offset, addend, sym, isShared);
+      continue;
+    case R_386_TLS_GD:
+      ctx.in.gotPlt->hasGotPltOffRel.store(true, std::memory_order_relaxed);
+      // Use R_TPREL_NEG for R_386_TLS_GD (negative TP offset).
+      if (rs.handleTlsGd(R_TLSGD_GOTPLT, R_GOTPLT, R_TPREL_NEG, type, offset,
+                         addend, sym, isShared))
+        ++it;
+      continue;
+    case R_386_TLS_LDM:
+      ctx.in.gotPlt->hasGotPltOffRel.store(true, std::memory_order_relaxed);
+      if (rs.handleTlsLd(R_TLSLD_GOTPLT, type, offset, addend, sym, isShared))
+        ++it;
+      continue;
+    case R_386_TLS_LDO_32:
+      sec.addReloc({isShared ? R_DTPREL : R_TPREL, type, offset, addend, &sym});
+      continue;
+    case R_386_TLS_GOTDESC:
+      ctx.in.gotPlt->hasGotPltOffRel.store(true, std::memory_order_relaxed);
+      rs.handleTlsDesc(R_TLSDESC_GOTPLT, R_GOTPLT, type, offset, addend, sym,
+                       isShared);
+      continue;
+    case R_386_TLS_DESC_CALL:
+      // For executables, TLSDESC is optimized to IE or LE. Use R_TPREL as the
+      // rewrites for this relocation are identical.
+      if (!isShared)
+        sec.addReloc({R_TPREL, type, offset, addend, &sym});
+      continue;
+    default:
+      break;
+    }
+    rs.process(expr, type, offset, sym, addend);
+  }
+}
+
+void X86::scanSection(InputSectionBase &sec) {
+  elf::scanSection1<X86, ELF32LE>(*this, sec);
 }
 
 // If Intel Indirect Branch Tracking is enabled, we have to emit special PLT
