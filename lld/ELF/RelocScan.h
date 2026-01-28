@@ -60,6 +60,11 @@ public:
 
   template <class ELFT, class RelTy>
   int64_t getAddend(const RelTy &r, RelType type);
+  // Call target.getRelExpr and check for R_NONE/undefined. Returns R_NONE if
+  // the relocation should be skipped.
+  template <class Target, class ELFT>
+  RelExpr scanOne(Target &target, uint32_t symIdx, Symbol &sym, uint64_t offset,
+                  RelType type);
   bool maybeReportUndefined(Undefined &sym, uint64_t offset);
   bool checkTlsLe(uint64_t offset, Symbol &sym, RelType type);
   bool isStaticLinkTimeConstant(RelExpr e, RelType type, const Symbol &sym,
@@ -75,6 +80,18 @@ int64_t RelocScan::getAddend(const RelTy &r, RelType type) {
   return RelTy::HasAddend ? elf::getAddend<ELFT>(r)
                           : ctx.target->getImplicitAddend(
                                 sec->content().data() + r.r_offset, type);
+}
+
+template <class Target, class ELFT>
+RelExpr RelocScan::scanOne(Target &target, uint32_t symIdx, Symbol &sym,
+                           uint64_t offset, RelType type) {
+  RelExpr expr = target.getRelExpr(type, sym, sec->content().data() + offset);
+  if (expr == R_NONE)
+    return R_NONE;
+  if (sym.isUndefined() && symIdx != 0 &&
+      maybeReportUndefined(cast<Undefined>(sym), offset))
+    return R_NONE;
+  return expr;
 }
 
 template <class ELFT, class RelTy>
