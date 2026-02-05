@@ -1354,7 +1354,7 @@ runThinLTOBackend(CompilerInstance &CI, ModuleSummaryIndex *CombinedIndex,
   Conf.CGOptLevel = *OptLevelOrNone;
   Conf.OptLevel = CGOpts.OptimizationLevel;
   // llvm::codegen::RegisterCodeGenFlags F;
-  Conf.ModifyTargetOptions = [&](llvm::TargetOptions &TargetOpts)->void {
+  Conf.ModifyTargetOptions = [&](llvm::TargetOptions &TargetOpts) -> void {
     initTargetOptions(CI, Diags, TargetOpts);
   };
   Conf.SampleProfile = std::move(SampleProfile);
