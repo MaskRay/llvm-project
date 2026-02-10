@@ -1637,7 +1637,8 @@ public:
       const FunctionImporter::ImportMapTy &ImportList,
       const FunctionImporter::ExportSetTy &ExportList,
       const std::map<GlobalValue::GUID, GlobalValue::LinkageTypes> &ResolvedODR,
-      MapVector<StringRef, BitcodeModule> &ModuleMap, Triple TheTriple) override {
+      MapVector<StringRef, BitcodeModule> &ModuleMap,
+      Triple TheTriple) override {
     StringRef ModulePath = BM.getModuleIdentifier();
     assert(ModuleToDefinedGVSummaries.count(ModulePath));
     const GVSummaryMapTy &DefinedGlobals =
@@ -1705,7 +1706,8 @@ public:
       const FunctionImporter::ExportSetTy &ExportList,
       const std::map<GlobalValue::GUID, GlobalValue::LinkageTypes> &ResolvedODR,
       const GVSummaryMapTy &DefinedGlobals,
-      MapVector<StringRef, BitcodeModule> &ModuleMap, Triple TheTriple) override {
+      MapVector<StringRef, BitcodeModule> &ModuleMap,
+      Triple TheTriple) override {
     auto ModuleID = BM.getModuleIdentifier();
     llvm::TimeTraceScope timeScope("Run ThinLTO backend thread (first round)",
                                    ModuleID);
@@ -1802,7 +1804,8 @@ public:
       const FunctionImporter::ExportSetTy &ExportList,
       const std::map<GlobalValue::GUID, GlobalValue::LinkageTypes> &ResolvedODR,
       const GVSummaryMapTy &DefinedGlobals,
-      MapVector<StringRef, BitcodeModule> &ModuleMap, Triple TheTriple) override {
+      MapVector<StringRef, BitcodeModule> &ModuleMap,
+      Triple TheTriple) override {
     auto ModuleID = BM.getModuleIdentifier();
     llvm::TimeTraceScope timeScope("Run ThinLTO backend thread (second round)",
                                    ModuleID);
@@ -1919,7 +1922,8 @@ public:
       const FunctionImporter::ImportMapTy &ImportList,
       const FunctionImporter::ExportSetTy &ExportList,
       const std::map<GlobalValue::GUID, GlobalValue::LinkageTypes> &ResolvedODR,
-      MapVector<StringRef, BitcodeModule> &ModuleMap, Triple TheTriple) override {
+      MapVector<StringRef, BitcodeModule> &ModuleMap,
+      Triple TheTriple) override {
     StringRef ModulePath = BM.getModuleIdentifier();
 
     // The contents of this file may be used as input to a native link, and must
@@ -2461,7 +2465,8 @@ public:
       const FunctionImporter::ImportMapTy &ImportList,
       const FunctionImporter::ExportSetTy &ExportList,
       const std::map<GlobalValue::GUID, GlobalValue::LinkageTypes> &ResolvedODR,
-      MapVector<StringRef, BitcodeModule> &ModuleMap, class Triple TheTriple) override {
+      MapVector<StringRef, BitcodeModule> &ModuleMap,
+      class Triple TheTriple) override {
 
     StringRef ModulePath = BM.getModuleIdentifier();
 
