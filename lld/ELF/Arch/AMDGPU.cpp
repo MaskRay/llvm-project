@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "InputFiles.h"
+#include "RelocScan.h"
 #include "Symbols.h"
 #include "Target.h"
 #include "lld/Common/ErrorHandler.h"
@@ -34,6 +35,11 @@ public:
                 uint64_t val) const override;
   RelExpr getRelExpr(RelType type, const Symbol &s,
                      const uint8_t *loc) const override;
+  template <class ELFT, class RelTy>
+  void scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels);
+  void scanSection(InputSectionBase &sec) override {
+    elf::scanSection1<AMDGPU, ELF64LE>(*this, sec);
+  }
   RelType getDynRel(RelType type) const override;
   int64_t getImplicitAddend(const uint8_t *buf, RelType type) const override;
 };
@@ -176,6 +182,8 @@ void AMDGPU::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
 }
 
+// Only needed to support relocations used by relocateNonAlloc and
+// preprocessRelocs.
 RelExpr AMDGPU::getRelExpr(RelType type, const Symbol &s,
                            const uint8_t *loc) const {
   switch (type) {
@@ -188,14 +196,58 @@ RelExpr AMDGPU::getRelExpr(RelType type, const Symbol &s,
   case R_AMDGPU_REL64:
   case R_AMDGPU_REL16:
     return R_PC;
-  case R_AMDGPU_GOTPCREL:
-  case R_AMDGPU_GOTPCREL32_LO:
-  case R_AMDGPU_GOTPCREL32_HI:
-    return R_GOT_PC;
   default:
     Err(ctx) << getErrorLoc(ctx, loc) << "unknown relocation (" << type.v
              << ") against symbol " << &s;
     return R_NONE;
+  }
+}
+
+template <class ELFT, class RelTy>
+void AMDGPU::scanSectionImpl(InputSectionBase &sec, Relocs<RelTy> rels) {
+  RelocScan rs(ctx, &sec);
+  sec.relocations.reserve(rels.size());
+  for (auto it = rels.begin(); it != rels.end(); ++it) {
+    const RelTy &rel = *it;
+    uint32_t symIdx = rel.getSymbol(false);
+    Symbol &sym = sec.getFile<ELFT>()->getSymbol(symIdx);
+    uint64_t offset = rel.r_offset;
+    RelType type = rel.getType(false);
+    if (sym.isUndefined() && symIdx != 0 &&
+        rs.maybeReportUndefined(cast<Undefined>(sym), offset))
+      continue;
+    int64_t addend = rs.getAddend<ELFT>(rel, type);
+    RelExpr expr;
+    switch (type) {
+    // Absolute relocations:
+    case R_AMDGPU_ABS32:
+    case R_AMDGPU_ABS64:
+      expr = R_ABS;
+      break;
+
+    // PC-relative relocations:
+    case R_AMDGPU_REL32:
+    case R_AMDGPU_REL32_LO:
+    case R_AMDGPU_REL32_HI:
+    case R_AMDGPU_REL64:
+    case R_AMDGPU_REL16:
+      rs.processR_PC(type, offset, addend, sym);
+      continue;
+
+    // GOT-relative relocations:
+    case R_AMDGPU_GOTPCREL:
+    case R_AMDGPU_GOTPCREL32_LO:
+    case R_AMDGPU_GOTPCREL32_HI:
+      expr = R_GOT_PC;
+      break;
+
+    default:
+      Err(ctx) << getErrorLoc(ctx, sec.content().data() + offset)
+               << "unknown relocation (" << type.v << ") against symbol "
+               << &sym;
+      continue;
+    }
+    rs.process(expr, type, offset, sym, addend);
   }
 }
 
