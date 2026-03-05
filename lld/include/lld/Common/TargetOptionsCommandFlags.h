@@ -15,9 +15,11 @@
 
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Triple.h"
 #include <optional>
 
 namespace lld {
+llvm::TargetOptions initTargetOptionsFromCodeGenFlags(const llvm::Triple &TT);
 std::optional<llvm::Reloc::Model> getRelocModelFromCMModel();
 std::optional<llvm::CodeModel::Model> getCodeModelFromCMModel();
 std::string getCPUStr();

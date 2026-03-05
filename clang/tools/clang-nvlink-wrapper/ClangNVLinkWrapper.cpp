@@ -358,6 +358,9 @@ Expected<std::unique_ptr<lto::LTO>> createLTO(const ArgList &Args) {
       lto::createInProcessThinBackend(heavyweight_hardware_concurrency(Jobs));
 
   Conf.CPU = Args.getLastArgValue(OPT_arch);
+  Conf.InitTargetOptions = [](const Triple &TT) {
+    return codegen::InitTargetOptionsFromCodeGenFlags(TT);
+  };
   Conf.RemarksFilename =
       Args.getLastArgValue(OPT_opt_remarks_filename, RemarksFilename);
   Conf.RemarksPasses =

@@ -41,7 +41,7 @@ static lto::Config createConfig() {
 
   bool emitAddrsig = config->icfLevel == ICFLevel::safe;
   c.InitTargetOptions = [emitAddrsig](const Triple &TT) {
-    TargetOptions options = codegen::InitTargetOptionsFromCodeGenFlags(TT);
+    TargetOptions options = initTargetOptionsFromCodeGenFlags(TT);
     options.EmitAddrsig = emitAddrsig;
     return options;
   };

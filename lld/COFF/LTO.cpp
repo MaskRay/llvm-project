@@ -20,7 +20,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/DTLTO/DTLTO.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/LTO/Config.h"
@@ -49,7 +48,7 @@ lto::Config BitcodeCompiler::createConfig() {
   lto::Config c;
   bool emitAsm = ctx.config.emit == EmitKind::ASM;
   c.InitTargetOptions = [emitAsm](const Triple &TT) {
-    TargetOptions options = codegen::InitTargetOptionsFromCodeGenFlags(TT);
+    TargetOptions options = initTargetOptionsFromCodeGenFlags(TT);
     options.EmitAddrsig = true;
     // Always emit a section per function/datum with LTO. LLVM LTO should get
     // most of the benefit of linker GC, but there are still opportunities for

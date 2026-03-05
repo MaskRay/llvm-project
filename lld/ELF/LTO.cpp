@@ -43,7 +43,7 @@ static std::string getThinLTOOutputFile(Ctx &ctx, StringRef modulePath) {
                                    ctx.arg.thinLTOPrefixReplaceNew);
 }
 
-static std::shared_ptr<MemoryBuffer> getBBSectionsMemoryBuffer(Ctx &ctx) {
+static std::unique_ptr<MemoryBuffer> getBBSectionsMemoryBuffer(Ctx &ctx) {
   if (ctx.arg.ltoBasicBlockSections.empty() ||
       ctx.arg.ltoBasicBlockSections == "all" ||
       ctx.arg.ltoBasicBlockSections == "none")
@@ -59,8 +59,9 @@ static std::shared_ptr<MemoryBuffer> getBBSectionsMemoryBuffer(Ctx &ctx) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> mbOrErr =
       MemoryBuffer::getFile(ctx.arg.ltoBasicBlockSections.str());
   if (!mbOrErr) {
-    ErrAlways(ctx) << "cannot open " << ctx.arg.ltoBasicBlockSections << ":"
-                   << mbOrErr.getError().message();
+    Err(ctx) << "cannot open " << ctx.arg.ltoBasicBlockSections << ": "
+             << mbOrErr.getError().message();
+    return nullptr;
   }
   return std::move(*mbOrErr);
 }
@@ -72,7 +73,7 @@ static lto::Config createConfig(Ctx &ctx) {
   // Set up the callback to modify TargetOptions.
   c.InitTargetOptions =
       [&ctx, mb = std::move(mbPtr)](const Triple &TT) -> TargetOptions {
-    TargetOptions options = codegen::InitTargetOptionsFromCodeGenFlags(TT);
+    TargetOptions options = initTargetOptionsFromCodeGenFlags(TT);
     // LLD supports the new relocations and address-significance tables.
     options.EmitAddrsig = true;
     // Always emit a section per function/datum with LTO.
@@ -100,9 +101,8 @@ static lto::Config createConfig(Ctx &ctx) {
 
     options.UniqueBasicBlockSectionNames =
         ctx.arg.ltoUniqueBasicBlockSectionNames;
-    if (ctx.arg.ltoEmitAsm) {
+    if (ctx.arg.ltoEmitAsm)
       options.MCOptions.AsmVerbose = true;
-    }
     return options;
   };
 
