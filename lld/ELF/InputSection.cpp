@@ -1353,12 +1353,6 @@ template <class ELFT> void InputSection::writeTo(Ctx &ctx, uint8_t *buf) {
   relocate<ELFT>(ctx, buf, buf + content().size());
 }
 
-void InputSection::replace(InputSection *other) {
-  addralign = std::max(addralign, other->addralign);
-
-  other->repl = repl;
-  other->markDead();
-}
 
 template <class ELFT>
 EhInputSection::EhInputSection(ObjFile<ELFT> &f,
