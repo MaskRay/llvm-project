@@ -1353,22 +1353,6 @@ template <class ELFT> void InputSection::writeTo(Ctx &ctx, uint8_t *buf) {
   relocate<ELFT>(ctx, buf, buf + content().size());
 }
 
-void InputSection::replace(InputSection *other) {
-  addralign = std::max(addralign, other->addralign);
-
-  // When a section is replaced with another section that was allocated to
-  // another partition, the replacement section (and its associated sections)
-  // need to be placed in the main partition so that both partitions will be
-  // able to access it.
-  if (partition != other->partition) {
-    partition = 1;
-    for (InputSection *isec : dependentSections)
-      isec->partition = 1;
-  }
-
-  other->repl = repl;
-  other->markDead();
-}
 
 template <class ELFT>
 EhInputSection::EhInputSection(ObjFile<ELFT> &f,

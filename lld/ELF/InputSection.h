@@ -288,6 +288,10 @@ public:
     size_t compressedSize;
   };
 
+  // Index of this section in ctx.inputSections. Assigned after the section
+  // list is finalized and used by ICF's side table for equivalence classes.
+  uint32_t secIdx = 0;
+
   // A function compiled with -fsplit-stack calling a function
   // compiled without -fsplit-stack needs its prologue adjusted. Find
   // such functions and adjust their prologues.  This is very similar
@@ -456,15 +460,6 @@ public:
   void relocateNonAlloc(Ctx &, uint8_t *buf, Relocs<RelTy> rels);
   template <class ELFT> void relocate(Ctx &, uint8_t *buf, uint8_t *bufEnd);
 
-  // Points to the canonical section. If ICF folds two sections, repl pointer of
-  // one section points to the other.
-  InputSection *repl = this;
-
-  // Used by ICF.
-  uint32_t eqClass[2] = {0, 0};
-
-  // Called by ICF to merge two input sections.
-  void replace(InputSection *other);
 
   static InputSection discarded;
 
@@ -498,7 +493,7 @@ public:
 };
 
 #ifndef _WIN32
-static_assert(sizeof(InputSection) <= 152, "InputSection is too big");
+static_assert(sizeof(InputSection) <= 144, "InputSection is too big");
 #endif
 
 class SyntheticSection : public InputSection {

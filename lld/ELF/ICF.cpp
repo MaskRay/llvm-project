@@ -120,41 +120,23 @@ private:
 
   void parallelForEachClass(llvm::function_ref<void(size_t, size_t)> fn);
 
+  template <class RelTy>
+  void combineRelocHashes(InputSection *isec, Relocs<RelTy> rels);
+
   Ctx &ctx;
   SmallVector<InputSection *, 0> sections;
+
+  // Side table for equivalence classes, indexed by secIdx.
+  // Double-buffered: segregate/combineRelocHashes read from eqClass and
+  // write to nextEqClass, then the two are swapped after each iteration.
+  std::vector<uint32_t> eqClass;
+  std::vector<uint32_t> nextEqClass;
 
   // We repeat the main loop while `Repeat` is true.
   std::atomic<bool> repeat;
 
   // The main loop counter.
   int cnt = 0;
-
-  // We have two locations for equivalence classes. On the first iteration
-  // of the main loop, Class[0] has a valid value, and Class[1] contains
-  // garbage. We read equivalence classes from slot 0 and write to slot 1.
-  // So, Class[0] represents the current class, and Class[1] represents
-  // the next class. On each iteration, we switch their roles and use them
-  // alternately.
-  //
-  // Why are we doing this? Recall that other threads may be working on
-  // other equivalence classes in parallel. They may read sections that we
-  // are updating. We cannot update equivalence classes in place because
-  // it breaks the invariance that all possibly-identical sections must be
-  // in the same equivalence class at any moment. In other words, the for
-  // loop to update equivalence classes is not atomic, and that is
-  // observable from other threads. By writing new classes to other
-  // places, we can keep the invariance.
-  //
-  // Below, `Current` has the index of the current class, and `Next` has
-  // the index of the next class. If threading is enabled, they are either
-  // (0, 1) or (1, 0).
-  //
-  // Note on single-thread: if that's the case, they are always (0, 0)
-  // because we can safely read the next class without worrying about race
-  // conditions. Using the same location makes this algorithm converge
-  // faster because it uses results of the same iteration earlier.
-  int current = 0;
-  int next = 0;
 };
 }
 
@@ -223,7 +205,7 @@ void ICF<ELFT>::segregate(size_t begin, size_t end, uint32_t eqClassBase,
     // the equivalence class ID because every group ends with a unique index.
     // Add this to eqClassBase to avoid equality with unique IDs.
     for (size_t i = begin; i < mid; ++i)
-      sections[i]->eqClass[next] = eqClassBase + mid;
+      nextEqClass[sections[i]->secIdx] = eqClassBase + mid;
 
     // If we created a group, we need to iterate the main loop again.
     if (mid != end)
@@ -363,9 +345,9 @@ bool ICF<ELFT>::variableEq(const InputSection *secA, Relocs<RelTy> ra,
 
     // Sections that are in the special equivalence class 0, can never be the
     // same in terms of the equivalence class.
-    if (x->eqClass[current] == 0)
+    if (eqClass[x->secIdx] == 0)
       return false;
-    if (x->eqClass[current] != y->eqClass[current])
+    if (eqClass[x->secIdx] != eqClass[y->secIdx])
       return false;
   };
 
@@ -385,9 +367,9 @@ bool ICF<ELFT>::equalsVariable(const InputSection *a, const InputSection *b) {
 }
 
 template <class ELFT> size_t ICF<ELFT>::findBoundary(size_t begin, size_t end) {
-  uint32_t eqClass = sections[begin]->eqClass[current];
+  uint32_t eq = eqClass[sections[begin]->secIdx];
   for (size_t i = begin + 1; i < end; ++i)
-    if (eqClass != sections[i]->eqClass[current])
+    if (eq != eqClass[sections[i]->secIdx])
       return i;
   return end;
 }
@@ -416,12 +398,10 @@ void ICF<ELFT>::parallelForEachClass(
   // too small to use threading, call Fn sequentially.
   if (parallel::strategy.ThreadsRequested == 1 || sections.size() < 1024) {
     forEachClassRange(0, sections.size(), fn);
+    std::swap(eqClass, nextEqClass);
     ++cnt;
     return;
   }
-
-  current = cnt % 2;
-  next = (cnt + 1) % 2;
 
   // Shard into non-overlapping intervals, and call Fn in parallel.
   // The sharding must be completed before any calls to Fn are made
@@ -441,23 +421,24 @@ void ICF<ELFT>::parallelForEachClass(
     if (boundaries[i - 1] < boundaries[i])
       forEachClassRange(boundaries[i - 1], boundaries[i], fn);
   });
+  std::swap(eqClass, nextEqClass);
   ++cnt;
 }
 
 // Combine the hashes of the sections referenced by the given section into its
 // hash.
+template <class ELFT>
 template <class RelTy>
-static void combineRelocHashes(unsigned cnt, InputSection *isec,
-                               Relocs<RelTy> rels) {
-  uint32_t hash = isec->eqClass[cnt % 2];
+void ICF<ELFT>::combineRelocHashes(InputSection *isec, Relocs<RelTy> rels) {
+  uint32_t hash = eqClass[isec->secIdx];
   for (RelTy rel : rels) {
     Symbol &s = isec->file->getRelocTargetSym(rel);
     if (auto *d = dyn_cast<Defined>(&s))
       if (auto *relSec = dyn_cast_or_null<InputSection>(d->section))
-        hash += relSec->eqClass[cnt % 2];
+        hash += eqClass[relSec->secIdx];
   }
   // Set MSB to 1 to avoid collisions with unique IDs.
-  isec->eqClass[(cnt + 1) % 2] = hash | (1U << 31);
+  nextEqClass[isec->secIdx] = hash | (1U << 31);
 }
 
 // The main function of ICF.
@@ -470,28 +451,34 @@ template <class ELFT> void ICF<ELFT>::run() {
   //
   // If two .gcc_except_table have identical semantics (usually identical
   // content with PC-relative encoding), we will lose folding opportunity.
+  // Allocate side table for equivalence classes, indexed by secIdx.
+  size_t numSections = ctx.inputSections.size();
+  eqClass.assign(numSections, 0);
+  nextEqClass.assign(numSections, 0);
+
   uint32_t uniqueId = 0;
   for (Partition &part : ctx.partitions)
-    part.ehFrame->iterateFDEWithLSDA<ELFT>(
-        [&](InputSection &s) { s.eqClass[0] = s.eqClass[1] = ++uniqueId; });
+    part.ehFrame->iterateFDEWithLSDA<ELFT>([&](InputSection &s) {
+      eqClass[s.secIdx] = nextEqClass[s.secIdx] = ++uniqueId;
+    });
 
   // Collect sections to merge.
   for (InputSectionBase *sec : ctx.inputSections) {
     auto *s = dyn_cast<InputSection>(sec);
-    if (s && s->eqClass[0] == 0) {
+    if (s && eqClass[s->secIdx] == 0) {
       if (isEligible(s))
         sections.push_back(s);
       else
         // Ineligible sections are assigned unique IDs, i.e. each section
         // belongs to an equivalence class of its own.
-        s->eqClass[0] = s->eqClass[1] = ++uniqueId;
+        eqClass[s->secIdx] = nextEqClass[s->secIdx] = ++uniqueId;
     }
   }
 
   // Initially, we use hash values to partition sections.
   parallelForEach(sections, [&](InputSection *s) {
     // Set MSB to 1 to avoid collisions with unique IDs.
-    s->eqClass[0] = xxh3_64bits(s->content()) | (1U << 31);
+    eqClass[s->secIdx] = xxh3_64bits(s->content()) | (1U << 31);
   });
 
   // Perform 2 rounds of relocation hash propagation. 2 is an empirical value to
@@ -501,19 +488,21 @@ template <class ELFT> void ICF<ELFT>::run() {
     parallelForEach(sections, [&](InputSection *s) {
       const RelsOrRelas<ELFT> rels = s->template relsOrRelas<ELFT>();
       if (rels.areRelocsCrel())
-        combineRelocHashes(cnt, s, rels.crels);
+        combineRelocHashes(s, rels.crels);
       else if (rels.areRelocsRel())
-        combineRelocHashes(cnt, s, rels.rels);
+        combineRelocHashes(s, rels.rels);
       else
-        combineRelocHashes(cnt, s, rels.relas);
+        combineRelocHashes(s, rels.relas);
     });
+    std::swap(eqClass, nextEqClass);
   }
 
   // From now on, sections in Sections vector are ordered so that sections
   // in the same equivalence class are consecutive in the vector.
-  llvm::stable_sort(sections, [](const InputSection *a, const InputSection *b) {
-    return a->eqClass[0] < b->eqClass[0];
-  });
+  llvm::stable_sort(sections,
+                    [&](const InputSection *a, const InputSection *b) {
+                      return eqClass[a->secIdx] < eqClass[b->secIdx];
+                    });
 
   // Compare static contents and assign unique equivalence class IDs for each
   // static content. Use a base offset for these IDs to ensure no overlap with
@@ -543,22 +532,31 @@ template <class ELFT> void ICF<ELFT>::run() {
     print() << "selected section " << sections[begin];
     for (size_t i = begin + 1; i < end; ++i) {
       print() << "  removing identical section " << sections[i];
-      sections[begin]->replace(sections[i]);
+      InputSection *canonical = sections[begin];
+      InputSection *folded = sections[i];
+      canonical->addralign = std::max(canonical->addralign, folded->addralign);
+      if (canonical->partition != folded->partition) {
+        canonical->partition = 1;
+        for (InputSection *isec : canonical->dependentSections)
+          isec->partition = 1;
+      }
+      ctx.icfRepl[folded] = canonical;
+      folded->markDead();
 
       // At this point we know sections merged are fully identical and hence
       // we want to remove duplicate implicit dependencies such as link order
       // and relocation sections.
-      for (InputSection *isec : sections[i]->dependentSections)
+      for (InputSection *isec : folded->dependentSections)
         isec->markDead();
     }
   });
 
   // Change Defined symbol's section field to the canonical one.
-  auto fold = [](Symbol *sym) {
+  auto fold = [&](Symbol *sym) {
     if (auto *d = dyn_cast<Defined>(sym))
       if (auto *sec = dyn_cast_or_null<InputSection>(d->section))
-        if (sec->repl != d->section) {
-          d->section = sec->repl;
+        if (auto it = ctx.icfRepl.find(sec); it != ctx.icfRepl.end()) {
+          d->section = it->second;
           d->folded = true;
         }
   };

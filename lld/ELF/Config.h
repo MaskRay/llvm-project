@@ -43,6 +43,7 @@ class BitcodeFile;
 class ELFFileBase;
 class SharedFile;
 class InputSectionBase;
+class InputSection;
 class EhInputSection;
 class Defined;
 class Undefined;
@@ -677,6 +678,10 @@ struct Ctx : CommonLinkerContext {
   SmallVector<BitcodeFile *, 0> lazyBitcodeFiles;
   SmallVector<InputSectionBase *, 0> inputSections;
   SmallVector<EhInputSection *, 0> ehInputSections;
+
+  // ICF replacement map: folded section -> canonical section.
+  // Populated by doIcf, used by GDB index generation.
+  llvm::DenseMap<const InputSection *, InputSection *> icfRepl;
 
   SmallVector<SymbolAux, 0> symAux;
   // Duplicate symbol candidates.

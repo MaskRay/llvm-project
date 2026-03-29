@@ -1028,8 +1028,10 @@ void LinkerScript::addOrphanSections() {
   size_t n = 0;
   for (InputSectionBase *isec : ctx.inputSections) {
     // Process InputSection and MergeInputSection.
-    if (LLVM_LIKELY(isa<InputSection>(isec)))
+    if (LLVM_LIKELY(isa<InputSection>(isec))) {
+      isec->secIdx = n;
       ctx.inputSections[n++] = isec;
+    }
 
     if (LLVM_UNLIKELY(copyRelocs)) {
       // In -r links, SHF_LINK_ORDER sections are added while adding their

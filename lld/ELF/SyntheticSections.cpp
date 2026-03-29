@@ -3462,7 +3462,9 @@ void GdbIndexSection::writeTo(uint8_t *buf) {
   for (GdbChunk &chunk : chunks) {
     for (AddressEntry &e : chunk.addressAreas) {
       // In the case of ICF there may be duplicate address range entries.
-      const uint64_t baseAddr = e.section->repl->getVA(0);
+      auto it = ctx.icfRepl.find(e.section);
+      InputSection *sec = it != ctx.icfRepl.end() ? it->second : e.section;
+      const uint64_t baseAddr = sec->getVA(0);
       write64le(buf, baseAddr + e.lowAddress);
       write64le(buf + 8, baseAddr + e.highAddress);
       write32le(buf + 16, e.cuIndex + cuOff);
