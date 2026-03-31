@@ -1991,7 +1991,16 @@ void SymbolTableBaseSection::finalizeContents() {
     getParent()->link = sec->sectionIndex;
 
   if (this->type != SHT_DYNSYM) {
-    sortSymTabSymbols();
+    symbols.reserve(numLocals + globals.size());
+    for (auto &[_, entries] : localsByFile)
+      symbols.append(entries.begin(), entries.end());
+    symbols.append(globals.begin(), globals.end());
+    getParent()->info = numLocals + 1;
+    // Release construction-time buffers; getNumSymbols now reads from
+    // `symbols` alone.
+    decltype(localsByFile){}.swap(localsByFile);
+    decltype(globals){}.swap(globals);
+    numLocals = 0;
     return;
   }
 
@@ -2018,40 +2027,22 @@ void SymbolTableBaseSection::finalizeContents() {
   }
 }
 
-// The ELF spec requires that all local symbols precede global symbols, so we
-// sort symbol entries in this function. (For .dynsym, we don't do that because
-// symbols for dynamic linking are inherently all globals.)
-//
-// Aside from above, we put local symbols in groups starting with the STT_FILE
-// symbol. That is convenient for purpose of identifying where are local symbols
-// coming from.
-void SymbolTableBaseSection::sortSymTabSymbols() {
-  // Move all local symbols before global symbols.
-  auto e = std::stable_partition(
-      symbols.begin(), symbols.end(),
-      [](const SymbolTableEntry &s) { return s.sym->isLocal(); });
-  size_t numLocals = e - symbols.begin();
-  getParent()->info = numLocals + 1;
-
-  // We want to group the local symbols by file. For that we rebuild the local
-  // part of the symbols vector. We do not need to care about the STT_FILE
-  // symbols, they are already naturally placed first in each group. That
-  // happens because STT_FILE is always the first symbol in the object and hence
-  // precede all other local symbols we add for a file.
-  MapVector<InputFile *, SmallVector<SymbolTableEntry, 0>> arr;
-  for (const SymbolTableEntry &s : llvm::make_range(symbols.begin(), e))
-    arr[s.sym->file].push_back(s);
-
-  auto i = symbols.begin();
-  for (auto &p : arr)
-    for (SymbolTableEntry &entry : p.second)
-      *i++ = entry;
-}
-
 void SymbolTableBaseSection::addSymbol(Symbol *b) {
   // Adding a local symbol to a .dynsym is a bug.
   assert(this->type != SHT_DYNSYM || !b->isLocal());
-  symbols.push_back({b, strTabSec.addString(b->getName(), false)});
+  size_t off = strTabSec.addString(b->getName(), false);
+  if (this->type == SHT_DYNSYM) {
+    symbols.push_back({b, off});
+    return;
+  }
+  // .symtab: locals bucket by owning file (preserves file-insertion order
+  // and keeps each file's locals contiguous). Globals append flat.
+  if (b->isLocal()) {
+    localsByFile[b->file].push_back({b, off});
+    numLocals++;
+  } else {
+    globals.push_back({b, off});
+  }
 }
 
 size_t SymbolTableBaseSection::getSymbolIndex(const Symbol &sym) {

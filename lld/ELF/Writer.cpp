@@ -492,9 +492,17 @@ bool elf::includeInSymtab(Ctx &ctx, const Symbol &b) {
 // - copy eligible symbols to .symTab
 static void demoteAndCopyLocalSymbols(Ctx &ctx) {
   llvm::TimeTraceScope timeScope("Add local symbols");
-  auto symsVec =
-      std::make_unique<SmallVector<Symbol *, 0>[]>(ctx.objectFiles.size());
-  parallelFor(0, ctx.objectFiles.size(), [&](size_t i) {
+  size_t numFiles = ctx.objectFiles.size();
+  struct FileInfo {
+    SmallVector<Symbol *, 0> syms;
+    size_t strSize = 0, nStr = 0;
+    // After the serial prefix-sum pass below:
+    size_t strOff = 0, strIdx = 0;
+    SmallVector<SymbolTableEntry, 0> *bucket = nullptr;
+  };
+  auto filesInfo = std::make_unique<FileInfo[]>(numFiles);
+
+  parallelFor(0, numFiles, [&](size_t i) {
     DenseMap<SectionBase *, size_t> sectionIndexMap;
     for (Symbol *b : ctx.objectFiles[i]->getLocalSymbols()) {
       assert(b->isLocal() && "should have been caught in initializeSymbols()");
@@ -505,13 +513,65 @@ static void demoteAndCopyLocalSymbols(Ctx &ctx) {
       if (dr->section && !dr->section->isLive())
         demoteDefined(*dr, sectionIndexMap);
       else if (ctx.in.symTab && includeInSymtab(ctx, *b) &&
-               shouldKeepInSymtab(ctx, *dr))
-        symsVec[i].push_back(b);
+               shouldKeepInSymtab(ctx, *dr)) {
+        filesInfo[i].syms.push_back(b);
+        StringRef name = b->getName();
+        if (!name.empty()) {
+          filesInfo[i].strSize += name.size() + 1;
+          filesInfo[i].nStr++;
+        }
+      }
     }
   });
-  for (auto &syms : ArrayRef(symsVec.get(), ctx.objectFiles.size()))
-    for (Symbol *sym : syms)
-      ctx.in.symTab->addSymbol(sym);
+  if (!ctx.in.symTab)
+    return;
+
+  auto &symTab = *ctx.in.symTab;
+  auto &strTab = symTab.getStringTable();
+
+  // Pre-insert buckets for files with non-empty contribution. This grows the
+  // MapVector storage; subsequent operator[] on an existing key is a stable
+  // lookup, so bucket pointers captured below remain valid.
+  for (size_t i = 0; i < numFiles; ++i)
+    if (!filesInfo[i].syms.empty())
+      symTab.localBucketFor(ctx.objectFiles[i]);
+
+  // Prefix-sum per-file offsets and resize buckets.
+  size_t totalSyms = 0, totalStrSize = 0, totalNStr = 0;
+  size_t strOffBase = strTab.getSize();
+  for (size_t i = 0; i < numFiles; ++i) {
+    FileInfo &fi = filesInfo[i];
+    if (fi.syms.empty())
+      continue;
+    fi.strOff = strOffBase + totalStrSize;
+    fi.strIdx = totalNStr;
+    totalSyms += fi.syms.size();
+    totalStrSize += fi.strSize;
+    totalNStr += fi.nStr;
+    fi.bucket = &symTab.localBucketFor(ctx.objectFiles[i]);
+    fi.bucket->resize_for_overwrite(fi.bucket->size() + fi.syms.size());
+  }
+  auto strings = strTab.growStringsForWrite(totalNStr);
+  strTab.advanceSize(totalStrSize);
+
+  parallelFor(0, numFiles, [&](size_t i) {
+    FileInfo &fi = filesInfo[i];
+    if (!fi.bucket)
+      return;
+    size_t symIdx = fi.bucket->size() - fi.syms.size();
+    size_t strIdx = fi.strIdx, off = fi.strOff;
+    for (Symbol *sym : fi.syms) {
+      StringRef name = sym->getName();
+      if (name.empty()) {
+        (*fi.bucket)[symIdx++] = {sym, 0};
+      } else {
+        (*fi.bucket)[symIdx++] = {sym, off};
+        strings[strIdx++] = name;
+        off += name.size() + 1;
+      }
+    }
+  });
+  symTab.addLocalsCount(totalSyms);
 }
 
 // Create a section symbol for each output section so that we can represent
@@ -1977,11 +2037,28 @@ template <class ELFT> void Writer<ELFT>::finalizeSections() {
     llvm::TimeTraceScope timeScope("Add symbols to symtabs");
     // Now that we have defined all possible global symbols including linker-
     // synthesized ones. Visit all symbols to give the finishing touches.
-    for (Symbol *sym : ctx.symtab->getSymbols()) {
-      if (!sym->isUsedInRegularObj || !includeInSymtab(ctx, *sym))
-        continue;
+    ArrayRef<Symbol *> syms = ctx.symtab->getSymbols();
+
+    // Parallel phase: filter eligible symbols and compute binding.
+    // computeBinding reads sym fields + ctx.arg (read-only). The write to
+    // sym->binding is safe because each symbol appears exactly once.
+    auto eligible = std::make_unique<bool[]>(syms.size());
+    parallelFor(0, syms.size(), [&](size_t i) {
+      Symbol *sym = syms[i];
+      if (!sym->isUsedInRegularObj || !includeInSymtab(ctx, *sym)) {
+        eligible[i] = false;
+        return;
+      }
       if (!ctx.arg.relocatable)
         sym->binding = sym->computeBinding(ctx);
+      eligible[i] = true;
+    });
+
+    // Serial phase: add eligible symbols to tables.
+    for (size_t i = 0, e = syms.size(); i != e; ++i) {
+      if (!eligible[i])
+        continue;
+      Symbol *sym = syms[i];
       if (ctx.in.symTab)
         ctx.in.symTab->addSymbol(sym);
 

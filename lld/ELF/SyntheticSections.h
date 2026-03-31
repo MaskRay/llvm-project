@@ -415,6 +415,16 @@ public:
   size_t getSize() const override { return size; }
   bool isDynamic() const { return dynamic; }
 
+  // For parallel symtab construction: extend strings by `n` slots for
+  // parallel fill by index, and advance the output size by `delta` bytes.
+  // Offsets are pre-computed by the caller via prefix sum.
+  MutableArrayRef<StringRef> growStringsForWrite(size_t n) {
+    size_t oldSize = strings.size();
+    strings.resize_for_overwrite(oldSize + n);
+    return MutableArrayRef(strings).drop_front(oldSize);
+  }
+  void advanceSize(size_t delta) { size += delta; }
+
 private:
   const bool dynamic;
 
@@ -671,15 +681,32 @@ public:
   void finalizeContents() override;
   size_t getSize() const override { return getNumSymbols() * entsize; }
   void addSymbol(Symbol *sym);
-  unsigned getNumSymbols() const { return symbols.size() + 1; }
+  unsigned getNumSymbols() const {
+    return numLocals + globals.size() + symbols.size() + 1;
+  }
   size_t getSymbolIndex(const Symbol &sym);
   ArrayRef<SymbolTableEntry> getSymbols() const { return symbols; }
 
-protected:
-  void sortSymTabSymbols();
+  // For parallel local symbol construction: each file owns its own local
+  // bucket; finalizeContents concatenates them in insertion order.
+  StringTableSection &getStringTable() { return strTabSec; }
+  SmallVector<SymbolTableEntry, 0> &localBucketFor(InputFile *f) {
+    return localsByFile[f];
+  }
+  void addLocalsCount(size_t n) { numLocals += n; }
 
-  // A vector of symbols and their string table offsets.
+protected:
+  // Final concatenated vector: [per-file locals] + [globals]. For .dynsym,
+  // all symbols are globals and are pushed directly during addSymbol. For
+  // .symtab, populated in finalizeContents from localsByFile + globals.
   SmallVector<SymbolTableEntry, 0> symbols;
+  // .symtab only: locals bucketed by input file, preserving insertion order.
+  // Bulk-filled by demoteAndCopyLocalSymbols; appended to by addSymbol for
+  // section symbols, localized globals, and late synthetic locals.
+  llvm::MapVector<InputFile *, SmallVector<SymbolTableEntry, 0>> localsByFile;
+  // .symtab only: global symbols.
+  SmallVector<SymbolTableEntry, 0> globals;
+  size_t numLocals = 0;
 
   StringTableSection &strTabSec;
 
