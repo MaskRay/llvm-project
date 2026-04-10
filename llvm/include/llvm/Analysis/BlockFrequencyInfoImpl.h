@@ -17,6 +17,7 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/GenericCycleInfo.h"
 #include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -24,8 +25,10 @@
 #include "llvm/ADT/SparseBitVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/CodeGen/MachineSSAContext.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/SSAContext.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Support/BlockFrequency.h"
 #include "llvm/Support/BranchProbability.h"
@@ -60,13 +63,9 @@ extern LLVM_ABI llvm::cl::opt<double> IterativeBFIPrecision;
 
 class BranchProbabilityInfo;
 class Function;
-class Loop;
-class LoopInfo;
 class MachineBasicBlock;
 class MachineBranchProbabilityInfo;
 class MachineFunction;
-class MachineLoop;
-class MachineLoopInfo;
 
 namespace bfi_detail {
 
@@ -234,6 +233,13 @@ public:
 
     LoopData(LoopData *Parent, const BlockNode &Header)
       : Parent(Parent), Nodes(1, Header), BackedgeMass(1) {}
+
+    template <class It>
+    LoopData(LoopData *Parent, It FirstHeader, It LastHeader)
+        : Parent(Parent), Nodes(FirstHeader, LastHeader) {
+      NumHeaders = Nodes.size();
+      BackedgeMass.resize(NumHeaders);
+    }
 
     template <class It1, class It2>
     LoopData(LoopData *Parent, It1 FirstHeader, It1 LastHeader, It2 FirstOther,
@@ -542,15 +548,13 @@ template <> struct TypeMap<BasicBlock> {
   using BlockT = BasicBlock;
   using FunctionT = Function;
   using BranchProbabilityInfoT = BranchProbabilityInfo;
-  using LoopT = Loop;
-  using LoopInfoT = LoopInfo;
+  using CycleInfoT = GenericCycleInfo<SSAContext>;
 };
 template <> struct TypeMap<MachineBasicBlock> {
   using BlockT = MachineBasicBlock;
   using FunctionT = MachineFunction;
   using BranchProbabilityInfoT = MachineBranchProbabilityInfo;
-  using LoopT = MachineLoop;
-  using LoopInfoT = MachineLoopInfo;
+  using CycleInfoT = GenericCycleInfo<MachineSSAContext>;
 };
 
 /// Get the name of a MachineBasicBlock.
@@ -838,13 +842,12 @@ template <class BT> class BlockFrequencyInfoImpl : BlockFrequencyInfoImplBase {
   using FunctionT = typename bfi_detail::TypeMap<BT>::FunctionT;
   using BranchProbabilityInfoT =
       typename bfi_detail::TypeMap<BT>::BranchProbabilityInfoT;
-  using LoopT = typename bfi_detail::TypeMap<BT>::LoopT;
-  using LoopInfoT = typename bfi_detail::TypeMap<BT>::LoopInfoT;
+  using CycleInfoT = typename bfi_detail::TypeMap<BT>::CycleInfoT;
   using Successor = GraphTraits<const BlockT *>;
   using Predecessor = GraphTraits<Inverse<const BlockT *>>;
 
   const BranchProbabilityInfoT *BPI = nullptr;
-  const LoopInfoT *LI = nullptr;
+  const CycleInfoT *CI = nullptr;
   const FunctionT *F = nullptr;
 
   // All blocks in reverse postorder.
@@ -990,7 +993,7 @@ public:
   const FunctionT *getFunction() const { return F; }
 
   void calculate(const FunctionT &F, const BranchProbabilityInfoT &BPI,
-                 const LoopInfoT &LI);
+                 const CycleInfoT &CI);
 
   using BlockFrequencyInfoImplBase::getEntryFreq;
 
@@ -1041,10 +1044,10 @@ public:
 template <class BT>
 void BlockFrequencyInfoImpl<BT>::calculate(const FunctionT &F,
                                            const BranchProbabilityInfoT &BPI,
-                                           const LoopInfoT &LI) {
+                                           const CycleInfoT &CI) {
   // Save the parameters.
   this->BPI = &BPI;
-  this->LI = &LI;
+  this->CI = &CI;
   this->F = &F;
 
   // Clean up left-over data structures.
@@ -1127,27 +1130,30 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeRPOT() {
 
 template <class BT> void BlockFrequencyInfoImpl<BT>::initializeLoops() {
   LLVM_DEBUG(dbgs() << "loop-detection\n");
-  if (LI->empty())
-    return;
+
+  LLVM_DEBUG(CI->print(dbgs()));
 
   // Visit loops top down and assign them an index.
-  std::deque<std::pair<const LoopT *, LoopData *>> Q;
-  for (const LoopT *L : *LI)
-    Q.emplace_back(L, nullptr);
+  std::deque<std::pair<CycleRef, LoopData *>> Q;
+  for (CycleRef C : CI->toplevel_cycles())
+    Q.emplace_back(C, nullptr);
+  if (Q.empty())
+    return; // Early exit if there are no cycles.
   while (!Q.empty()) {
-    const LoopT *Loop = Q.front().first;
+    CycleRef Cycle = Q.front().first;
     LoopData *Parent = Q.front().second;
     Q.pop_front();
 
-    BlockNode Header = getNode(Loop->getHeader());
-    assert(Header.isValid());
+    if (CI->isReducible(Cycle)) {
+      BlockNode Header = getNode(CI->getHeader(Cycle));
+      Loops.emplace_back(Parent, Header);
 
-    Loops.emplace_back(Parent, Header);
-    Working[Header.Index].Loop = &Loops.back();
-    LLVM_DEBUG(dbgs() << " - loop = " << getBlockName(Header) << "\n");
+      Working[Header.Index].Loop = &Loops.back();
+      LLVM_DEBUG(dbgs() << " - loop = " << getBlockName(Header) << "\n");
+    }
 
-    for (const LoopT *L : *Loop)
-      Q.emplace_back(L, &Loops.back());
+    for (CycleRef C : CI->children(Cycle))
+      Q.emplace_back(C, Loops.empty() ? nullptr : &Loops.back());
   }
 
   // Visit nodes in reverse post-order and add them to their deepest containing
@@ -1161,12 +1167,14 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeLoops() {
       continue;
     }
 
-    const LoopT *Loop = LI->getLoopFor(RPOT[Index]);
-    if (!Loop)
+    CycleRef Cycle = CI->getCycle(RPOT[Index]);
+    while (Cycle && !CI->isReducible(Cycle))
+      Cycle = CI->getParentCycle(Cycle);
+    if (!Cycle)
       continue;
 
     // Add this node to its containing loop's member list.
-    BlockNode Header = getNode(Loop->getHeader());
+    BlockNode Header = getNode(CI->getHeader(Cycle));
     assert(Header.isValid());
     const auto &HeaderData = Working[Header.Index];
     assert(HeaderData.isLoopHeader());

@@ -52,6 +52,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
+#include "llvm/Analysis/CycleAnalysis.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -926,6 +927,7 @@ PreservedAnalyses IRCEPass::run(Function &F, FunctionAnalysisManager &AM) {
 
     if (CFGChanged && !SkipProfitabilityChecks) {
       PreservedAnalyses PA = PreservedAnalyses::all();
+      PA.abandon<CycleAnalysis>();
       PA.abandon<BlockFrequencyAnalysis>();
       AM.invalidate(F, PA);
     }
@@ -944,6 +946,7 @@ PreservedAnalyses IRCEPass::run(Function &F, FunctionAnalysisManager &AM) {
       Changed = true;
       if (!SkipProfitabilityChecks) {
         PreservedAnalyses PA = PreservedAnalyses::all();
+        PA.abandon<CycleAnalysis>();
         PA.abandon<BlockFrequencyAnalysis>();
         AM.invalidate(F, PA);
       }
