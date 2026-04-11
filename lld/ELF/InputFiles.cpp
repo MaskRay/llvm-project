@@ -269,7 +269,7 @@ std::optional<MemoryBufferRef> elf::readFile(Ctx &ctx, StringRef path) {
 // All input object files must be for the same architecture
 // (e.g. it does not make sense to link x86 object files with
 // MIPS object files.) This function checks for that error.
-static bool isCompatible(Ctx &ctx, InputFile *file) {
+bool elf::isCompatible(Ctx &ctx, InputFile *file) {
   if (!file->isElf() && !isa<BitcodeFile>(file))
     return true;
 
@@ -1922,8 +1922,7 @@ void BitcodeFile::parse() {
   for (std::pair<StringRef, Comdat::SelectionKind> s : obj->getComdatTable()) {
     keptComdats.push_back(
         s.second == Comdat::NoDeduplicate ||
-        ctx.symtab->comdatGroups.try_emplace(CachedHashStringRef(s.first), this)
-            .second);
+        ctx.symtab->addComdatGroup(CachedHashStringRef(s.first), this));
   }
 
   if (numSymbols == 0) {

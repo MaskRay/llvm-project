@@ -29,6 +29,8 @@
 #include "Symbols.h"
 #include "Target.h"
 #include "lld/Common/Memory.h"
+#include "llvm/IR/Comdat.h"
+#include "llvm/LTO/LTO.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/Parallel.h"
 #include "llvm/Support/TimeProfiler.h"
@@ -115,7 +117,8 @@ static void readFileSymbols(ELFFileBase *file, uint16_t fileIdx,
 template <class ELFT>
 static void doParallelParse(Ctx &ctx, ArrayRef<ELFFileBase *> objFiles,
                             ArrayRef<uint32_t> firstGlobalId,
-                            uint32_t totalGlobals, ArrayRef<bool> isArchive) {
+                            uint32_t totalGlobals, ArrayRef<bool> isArchive,
+                            ArrayRef<InputFile *> allFiles) {
   // ---- Phase 1: Read symbols + comdat names (parallel per file) ----
   auto fileData = std::make_unique<FileData[]>(objFiles.size());
   {
@@ -302,30 +305,40 @@ static void doParallelParse(Ctx &ctx, ArrayRef<ELFFileBase *> objFiles,
     });
   }
 
-  // Pre-populate COMDAT groups in parallel using sharded DenseMaps. Each
-  // shard fits in L2 cache, avoiding the serial bottleneck of one large map.
+  // Pre-populate COMDAT groups using sharded DenseMaps, in command-line
+  // order so the first file in the command line owns each signature. That
+  // matches what the serial path would have done via
+  // `comdatGroups.try_emplace(...)`. Both obj and bitcode file comdats are
+  // registered here; obj comdat names are cached in fileData, bitcode comdat
+  // tables are pulled from the IR directly (cheap — just a symbol-table walk).
   {
-    llvm::TimeTraceScope ts("Pre-populate comdat groups (parallel)");
+    llvm::TimeTraceScope ts("Pre-populate comdat groups");
     auto shards =
         std::make_unique<DenseMap<CachedHashStringRef, const InputFile *>[]>(
             kNumBuckets);
-    size_t shardCounts[kNumBuckets] = {};
-    for (size_t i = 0; i < objFiles.size(); ++i) {
-      if (!activated[i].load(std::memory_order_relaxed))
-        continue;
-      for (const auto &name : fileData[i].comdatNames)
-        shardCounts[name.hash() % kNumBuckets]++;
-    }
-    parallelFor(0, (size_t)kNumBuckets, [&](size_t b) {
-      shards[b].reserve(shardCounts[b]);
-      for (size_t i = 0; i < objFiles.size(); ++i) {
+    // Map from objFiles* to index for fileData lookup.
+    DenseMap<const InputFile *, size_t> objIdx;
+    for (size_t i = 0; i < objFiles.size(); ++i)
+      objIdx[objFiles[i]] = i;
+
+    auto tryOwn = [&](CachedHashStringRef name, const InputFile *f) {
+      shards[name.hash() % kNumBuckets].try_emplace(name, f);
+    };
+    for (InputFile *f : allFiles) {
+      if (auto it = objIdx.find(f); it != objIdx.end()) {
+        size_t i = it->second;
         if (!activated[i].load(std::memory_order_relaxed))
           continue;
-        for (const auto &name : fileData[i].comdatNames)
-          if (name.hash() % kNumBuckets == b)
-            shards[b].try_emplace(name, objFiles[i]);
+        for (CachedHashStringRef name : fileData[i].comdatNames)
+          tryOwn(name, f);
+      } else if (auto *bf = dyn_cast<BitcodeFile>(f)) {
+        if (bf->lazy)
+          continue;
+        for (auto [name, kind] : bf->obj->getComdatTable())
+          if (kind != llvm::Comdat::NoDeduplicate)
+            tryOwn(CachedHashStringRef(name), f);
       }
-    });
+    }
     ctx.symtab->comdatGroupShards = std::move(shards);
     ctx.symtab->numComdatShards = kNumBuckets;
   }
@@ -375,10 +388,19 @@ void elf::parallelParseFiles(
     Ctx &ctx, SmallVector<std::unique_ptr<InputFile>, 0> &files) {
   llvm::TimeTraceScope timeScope("Parse input files");
 
-  // Partition into ELF object files vs everything else.
+  // Partition into ELF object files vs everything else. Also flatten the
+  // unique_ptr file list into raw pointers so doParallelParse can see the
+  // full command-line file order (needed for COMDAT ownership resolution).
+  // Incompatible files (wrong architecture) are dropped here, matching
+  // doParseFile()'s early-return behavior.
+  SmallVector<InputFile *, 0> allFiles;
   SmallVector<ELFFileBase *, 0> objFiles;
   SmallVector<InputFile *, 0> nonObjFiles;
+  allFiles.reserve(files.size());
   for (auto &f : files) {
+    if (!isCompatible(ctx, f.get()))
+      continue;
+    allFiles.push_back(f.get());
     if (f->kind() == InputFile::ObjKind)
       objFiles.push_back(cast<ELFFileBase>(f.get()));
     else
@@ -399,7 +421,23 @@ void elf::parallelParseFiles(
 
   if (!objFiles.empty())
     invokeELFT(doParallelParse, ctx, objFiles, firstGlobalId, totalGlobals,
-               isArchive);
+               isArchive, allFiles);
+
+  // Flush nonPrevailingSyms now so that symbols in discarded COMDAT sections
+  // are demoted to Undefined BEFORE BitcodeFile::parse() runs below. Otherwise
+  // a later bitcode file that owns the same COMDAT would see the obj file's
+  // stale Defined and BitcodeFile::postParse() would wrongly report a
+  // duplicate. The serial driver path does this later in Driver.cpp, which
+  // is fine there because bitcode files are parsed before objects. In the
+  // parallel path bitcode is parsed last.
+  for (auto &it : ctx.nonPrevailingSyms) {
+    Symbol &sym = *it.first;
+    Undefined(sym.file, sym.getName(), sym.binding, sym.stOther, sym.type,
+              it.second)
+        .overwrite(sym);
+    cast<Undefined>(sym).nonPrevailing = true;
+  }
+  ctx.nonPrevailingSyms.clear();
 
   // Parse non-obj inputs serially.
   llvm::TimeTraceScope ts("Parse non-obj files");

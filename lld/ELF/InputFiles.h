@@ -42,6 +42,10 @@ const ELFSyncStream &operator<<(const ELFSyncStream &, const InputFile *);
 // Opens a given file.
 std::optional<MemoryBufferRef> readFile(Ctx &, StringRef path);
 
+// Check that `file` is architecturally compatible with the target. Emits an
+// error and returns false otherwise.
+bool isCompatible(Ctx &, InputFile *file);
+
 // Add symbols in File to the symbol table.
 void parseFile(Ctx &, InputFile *file);
 void parseFiles(Ctx &, const SmallVector<std::unique_ptr<InputFile>, 0> &);

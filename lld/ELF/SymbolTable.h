@@ -93,6 +93,22 @@ public:
     return it != comdatGroups.end() ? it->second : nullptr;
   }
 
+  // Returns true if `f` is (or becomes) the owner of the comdat group named
+  // `name`. If no owner exists yet, `f` is registered as the owner. Matches
+  // the `isNew || owner == self` pattern used in the serial
+  // ObjFile<ELFT>::parse() path. Routes through the sharded map when parallel
+  // parse is active, so late-joining BitcodeFile::parse() calls interoperate
+  // with phase 4's pre-population.
+  bool addComdatGroup(llvm::CachedHashStringRef name, const InputFile *f) {
+    if (numComdatShards) {
+      auto &shard = comdatGroupShards[name.hash() % numComdatShards];
+      auto [it, isNew] = shard.try_emplace(name, f);
+      return isNew || it->second == f;
+    }
+    auto [it, isNew] = comdatGroups.try_emplace(name, f);
+    return isNew || it->second == f;
+  }
+
   // The Map of __acle_se_<sym>, <sym> pairs found in the input objects.
   // Key is the <sym> name.
   llvm::SmallMapVector<StringRef, ArmCmseEntryFunction, 1> cmseSymMap;
