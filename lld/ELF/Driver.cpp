@@ -195,7 +195,8 @@ static std::tuple<ELFKind, uint16_t, uint8_t> parseEmulation(Ctx &ctx,
 // Returns slices of MB by parsing MB as an archive file.
 // Each slice consists of a member file in the archive.
 std::vector<std::pair<MemoryBufferRef, uint64_t>> static getArchiveMembers(
-    Ctx &ctx, MemoryBufferRef mb) {
+    Ctx &ctx, MemoryBufferRef mb,
+    SmallVectorImpl<std::unique_ptr<MemoryBuffer>> *thinSink = nullptr) {
   std::unique_ptr<Archive> file =
       CHECK(Archive::create(mb),
             mb.getBufferIdentifier() + ": failed to parse archive");
@@ -219,7 +220,11 @@ std::vector<std::pair<MemoryBufferRef, uint64_t>> static getArchiveMembers(
 
   // Take ownership of memory buffers created for members of thin archives.
   std::vector<std::unique_ptr<MemoryBuffer>> mbs = file->takeThinBuffers();
-  std::move(mbs.begin(), mbs.end(), std::back_inserter(ctx.memoryBuffers));
+  if (thinSink)
+    for (auto &b : mbs)
+      thinSink->push_back(std::move(b));
+  else
+    std::move(mbs.begin(), mbs.end(), std::back_inserter(ctx.memoryBuffers));
 
   return v;
 }
@@ -264,6 +269,14 @@ void LinkerDriver::addFile(StringRef path, bool withLOption) {
     readLinkerScript(ctx, mbref);
     return;
   case file_magic::archive: {
+    if (deferArchives) {
+      pendingArchives.push_back(
+          {mbref, path, inWholeArchive, nextGroupId, files.size()});
+      if (!isInGroup)
+        ++nextGroupId;
+      files.push_back(nullptr);
+      return;
+    }
     auto members = getArchiveMembers(ctx, mbref);
     if (inWholeArchive) {
       for (const std::pair<MemoryBufferRef, uint64_t> &p : members) {
@@ -2160,8 +2173,89 @@ static bool isFormatBinary(Ctx &ctx, StringRef s) {
   return false;
 }
 
+// Expand archives deferred by addFile() on worker threads: parse each
+// archive's member list and construct ObjFile/BitcodeFile per member.
+void LinkerDriver::expandPendingArchives() {
+  if (pendingArchives.empty())
+    return;
+  llvm::TimeTraceScope timeScope("Expand archives (parallel)");
+
+  struct Result {
+    SmallVector<std::unique_ptr<InputFile>, 0> members;
+    SmallVector<std::unique_ptr<MemoryBuffer>, 0> thinBufs;
+  };
+  SmallVector<Result, 0> results(pendingArchives.size());
+
+  size_t afBase = archiveFiles.size();
+  for (auto &pa : pendingArchives)
+    archiveFiles.emplace_back(pa.path, 0u);
+
+  SaveAndRestore saveIG(isInGroup, true);
+  std::mutex mu; // serializes BitcodeFile (ctx.saver not thread-safe)
+
+  parallelFor(0, pendingArchives.size(), [&](size_t i) {
+    auto &pa = pendingArchives[i];
+    auto &res = results[i];
+    auto members = getArchiveMembers(ctx, pa.mbref, &res.thinBufs);
+    res.members.reserve(members.size());
+    bool lazy = !pa.wholeArchive;
+    for (const auto &[mb, offset] : members) {
+      auto magic = identify_magic(mb.getBuffer());
+      std::unique_ptr<InputFile> f;
+      if (magic == file_magic::bitcode) {
+        std::lock_guard<std::mutex> lk(mu);
+        f = std::make_unique<BitcodeFile>(ctx, mb, pa.path, offset, lazy);
+      } else if (magic == file_magic::elf_relocatable || pa.wholeArchive) {
+        if (ctx.arg.fatLTOObjects) {
+          Expected<MemoryBufferRef> fatLTOData =
+              IRObjectFile::findBitcodeInMemBuffer(mb);
+          if (!errorToBool(fatLTOData.takeError())) {
+            std::lock_guard<std::mutex> lk(mu);
+            auto bf = std::make_unique<BitcodeFile>(ctx, *fatLTOData, pa.path,
+                                                   offset, lazy);
+            bf->obj->fatLTOObject(true);
+            f = std::move(bf);
+          }
+        }
+        if (!f)
+          f = createObjFile(ctx, mb, pa.path, lazy);
+      } else {
+        Warn(ctx) << pa.path << ": archive member '"
+                  << mb.getBufferIdentifier()
+                  << "' is neither ET_REL nor LLVM bitcode";
+        continue;
+      }
+      f->groupId = pa.groupId;
+      res.members.push_back(std::move(f));
+    }
+    archiveFiles[afBase + i].second = res.members.size();
+  });
+
+  // Splice results into files[], replacing nullptr placeholders.
+  SmallVector<std::unique_ptr<InputFile>, 0> flat;
+  size_t total = files.size() - pendingArchives.size();
+  for (auto &r : results)
+    total += r.members.size();
+  flat.reserve(total);
+  size_t j = 0;
+  for (size_t i = 0, e = files.size(); i != e; ++i) {
+    if (files[i]) {
+      flat.push_back(std::move(files[i]));
+      continue;
+    }
+    for (auto &m : results[j].members)
+      flat.push_back(std::move(m));
+    for (auto &b : results[j].thinBufs)
+      ctx.memoryBuffers.push_back(std::move(b));
+    ++j;
+  }
+  files = std::move(flat);
+  pendingArchives.clear();
+}
+
 void LinkerDriver::createFiles(opt::InputArgList &args) {
   llvm::TimeTraceScope timeScope("Load input files");
+  deferArchives = true;
   // For --{push,pop}-state.
   std::vector<std::tuple<bool, bool, bool>> stack;
 
@@ -2283,6 +2377,8 @@ void LinkerDriver::createFiles(opt::InputArgList &args) {
 
   if (defaultScript && !hasScript)
     readLinkerScript(ctx, *defaultScript);
+  deferArchives = false;
+  expandPendingArchives();
   if (files.empty() && !hasInput && errCount(ctx) == 0)
     ErrAlways(ctx) << "no input files";
 }

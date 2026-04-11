@@ -186,6 +186,7 @@ public:
 private:
   Ctx &ctx;
   void createFiles(llvm::opt::InputArgList &args);
+  void expandPendingArchives();
   void inferMachineType();
   template <class ELFT> void link(llvm::opt::InputArgList &args);
   template <class ELFT> void compileBitcodeFiles(bool skipLinkedOutput);
@@ -196,6 +197,17 @@ private:
 
   // True if we are in --start-lib and --end-lib.
   bool inLib = false;
+
+  // Set during createFiles() to defer archive expansion to parallel phase.
+  bool deferArchives = false;
+  struct PendingArchive {
+    MemoryBufferRef mbref;
+    llvm::StringRef path;
+    bool wholeArchive;
+    uint32_t groupId;
+    size_t placeholderIdx;
+  };
+  SmallVector<PendingArchive, 0> pendingArchives;
 
   std::unique_ptr<BitcodeCompiler> lto;
   SmallVector<std::unique_ptr<InputFile>, 0> files, ltoObjectFiles;
