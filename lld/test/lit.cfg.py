@@ -108,6 +108,9 @@ llvm_config.feature_config(
 # Set a fake constant version so that we get consistent output.
 config.environment["LLD_VERSION"] = "LLD 1.0"
 
+if "LLD_PARALLEL_PARSE" in os.environ:
+    config.environment["LLD_PARALLEL_PARSE"] = os.environ["LLD_PARALLEL_PARSE"]
+
 # LLD_IN_TEST determines how many times `main` is run inside each process, which
 # lets us test that it's cleaning up after itself and resetting global state
 # correctly (which is important for usage as a library).

@@ -723,6 +723,13 @@ struct Ctx : CommonLinkerContext {
   InputFile *internalFile = nullptr;
   // Dummy Undefined for relocations without a symbol.
   Undefined *dummySym = nullptr;
+  // True if the parallel parse pipeline was used. Tells the driver that
+  // ctx.objectFiles up to parallelParseNumObjs already had their
+  // initSectionsAndLocalSyms/postParse run. Files pushed after that (e.g.
+  // via extract() from --entry, --wrap, libcall handling) still need the
+  // serial init/postParse passes.
+  bool parallelParse = false;
+  size_t parallelParseNumObjs = 0;
   // True if symbols can be exported (isExported) or preemptible.
   bool hasDynsym = false;
   // True if SHT_LLVM_SYMPART is used.

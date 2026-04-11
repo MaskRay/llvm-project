@@ -30,9 +30,15 @@ using namespace lld::elf;
 
 void SymbolTable::wrap(Symbol *sym, Symbol *real, Symbol *wrap) {
   // Redirect __real_foo to the original foo and foo to the original __wrap_foo.
-  int &idx1 = symMap[CachedHashStringRef(sym->getName())];
-  int &idx2 = symMap[CachedHashStringRef(real->getName())];
-  int &idx3 = symMap[CachedHashStringRef(wrap->getName())];
+  auto getIdx = [&](StringRef name) -> int & {
+    CachedHashStringRef key(name);
+    if (numShards)
+      return shardMaps[key.hash() % numShards][key];
+    return symMap[key];
+  };
+  int &idx1 = getIdx(sym->getName());
+  int &idx2 = getIdx(real->getName());
+  int &idx3 = getIdx(wrap->getName());
 
   idx2 = idx1;
   idx1 = idx3;
@@ -72,9 +78,22 @@ Symbol *SymbolTable::insert(StringRef name) {
   if (pos != StringRef::npos && pos + 1 < name.size() && name[pos + 1] == '@')
     stem = name.take_front(pos);
 
-  auto p = symMap.insert({CachedHashStringRef(stem), (int)symVector.size()});
-  if (!p.second) {
-    Symbol *sym = symVector[p.first->second];
+  CachedHashStringRef key(stem);
+  int *idxPtr;
+  bool isNew;
+  if (numShards) {
+    auto &m = shardMaps[key.hash() % numShards];
+    auto p = m.insert({key, (int)symVector.size()});
+    idxPtr = &p.first->second;
+    isNew = p.second;
+  } else {
+    auto p = symMap.insert({key, (int)symVector.size()});
+    idxPtr = &p.first->second;
+    isNew = p.second;
+  }
+
+  if (!isNew) {
+    Symbol *sym = symVector[*idxPtr];
     if (stem.size() != name.size()) {
       sym->setName(name);
       sym->hasVersionSuffix = true;
@@ -95,6 +114,14 @@ Symbol *SymbolTable::insert(StringRef name) {
   return sym;
 }
 
+void SymbolTable::installShardedSymbols(
+    std::unique_ptr<DenseMap<CachedHashStringRef, int>[]> maps,
+    unsigned shardCount, SmallVector<Symbol *, 0> &&syms) {
+  shardMaps = std::move(maps);
+  numShards = shardCount;
+  symVector = std::move(syms);
+}
+
 // This variant of addSymbol is used by BinaryFile::parse to check duplicate
 // symbol errors.
 Symbol *SymbolTable::addAndCheckDuplicate(Ctx &ctx, const Defined &newSym) {
@@ -107,7 +134,18 @@ Symbol *SymbolTable::addAndCheckDuplicate(Ctx &ctx, const Defined &newSym) {
 }
 
 Symbol *SymbolTable::find(StringRef name) {
-  auto it = symMap.find(CachedHashStringRef(name));
+  return find(CachedHashStringRef(name));
+}
+
+Symbol *SymbolTable::find(CachedHashStringRef key) {
+  if (numShards) {
+    auto &m = shardMaps[key.hash() % numShards];
+    auto it = m.find(key);
+    if (it == m.end())
+      return nullptr;
+    return symVector[it->second];
+  }
+  auto it = symMap.find(key);
   if (it == symMap.end())
     return nullptr;
   return symVector[it->second];

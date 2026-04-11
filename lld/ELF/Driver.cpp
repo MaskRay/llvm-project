@@ -3300,6 +3300,16 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
   parseFiles(ctx, files);
 
+  // In the parallel parse pipeline, the pre-parseFiles addUnusedUndefined
+  // entries for -u/--undefined live in the serial symMap which is shadowed
+  // by the sharded shardMaps once installShardedSymbols runs. Re-add them
+  // through find()/insert() so they route to the shards: this both marks
+  // the winner referenced and lets a strong undef extract a lazy def.
+  if (ctx.parallelParse) {
+    for (StringRef name : ctx.arg.undefined)
+      ctx.symtab->addUnusedUndefined(name)->referenced = true;
+  }
+
   // Create dynamic sections for dynamic linking and static PIE.
   ctx.hasDynsym = !ctx.sharedFiles.empty() || ctx.arg.isPic;
   ctx.arg.exportDynamic &= ctx.hasDynsym;
@@ -3363,10 +3373,19 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
   // No more lazy bitcode can be extracted at this point. Do post parse work
   // like checking duplicate symbols.
-  parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
+  // When parallel parse was used, initSectionsAndLocalSyms and postParse for
+  // objectFiles[0..parallelParseNumObjs) were already done inside the
+  // pipeline. Files extracted after that (via --entry, --wrap, libcall, or
+  // LTO-libcall chains from BitcodeFile::parse) still need the serial init +
+  // postParse pass.
+  auto remaining =
+      ArrayRef(ctx.objectFiles).drop_front(ctx.parallelParseNumObjs);
+  parallelForEach(remaining, [](ELFFileBase *file) {
     initSectionsAndLocalSyms(file, /*ignoreComdats=*/false);
   });
-  parallelForEach(ctx.objectFiles, postParseObjectFile);
+  parallelForEach(remaining, postParseObjectFile);
+  // When parallel parse was used, initSectionsAndLocalSyms and postParse
+  // were already done inside the pipeline's combined pass.
   parallelForEach(ctx.bitcodeFiles,
                   [](BitcodeFile *file) { file->postParse(); });
   for (auto &it : ctx.nonPrevailingSyms) {

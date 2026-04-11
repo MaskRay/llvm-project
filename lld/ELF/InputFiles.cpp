@@ -12,6 +12,7 @@
 #include "Driver.h"
 #include "InputSection.h"
 #include "LinkerScript.h"
+#include "ParallelParse.h"
 #include "SymbolTable.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
@@ -263,7 +264,7 @@ std::optional<MemoryBufferRef> elf::readFile(Ctx &ctx, StringRef path) {
 // All input object files must be for the same architecture
 // (e.g. it does not make sense to link x86 object files with
 // MIPS object files.) This function checks for that error.
-static bool isCompatible(Ctx &ctx, InputFile *file) {
+bool elf::isCompatible(Ctx &ctx, InputFile *file) {
   if (!file->isElf() && !isa<BitcodeFile>(file))
     return true;
 
@@ -356,6 +357,11 @@ doParseFiles(Ctx &ctx,
 
 void elf::parseFiles(Ctx &ctx,
                      const SmallVector<std::unique_ptr<InputFile>, 0> &files) {
+  if (getenv("LLD_PARALLEL_PARSE") && !ctx.arg.relocatable) {
+    parallelParseFiles(
+        ctx, const_cast<SmallVector<std::unique_ptr<InputFile>, 0> &>(files));
+    return;
+  }
   llvm::TimeTraceScope timeScope("Parse input files");
   invokeELFT(doParseFiles, ctx, files);
 }
@@ -599,10 +605,10 @@ template <class ELFT> void ObjFile<ELFT>::parse(bool ignoreComdats) {
       if (flag && flag != GRP_COMDAT)
         Fatal(ctx) << this << ": unsupported SHT_GROUP format";
 
-      bool keepGroup = !flag || ignoreComdats ||
-                       ctx.symtab->comdatGroups
-                           .try_emplace(CachedHashStringRef(signature), this)
-                           .second;
+      bool keepGroup = !flag || ignoreComdats;
+      if (!keepGroup)
+        keepGroup =
+            ctx.symtab->addComdatGroup(CachedHashStringRef(signature), this);
       if (keepGroup) {
         if (!ctx.arg.resolveGroups)
           sections[i] = createInputSection(
@@ -768,6 +774,8 @@ void ObjFile<ELFT>::initializeSections(bool ignoreComdats,
   ArrayRef<Elf_Shdr> objSections = getELFShdrs<ELFT>();
   StringRef shstrtab = CHECK2(obj.getSectionStringTable(objSections), this);
   uint64_t size = objSections.size();
+  if (sections.size() != size)
+    sections.resize(size);
   SmallVector<ArrayRef<Elf_Word>, 0> selectedGroups;
   AArch64BuildAttrSubsections aarch64BAsubSections;
   bool hasAArch64BuildAttributes = false;
@@ -831,9 +839,13 @@ void ObjFile<ELFT>::initializeSections(bool ignoreComdats,
       ArrayRef<Elf_Word> entries =
           cantFail(obj.template getSectionContentsAsArray<Elf_Word>(sec));
       if ((entries[0] & GRP_COMDAT) == 0 || ignoreComdats ||
-          ctx.symtab->comdatGroups.find(CachedHashStringRef(signature))
-                  ->second == this)
+          ctx.symtab->findComdatOwner(CachedHashStringRef(signature)) == this) {
         selectedGroups.push_back(entries);
+      } else {
+        for (uint32_t secIndex : entries.slice(1))
+          if (secIndex < size)
+            this->sections[secIndex] = &InputSection::discarded;
+      }
       break;
     }
     case SHT_SYMTAB_SHNDX:
@@ -1255,6 +1267,10 @@ void ObjFile<ELFT>::initSectionsAndLocalSyms(bool ignoreComdats) {
 
   if (!firstGlobal)
     return;
+  // In the parallel-parse path, initializeSymbols() is not called, so the
+  // symbols[] array may still be unallocated. Allocate it on demand.
+  if (!symbols)
+    symbols = std::make_unique<Symbol *[]>(numSymbols);
   SymbolUnion *locals = makeThreadLocalN<SymbolUnion>(firstGlobal);
   memset(locals, 0, sizeof(SymbolUnion) * firstGlobal);
 
@@ -1358,6 +1374,8 @@ template <class ELFT> void ObjFile<ELFT>::postParse() {
     }
 
     if (sym.binding == STB_WEAK || binding == STB_WEAK)
+      continue;
+    if (!archiveName.empty() && sym.file && !sym.file->archiveName.empty())
       continue;
     std::lock_guard<std::mutex> lock(mu);
     ctx.duplicates.push_back({&sym, this, sec, eSym.st_value});
@@ -1897,8 +1915,7 @@ void BitcodeFile::parse() {
   for (std::pair<StringRef, Comdat::SelectionKind> s : obj->getComdatTable()) {
     keptComdats.push_back(
         s.second == Comdat::NoDeduplicate ||
-        ctx.symtab->comdatGroups.try_emplace(CachedHashStringRef(s.first), this)
-            .second);
+        ctx.symtab->addComdatGroup(CachedHashStringRef(s.first), this));
   }
 
   if (numSymbols == 0) {

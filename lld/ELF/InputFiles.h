@@ -42,6 +42,10 @@ const ELFSyncStream &operator<<(const ELFSyncStream &, const InputFile *);
 // Opens a given file.
 std::optional<MemoryBufferRef> readFile(Ctx &, StringRef path);
 
+// Check that `file` is architecturally compatible with the target. Emits an
+// error and returns false otherwise.
+bool isCompatible(Ctx &, InputFile *file);
+
 // Add symbols in File to the symbol table.
 void parseFile(Ctx &, InputFile *file);
 void parseFiles(Ctx &, const SmallVector<std::unique_ptr<InputFile>, 0> &);
@@ -50,6 +54,8 @@ void parseFiles(Ctx &, const SmallVector<std::unique_ptr<InputFile>, 0> &);
 class InputFile {
 public:
   Ctx &ctx;
+
+  void setSymbol(size_t i, Symbol *s) { symbols[i] = s; }
 
 protected:
   std::unique_ptr<Symbol *[]> symbols;
@@ -210,6 +216,9 @@ public:
     return getELFSyms<ELFT>().slice(firstGlobal);
   }
 
+  uint32_t getFirstGlobal() const { return firstGlobal; }
+  uint32_t getNumSymbols() const { return numSymbols; }
+
   // Get cached DWARF information.
   DWARFCache *getDwarf();
 
@@ -263,7 +272,6 @@ public:
                                  const Elf_Shdr &sec);
 
   uint32_t getSectionIndex(const Elf_Sym &sym) const;
-
 
   // Pointer to this input file's .llvm_addrsig section, if it has one.
   const Elf_Shdr *addrsigSec = nullptr;
