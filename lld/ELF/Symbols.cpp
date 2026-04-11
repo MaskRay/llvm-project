@@ -579,10 +579,14 @@ void elf::reportDuplicate(Ctx &ctx, const Symbol &sym, const InputFile *newFile,
 }
 
 void Symbol::checkDuplicate(Ctx &ctx, const Defined &other) const {
-  if (isDefined() && !isWeak() && !other.isWeak())
+  if (isDefined() && !isWeak() && !other.isWeak()) {
+    if (file && !file->archiveName.empty() && other.file &&
+        !other.file->archiveName.empty())
+      return;
     reportDuplicate(ctx, *this, other.file,
                     dyn_cast_or_null<InputSectionBase>(other.section),
                     other.value);
+  }
 }
 
 void Symbol::resolve(Ctx &ctx, const CommonSymbol &other) {

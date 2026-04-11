@@ -55,11 +55,18 @@ public:
   void scanVersionScript();
 
   Symbol *find(StringRef name);
+  Symbol *find(llvm::CachedHashStringRef key);
 
   void handleDynamicList();
 
   Symbol *addUnusedUndefined(StringRef name,
                              uint8_t binding = llvm::ELF::STB_GLOBAL);
+
+  // Install sharded symbol maps from parallel parse pipeline. After this call,
+  // find() and insert() route through the shard maps instead of symMap.
+  void installShardedSymbols(
+      std::unique_ptr<llvm::DenseMap<llvm::CachedHashStringRef, int>[]> maps,
+      unsigned numShards, SmallVector<Symbol *, 0> &&syms);
 
   // Set of .so files to not link the same shared object file more than once.
   llvm::DenseMap<llvm::CachedHashStringRef, SharedFile *> soNames;
@@ -68,6 +75,23 @@ public:
   // same name, only one of them is linked, and the other is ignored. This map
   // is used to uniquify them.
   llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *> comdatGroups;
+
+  // Sharded comdat groups for parallel parse. When non-empty, findComdatOwner()
+  // routes lookups through these shards instead of comdatGroups.
+  std::unique_ptr<
+      llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *>[]>
+      comdatGroupShards;
+  unsigned numComdatShards = 0;
+
+  const InputFile *findComdatOwner(llvm::CachedHashStringRef name) const {
+    if (numComdatShards) {
+      auto &shard = comdatGroupShards[name.hash() % numComdatShards];
+      auto it = shard.find(name);
+      return it != shard.end() ? it->second : nullptr;
+    }
+    auto it = comdatGroups.find(name);
+    return it != comdatGroups.end() ? it->second : nullptr;
+  }
 
   // The Map of __acle_se_<sym>, <sym> pairs found in the input objects.
   // Key is the <sym> name.
@@ -99,6 +123,11 @@ private:
   // when cross linking.
   llvm::DenseMap<llvm::CachedHashStringRef, int> symMap;
   SmallVector<Symbol *, 0> symVector;
+
+  // Sharded mode: parallel parse installs per-bucket DenseMaps here.
+  // When numShards > 0, find()/insert() route through shardMaps.
+  unsigned numShards = 0;
+  std::unique_ptr<llvm::DenseMap<llvm::CachedHashStringRef, int>[]> shardMaps;
 
   // A map from demangled symbol names to their symbol objects.
   // This mapping is 1:N because two symbols with different versions

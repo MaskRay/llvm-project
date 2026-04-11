@@ -51,6 +51,7 @@ add_lld_library(lldELF
   MapFile.cpp
   MarkLive.cpp
   OutputSections.cpp
+  ParallelParse.cpp
   Relocations.cpp
   ScriptLexer.cpp
   ScriptParser.cpp

@@ -51,6 +51,8 @@ class InputFile {
 public:
   Ctx &ctx;
 
+  void setSymbol(size_t i, Symbol *s) { symbols[i] = s; }
+
 protected:
   std::unique_ptr<Symbol *[]> symbols;
   size_t numSymbols = 0;
@@ -210,6 +212,9 @@ public:
     return getELFSyms<ELFT>().slice(firstGlobal);
   }
 
+  uint32_t getFirstGlobal() const { return firstGlobal; }
+  uint32_t getNumSymbols() const { return numSymbols; }
+
   // Get cached DWARF information.
   DWARFCache *getDwarf();
 
@@ -263,7 +268,6 @@ public:
                                  const Elf_Shdr &sec);
 
   uint32_t getSectionIndex(const Elf_Sym &sym) const;
-
 
   // Pointer to this input file's .llvm_addrsig section, if it has one.
   const Elf_Shdr *addrsigSec = nullptr;

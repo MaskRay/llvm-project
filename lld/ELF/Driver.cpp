@@ -3309,10 +3309,16 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
   // No more lazy bitcode can be extracted at this point. Do post parse work
   // like checking duplicate symbols.
-  parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
-    initSectionsAndLocalSyms(file, /*ignoreComdats=*/false);
-  });
-  parallelForEach(ctx.objectFiles, postParseObjectFile);
+  // When parallel parse was used, initSectionsAndLocalSyms and postParse for
+  // objectFiles were already done inside the pipeline.
+  if (!ctx.parallelParse) {
+    parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
+      initSectionsAndLocalSyms(file, /*ignoreComdats=*/false);
+    });
+    parallelForEach(ctx.objectFiles, postParseObjectFile);
+  }
+  // When parallel parse was used, initSectionsAndLocalSyms and postParse
+  // were already done inside the pipeline's combined pass.
   parallelForEach(ctx.bitcodeFiles,
                   [](BitcodeFile *file) { file->postParse(); });
   for (auto &it : ctx.nonPrevailingSyms) {
