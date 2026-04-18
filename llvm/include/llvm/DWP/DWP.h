@@ -54,58 +54,86 @@ enum DWPSectionId : unsigned {
 /// through the MC infrastructure (MCContext, MCAssembler, MCDataFragment
 /// allocation, layout, etc.).
 class LLVM_ABI DWPWriter {
-  /// Per-section storage: zero-copy chunks + inline buffer for small writes.
+public:
+  /// Per-section storage. Chunks are stored in emission order so callers
+  /// that interleave emitBytes()/emitIntValue() (writeStringsAndOffsets,
+  /// writeIndex) produce bytes in the correct order. Each chunk is either
+  /// a borrowed StringRef into an input mmap or a slice of OwnedBytes.
   struct SectionData {
-    SmallVector<StringRef, 4> Chunks; // zero-copy refs to input data
-    SmallVector<char, 0> Buffer;      // for emitIntValue / constructed data
+    enum Kind : uint8_t { Borrowed, Owned };
+    struct Chunk {
+      Kind K;
+      StringRef Borrowed;  // when K == Borrowed
+      uint32_t OwnedBegin; // when K == Owned
+      uint32_t OwnedLen;
+    };
+    SmallVector<Chunk, 4> Chunks;
+    SmallVector<char, 0> OwnedBytes;
 
     uint64_t totalSize() const {
       uint64_t Size = 0;
-      for (auto &C : Chunks)
-        Size += C.size();
-      Size += Buffer.size();
+      for (const Chunk &C : Chunks)
+        Size += C.K == Borrowed ? C.Borrowed.size() : C.OwnedLen;
       return Size;
     }
 
-    bool empty() const { return Chunks.empty() && Buffer.empty(); }
+    bool empty() const { return Chunks.empty(); }
 
-    void writeTo(raw_ostream &OS) const {
-      for (auto &C : Chunks)
-        OS.write(C.data(), C.size());
-      if (!Buffer.empty())
-        OS.write(Buffer.data(), Buffer.size());
+    void appendBorrowed(StringRef Data) {
+      if (!Data.empty())
+        Chunks.push_back({Borrowed, Data, 0, 0});
+    }
+
+    void appendOwned(const char *Data, uint32_t Len) {
+      if (!Len)
+        return;
+      uint32_t Begin = OwnedBytes.size();
+      OwnedBytes.append(Data, Data + Len);
+      if (!Chunks.empty() && Chunks.back().K == Owned &&
+          Chunks.back().OwnedBegin + Chunks.back().OwnedLen == Begin) {
+        Chunks.back().OwnedLen += Len;
+      } else {
+        Chunks.push_back({Owned, StringRef(), Begin, Len});
+      }
     }
   };
 
+private:
   SectionData Sections[DS_NumSections];
+  /// Storage for DWPStringPool. Kept separate so the pool has a stable
+  /// SmallVectorImpl<char>& to append into; handed off to DS_Str at write
+  /// time via a single Borrowed chunk.
+  SmallVector<char, 0> StrPoolStorage;
   DWPSectionId CurrentSection = DS_Info;
   uint16_t ELFMachine = 0;
   uint8_t ELFOSABI = 0;
+  bool Is64Bit = true;
+  bool IsLittleEndian = true;
 
 public:
   DWPWriter() = default;
 
   void setMachine(uint16_t Machine) { ELFMachine = Machine; }
   void setOSABI(uint8_t OSABI) { ELFOSABI = OSABI; }
+  void setClass(bool Is64) { Is64Bit = Is64; }
+  void setLittleEndian(bool Little) { IsLittleEndian = Little; }
 
-  SmallVectorImpl<char> &getSectionBuffer(DWPSectionId Id) {
-    return Sections[Id].Buffer;
-  }
+  SmallVectorImpl<char> &getStringPoolStorage() { return StrPoolStorage; }
 
   void switchSection(DWPSectionId Id) { CurrentSection = Id; }
 
   /// Zero-copy: stores a reference to the input data without copying.
   void emitBytes(StringRef Data) {
-    if (!Data.empty())
-      Sections[CurrentSection].Chunks.push_back(Data);
+    Sections[CurrentSection].appendBorrowed(Data);
   }
 
   void emitIntValue(uint64_t Value, unsigned Size) {
-    auto &Buf = Sections[CurrentSection].Buffer;
+    char Buf[8];
     for (unsigned I = 0; I < Size; ++I) {
-      Buf.push_back(static_cast<char>(Value & 0xff));
+      Buf[I] = static_cast<char>(Value & 0xff);
       Value >>= 8;
     }
+    Sections[CurrentSection].appendOwned(Buf, Size);
   }
 
   Error writeELF(raw_pwrite_stream &OS);

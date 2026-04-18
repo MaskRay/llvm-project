@@ -18,9 +18,15 @@
 #include "llvm/DWP/DWPError.h"
 #include "llvm/Object/Decompressor.h"
 #include "llvm/Object/ELFObjectFile.h"
-#include "llvm/Support/EndianStream.h"
+#include "llvm/Object/ELFTypes.h"
 #include "llvm/Support/MathExtras.h"
 #include <limits>
+
+// Prototype: we reuse llvm-objcopy's ELF writer. Its header lives in the
+// ObjCopy lib's private include directory; a non-prototype version would
+// either promote the necessary pieces to a public header or expose a narrow
+// DWP-oriented helper in ObjCopy.
+#include "../ObjCopy/ELF/ELFObject.h"
 
 using namespace llvm;
 using namespace llvm::object;
@@ -351,9 +357,9 @@ handleCompressedSection(std::deque<SmallString<32>> &UncompressedSections,
   return Error::success();
 }
 
-static Error buildDuplicateError(const std::pair<uint64_t, UnitIndexEntry> &PrevE,
-                                 const CompileUnitIdentifiers &ID,
-                                 StringRef DWPName) {
+static Error
+buildDuplicateError(const std::pair<uint64_t, UnitIndexEntry> &PrevE,
+                    const CompileUnitIdentifiers &ID, StringRef DWPName) {
   return make_error<DWPError>(
       std::string("duplicate DWO ID (") + utohexstr(PrevE.first) + ") in " +
       buildDWODescription(PrevE.second.Name, PrevE.second.DWPName,
@@ -451,8 +457,7 @@ writeStringsAndOffsets(DWPWriter &Out, DWPStringPool &Strings,
 
   // Fast path: when there is only one input, all strings are unique and offsets
   // don't need remapping. Copy both sections directly without any hashing.
-  if (SingleInput &&
-      StrOffsetsOptValue != Dwarf64StrOffsetsPromotion::Always) {
+  if (SingleInput && StrOffsetsOptValue != Dwarf64StrOffsetsPromotion::Always) {
     Out.switchSection(DS_Str);
     Out.emitBytes(CurStrSection);
     Out.switchSection(DS_StrOffsets);
@@ -731,7 +736,7 @@ Error write(DWPWriter &Out, ArrayRef<std::string> Inputs,
   StringRef FirstInput;
   bool AnySectionOverflow = false;
 
-  DWPStringPool Strings(Out.getSectionBuffer(DS_Str));
+  DWPStringPool Strings(Out.getStringPoolStorage());
 
   SmallVector<OwningBinary<object::ObjectFile>, 128> Objects;
   Objects.reserve(Inputs.size());
@@ -752,11 +757,13 @@ Error write(DWPWriter &Out, ArrayRef<std::string> Inputs,
     auto &Obj = *ErrOrObj->getBinary();
     Objects.push_back(std::move(*ErrOrObj));
 
-    // Set the ELF machine type from the first input file.
+    // Set the output ELF class/endian/machine from the first input.
     if (!MachineSet) {
       if (auto *ELFObj = dyn_cast<ELFObjectFileBase>(&Obj)) {
         Out.setMachine(ELFObj->getEMachine());
         Out.setOSABI(ELFObj->getOS());
+        Out.setClass(ELFObj->getBytesInAddress() == 8);
+        Out.setLittleEndian(ELFObj->isLittleEndian());
       }
       MachineSet = true;
     }
@@ -779,10 +786,9 @@ Error write(DWPWriter &Out, ArrayRef<std::string> Inputs,
     for (const auto &Section : Obj.sections())
       if (auto Err = handleSection(
               KnownSections, Section, Out, UncompressedSections,
-              ContributionOffsets, CurEntry, CurStrSection,
-              CurStrOffsetSection, CurTypesSection, CurInfoSection,
-              AbbrevSection, CurCUIndexSection, CurTUIndexSection,
-              SectionLength))
+              ContributionOffsets, CurEntry, CurStrSection, CurStrOffsetSection,
+              CurTypesSection, CurInfoSection, AbbrevSection, CurCUIndexSection,
+              CurTUIndexSection, SectionLength))
         return Err;
 
     if (CurInfoSection.empty())
@@ -1038,166 +1044,129 @@ Error write(DWPWriter &Out, ArrayRef<std::string> Inputs,
 }
 
 //===----------------------------------------------------------------------===//
-// DWPWriter::writeELF — produce a minimal ELF64 relocatable object.
+// DWPWriter::writeELF — build an objcopy::elf::Object and hand it to
+// ObjCopy's ELFWriter<ELFT>. ObjCopy already handles 32/64 class, LE/BE, and
+// layout; DWP only contributes debug sections.
 //===----------------------------------------------------------------------===//
 
+namespace {
+using namespace llvm::objcopy::elf;
+
+struct SectionMeta {
+  DWPSectionId Id;
+  const char *Name;
+  uint64_t Flags;
+  uint64_t EntSize;
+};
+
+// Output order: pass-through debug sections first, then the synthesized
+// index tables. ObjCopy preserves insertion order when laying out sections.
+static constexpr SectionMeta Metas[] = {
+    {DS_Loclists, ".debug_loclists.dwo", ELF::SHF_EXCLUDE, 0},
+    {DS_Loc, ".debug_loc.dwo", ELF::SHF_EXCLUDE, 0},
+    {DS_Abbrev, ".debug_abbrev.dwo", ELF::SHF_EXCLUDE, 0},
+    {DS_Line, ".debug_line.dwo", ELF::SHF_EXCLUDE, 0},
+    {DS_Rnglists, ".debug_rnglists.dwo", ELF::SHF_EXCLUDE, 0},
+    {DS_Macro, ".debug_macro.dwo", ELF::SHF_EXCLUDE, 0},
+    {DS_Str, ".debug_str.dwo",
+     ELF::SHF_EXCLUDE | ELF::SHF_MERGE | ELF::SHF_STRINGS, 1},
+    {DS_StrOffsets, ".debug_str_offsets.dwo", ELF::SHF_EXCLUDE, 0},
+    {DS_Info, ".debug_info.dwo", ELF::SHF_EXCLUDE, 0},
+    {DS_Types, ".debug_types.dwo", ELF::SHF_EXCLUDE, 0},
+    {DS_TUIndex, ".debug_tu_index", 0, 0},
+    {DS_CUIndex, ".debug_cu_index", 0, 0},
+};
+
+template <class ELFT>
+static Error writeObject(Object &Obj, raw_pwrite_stream &OS) {
+  ELFWriter<ELFT> W(Obj, OS, /*WSH=*/true, /*OnlyKeepDebug=*/false);
+  if (Error E = W.finalize())
+    return E;
+  return W.write();
+}
+} // namespace
+
 Error DWPWriter::writeELF(raw_pwrite_stream &OS) {
-  support::endian::Writer Wr(OS, llvm::endianness::little);
+  using namespace llvm::objcopy::elf;
 
-  // Section metadata table.
-  struct SectionMeta {
-    DWPSectionId Id;
-    const char *Name;
-    uint64_t Flags;
-    uint64_t EntSize;
-  };
-  static constexpr SectionMeta Meta[] = {
-      {DS_Loclists, ".debug_loclists.dwo", ELF::SHF_EXCLUDE, 0},
-      {DS_Loc, ".debug_loc.dwo", ELF::SHF_EXCLUDE, 0},
-      {DS_Abbrev, ".debug_abbrev.dwo", ELF::SHF_EXCLUDE, 0},
-      {DS_Line, ".debug_line.dwo", ELF::SHF_EXCLUDE, 0},
-      {DS_Rnglists, ".debug_rnglists.dwo", ELF::SHF_EXCLUDE, 0},
-      {DS_Macro, ".debug_macro.dwo", ELF::SHF_EXCLUDE, 0},
-      {DS_Str, ".debug_str.dwo", ELF::SHF_EXCLUDE | ELF::SHF_MERGE | ELF::SHF_STRINGS, 1},
-      {DS_StrOffsets, ".debug_str_offsets.dwo", ELF::SHF_EXCLUDE, 0},
-      {DS_Info, ".debug_info.dwo", ELF::SHF_EXCLUDE, 0},
-      {DS_Types, ".debug_types.dwo", ELF::SHF_EXCLUDE, 0},
-      {DS_TUIndex, ".debug_tu_index", 0, 0},
-      {DS_CUIndex, ".debug_cu_index", 0, 0},
-  };
+  Object Obj;
+  Obj.Type = ELF::ET_REL;
+  Obj.Machine = ELFMachine;
+  Obj.OSABI = ELFOSABI;
+  Obj.ABIVersion = 0;
+  Obj.Entry = 0;
+  Obj.Version = ELF::EV_CURRENT;
+  Obj.Flags = 0;
+  Obj.Is64Bits = Is64Bit;
 
-  // Collect non-empty sections and build the section name string table.
-  struct OutputEntry {
-    const SectionData *Data;
-    const char *Name;
-    uint64_t Flags;
-    uint64_t EntSize;
-    uint32_t NameOffset;
-    uint64_t FileOffset; // filled in during layout
-  };
-  SmallVector<OutputEntry> Entries;
+  auto &ShStrTab = Obj.addSection<StringTableSection>();
+  ShStrTab.Name = ".shstrtab";
+  Obj.SectionNames = &ShStrTab;
 
-  SmallString<256> Strtab;
-  Strtab.push_back('\0'); // null string at offset 0
+  // Hand the accumulated string pool (if any) over to DS_Str as a single
+  // zero-copy chunk. StrPoolStorage lives on this DWPWriter, which outlives
+  // writeELF.
+  if (!StrPoolStorage.empty())
+    Sections[DS_Str].appendBorrowed(
+        StringRef(StrPoolStorage.data(), StrPoolStorage.size()));
 
-  for (const auto &M : Meta) {
-    if (Sections[M.Id].empty())
+  for (const SectionMeta &M : Metas) {
+    SectionData &SD = Sections[M.Id];
+    if (SD.empty())
       continue;
-    uint32_t NameOff = Strtab.size();
-    Strtab.append(M.Name);
-    Strtab.push_back('\0');
-    Entries.push_back({&Sections[M.Id], M.Name, M.Flags, M.EntSize, NameOff, 0});
+
+    auto Configure = [&](SectionBase &Sec, uint64_t Size) {
+      Sec.Name = M.Name;
+      Sec.Type = Sec.OriginalType = ELF::SHT_PROGBITS;
+      Sec.Flags = Sec.OriginalFlags = M.Flags;
+      Sec.EntrySize = M.EntSize;
+      Sec.Size = Size;
+      Sec.Align = 1;
+    };
+
+    auto chunkBytes = [&](const SectionData::Chunk &C) -> ArrayRef<uint8_t> {
+      if (C.K == SectionData::Borrowed)
+        return ArrayRef<uint8_t>(
+            reinterpret_cast<const uint8_t *>(C.Borrowed.data()),
+            C.Borrowed.size());
+      return ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(
+                                   SD.OwnedBytes.data() + C.OwnedBegin),
+                               C.OwnedLen);
+    };
+
+    // Fast path: exactly one chunk (whether borrowed or owned). Hand its
+    // bytes to ObjCopy's Section as a non-owning ArrayRef; the backing store
+    // lives on DWPWriter or the input mmap, both of which outlive writeELF.
+    if (SD.Chunks.size() == 1) {
+      ArrayRef<uint8_t> Data = chunkBytes(SD.Chunks[0]);
+      auto &Sec = Obj.addSection<Section>(Data);
+      Configure(Sec, Data.size());
+      continue;
+    }
+
+    // Otherwise concatenate all chunks in order into an owned blob. This is
+    // unavoidable with ObjCopy's single-Contents section model; a future
+    // MultiChunkSection could keep the chunks scattered and avoid the copy.
+    std::vector<uint8_t> Buf;
+    Buf.reserve(SD.totalSize());
+    for (const SectionData::Chunk &C : SD.Chunks) {
+      ArrayRef<uint8_t> Bytes = chunkBytes(C);
+      Buf.insert(Buf.end(), Bytes.begin(), Bytes.end());
+    }
+    uint64_t Size = Buf.size();
+    auto &Sec =
+        Obj.addSection<OwnedDataSection>(M.Name, ArrayRef<uint8_t>(Buf));
+    Configure(Sec, Size);
   }
 
-  // Add .strtab and .symtab name entries.
-  uint32_t StrtabNameOff = Strtab.size();
-  Strtab.append(".strtab");
-  Strtab.push_back('\0');
-  uint32_t SymtabNameOff = Strtab.size();
-  Strtab.append(".symtab");
-  Strtab.push_back('\0');
-
-  // Layout:
-  //   [ELF Header]              64 bytes
-  //   [section data...]         variable
-  //   [.strtab data]            variable
-  //   [padding to 8-byte align]
-  //   [.symtab data]            24 bytes (one null entry)
-  //   [padding to 8-byte align]
-  //   [Section Header Table]    64 * NumSections bytes
-
-  constexpr uint64_t EhdrSize = 64;
-  constexpr uint64_t ShdrSize = 64;
-  constexpr uint64_t SymEntSize = 24;
-
-  uint64_t Offset = EhdrSize;
-  for (auto &E : Entries) {
-    E.FileOffset = Offset;
-    Offset += E.Data->totalSize();
+  if (Is64Bit) {
+    if (IsLittleEndian)
+      return writeObject<object::ELF64LE>(Obj, OS);
+    return writeObject<object::ELF64BE>(Obj, OS);
   }
-
-  uint64_t StrtabOffset = Offset;
-  Offset += Strtab.size();
-
-  uint64_t SymtabOffset = alignTo(Offset, 8);
-  Offset = SymtabOffset + SymEntSize;
-
-  uint64_t SHTOffset = alignTo(Offset, 8);
-
-  // Section indices: [0]=null, [1..N]=data, [N+1]=strtab, [N+2]=symtab
-  uint32_t StrtabIdx = 1 + Entries.size();
-  uint32_t SymtabIdx = StrtabIdx + 1;
-  uint32_t NumSections = SymtabIdx + 1;
-
-  // --- Write ELF header ---
-  OS.write(ELF::ElfMagic, 4);
-  Wr.write<uint8_t>(ELF::ELFCLASS64);
-  Wr.write<uint8_t>(ELF::ELFDATA2LSB);
-  Wr.write<uint8_t>(ELF::EV_CURRENT);
-  Wr.write<uint8_t>(ELFOSABI);
-  OS.write_zeros(8);                    // EI_ABIVERSION + padding
-  Wr.write<uint16_t>(ELF::ET_REL);            // e_type
-  Wr.write<uint16_t>(ELFMachine);         // e_machine
-  Wr.write<uint32_t>(ELF::EV_CURRENT);         // e_version
-  Wr.write<uint64_t>(0);                  // e_entry
-  Wr.write<uint64_t>(0);                  // e_phoff
-  Wr.write<uint64_t>(SHTOffset);          // e_shoff
-  Wr.write<uint32_t>(0);                  // e_flags
-  Wr.write<uint16_t>(EhdrSize);           // e_ehsize
-  Wr.write<uint16_t>(0);                  // e_phentsize
-  Wr.write<uint16_t>(0);                  // e_phnum
-  Wr.write<uint16_t>(ShdrSize);           // e_shentsize
-  Wr.write<uint16_t>(NumSections);        // e_shnum
-  Wr.write<uint16_t>(StrtabIdx);          // e_shstrndx
-
-  // --- Write section data ---
-  for (const auto &E : Entries)
-    E.Data->writeTo(OS);
-
-  // --- Write .strtab ---
-  OS.write(Strtab.data(), Strtab.size());
-
-  // --- Pad + write .symtab (one null symbol entry) ---
-  OS.write_zeros(SymtabOffset - (StrtabOffset + Strtab.size()));
-  OS.write_zeros(SymEntSize);
-
-  // --- Pad for section header table ---
-  uint64_t CurPos = SymtabOffset + SymEntSize;
-  OS.write_zeros(SHTOffset - CurPos);
-
-  // Helper to write one section header.
-  auto writeSHdr = [&](uint32_t Name, uint32_t Type, uint64_t Flags,
-                       uint64_t FileOff, uint64_t Size, uint32_t Link,
-                       uint32_t Info, uint64_t Align, uint64_t EntSize) {
-    Wr.write<uint32_t>(Name);
-    Wr.write<uint32_t>(Type);
-    Wr.write<uint64_t>(Flags);
-    Wr.write<uint64_t>(0); // sh_addr
-    Wr.write<uint64_t>(FileOff);
-    Wr.write<uint64_t>(Size);
-    Wr.write<uint32_t>(Link);
-    Wr.write<uint32_t>(Info);
-    Wr.write<uint64_t>(Align);
-    Wr.write<uint64_t>(EntSize);
-  };
-
-  // [0] ELF::SHT_NULL
-  writeSHdr(0, ELF::SHT_NULL, 0, 0, 0, 0, 0, 0, 0);
-
-  // [1..N] data sections
-  for (const auto &E : Entries)
-    writeSHdr(E.NameOffset, ELF::SHT_PROGBITS, E.Flags, E.FileOffset,
-              E.Data->totalSize(), 0, 0, 1, E.EntSize);
-
-  // [N+1] .strtab
-  writeSHdr(StrtabNameOff, ELF::SHT_STRTAB, 0, StrtabOffset, Strtab.size(), 0, 0, 1,
-            0);
-
-  // [N+2] .symtab
-  writeSHdr(SymtabNameOff, ELF::SHT_SYMTAB, 0, SymtabOffset, SymEntSize, StrtabIdx,
-            1, 8, SymEntSize);
-
-  return Error::success();
+  if (IsLittleEndian)
+    return writeObject<object::ELF32LE>(Obj, OS);
+  return writeObject<object::ELF32BE>(Obj, OS);
 }
 
 } // namespace llvm
