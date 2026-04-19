@@ -113,6 +113,18 @@ static cl::opt<bool> VerboseVerbose(
              "issues, or add it to the input dump if enabled.  Implies\n"
              "-v.\n"));
 
+static cl::opt<FailureReportFormat> ReportFormat(
+    "report",
+    cl::desc("Render failure diagnostics as a per-directive status report.\n"
+             "Independent of --dump-input."),
+    cl::ValueOptional, cl::init(FailureReportFormat::None),
+    cl::values(clEnumValN(FailureReportFormat::None, "none",
+                          "Standard FileCheck output"),
+               clEnumValN(FailureReportFormat::Status, "status",
+                          "Per-directive status report"),
+               // Bare `--report` defaults to status.
+               clEnumValN(FailureReportFormat::Status, "", "")));
+
 // The order of DumpInputValue members affects their precedence, as documented
 // for -dump-input below.
 enum DumpInputValue {
@@ -796,6 +808,7 @@ int main(int argc, char **argv) {
   Req.NoCanonicalizeWhiteSpace = NoCanonicalizeWhiteSpace;
   Req.MatchFullLines = MatchFullLines;
   Req.IgnoreCase = IgnoreCase;
+  Req.ReportFormat = ReportFormat;
 
   if (VerboseVerbose)
     Req.Verbose = true;
@@ -853,11 +866,23 @@ int main(int argc, char **argv) {
                             InputFileText, InputFile.getBufferIdentifier()),
                         SMLoc());
 
+  // When --report is active, the renderer replaces the engine's per-line
+  // text diagnostics.  Install a no-op SM handler so engine PrintMessage
+  // calls are suppressed.  --dump-input remains independent.
+  if (Req.ReportFormat != FailureReportFormat::None)
+    SM.setDiagHandler([](const SMDiagnostic &, void *) {}, nullptr);
+
   std::vector<FileCheckDiag> Diags;
-  int ExitCode = FC.checkInput(SM, InputFileText,
-                               DumpInput == DumpInputNever ? nullptr : &Diags)
-                     ? EXIT_SUCCESS
-                     : 1;
+  bool CollectDiags = DumpInput != DumpInputNever ||
+                      Req.ReportFormat != FailureReportFormat::None;
+  int ExitCode =
+      FC.checkInput(SM, InputFileText, CollectDiags ? &Diags : nullptr)
+          ? EXIT_SUCCESS
+          : 1;
+
+  if (ExitCode == 1 && Req.ReportFormat != FailureReportFormat::None)
+    renderFailureReport(Diags, SM, InputFilename, errs());
+
   if (DumpInput == DumpInputAlways ||
       (ExitCode == 1 && DumpInput == DumpInputFail)) {
     errs() << "\n"

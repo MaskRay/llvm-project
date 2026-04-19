@@ -2039,7 +2039,12 @@ static Error printMatch(bool ExpectedMatch, const SourceMgr &SM,
   bool HasError = !ExpectedMatch || MatchResult.TheError;
   bool PrintDiag = true;
   if (!HasError) {
-    if (!Req.Verbose)
+    // The failure-report renderer needs successful matches recorded as Diags
+    // to anchor positional context, so don't drop them just because Verbose
+    // is off.
+    bool WantDiags =
+        Req.Verbose || Req.ReportFormat != FailureReportFormat::None;
+    if (!WantDiags)
       return ErrorReported::reportedOrSuccess(HasError);
     if (!Req.VerboseVerbose && Pat.getCheckTy() == Check::CheckEOF)
       return ErrorReported::reportedOrSuccess(HasError);
@@ -2724,9 +2729,71 @@ void FileCheckPatternContext::clearLocalVars() {
     GlobalNumericVariableTable.erase(Var);
 }
 
+// Replay the remaining CHECKs in a failing region with adjacency
+// constraints dropped, so the report renderer has a per-directive outcome
+// for every CHECK, not just the first failure.  Stops at the next
+// CHECK-LABEL (a hard region anchor).
+static void replayLenient(ArrayRef<FileCheckString> CheckStrings,
+                          unsigned Start, unsigned End, StringRef Buffer,
+                          const SourceMgr &SM,
+                          std::vector<FileCheckDiag> *Diags) {
+  if (!Diags || Buffer.data() == nullptr)
+    return;
+  // Fallback pointer for SMRange construction once the cursor runs out.
+  // Using a null data() pointer would trigger the FileCheckDiag
+  // constructor's getLineAndColumn assertion.
+  const char *Sentinel = Buffer.data() + Buffer.size();
+  StringRef Cursor = Buffer;
+  for (unsigned I = Start; I < End; ++I) {
+    const FileCheckString &CS = CheckStrings[I];
+    Check::FileCheckKind Kind = CS.Pat.getCheckTy();
+    if (Kind == Check::CheckLabel)
+      break;
+    if (Kind == Check::CheckComment || Kind == Check::CheckBadNot ||
+        Kind == Check::CheckBadCount || Kind == Check::CheckMisspelled ||
+        Kind == Check::CheckEOF)
+      continue;
+
+    Pattern::MatchResult MR = CS.Pat.match(Cursor, SM);
+    consumeError(std::move(MR.TheError));
+    bool ExcludedKind = (Kind == Check::CheckNot);
+    bool AdjacencyClaimingKind = Kind == Check::CheckNext ||
+                                 Kind == Check::CheckSame ||
+                                 Kind == Check::CheckEmpty;
+    if (MR.TheMatch) {
+      size_t Pos = MR.TheMatch->Pos;
+      size_t Len = MR.TheMatch->Len;
+      SMLoc MStart = SMLoc::getFromPointer(Cursor.data() + Pos);
+      SMLoc MEnd = SMLoc::getFromPointer(Cursor.data() + Pos + Len);
+      Diags->emplace_back(SM, CS.Pat.getCheckTy(), CS.Loc,
+                          ExcludedKind ? FileCheckDiag::MatchFoundButExcluded
+                                       : FileCheckDiag::MatchFoundAndExpected,
+                          SMRange(MStart, MEnd),
+                          AdjacencyClaimingKind
+                              ? StringRef(kFileCheckNonAdjacentNote)
+                              : StringRef(""));
+      Cursor = Cursor.substr(Pos + Len);
+    } else {
+      // Zero-length point range at the cursor: a wider range would cause
+      // --dump-input to paint a `next:N` annotation on every covered input
+      // line, stacking duplicate markers across lenient diags.
+      const char *Pt = Cursor.empty() ? Sentinel : Cursor.data();
+      SMLoc PtLoc = SMLoc::getFromPointer(Pt);
+      Diags->emplace_back(SM, CS.Pat.getCheckTy(), CS.Loc,
+                          ExcludedKind ? FileCheckDiag::MatchNoneAndExcluded
+                                       : FileCheckDiag::MatchNoneButExpected,
+                          SMRange(PtLoc, PtLoc));
+      // Don't advance the cursor on a miss: later CHECKs in the region
+      // must remain free to match anywhere in the remainder (see the
+      // gnuhash cascade test).
+    }
+  }
+}
+
 bool FileCheck::checkInput(SourceMgr &SM, StringRef Buffer,
                            std::vector<FileCheckDiag> *Diags) {
   bool ChecksFailed = false;
+  bool ReportMode = Req.ReportFormat != FailureReportFormat::None;
 
   unsigned i = 0, j = 0, e = CheckStrings.size();
   while (true) {
@@ -2770,6 +2837,8 @@ bool FileCheck::checkInput(SourceMgr &SM, StringRef Buffer,
 
       if (MatchPos == StringRef::npos) {
         ChecksFailed = true;
+        if (ReportMode)
+          replayLenient(CheckStrings, i + 1, j, CheckRegion, SM, Diags);
         i = j;
         break;
       }

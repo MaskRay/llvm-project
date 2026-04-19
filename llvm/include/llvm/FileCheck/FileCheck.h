@@ -24,8 +24,20 @@
 
 namespace llvm {
 class MemoryBuffer;
+class raw_ostream;
 class SourceMgr;
+template <typename T> class ArrayRef;
 template <typename T> class SmallVectorImpl;
+
+/// Selects the format of failure diagnostics emitted by --report.
+enum class FailureReportFormat {
+  /// Standard FileCheck diagnostics; no per-directive report.
+  None,
+  /// Per-directive status report (Design G).  Compact one-line entries
+  /// for matched directives; expanded blocks for failures with
+  /// nearest-candidate hints.
+  Status,
+};
 
 /// Contains info about various FileCheck options.
 struct FileCheckRequest {
@@ -43,6 +55,7 @@ struct FileCheckRequest {
   bool AllowDeprecatedDagOverlap = false;
   bool Verbose = false;
   bool VerboseVerbose = false;
+  FailureReportFormat ReportFormat = FailureReportFormat::None;
 };
 
 namespace Check {
@@ -213,6 +226,18 @@ public:
   LLVM_ABI bool checkInput(SourceMgr &SM, StringRef Buffer,
                            std::vector<FileCheckDiag> *Diags = nullptr);
 };
+
+/// Sentinel written into FileCheckDiag::Note when lenient replay records a
+/// match for an adjacency-claiming directive (CHECK-NEXT/SAME/EMPTY) that
+/// strict semantics would have required on a different input line.  The
+/// report renderer consults this to annotate the row as `(non-adjacent)`.
+inline constexpr StringLiteral kFileCheckNonAdjacentNote = "non-adjacent";
+
+/// Render \p Diags as a per-directive status report on \p OS.  Matched
+/// directives get a compact one-liner; failures get an expanded block
+/// with pattern body and an optional nearest-candidate hint.
+LLVM_ABI void renderFailureReport(ArrayRef<FileCheckDiag> Diags, SourceMgr &SM,
+                                  StringRef InputFile, raw_ostream &OS);
 
 } // namespace llvm
 

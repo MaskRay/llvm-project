@@ -1,0 +1,73 @@
+## Sparse case: single CHECK in a long input that doesn't match.  The
+## report must show the engine's fuzzy-match candidate as a `nearest:`
+## line so the reader doesn't have to scan the input by hand.
+##
+## Regression protection for an earlier renderer that filtered the
+## fuzzy candidate via a Levenshtein cap and silently dropped useful
+## hints; trust the engine's own verdict instead.
+# RUN: split-file %s %t
+# RUN: %ProtectFileCheckOutput not FileCheck %t/check.txt \
+# RUN:   --input-file=%t/input.txt --report=status --dump-input=never 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=R
+
+# R:      1: error: CHECK: pattern not found in input
+# R-NEXT:   pattern:  ERROR: critical_failure
+# R-NEXT:   nearest:  {{.*}}input.txt:51 "[ERROR] critical failure: cleanup failed at offset 0x42"
+# R-EMPTY:
+# R-NEXT: FileCheck: 1 failed, 0 matched.
+
+#--- input.txt
+[INFO] line 1: filler
+[INFO] line 2: filler
+[INFO] line 3: filler
+[INFO] line 4: filler
+[INFO] line 5: filler
+[INFO] line 6: filler
+[INFO] line 7: filler
+[INFO] line 8: filler
+[INFO] line 9: filler
+[INFO] line 10: filler
+[INFO] line 11: filler
+[INFO] line 12: filler
+[INFO] line 13: filler
+[INFO] line 14: filler
+[INFO] line 15: filler
+[INFO] line 16: filler
+[INFO] line 17: filler
+[INFO] line 18: filler
+[INFO] line 19: filler
+[INFO] line 20: filler
+[INFO] line 21: filler
+[INFO] line 22: filler
+[INFO] line 23: filler
+[INFO] line 24: filler
+[INFO] line 25: filler
+[INFO] line 26: filler
+[INFO] line 27: filler
+[INFO] line 28: filler
+[INFO] line 29: filler
+[INFO] line 30: filler
+[INFO] line 31: filler
+[INFO] line 32: filler
+[INFO] line 33: filler
+[INFO] line 34: filler
+[INFO] line 35: filler
+[INFO] line 36: filler
+[INFO] line 37: filler
+[INFO] line 38: filler
+[INFO] line 39: filler
+[INFO] line 40: filler
+[INFO] line 41: filler
+[INFO] line 42: filler
+[INFO] line 43: filler
+[INFO] line 44: filler
+[INFO] line 45: filler
+[INFO] line 46: filler
+[INFO] line 47: filler
+[INFO] line 48: filler
+[INFO] line 49: filler
+[INFO] line 50: filler
+[ERROR] critical failure: cleanup failed at offset 0x42
+
+#--- check.txt
+; CHECK: ERROR: critical_failure

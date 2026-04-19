@@ -1,0 +1,30 @@
+## Lenient replay: when the first CHECK-NEXT fails, remaining CHECKs in the
+## region are still attempted so the report shows all outcomes -- not just
+## the first failure.  This is the gnuhash-shape regression: my prior
+## post-pass renderer showed only one mismatch, hiding the rest.
+# RUN: split-file %s %t
+# RUN: %ProtectFileCheckOutput not FileCheck %t/check.txt \
+# RUN:   --input-file=%t/input.txt --report=status --dump-input=never 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=R --match-full-lines
+
+# R:        1  CHECK  HEADER    matched @ 1
+# R-NEXT:   2  CHECK-NEXT  ITEM_A    matched @ 2
+# R-EMPTY:
+# R-NEXT: 3: error: CHECK-NEXT: pattern not found in input
+# R-NEXT:   pattern:  ITEM_B
+# R-NEXT:   nearest:  {{.*}}input.txt:3 "ITEM_C"
+# R-EMPTY:
+# R-NEXT:   4  CHECK-NEXT  ITEM_C    matched @ 3 (non-adjacent)
+# R-EMPTY:
+# R-NEXT: FileCheck: 1 failed, 3 matched.
+
+#--- input.txt
+HEADER
+ITEM_A
+ITEM_C
+
+#--- check.txt
+; CHECK:      HEADER
+; CHECK-NEXT: ITEM_A
+; CHECK-NEXT: ITEM_B
+; CHECK-NEXT: ITEM_C

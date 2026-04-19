@@ -1,0 +1,35 @@
+## --report=status, --report (bare default), FILECHECK_OPTS=--report all
+## activate the renderer; --report=none falls back to the standard text
+## diagnostics.
+# RUN: split-file %s %t
+
+# RUN: %ProtectFileCheckOutput not FileCheck %t/check.txt \
+# RUN:   --input-file=%t/input.txt --report=status --dump-input=never 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=R
+
+# RUN: %ProtectFileCheckOutput not FileCheck %t/check.txt \
+# RUN:   --input-file=%t/input.txt --report --dump-input=never 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=R
+
+# RUN: env FILECHECK_OPTS=--report not FileCheck %t/check.txt \
+# RUN:   --input-file=%t/input.txt --dump-input=never 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=R
+
+# RUN: %ProtectFileCheckOutput not FileCheck %t/check.txt \
+# RUN:   --input-file=%t/input.txt --report=none --dump-input=never 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=STD
+
+## Status report carries the quickfix-compatible header and summary.
+# R:     error: CHECK: pattern not found in input
+# R:     pattern:  expected
+# R:     FileCheck: 1 failed, 0 matched.
+
+## --report=none retains the standard FileCheck text diagnostics.
+# STD:     error: CHECK: expected string not found in input
+# STD-NOT: FileCheck: 1 failed
+
+#--- input.txt
+actual
+
+#--- check.txt
+; CHECK: expected

@@ -1,0 +1,26 @@
+## CHECK-NOT firing renders as an "unexpected match" failure block with the
+## input line that violated the constraint.
+# RUN: split-file %s %t
+# RUN: %ProtectFileCheckOutput not FileCheck %t/check.txt \
+# RUN:   --input-file=%t/input.txt --report=status --dump-input=never 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=R --match-full-lines
+
+# R:        1  CHECK  START    matched @ 1
+# R-EMPTY:
+# R-NEXT: 2: error: CHECK-NOT: unexpected match
+# R-NEXT:   pattern:  FORBIDDEN
+# R-NEXT:   found at: {{.*}}input.txt:2 "FORBIDDEN"
+# R-EMPTY:
+# R-NEXT:   3  CHECK  END    matched @ 3
+# R-EMPTY:
+# R-NEXT: FileCheck: 1 failed, 2 matched.
+
+#--- input.txt
+START
+FORBIDDEN
+END
+
+#--- check.txt
+; CHECK: START
+; CHECK-NOT: FORBIDDEN
+; CHECK: END

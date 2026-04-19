@@ -1,0 +1,17 @@
+## Single plain CHECK that doesn't match.  Output: quickfix-compatible
+## error header, pattern body, summary.
+# RUN: split-file %s %t
+# RUN: %ProtectFileCheckOutput not FileCheck %t/check.txt \
+# RUN:   --input-file=%t/input.txt --report=status --dump-input=never 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=R --match-full-lines
+
+# R:      1: error: CHECK: pattern not found in input
+# R-NEXT:   pattern:  hello universe
+# R-EMPTY:
+# R-NEXT: FileCheck: 1 failed, 0 matched.
+
+#--- input.txt
+hello world
+
+#--- check.txt
+; CHECK: hello universe

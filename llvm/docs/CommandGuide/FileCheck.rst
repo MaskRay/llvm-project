@@ -110,6 +110,25 @@ and from the command line.
   -verify``. With this option FileCheck will verify that input does not contain
   warnings not covered by any ``CHECK:`` patterns.
 
+.. option:: --report[=<value>]
+
+  Render failure diagnostics as a per-directive status report instead of the
+  default per-line text diagnostics.  Each CHECK gets a row: a compact line
+  for matched directives, an expanded block (with a quickfix-compatible
+  ``<file>:<line>: error:`` header and optional nearest-candidate hint) for
+  failures.  Bare ``--report`` defaults to ``status``.
+
+  * ``none``   - Standard FileCheck diagnostics (default)
+  * ``status`` - Per-directive status report
+
+  When a CHECK fails, FileCheck continues attempting subsequent CHECKs in
+  the same CHECK-LABEL region under relaxed semantics so the report covers
+  every directive in the region, not just the first failure.  The verdict
+  (pass/fail) is unchanged by ``--report``.
+
+  ``--report`` and ``--dump-input`` are independent.  When both are active,
+  the report is emitted first, then the input dump.
+
 .. option:: --dump-input <value>
 
   Dump input to stderr, adding annotations representing currently enabled

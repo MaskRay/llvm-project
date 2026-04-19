@@ -1,0 +1,29 @@
+## Positive tests: --report=status on matching input exits 0 with no report.
+# RUN: split-file %s %t
+
+## Plain CHECK that matches.
+# RUN: %ProtectFileCheckOutput FileCheck %t/check.txt \
+# RUN:   --input-file=%t/input.txt --report=status --dump-input=never 2>&1 \
+# RUN:   | count 0
+
+## Dense CHECK-NEXT block that matches.  This is the regression-protection
+## case for the `MatchPos > 0` bug from the reverted PR #187120.
+# RUN: %ProtectFileCheckOutput FileCheck %t/next.txt \
+# RUN:   --input-file=%t/next-input.txt --report=status --dump-input=never 2>&1 \
+# RUN:   | count 0
+
+#--- input.txt
+hello world
+
+#--- check.txt
+; CHECK: hello world
+
+#--- next-input.txt
+ALPHA
+BETA
+GAMMA
+
+#--- next.txt
+; CHECK:      ALPHA
+; CHECK-NEXT: BETA
+; CHECK-NEXT: GAMMA
