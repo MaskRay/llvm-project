@@ -47,7 +47,6 @@
 #include "llvm/Config/abi-breaking.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/SwapByteOrder.h"
 #include "llvm/Support/type_traits.h"
 #include "llvm/Support/xxhash.h"
 #include <algorithm>
@@ -137,14 +136,6 @@ template <typename T> hash_code hash_value(const std::optional<T> &arg);
 // the header file mainly to allow inlining and constant propagation.
 namespace hashing {
 namespace detail {
-
-inline uint32_t fetch32(const char *p) {
-  uint32_t result;
-  std::memcpy(&result, p, sizeof(result));
-  if (sys::IsBigEndianHost)
-    sys::swapByteOrder(result);
-  return result;
-}
 
 constexpr uint64_t hash_16_bytes(uint64_t low, uint64_t high) {
   // Murmur-inspired hashing.
@@ -343,11 +334,7 @@ namespace detail {
 /// behavior in the presence of integral promotions. Essentially,
 /// "hash_value('4')" and "hash_value('0' + 4)" should be the same.
 inline hash_code hash_integer_value(uint64_t value) {
-  // Similar to hash_4to8_bytes but using a seed instead of length.
-  const uint64_t seed = get_execution_seed();
-  const char *s = reinterpret_cast<const char *>(&value);
-  const uint64_t a = fetch32(s);
-  return hash_16_bytes(seed + (a << 3), fetch32(s + 4));
+  return hash_16_bytes(value, get_execution_seed());
 }
 
 } // namespace detail
