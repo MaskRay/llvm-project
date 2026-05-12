@@ -9863,11 +9863,13 @@ Expected<Decl *> ASTImporter::Import(Decl *FromD) {
   if (!ToDOrErr) {
     // Failed to import.
 
+    Decl *FailedImportedToD = nullptr;
     auto Pos = ImportedDecls.find(FromD);
     if (Pos != ImportedDecls.end()) {
       // Import failed after the object was created.
       // Remove all references to it.
       auto *ToD = Pos->second;
+      FailedImportedToD = ToD;
       ImportedDecls.erase(Pos);
 
       // ImportedDecls and ImportedFromDecls are not symmetric.  It may happen
@@ -9903,8 +9905,9 @@ Expected<Decl *> ASTImporter::Import(Decl *FromD) {
                     [&ErrOut](const ASTImportError &E) { ErrOut = E; });
     setImportDeclError(FromD, ErrOut);
     // Set the error for the mapped to Decl, which is in the "to" context.
-    if (Pos != ImportedDecls.end())
-      SharedState->setImportDeclError(Pos->second, ErrOut);
+    // Pos has been erased above, so use the value captured before the erase.
+    if (FailedImportedToD)
+      SharedState->setImportDeclError(FailedImportedToD, ErrOut);
 
     // Set the error for all nodes which have been created before we
     // recognized the error.

@@ -174,6 +174,7 @@ IncrementalParser::Parse(llvm::StringRef input) {
 
 void IncrementalParser::CleanUpPTU(TranslationUnitDecl *MostRecentTU) {
   if (StoredDeclsMap *Map = MostRecentTU->getPrimaryContext()->getLookupPtr()) {
+    llvm::SmallVector<DeclarationName, 8> KeysToRemove;
     for (auto &&[Key, List] : *Map) {
       DeclContextLookupResult R = List.getLookupResult();
       std::vector<NamedDecl *> NamedDeclsToRemove;
@@ -185,12 +186,14 @@ void IncrementalParser::CleanUpPTU(TranslationUnitDecl *MostRecentTU) {
           RemoveAll = false;
       }
       if (LLVM_LIKELY(RemoveAll)) {
-        Map->erase(Key);
+        KeysToRemove.push_back(Key);
       } else {
         for (NamedDecl *D : NamedDeclsToRemove)
           List.remove(D);
       }
     }
+    for (DeclarationName Key : KeysToRemove)
+      Map->erase(Key);
   }
 
   ExternCContextDecl *ECCD = S.getASTContext().getExternCContextDecl();
