@@ -53,7 +53,7 @@ namespace llvm {
 /// hole moves with each slide), and stops at the next empty slot.  Empty
 /// buckets are represented with an illegal pointer value (-1) to allow null
 /// pointers to be inserted; no tombstone state is needed.  The hash table is
-/// resized when the table is 3/4 or more.  When this happens, the table is
+/// resized when the table is 2/3 or more.  When this happens, the table is
 /// doubled in size.
 class SmallPtrSetImplBase : public DebugEpochBase {
   friend class SmallPtrSetIteratorImpl;
@@ -121,13 +121,13 @@ public:
     // No need to expand if we're small and NewNumEntries will fit in the space.
     if (isSmall() && NewNumEntries <= CurArraySize)
       return;
-    // insert_imp_big will reallocate if stores is more than 75% full, on the
+    // insert_imp_big will reallocate if stores is more than 2/3 full, on the
     // /final/ insertion.
-    if (!isSmall() && ((NewNumEntries - 1) * 4) < (CurArraySize * 3))
+    if (!isSmall() && ((NewNumEntries - 1) * 3) < (CurArraySize * 2))
       return;
-    // We must Grow -- find the size where we'd be 75% full, then round up to
+    // We must Grow -- find the size where we'd be 2/3 full, then round up to
     // the next power of two.
-    size_type NewSize = NewNumEntries + (NewNumEntries / 3);
+    size_type NewSize = NewNumEntries + (NewNumEntries / 2);
     NewSize = llvm::bit_ceil(NewSize);
     // Like insert_imp_big, always allocate at least 128 elements.
     NewSize = std::max(128u, NewSize);

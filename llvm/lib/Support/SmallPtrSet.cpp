@@ -39,8 +39,8 @@ void SmallPtrSetImplBase::shrink_and_clear() {
 
 std::pair<const void *const *, bool>
 SmallPtrSetImplBase::insert_imp_big(const void *Ptr) {
-  if (LLVM_UNLIKELY(size() * 4 >= CurArraySize * 3)) {
-    // If more than 3/4 of the array is full, grow.
+  if (LLVM_UNLIKELY(size() * 3 >= CurArraySize * 2)) {
+    // If more than 2/3 of the array is full, grow.
     Grow(CurArraySize < 64 ? 128 : CurArraySize * 2);
   }
 
