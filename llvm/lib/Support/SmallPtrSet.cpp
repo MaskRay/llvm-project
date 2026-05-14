@@ -85,15 +85,24 @@ const void *const *SmallPtrSetImplBase::FindBucketFor(const void *Ptr) const {
 void SmallPtrSetImplBase::eraseFromBucket(const void **Bucket) {
   // Knuth TAOCP 6.4 Algorithm R: walk forward sliding each following entry
   // whose probe path crosses the hole.
+  //
+  // The textbook predicate `((I - Ideal) & Mask) < ((J - Ideal) & Mask)`
+  // simplifies: with Back := (I - Ideal) & Mask and Gap := (J - I) & Mask
+  // (strictly positive), the condition is equivalent to `Back + Gap < Mask
+  // + 1`, i.e. `Back <= Mask - Gap`.  Tracking Gap as a loop counter saves
+  // one `& Mask` per probe.
   unsigned Mask = CurArraySize - 1;
   unsigned I = Bucket - CurArray;
   unsigned J = I;
+  unsigned Gap = 0;
   const void *Empty = getEmptyMarker();
-  while ((J = (J + 1) & Mask), CurArray[J] != Empty) {
-    auto Ideal = DenseMapInfo<void *>::getHashValue(CurArray[J]);
-    if (((I - Ideal) & Mask) < ((J - Ideal) & Mask)) {
+  while ((J = (J + 1) & Mask, ++Gap), CurArray[J] != Empty) {
+    unsigned Back =
+        (I - DenseMapInfo<void *>::getHashValue(CurArray[J])) & Mask;
+    if (Back <= Mask - Gap) {
       CurArray[I] = CurArray[J];
       I = J;
+      Gap = 0;
     }
   }
   CurArray[I] = Empty;
