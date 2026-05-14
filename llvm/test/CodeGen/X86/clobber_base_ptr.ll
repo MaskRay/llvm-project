@@ -33,9 +33,9 @@ define i32 @clober_bp() {
 ; CHECK-NEXT:    movl %eax, %esp
 ; CHECK-NEXT:    movl $1, (%eax)
 ; CHECK-NEXT:    leal 8(%esi), %edi
-; CHECK-NEXT:    movl $4, %ecx
 ; CHECK-NEXT:    pushl %esi
 ; CHECK-NEXT:    movl %eax, %esi
+; CHECK-NEXT:    movl $4, %ecx
 ; CHECK-NEXT:    #APP
 ; CHECK-NEXT:    rep movsb (%esi), %es:(%edi)
 ; CHECK-NEXT:    #NO_APP
@@ -86,12 +86,12 @@ define i32 @clobber_bpfp() {
 ; CHECK-NEXT:    movl %eax, %esp
 ; CHECK-NEXT:    movl $1, (%eax)
 ; CHECK-NEXT:    leal 8(%esi), %edi
-; CHECK-NEXT:    movl $4, %ecx
 ; CHECK-NEXT:    pushl %ebp
 ; CHECK-NEXT:    pushl %esi
 ; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    .cfi_escape 0x0f, 0x06, 0x74, 0x04, 0x06, 0x11, 0x08, 0x22 #
 ; CHECK-NEXT:    movl %eax, %esi
+; CHECK-NEXT:    movl $4, %ecx
 ; CHECK-NEXT:    #APP
 ; CHECK-NEXT:    rep movsb (%esi), %es:(%edi)
 ; CHECK-NEXT:    #NO_APP

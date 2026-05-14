@@ -730,16 +730,16 @@ define <17 x float> @test_mgather_v17f32(ptr %base, <17 x i32> %index)
 ; WIDEN_AVX2-NEXT:    vinserti128 $1, %xmm1, %ymm3, %ymm1
 ; WIDEN_AVX2-NEXT:    vpcmpeqd %ymm3, %ymm3, %ymm3
 ; WIDEN_AVX2-NEXT:    vxorps %xmm4, %xmm4, %xmm4
-; WIDEN_AVX2-NEXT:    vpcmpeqd %ymm5, %ymm5, %ymm5
-; WIDEN_AVX2-NEXT:    vxorps %xmm6, %xmm6, %xmm6
-; WIDEN_AVX2-NEXT:    vgatherdps %ymm5, (%rsi,%ymm1,4), %ymm6
+; WIDEN_AVX2-NEXT:    vxorps %xmm5, %xmm5, %xmm5
+; WIDEN_AVX2-NEXT:    vpcmpeqd %ymm6, %ymm6, %ymm6
+; WIDEN_AVX2-NEXT:    vgatherdps %ymm6, (%rsi,%ymm1,4), %ymm5
 ; WIDEN_AVX2-NEXT:    vxorps %xmm1, %xmm1, %xmm1
 ; WIDEN_AVX2-NEXT:    vgatherdps %ymm3, (%rsi,%ymm0,4), %ymm1
 ; WIDEN_AVX2-NEXT:    vmovss {{.*#+}} xmm0 = [4294967295,0,0,0]
 ; WIDEN_AVX2-NEXT:    vgatherdps %ymm0, (%rsi,%ymm2,4), %ymm4
 ; WIDEN_AVX2-NEXT:    vmovss %xmm4, 64(%rdi)
 ; WIDEN_AVX2-NEXT:    vmovaps %ymm1, 32(%rdi)
-; WIDEN_AVX2-NEXT:    vmovaps %ymm6, (%rdi)
+; WIDEN_AVX2-NEXT:    vmovaps %ymm5, (%rdi)
 ; WIDEN_AVX2-NEXT:    vzeroupper
 ; WIDEN_AVX2-NEXT:    retq
 {

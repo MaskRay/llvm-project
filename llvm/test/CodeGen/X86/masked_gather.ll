@@ -1976,8 +1976,8 @@ define <8 x i32> @gather_v8i32_v8i32(<8 x i32> %trigger) {
 ; AVX512VL:       # %bb.0:
 ; AVX512VL-NEXT:    vptestnmd %ymm0, %ymm0, %k1
 ; AVX512VL-NEXT:    vpxor %xmm0, %xmm0, %xmm0
-; AVX512VL-NEXT:    kmovw %k1, %k2
 ; AVX512VL-NEXT:    vpxor %xmm1, %xmm1, %xmm1
+; AVX512VL-NEXT:    kmovw %k1, %k2
 ; AVX512VL-NEXT:    vpgatherdd c+12(,%ymm0), %ymm1 {%k2}
 ; AVX512VL-NEXT:    vpxor %xmm2, %xmm2, %xmm2
 ; AVX512VL-NEXT:    vpgatherdd c+28(,%ymm0), %ymm2 {%k1}
@@ -2565,13 +2565,13 @@ define <8 x i32> @masked_gather_v8i32_v8i32(i8 %trigger) {
 ; AVX2-GATHER-NEXT:    vpand %ymm1, %ymm0, %ymm0
 ; AVX2-GATHER-NEXT:    vpcmpeqd %ymm1, %ymm0, %ymm0
 ; AVX2-GATHER-NEXT:    vpxor %xmm1, %xmm1, %xmm1
-; AVX2-GATHER-NEXT:    vmovdqa %ymm0, %ymm2
-; AVX2-GATHER-NEXT:    vpxor %xmm3, %xmm3, %xmm3
-; AVX2-GATHER-NEXT:    vpgatherdd %ymm2, c+12(,%ymm1), %ymm3
 ; AVX2-GATHER-NEXT:    vpxor %xmm2, %xmm2, %xmm2
-; AVX2-GATHER-NEXT:    vpgatherdd %ymm0, c+28(,%ymm1), %ymm2
-; AVX2-GATHER-NEXT:    vpaddd %ymm2, %ymm3, %ymm0
-; AVX2-GATHER-NEXT:    vpaddd %ymm2, %ymm0, %ymm0
+; AVX2-GATHER-NEXT:    vmovdqa %ymm0, %ymm3
+; AVX2-GATHER-NEXT:    vpgatherdd %ymm3, c+12(,%ymm1), %ymm2
+; AVX2-GATHER-NEXT:    vpxor %xmm3, %xmm3, %xmm3
+; AVX2-GATHER-NEXT:    vpgatherdd %ymm0, c+28(,%ymm1), %ymm3
+; AVX2-GATHER-NEXT:    vpaddd %ymm3, %ymm2, %ymm0
+; AVX2-GATHER-NEXT:    vpaddd %ymm3, %ymm0, %ymm0
 ; AVX2-GATHER-NEXT:    retq
 ;
 ; AVX512F-LABEL: masked_gather_v8i32_v8i32:
@@ -2579,8 +2579,8 @@ define <8 x i32> @masked_gather_v8i32_v8i32(i8 %trigger) {
 ; AVX512F-NEXT:    movzbl %dil, %eax
 ; AVX512F-NEXT:    kmovw %eax, %k1
 ; AVX512F-NEXT:    vpxor %xmm0, %xmm0, %xmm0
-; AVX512F-NEXT:    kmovw %k1, %k2
 ; AVX512F-NEXT:    vpxor %xmm1, %xmm1, %xmm1
+; AVX512F-NEXT:    kmovw %k1, %k2
 ; AVX512F-NEXT:    vpgatherdd c+12(,%zmm0), %zmm1 {%k2}
 ; AVX512F-NEXT:    vpxor %xmm2, %xmm2, %xmm2
 ; AVX512F-NEXT:    vpgatherdd c+28(,%zmm0), %zmm2 {%k1}
@@ -2592,8 +2592,8 @@ define <8 x i32> @masked_gather_v8i32_v8i32(i8 %trigger) {
 ; AVX512VL:       # %bb.0:
 ; AVX512VL-NEXT:    kmovw %edi, %k1
 ; AVX512VL-NEXT:    vpxor %xmm0, %xmm0, %xmm0
-; AVX512VL-NEXT:    kmovw %k1, %k2
 ; AVX512VL-NEXT:    vpxor %xmm1, %xmm1, %xmm1
+; AVX512VL-NEXT:    kmovw %k1, %k2
 ; AVX512VL-NEXT:    vpgatherdd c+12(,%ymm0), %ymm1 {%k2}
 ; AVX512VL-NEXT:    vpxor %xmm2, %xmm2, %xmm2
 ; AVX512VL-NEXT:    vpgatherdd c+28(,%ymm0), %ymm2 {%k1}
