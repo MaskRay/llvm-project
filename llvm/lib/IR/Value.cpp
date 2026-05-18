@@ -1177,11 +1177,15 @@ void ValueHandleBase::AddToUseList() {
   // DenseMap.  However, doing this insertion could cause the DenseMap to
   // reallocate itself, which would invalidate all of the PrevP pointers that
   // point into the old table.  Handle this by checking for reallocation and
-  // updating the stale pointers only if needed.
+  // updating the stale pointers only if needed.  Insertion may also relocate
+  // one existing entry in place (home-bucket eviction); the getOrInsert
+  // callback repairs that entry's PrevP pointer.
   DenseMap<Value*, ValueHandleBase*> &Handles = pImpl->ValueHandles;
   const void *OldBucketPtr = Handles.getPointerIntoBucketsArray();
 
-  ValueHandleBase *&Entry = Handles[getValPtr()];
+  ValueHandleBase *&Entry = Handles.getOrInsert(getValPtr(), [](auto &Bucket) {
+    Bucket.second->setPrevPtr(&Bucket.second);
+  });
   assert(!Entry && "Value really did already have handles?");
   AddToExistingUseList(&Entry);
   getValPtr()->HasValueHandle = true;
