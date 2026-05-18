@@ -16,6 +16,7 @@
 #define LLVM_ADT_SETOPERATIONS_H
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
 
@@ -60,12 +61,13 @@ template <class S1Ty, class S2Ty> void set_intersect(S1Ty &S1, const S2Ty &S2) {
   if constexpr (detail::HasMemberRemoveIf<S1Ty, decltype(Pred)>) {
     S1.remove_if(Pred);
   } else {
-    typename S1Ty::iterator Next;
-    for (typename S1Ty::iterator I = S1.begin(); I != S1.end(); I = Next) {
-      Next = std::next(I);
-      if (!S2.count(*I))
-        S1.erase(I); // Erase element if not in S2
-    }
+    // erase() may invalidate iterators, so do not iterate S1 while erasing
+    // from it; rebuild it instead.
+    S1Ty Result;
+    for (const auto &E : S1)
+      if (S2.count(E))
+        Result.insert(E);
+    S1 = std::move(Result);
   }
 }
 
@@ -117,13 +119,14 @@ template <class S1Ty, class S2Ty> void set_subtract(S1Ty &S1, const S2Ty &S2) {
       }
     } else if constexpr (detail::HasMemberEraseIter<S1Ty>) {
       if (S1.size() < S2.size()) {
-        typename S1Ty::iterator Next;
-        for (typename S1Ty::iterator SI = S1.begin(), SE = S1.end(); SI != SE;
-             SI = Next) {
-          Next = std::next(SI);
-          if (S2.contains(*SI))
-            S1.erase(SI);
-        }
+        // erase() may invalidate iterators, so collect the elements to remove
+        // before erasing them.
+        SmallVector<typename S1Ty::value_type, 0> ToErase;
+        for (const auto &E : S1)
+          if (S2.contains(E))
+            ToErase.push_back(E);
+        for (const auto &E : ToErase)
+          S1.erase(E);
         return;
       }
     }

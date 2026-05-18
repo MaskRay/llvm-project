@@ -726,6 +726,10 @@ void HLSLExternalSemaSource::CompleteType(TagDecl *Tag) {
   auto It = Completions.find(Record);
   if (It == Completions.end())
     return;
-  It->second(Record);
+  // Move the callback out and erase the entry before running it: the callback
+  // may re-enter completeType() and mutate Completions, which would invalidate
+  // It (and the erased entry must not be run again).
+  CompletionFunction Fn = std::move(It->second);
   Completions.erase(It);
+  Fn(Record);
 }

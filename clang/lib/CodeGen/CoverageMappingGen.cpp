@@ -2259,14 +2259,14 @@ struct CounterCoverageMappingBuilder
            "Didn't find all MCDCBranches to be restored");
     (void)FoundCount;
 
-    // Tell CodeGenPGO not to instrument.
-    for (auto I = MCDCState.BranchByStmt.begin(),
-              E = MCDCState.BranchByStmt.end();
-         I != E;) {
-      auto II = I++;
-      if (II->second.DecisionStmt == Decision)
-        MCDCState.BranchByStmt.erase(II);
-    }
+    // Tell CodeGenPGO not to instrument.  Collect before erasing: erase()
+    // may invalidate iterators.
+    llvm::SmallVector<const Stmt *, 8> BranchesToRemove;
+    for (const auto &[Br, Info] : MCDCState.BranchByStmt)
+      if (Info.DecisionStmt == Decision)
+        BranchesToRemove.push_back(Br);
+    for (const Stmt *Br : BranchesToRemove)
+      MCDCState.BranchByStmt.erase(Br);
     MCDCState.DecisionByStmt.erase(Decision);
   }
 

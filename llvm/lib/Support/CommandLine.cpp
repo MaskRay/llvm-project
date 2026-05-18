@@ -277,10 +277,10 @@ public:
       OptionNames.push_back(O->ArgStr);
 
     SubCommand &Sub = *SC;
-    auto End = Sub.OptionsMap.end();
     for (auto Name : OptionNames) {
       auto I = Sub.OptionsMap.find(Name);
-      if (I != End && I->second == O)
+      // Recompute end() each iteration: a prior erase() may invalidate it.
+      if (I != Sub.OptionsMap.end() && I->second == O)
         Sub.OptionsMap.erase(I);
     }
 
@@ -1494,8 +1494,14 @@ void CommandLineParser::ResetAllOptionOccurrences() {
   // Options might be reset twice (they can be reference in both OptionsMap
   // and one of the other members), but that does not harm.
   for (auto *SC : RegisteredSubCommands) {
+    // reset() can removeArgument() a default option, which erases it from
+    // OptionsMap; snapshot the options before resetting so we are not
+    // iterating OptionsMap while it is being mutated.
+    SmallVector<Option *, 0> OptionsToReset;
     for (auto &O : SC->OptionsMap)
-      O.second->reset();
+      OptionsToReset.push_back(O.second);
+    for (Option *O : OptionsToReset)
+      O->reset();
     for (Option *O : SC->PositionalOpts)
       O->reset();
     for (Option *O : SC->SinkOpts)
