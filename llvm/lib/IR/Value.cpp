@@ -1175,26 +1175,22 @@ void ValueHandleBase::AddToUseList() {
   }
 
   // Ok, it doesn't have any handles yet, so we must insert it into the
-  // DenseMap.  However, doing this insertion could cause the DenseMap to
-  // reallocate itself, which would invalidate all of the PrevP pointers that
-  // point into the old table.  Handle this by checking for reallocation and
-  // updating the stale pointers only if needed.
+  // DenseMap.  Inserting can relocate other live entries (the DenseMap may
+  // reallocate, and its deletion/insertion scheme may also move surviving
+  // entries in place), which invalidates the PrevP pointers that point into
+  // the bucket array.  Re-point every list head afterwards.
   DenseMap<Value*, ValueHandleBase*> &Handles = pImpl->ValueHandles;
-  const void *OldBucketPtr = Handles.getPointerIntoBucketsArray();
 
   ValueHandleBase *&Entry = Handles[getValPtr()];
   assert(!Entry && "Value really did already have handles?");
   AddToExistingUseList(&Entry);
   getValPtr()->HasValueHandle = true;
 
-  // If reallocation didn't happen or if this was the first insertion, don't
-  // walk the table.
-  if (Handles.isPointerIntoBucketsArray(OldBucketPtr) ||
-      Handles.size() == 1) {
+  // If this was the first insertion there is nothing else to fix.
+  if (Handles.size() == 1)
     return;
-  }
 
-  // Okay, reallocation did happen.  Fix the Prev Pointers.
+  // Other entries may have moved.  Fix the Prev Pointers.
   for (auto I = Handles.begin(), E = Handles.end(); I != E; ++I) {
     assert(I->second && I->first == I->second->getValPtr() &&
            "List invariant broken!");
@@ -1223,7 +1219,9 @@ void ValueHandleBase::RemoveFromUseList() {
   LLVMContextImpl *pImpl = getValPtr()->getContext().pImpl;
   DenseMap<Value*, ValueHandleBase*> &Handles = pImpl->ValueHandles;
   if (Handles.isPointerIntoBucketsArray(PrevPtr)) {
-    Handles.erase(getValPtr());
+    Handles.erase(getValPtr(), [](auto &Bucket) {
+      Bucket.second->setPrevPtr(&Bucket.second);
+    });
     getValPtr()->HasValueHandle = false;
   }
 }
