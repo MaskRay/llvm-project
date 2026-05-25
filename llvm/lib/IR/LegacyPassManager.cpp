@@ -915,15 +915,16 @@ void PMDataManager::removeNotPreservedAnalysis(Pass *P) {
     }
     return true;
   };
-  AvailableAnalysis.remove_if(IsNotPreserved);
-
+  SmallVector<DenseMap<AnalysisID, Pass *> *, 8> Maps = {&AvailableAnalysis};
   // Check inherited analysis also. If P is not preserving analysis
   // provided by parent manager then remove it here.
-  for (DenseMap<AnalysisID, Pass *> *IA : InheritedAnalysis) {
-    if (!IA)
-      continue;
-    IA->remove_if(IsNotPreserved);
-  }
+  for (DenseMap<AnalysisID, Pass *> *IA : InheritedAnalysis)
+    if (IA)
+      Maps.push_back(IA);
+  // Prune all maps from a single remove_if call site so the DenseMap::remove_if
+  // instantiation is inlined here instead of emitted out of line.
+  for (DenseMap<AnalysisID, Pass *> *M : Maps)
+    M->remove_if(IsNotPreserved);
 }
 
 /// Remove analysis passes that are not used any longer
