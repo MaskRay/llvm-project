@@ -438,12 +438,14 @@ protected:
   /// Returns the number of buckets to allocate to ensure that the DenseMap can
   /// accommodate \p NumEntries without need to grow().
   unsigned getMinBucketToReserveForEntries(unsigned NumEntries) {
-    // Ensure that "NumEntries * 4 < NumBuckets * 3"
+    // Ensure that "NumEntries * 3 < NumBuckets * 2", consistent with the 2/3
+    // max load factor in findBucketForInsertion().
     if (NumEntries == 0)
       return 0;
-    // +1 is required because of the strict inequality.
+    // NextPowerOf2 is strictly greater than its argument, and 3*N/2 is never
+    // itself a power of two, so this is the tight bucket count.
     // For example, if NumEntries is 48, we need to return 128.
-    return NextPowerOf2(NumEntries * 4 / 3 + 1);
+    return NextPowerOf2(NumEntries * 3 / 2);
   }
 
   // Move key/value from Other to *this.
@@ -630,13 +632,13 @@ private:
                                   BucketT *TheBucket) {
     incrementEpoch();
 
-    // Grow the table if the load factor would exceed 3/4 after insertion.
-    // Linear probing with gap-closing deletion (Knuth Algorithm R) keeps
-    // every chain compact and bounded by the table's empty-bucket count,
-    // so no tombstone-driven resize is needed.
+    // Grow the table if the load factor would exceed 2/3 after insertion,
+    // matching SmallPtrSet. Linear probing with gap-closing deletion (Knuth
+    // Algorithm R) keeps every chain compact and bounded by the table's
+    // empty-bucket count, so no tombstone-driven resize is needed.
     unsigned NewNumEntries = getNumEntries() + 1;
     unsigned NumBuckets = getNumBuckets();
-    if (LLVM_UNLIKELY(NewNumEntries * 4 >= NumBuckets * 3)) {
+    if (LLVM_UNLIKELY(NewNumEntries * 3 >= NumBuckets * 2)) {
       this->grow(NumBuckets * 2);
       LookupBucketFor(Lookup, TheBucket);
     }

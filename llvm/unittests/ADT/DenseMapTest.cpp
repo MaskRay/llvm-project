@@ -503,8 +503,10 @@ TEST(DenseMapCustomTest, DefaultMinReservedSizeTest) {
   // IF THIS VALUE CHANGE, please update InitialSizeTest, InitFromIterator, and
   // ReserveTest as well!
   const int ExpectedInitialBucketCount = 64;
-  // Formula from DenseMap::getMinBucketToReserveForEntries()
-  const int ExpectedMaxInitialEntries = ExpectedInitialBucketCount * 3 / 4 - 1;
+  // The map grows at a 2/3 load factor, so the largest entry count that fits
+  // without growing is floor((NumBuckets * 2 - 1) / 3).
+  const int ExpectedMaxInitialEntries =
+      (ExpectedInitialBucketCount * 2 - 1) / 3;
 
   DenseMap<int, CountCopyAndMove> Map;
   // Will allocate 64 buckets
@@ -992,7 +994,7 @@ TEST(DenseMapCustomTest, InitSize) {
   }
   {
     DenseMap<int *, int> Map(1);
-    EXPECT_EQ(ElemSize * 4U, Map.getMemorySize());
+    EXPECT_EQ(ElemSize * 2U, Map.getMemorySize());
   }
   {
     DenseMap<int *, int> Map(2);
