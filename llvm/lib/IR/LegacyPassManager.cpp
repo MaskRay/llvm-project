@@ -914,6 +914,12 @@ void PMDataManager::removeNotPreservedAnalysis(Pass *P) {
   // call site makes the inliner emit it out of line, which adds a call in this
   // hot per-pass path. A single call site keeps it inlined here.
   for (DenseMap<AnalysisID, Pass *> *M : Maps) {
+    // remove_if scans the whole bucket array, which is not freed on erase, so
+    // an emptied map can still hold many buckets. These maps are frequently
+    // empty here and this runs after every pass, so skip the scan; matches the
+    // empty() short-circuit that the previous begin()/end() loop relied on.
+    if (M->empty())
+      continue;
     M->remove_if([&](const auto &Entry) {
       if (Entry.second->getAsImmutablePass() != nullptr ||
           is_contained(PreservedSet, Entry.first))
