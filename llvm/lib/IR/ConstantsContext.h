@@ -587,8 +587,6 @@ private:
     }
 
     static bool isEqual(const LookupKey &LHS, const ConstantClass *RHS) {
-      if (RHS == getEmptyKey())
-        return false;
       if (LHS.first != RHS->getType())
         return false;
       return LHS.second == RHS;

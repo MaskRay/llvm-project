@@ -120,8 +120,6 @@ struct AnonStructTypeKeyInfo {
   }
 
   static bool isEqual(const KeyTy &LHS, const StructType *RHS) {
-    if (RHS == getEmptyKey())
-      return false;
     return LHS == KeyTy(RHS);
   }
 
@@ -168,8 +166,6 @@ struct FunctionTypeKeyInfo {
   }
 
   static bool isEqual(const KeyTy &LHS, const FunctionType *RHS) {
-    if (RHS == getEmptyKey())
-      return false;
     return LHS == KeyTy(RHS);
   }
 
@@ -211,8 +207,6 @@ struct TargetExtTypeKeyInfo {
   }
 
   static bool isEqual(const KeyTy &LHS, const TargetExtType *RHS) {
-    if (RHS == getEmptyKey())
-      return false;
     return LHS == KeyTy(RHS);
   }
 
@@ -1519,8 +1513,6 @@ struct DIArgListInfo {
   }
 
   static bool isEqual(const KeyTy &LHS, const DIArgList *RHS) {
-    if (RHS == getEmptyKey())
-      return false;
     return LHS.isKeyOf(RHS);
   }
 
@@ -1545,16 +1537,12 @@ template <class NodeTy> struct MDNodeInfo {
   }
 
   static bool isEqual(const KeyTy &LHS, const NodeTy *RHS) {
-    if (RHS == getEmptyKey())
-      return false;
     return SubsetEqualTy::isSubsetEqual(LHS, RHS) || LHS.isKeyOf(RHS);
   }
 
   static bool isEqual(const NodeTy *LHS, const NodeTy *RHS) {
     if (LHS == RHS)
       return true;
-    if (RHS == getEmptyKey())
-      return false;
     return SubsetEqualTy::isSubsetEqual(LHS, RHS);
   }
 };
