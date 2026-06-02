@@ -84,6 +84,12 @@ inline void setUnused(used_t *U, size_t I) {
   U[I >> 5] &= ~(used_t(1) << (I & 31));
 }
 
+// In-band empty marker for pointer keys (all-ones is never a valid object
+// pointer).  Single source of truth, shared by DenseMapBase and the iterator.
+template <typename KeyT> KeyT emptyPtrKey() {
+  return reinterpret_cast<KeyT>(~uintptr_t(0));
+}
+
 // Invoke Func(I) for each occupied bucket index I in [0, N). Set always_inline;
 // otherwise, for a heavy caller such as moveFrom's rehash, the inliner can
 // leave it out of line and the per-element call dwarfs the work.
@@ -200,9 +206,16 @@ public:
     }
 
     destroyAll();
-    std::memset(getUsed(), 0,
-                llvm::densemap::detail::usedWords(getNumBuckets()) *
-                    sizeof(used_t));
+    if constexpr (UseSentinel) {
+      BucketT *B = getBuckets();
+      unsigned N = getNumBuckets();
+      for (unsigned I = 0; I != N; ++I)
+        B[I].getFirst() = emptyKey();
+    } else {
+      std::memset(getUsed(), 0,
+                  llvm::densemap::detail::usedWords(getNumBuckets()) *
+                      sizeof(used_t));
+    }
     setNumEntries(0);
   }
 
@@ -403,12 +416,12 @@ public:
     BucketT *B = getBuckets();
     bool Removed = false;
     for (unsigned I = 0; I != NumBuckets; ++I) {
-      if (!llvm::densemap::detail::used(U, I))
+      if (!occupied(B, U, I))
         continue;
       if (Pred(B[I])) {
         B[I].getSecond().~ValueT();
         B[I].getFirst().~KeyT();
-        llvm::densemap::detail::setUnused(U, I);
+        vacate(B, U, I);
         decrementNumEntries();
         Removed = true;
       }
@@ -481,7 +494,7 @@ protected:
     BucketT *B = getBuckets();
     const used_t *U = getUsed();
     const unsigned E = getNumBuckets();
-    llvm::densemap::detail::forEachUsed(U, E, [&](unsigned I) {
+    forEachOccupied(B, U, E, [&](unsigned I) {
       B[I].getSecond().~ValueT();
       B[I].getFirst().~KeyT();
     });
@@ -494,9 +507,16 @@ protected:
 
     assert((getNumBuckets() & (getNumBuckets() - 1)) == 0 &&
            "# initial buckets must be a power of two!");
-    std::memset(getUsed(), 0,
-                llvm::densemap::detail::usedWords(getNumBuckets()) *
-                    sizeof(used_t));
+    if constexpr (UseSentinel) {
+      BucketT *B = getBuckets();
+      unsigned N = getNumBuckets();
+      for (unsigned I = 0; I != N; ++I)
+        ::new (&B[I].getFirst()) KeyT(emptyKey());
+    } else {
+      std::memset(getUsed(), 0,
+                  llvm::densemap::detail::usedWords(getNumBuckets()) *
+                      sizeof(used_t));
+    }
   }
 
   /// Returns the number of buckets to allocate to ensure that the DenseMap can
@@ -520,16 +540,16 @@ protected:
     used_t *U = getUsed();
     BucketT *B = getBuckets();
     const unsigned Mask = getNumBuckets() - 1;
-    llvm::densemap::detail::forEachUsed(OtherU, E, [&](unsigned I) {
+    forEachOccupied(OtherB, OtherU, E, [&](unsigned I) {
       // Find the first empty slot on this key's probe chain; there is no equal
       // key in the destination, so nothing to compare against.
       unsigned BucketNo = KeyInfoT::getHashValue(OtherB[I].getFirst()) & Mask;
-      while (llvm::densemap::detail::used(U, BucketNo))
+      while (occupied(B, U, BucketNo))
         BucketNo = (BucketNo + 1) & Mask;
       BucketT *DestBucket = B + BucketNo;
       ::new (&DestBucket->getFirst()) KeyT(std::move(OtherB[I].getFirst()));
       ::new (&DestBucket->getSecond()) ValueT(std::move(OtherB[I].getSecond()));
-      llvm::densemap::detail::setUsed(U, BucketNo);
+      occupy(U, BucketNo);
 
       // Free the moved-out key/value.
       OtherB[I].getSecond().~ValueT();
@@ -558,14 +578,20 @@ protected:
     const unsigned NumBuckets = getNumBuckets();
     used_t *U = getUsed();
     const used_t *OtherU = other.getUsed();
-    std::memcpy(U, OtherU,
-                llvm::densemap::detail::usedWords(NumBuckets) * sizeof(used_t));
+    if constexpr (!UseSentinel)
+      std::memcpy(U, OtherU,
+                  llvm::densemap::detail::usedWords(NumBuckets) *
+                      sizeof(used_t));
     if constexpr (std::is_trivially_copyable_v<KeyT> &&
                   std::is_trivially_copyable_v<ValueT>) {
+      // For sentinel keys this copies empty source buckets too, whose keys hold
+      // emptyKey(), so occupancy is preserved.
       memcpy(reinterpret_cast<void *>(Buckets), OtherBuckets,
              NumBuckets * sizeof(BucketT));
     } else {
-      llvm::densemap::detail::forEachUsed(U, NumBuckets, [&](unsigned I) {
+      // note: for sentinel keys this branch is never taken (pointers are
+      // trivially copyable), so empty dest buckets are not initialized here.
+      forEachOccupied(OtherBuckets, OtherU, NumBuckets, [&](unsigned I) {
         ::new (&Buckets[I].getFirst()) KeyT(OtherBuckets[I].getFirst());
         ::new (&Buckets[I].getSecond()) ValueT(OtherBuckets[I].getSecond());
       });
@@ -598,7 +624,7 @@ private:
     while (true) {
       J = (J + 1) & Mask;
       BucketT &BJ = BucketsPtr[J];
-      if (!llvm::densemap::detail::used(U, J))
+      if (!occupied(BucketsPtr, U, J))
         break;
       auto Ideal = KeyInfoT::getHashValue(BJ.getFirst());
       // If the hole (I) lies on the linear-probe chain from the home bucket
@@ -614,7 +640,7 @@ private:
       }
     }
     // The hole carries a stale used bit through the shifts; clear it here.
-    llvm::densemap::detail::setUnused(U, I);
+    vacate(BucketsPtr, U, I);
   }
 
   /// Erase \p Val and close the resulting hole by potentially shifting other
@@ -684,6 +710,49 @@ private:
 
   unsigned getNumBuckets() const { return derived().getNumBuckets(); }
 
+protected:
+  static constexpr bool UseSentinel = std::is_pointer_v<KeyT>;
+  // In-band empty marker for pointer keys (all-ones is never a valid object
+  // pointer).
+  static KeyT emptyKey() {
+    static_assert(UseSentinel);
+    return llvm::densemap::detail::emptyPtrKey<KeyT>();
+  }
+  // Occupancy test for bucket I.
+  static bool occupied(const BucketT *B, const used_t *U, unsigned I) {
+    if constexpr (UseSentinel)
+      return !KeyInfoT::isEqual(emptyKey(), B[I].getFirst());
+    else
+      return llvm::densemap::detail::used(U, I);
+  }
+  // Mark bucket I empty (observed later). For sentinel the key must already be
+  // a constructed, trivially-destructible pointer; we assign the marker.
+  static void vacate(BucketT *B, used_t *U, unsigned I) {
+    if constexpr (UseSentinel)
+      B[I].getFirst() = emptyKey();
+    else
+      llvm::densemap::detail::setUnused(U, I);
+  }
+  // Mark bucket I occupied. For sentinel this is implicit (the real key is
+  // written by the caller's placement-new), so it's a no-op.
+  static void occupy(used_t *U, unsigned I) {
+    if constexpr (!UseSentinel)
+      llvm::densemap::detail::setUsed(U, I);
+  }
+  // Visit each occupied bucket index in [0,N).
+  template <typename Fn>
+  static void forEachOccupied(const BucketT *B, const used_t *U, unsigned N,
+                              Fn F) {
+    if constexpr (UseSentinel) {
+      for (unsigned I = 0; I != N; ++I)
+        if (!KeyInfoT::isEqual(emptyKey(), B[I].getFirst()))
+          F(I);
+    } else {
+      llvm::densemap::detail::forEachUsed(U, N, F);
+    }
+  }
+
+private:
   BucketT *getBucketsEnd() { return getBuckets() + getNumBuckets(); }
 
   const BucketT *getBucketsEnd() const {
@@ -718,8 +787,7 @@ private:
     assert(TheBucket);
 
     // Mark the slot used; the caller placement-constructs the raw key/value.
-    llvm::densemap::detail::setUsed(getUsed(),
-                                    unsigned(TheBucket - getBuckets()));
+    occupy(getUsed(), unsigned(TheBucket - getBuckets()));
 
     // Only update the state after we've grown our bucket space appropriately
     // so that when growing buckets we have self-consistent entry count.
@@ -735,16 +803,29 @@ private:
 
     const unsigned Mask = NumBuckets - 1;
     unsigned BucketNo = KeyInfoT::getHashValue(Val) & Mask;
-    while (true) {
-      // An empty bucket terminates the probe: the key isn't in the map.
-      if (LLVM_LIKELY(!llvm::densemap::detail::used(U, BucketNo)))
-        return nullptr;
-      const BucketT *Bucket = BucketsPtr + BucketNo;
-      if (LLVM_LIKELY(KeyInfoT::isEqual(Val, Bucket->getFirst())))
-        return Bucket;
+    if constexpr (UseSentinel) {
+      while (true) {
+        const BucketT *Bucket = BucketsPtr + BucketNo;
+        if (LLVM_LIKELY(KeyInfoT::isEqual(Val, Bucket->getFirst())))
+          return Bucket;
+        // An empty bucket terminates the probe: the key isn't in the map.
+        if (LLVM_LIKELY(KeyInfoT::isEqual(emptyKey(), Bucket->getFirst())))
+          return nullptr;
+        // Hash collision: continue linear probing.
+        BucketNo = (BucketNo + 1) & Mask;
+      }
+    } else {
+      while (true) {
+        // An empty bucket terminates the probe: the key isn't in the map.
+        if (LLVM_LIKELY(!llvm::densemap::detail::used(U, BucketNo)))
+          return nullptr;
+        const BucketT *Bucket = BucketsPtr + BucketNo;
+        if (LLVM_LIKELY(KeyInfoT::isEqual(Val, Bucket->getFirst())))
+          return Bucket;
 
-      // Hash collision: continue linear probing.
-      BucketNo = (BucketNo + 1) & Mask;
+        // Hash collision: continue linear probing.
+        BucketNo = (BucketNo + 1) & Mask;
+      }
     }
   }
 
@@ -769,23 +850,43 @@ private:
 
     const unsigned Mask = NumBuckets - 1;
     unsigned BucketNo = KeyInfoT::getHashValue(Val) & Mask;
-    while (true) {
-      BucketT *ThisBucket = BucketsPtr + BucketNo;
-      // If we found an empty bucket, the key doesn't exist in the set.
-      // Return it as the insertion point.
-      if (LLVM_LIKELY(!llvm::densemap::detail::used(U, BucketNo))) {
-        FoundBucket = ThisBucket;
-        return false;
+    if constexpr (UseSentinel) {
+      while (true) {
+        BucketT *ThisBucket = BucketsPtr + BucketNo;
+        // Found Val's bucket?  If so, return it.
+        if (LLVM_LIKELY(KeyInfoT::isEqual(Val, ThisBucket->getFirst()))) {
+          FoundBucket = ThisBucket;
+          return true;
+        }
+        // If we found an empty bucket, the key doesn't exist in the set.
+        // Return it as the insertion point.
+        if (LLVM_LIKELY(
+                KeyInfoT::isEqual(emptyKey(), ThisBucket->getFirst()))) {
+          FoundBucket = ThisBucket;
+          return false;
+        }
+        // Hash collision: continue linear probing.
+        BucketNo = (BucketNo + 1) & Mask;
       }
+    } else {
+      while (true) {
+        BucketT *ThisBucket = BucketsPtr + BucketNo;
+        // If we found an empty bucket, the key doesn't exist in the set.
+        // Return it as the insertion point.
+        if (LLVM_LIKELY(!llvm::densemap::detail::used(U, BucketNo))) {
+          FoundBucket = ThisBucket;
+          return false;
+        }
 
-      // Found Val's bucket?  If so, return it.
-      if (LLVM_LIKELY(KeyInfoT::isEqual(Val, ThisBucket->getFirst()))) {
-        FoundBucket = ThisBucket;
-        return true;
+        // Found Val's bucket?  If so, return it.
+        if (LLVM_LIKELY(KeyInfoT::isEqual(Val, ThisBucket->getFirst()))) {
+          FoundBucket = ThisBucket;
+          return true;
+        }
+
+        // Hash collision: continue linear probing.
+        BucketNo = (BucketNo + 1) & Mask;
       }
-
-      // Hash collision: continue linear probing.
-      BucketNo = (BucketNo + 1) & Mask;
     }
   }
 
@@ -1066,6 +1167,10 @@ private:
     ::new (&Dst->getSecond()) ValueT(std::move(Src->getSecond()));
     Src->getSecond().~ValueT();
     Src->getFirst().~KeyT();
+    // For sentinel keys, swapImpl observes inline occupancy after relocations,
+    // so the moved-out source must read empty.
+    if constexpr (BaseT::UseSentinel)
+      Src->getFirst() = BaseT::emptyKey();
   }
 
   void swapImpl(SmallDenseMap &RHS) {
@@ -1080,8 +1185,8 @@ private:
       used_t *LU = getInlineUsed(), *RU = RHS.getInlineUsed();
       BucketT *LB = getInlineBuckets(), *RB = RHS.getInlineBuckets();
       for (unsigned I = 0; I != InlineBuckets; ++I) {
-        bool L = llvm::densemap::detail::used(LU, I);
-        bool R = llvm::densemap::detail::used(RU, I);
+        bool L = BaseT::occupied(LB, LU, I);
+        bool R = BaseT::occupied(RB, RU, I);
         if (L && R) {
           // Both occupied: exchange through a temporary.
           alignas(BucketT) char Tmp[sizeof(BucketT)];
@@ -1095,8 +1200,9 @@ private:
           relocateBucket(&LB[I], &RB[I]);
         }
       }
-      for (unsigned W = 0; W != InlineUsedWords; ++W)
-        std::swap(LU[W], RU[W]);
+      if constexpr (!BaseT::UseSentinel)
+        for (unsigned W = 0; W != InlineUsedWords; ++W)
+          std::swap(LU[W], RU[W]);
       return;
     }
     if (!Small && !RHS.Small) {
@@ -1117,10 +1223,15 @@ private:
       BucketT *SB = SmallSide.getInlineBuckets(),
               *LB = LargeSide.getInlineBuckets();
       for (unsigned I = 0; I != InlineBuckets; ++I)
-        if (llvm::densemap::detail::used(SU, I))
+        if (BaseT::occupied(SB, SU, I))
           relocateBucket(&LB[I], &SB[I]);
-      for (unsigned W = 0; W != InlineUsedWords; ++W)
-        LU[W] = SU[W];
+        else if constexpr (BaseT::UseSentinel)
+          // The destination inline slot is raw storage; for sentinel keys it
+          // must read empty, so plant the marker.
+          LB[I].getFirst() = BaseT::emptyKey();
+      if constexpr (!BaseT::UseSentinel)
+        for (unsigned W = 0; W != InlineUsedWords; ++W)
+          LU[W] = SU[W];
     }
     SmallSide.Small = false;
     SmallSide.storage.Large = TmpRep;
@@ -1372,6 +1483,15 @@ public:
 
 private:
   void AdvancePastEmptyBuckets() {
+    if constexpr (std::is_pointer_v<KeyT>) {
+      // Pointer keys store occupancy in-band: an empty bucket holds the
+      // all-ones sentinel.  &*Ptr works for both forward (pointer) and reverse
+      // (reverse_iterator) Ptr types; Ptr != End guards the end iterator.
+      KeyT Empty = llvm::densemap::detail::emptyPtrKey<KeyT>();
+      while (Ptr != End && KeyInfoT::isEqual(Empty, (&*Ptr)->getFirst()))
+        ++Ptr;
+      return;
+    }
     if constexpr (shouldReverseIterate<KeyT>()) {
       // Reverse iteration (a debug aid) walks toward lower indices; keep the
       // simple per-bucket scan.  The Ptr != End short-circuit guards &*Ptr so
