@@ -838,7 +838,6 @@ class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, KeyInfoT, BucketT>,
   using UsedT = llvm::densemap::detail::UsedT;
 
   BucketT *Buckets = nullptr;
-  UsedT *Used = nullptr;
   unsigned NumEntries = 0;
   unsigned NumBuckets = 0;
 
@@ -891,7 +890,6 @@ public:
 private:
   void swapImpl(DenseMap &RHS) {
     std::swap(Buckets, RHS.Buckets);
-    std::swap(Used, RHS.Used);
     std::swap(NumEntries, RHS.NumEntries);
     std::swap(NumBuckets, RHS.NumBuckets);
   }
@@ -902,9 +900,14 @@ private:
 
   BucketT *getBuckets() const { return Buckets; }
 
-  typename BaseT::Rep getRep() const { return {Buckets, Used, NumBuckets}; }
+  typename BaseT::Rep getRep() const {
+    return {Buckets, getUsed(), NumBuckets};
+  }
 
-  UsedT *getUsed() const { return Used; }
+  UsedT *getUsed() const {
+    return reinterpret_cast<UsedT *>(reinterpret_cast<char *>(Buckets) +
+                                     sizeof(BucketT) * NumBuckets);
+  }
 
   unsigned getNumBuckets() const { return NumBuckets; }
 
@@ -915,7 +918,6 @@ private:
                       llvm::densemap::detail::allocBytes<BucketT>(NumBuckets),
                       llvm::densemap::detail::allocAlign<BucketT>());
     Buckets = nullptr;
-    Used = nullptr;
     NumBuckets = 0;
   }
 
@@ -923,15 +925,13 @@ private:
     NumBuckets = Num;
     if (NumBuckets == 0) {
       Buckets = nullptr;
-      Used = nullptr;
       return false;
     }
-
-    auto *Storage = static_cast<char *>(
+    assert(sizeof(BucketT) * NumBuckets % alignof(UsedT) == 0 &&
+           "used array would be misaligned");
+    Buckets = reinterpret_cast<BucketT *>(
         allocate_buffer(llvm::densemap::detail::allocBytes<BucketT>(NumBuckets),
                         llvm::densemap::detail::allocAlign<BucketT>()));
-    Buckets = reinterpret_cast<BucketT *>(Storage);
-    Used = reinterpret_cast<UsedT *>(Storage + sizeof(BucketT) * NumBuckets);
     return true;
   }
 
