@@ -128,9 +128,6 @@ void privatizeSymbol(
 namespace llvm {
 template <>
 struct DenseMapInfo<const Fortran::lower::SomeExpr *> {
-  static inline const Fortran::lower::SomeExpr *getEmptyKey() {
-    return reinterpret_cast<Fortran::lower::SomeExpr *>(~0);
-  }
   static unsigned getHashValue(const Fortran::lower::SomeExpr *v) {
     return Fortran::lower::getHashValue(v);
   }
@@ -143,9 +140,6 @@ struct DenseMapInfo<const Fortran::lower::SomeExpr *> {
 // DenseMapInfo for pointers to Fortran::evaluate::Component.
 template <>
 struct DenseMapInfo<const Fortran::evaluate::Component *> {
-  static inline const Fortran::evaluate::Component *getEmptyKey() {
-    return reinterpret_cast<Fortran::evaluate::Component *>(~0);
-  }
   static unsigned getHashValue(const Fortran::evaluate::Component *v) {
     return Fortran::lower::getHashValue(v);
   }

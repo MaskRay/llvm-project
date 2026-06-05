@@ -2048,10 +2048,6 @@ struct CSEDenseMapInfo {
            isa<ShuffleVectorInst>(I) || isa<GetElementPtrInst>(I);
   }
 
-  static inline Instruction *getEmptyKey() {
-    return DenseMapInfo<Instruction *>::getEmptyKey();
-  }
-
   static unsigned getHashValue(const Instruction *I) {
     assert(canHandle(I) && "Unknown instruction!");
     return hash_combine(I->getOpcode(),
@@ -2059,8 +2055,6 @@ struct CSEDenseMapInfo {
   }
 
   static bool isEqual(const Instruction *LHS, const Instruction *RHS) {
-    if (LHS == getEmptyKey() || RHS == getEmptyKey())
-      return LHS == RHS;
     return LHS->isIdenticalTo(RHS);
   }
 };
