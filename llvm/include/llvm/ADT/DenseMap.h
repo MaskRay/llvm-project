@@ -95,15 +95,22 @@ LLVM_ATTRIBUTE_ALWAYS_INLINE void forEachUsed(const UsedT *U, unsigned N,
   }
 }
 
-// Buckets and the used array share one allocation: the bucket array first, then
-// the used words.  NumBuckets is a power of two >= 4, so the bucket region size
-// is a multiple of sizeof(UsedT) and the trailing used words are aligned.
+// Buckets and the used array share one allocation: the used words first, then
+// the bucket array.  Storing only the allocation base lets DenseMap drop its
+// separate Used pointer and recover the bucket pointer as base + bucketOffset.
+// The used region is padded up to alignof(BucketT) so the bucket array that
+// follows is aligned.
 template <typename BucketT> constexpr size_t allocAlign() {
   return std::max(alignof(BucketT), alignof(UsedT));
 }
+// Byte offset of the bucket array from the allocation base.
+template <typename BucketT> size_t bucketOffset(unsigned Num) {
+  constexpr size_t A = alignof(BucketT);
+  return (usedWords(Num) * sizeof(UsedT) + (A - 1)) & ~(A - 1);
+}
 template <typename BucketT> size_t allocBytes(unsigned Num) {
-  return sizeof(BucketT) * static_cast<size_t>(Num) +
-         usedWords(Num) * sizeof(UsedT);
+  return bucketOffset<BucketT>(Num) +
+         sizeof(BucketT) * static_cast<size_t>(Num);
 }
 
 } // namespace densemap::detail
@@ -839,8 +846,8 @@ class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, KeyInfoT, BucketT>,
   using BaseT = DenseMapBase<DenseMap, KeyT, ValueT, KeyInfoT, BucketT>;
   using UsedT = llvm::densemap::detail::UsedT;
 
-  BucketT *Buckets = nullptr;
-  UsedT *Used = nullptr;
+  // Allocation base: the used words, then (padded) the bucket array.
+  char *Storage = nullptr;
   unsigned NumEntries = 0;
   unsigned NumBuckets = 0;
 
@@ -892,8 +899,7 @@ public:
 
 private:
   void swapImpl(DenseMap &RHS) {
-    std::swap(Buckets, RHS.Buckets);
-    std::swap(Used, RHS.Used);
+    std::swap(Storage, RHS.Storage);
     std::swap(NumEntries, RHS.NumEntries);
     std::swap(NumBuckets, RHS.NumBuckets);
   }
@@ -902,42 +908,39 @@ private:
 
   void setNumEntries(unsigned Num) { NumEntries = Num; }
 
-  BucketT *getBuckets() const { return Buckets; }
+  BucketT *getBuckets() const {
+    return reinterpret_cast<BucketT *>(
+        Storage + llvm::densemap::detail::bucketOffset<BucketT>(NumBuckets));
+  }
 
-  typename BaseT::Rep getRep() const { return {Buckets, Used, NumBuckets}; }
+  typename BaseT::Rep getRep() const {
+    return {getBuckets(), getUsed(), NumBuckets};
+  }
 
-  UsedT *getUsed() const { return Used; }
+  UsedT *getUsed() const { return reinterpret_cast<UsedT *>(Storage); }
 
   unsigned getNumBuckets() const { return NumBuckets; }
 
   void deallocateBuckets() {
     if (NumBuckets == 0)
       return;
-    deallocate_buffer(Buckets,
+    deallocate_buffer(Storage,
                       llvm::densemap::detail::allocBytes<BucketT>(NumBuckets),
                       llvm::densemap::detail::allocAlign<BucketT>());
-    Buckets = nullptr;
-    Used = nullptr;
+    Storage = nullptr;
     NumBuckets = 0;
   }
 
   bool allocateBuckets(unsigned Num) {
     NumBuckets = Num;
     if (NumBuckets == 0) {
-      Buckets = nullptr;
-      Used = nullptr;
+      Storage = nullptr;
       return false;
     }
 
-    auto *Storage = static_cast<char *>(
+    Storage = static_cast<char *>(
         allocate_buffer(llvm::densemap::detail::allocBytes<BucketT>(NumBuckets),
                         llvm::densemap::detail::allocAlign<BucketT>()));
-    Buckets = reinterpret_cast<BucketT *>(Storage);
-    // NumBuckets is a power of two >= 4 (getMinBucketToReserveForEntries(1) is
-    // 4), so the used array trailing the buckets is aligned.
-    assert(sizeof(BucketT) * NumBuckets % alignof(UsedT) == 0 &&
-           "used array would be misaligned");
-    Used = reinterpret_cast<UsedT *>(Storage + sizeof(BucketT) * NumBuckets);
     return true;
   }
 
@@ -998,8 +1001,8 @@ class SmallDenseMap
     UsedT Used[InlineUsedWords];
   };
   struct LargeRep {
-    BucketT *Buckets;
-    UsedT *Used;
+    // Allocation base: the used words, then (padded) the bucket array.
+    char *Storage;
     unsigned NumBuckets;
   };
 
@@ -1155,15 +1158,24 @@ private:
     return storage.Inline.Used;
   }
 
+  const BucketT *getLargeBuckets() const {
+    return reinterpret_cast<const BucketT *>(
+        storage.Large.Storage + llvm::densemap::detail::bucketOffset<BucketT>(
+                                    storage.Large.NumBuckets));
+  }
+
+  const UsedT *getLargeUsed() const {
+    return reinterpret_cast<const UsedT *>(storage.Large.Storage);
+  }
+
   const BucketT *getBuckets() const {
-    return Small ? getInlineBuckets() : storage.Large.Buckets;
+    return Small ? getInlineBuckets() : getLargeBuckets();
   }
 
   typename BaseT::Rep getRep() const {
     if (Small)
       return {getInlineBuckets(), getInlineUsed(), InlineBuckets};
-    return {storage.Large.Buckets, storage.Large.Used,
-            storage.Large.NumBuckets};
+    return {getLargeBuckets(), getLargeUsed(), storage.Large.NumBuckets};
   }
 
   BucketT *getBuckets() {
@@ -1172,7 +1184,7 @@ private:
   }
 
   const UsedT *getUsed() const {
-    return Small ? getInlineUsed() : storage.Large.Used;
+    return Small ? getInlineUsed() : getLargeUsed();
   }
 
   UsedT *getUsed() {
@@ -1191,7 +1203,7 @@ private:
       return;
 
     deallocate_buffer(
-        storage.Large.Buckets,
+        storage.Large.Storage,
         llvm::densemap::detail::allocBytes<BucketT>(storage.Large.NumBuckets),
         llvm::densemap::detail::allocAlign<BucketT>());
     storage.Large.NumBuckets = 0;
@@ -1203,11 +1215,9 @@ private:
       return true;
     }
     Small = false;
-    auto *S = static_cast<char *>(
+    storage.Large.Storage = static_cast<char *>(
         allocate_buffer(llvm::densemap::detail::allocBytes<BucketT>(Num),
                         llvm::densemap::detail::allocAlign<BucketT>()));
-    storage.Large.Buckets = reinterpret_cast<BucketT *>(S);
-    storage.Large.Used = reinterpret_cast<UsedT *>(S + sizeof(BucketT) * Num);
     storage.Large.NumBuckets = Num;
     return true;
   }
@@ -1216,7 +1226,7 @@ private:
   void kill() {
     deallocateBuckets();
     Small = false;
-    storage.Large = LargeRep{nullptr, nullptr, 0};
+    storage.Large = LargeRep{nullptr, 0};
   }
 
   static unsigned roundUpNumBuckets(unsigned MinNumBuckets) {

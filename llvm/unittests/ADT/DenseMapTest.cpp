@@ -977,8 +977,10 @@ TEST(DenseMapCustomTest, PairPrinting) {
 TEST(DenseMapCustomTest, InitSize) {
   constexpr unsigned ElemSize = sizeof(std::pair<int *, int>);
   // getMemorySize() counts the bucket array plus the packed used-bit array: one
-  // uint32 word per 32 buckets (a single word covers all counts used here).
-  constexpr unsigned UsedSize = sizeof(uint32_t);
+  // uint32 word per 32 buckets (a single word covers all counts used here). The
+  // used array precedes the buckets and is padded up to the bucket alignment.
+  constexpr unsigned UsedSize =
+      alignTo<alignof(std::pair<int *, int>)>(sizeof(uint32_t));
 
   {
     DenseMap<int *, int> Map;
@@ -1015,8 +1017,10 @@ TEST(DenseMapCustomTest, InitSize) {
 TEST(SmallDenseMapCustomTest, InitSize) {
   constexpr unsigned ElemSize = sizeof(std::pair<int *, int>);
   // getMemorySize() counts the bucket array plus the packed used-bit array: one
-  // uint32 word per 32 buckets (a single word covers all counts used here).
-  constexpr unsigned UsedSize = sizeof(uint32_t);
+  // uint32 word per 32 buckets (a single word covers all counts used here). The
+  // used array precedes the buckets and is padded up to the bucket alignment.
+  constexpr unsigned UsedSize =
+      alignTo<alignof(std::pair<int *, int>)>(sizeof(uint32_t));
   {
     SmallDenseMap<int *, int> Map;
     EXPECT_EQ(ElemSize * 4U + UsedSize, Map.getMemorySize());
