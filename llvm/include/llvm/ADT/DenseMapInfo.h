@@ -40,7 +40,7 @@ inline uint64_t mix(uint64_t x) {
 // the returned value: the low bits of the product's high half still depend on
 // all input bits. The multiply must stay 64-bit -- a 32-bit product's low bits
 // depend only on the low input bits, which reintroduces primary clustering.
-inline unsigned mixHi(uint64_t x) {
+inline unsigned multiplyShift(uint64_t x) {
   return unsigned((x * 0x9e3779b97f4a7c15u) >> 32);
 }
 } // namespace densemap::detail
@@ -69,7 +69,7 @@ template <typename T, typename Enable = void> struct DenseMapInfo {
 // clients can instantiate DenseMap<T*, ...> with forward declared key types.
 template <typename T> struct DenseMapInfo<T *> {
   static unsigned getHashValue(const T *PtrVal) {
-    return densemap::detail::mixHi(reinterpret_cast<uintptr_t>(PtrVal));
+    return densemap::detail::multiplyShift(reinterpret_cast<uintptr_t>(PtrVal));
   }
 
   static bool isEqual(const T *LHS, const T *RHS) { return LHS == RHS; }

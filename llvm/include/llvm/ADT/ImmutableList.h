@@ -222,8 +222,7 @@ public:
 template <typename T> struct DenseMapInfo<ImmutableList<T>, void> {
   static unsigned getHashValue(ImmutableList<T> X) {
     uintptr_t PtrVal = reinterpret_cast<uintptr_t>(X.getInternalPointer());
-    return (unsigned((uintptr_t)PtrVal) >> 4) ^
-           (unsigned((uintptr_t)PtrVal) >> 9);
+    return densemap::detail::multiplyShift(PtrVal);
   }
 
   static bool isEqual(ImmutableList<T> X1, ImmutableList<T> X2) {
