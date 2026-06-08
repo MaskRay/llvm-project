@@ -143,10 +143,14 @@ StringMap<SmallVector<Symbol *, 0>> &SymbolTable::getDemangledSyms() {
         std::string substr;
         if (pos == std::string::npos)
           demangled = demangle(name);
-        else if (pos + 1 == name.size() || name[pos + 1] == '@') {
+        else if (pos + 1 == name.size()) {
           substr = name.substr(0, pos);
           demangled = demangle(substr);
         } else {
+          // Keep the version suffix (foo()@v or foo()@@v) so version-script
+          // patterns can match a definition by its version node. A default
+          // version (foo()@@v) is thus keyed by its full name, like a
+          // non-default one, rather than by the bare demangled name.
           substr = name.substr(0, pos);
           demangled = (demangle(substr) + name.substr(pos)).str();
         }
@@ -166,15 +170,22 @@ SmallVector<Symbol *, 0> SymbolTable::findByVersion(SymbolVersion ver) {
 }
 
 SmallVector<Symbol *, 0> SymbolTable::findAllByVersion(SymbolVersion ver,
-                                                       bool includeNonDefault) {
+                                                       bool includeNonDefault,
+                                                       bool matchDefault) {
   SmallVector<Symbol *, 0> res;
   SingleStringMatcher m(ver.name);
   auto check = [&](const Symbol &sym) -> bool {
-    if (!includeNonDefault)
-      return !sym.hasVersionSuffix;
     StringRef name = sym.getName();
     size_t pos = name.find('@');
-    return !(pos + 1 < name.size() && name[pos + 1] == '@');
+    bool isDefault =
+        pos != StringRef::npos && pos + 1 < name.size() && name[pos + 1] == '@';
+    // matchDefault matches only default-versioned definitions (foo@@v); the
+    // caller supplies a `pat@@v` pattern so the match stays scoped to node v.
+    if (matchDefault)
+      return isDefault;
+    if (!includeNonDefault)
+      return !sym.hasVersionSuffix;
+    return !isDefault;
   };
 
   if (ver.isExternCpp) {
@@ -223,11 +234,12 @@ bool SymbolTable::assignExactVersion(SymbolVersion ver, uint16_t versionId,
 
   // Assign the version.
   for (Symbol *sym : syms) {
-    // For a non-local versionId, skip symbols containing version info because
+    // Skip symbols carrying a version in their name (foo@v or foo@@v) because
     // symbol versions specified by symbol names take precedence over version
-    // scripts. See parseSymbolVersion(ctx).
-    if (!includeNonDefault && versionId != VER_NDX_LOCAL &&
-        sym->getName().contains('@'))
+    // scripts. See parseSymbolVersion(ctx). A default-versioned definition is
+    // keyed by its bare name and would otherwise be matched here regardless of
+    // its node; it is instead handled node-scoped via a `pat@@v` match below.
+    if (!includeNonDefault && sym->hasVersionSuffix)
       continue;
 
     // If the version has not been assigned, assign versionId to the symbol.
@@ -244,16 +256,20 @@ bool SymbolTable::assignExactVersion(SymbolVersion ver, uint16_t versionId,
   return !syms.empty();
 }
 
-void SymbolTable::assignWildcardVersion(SymbolVersion ver, uint16_t versionId,
-                                        bool includeNonDefault) {
+bool SymbolTable::assignWildcardVersion(SymbolVersion ver, uint16_t versionId,
+                                        bool includeNonDefault,
+                                        bool matchDefault) {
   // Exact matching takes precedence over fuzzy matching,
   // so we set a version to a symbol only if no version has been assigned
   // to the symbol. This behavior is compatible with GNU.
-  for (Symbol *sym : findAllByVersion(ver, includeNonDefault))
+  SmallVector<Symbol *, 0> syms =
+      findAllByVersion(ver, includeNonDefault, matchDefault);
+  for (Symbol *sym : syms)
     if (!sym->versionScriptAssigned) {
       sym->versionScriptAssigned = true;
       sym->versionId = versionId;
     }
+  return !syms.empty();
 }
 
 // This function processes version scripts by updating the versionId
@@ -273,6 +289,15 @@ void SymbolTable::scanVersionScript() {
       found |= assignExactVersion({(pat.name + "@" + v.name).toStringRef(buf),
                                    pat.isExternCpp, /*hasWildCard=*/false},
                                   id, ver, /*includeNonDefault=*/true);
+      // Default-versioned definitions (foo@@v) are deferred from the passes
+      // above; localize/protect them only via their own node v. A global
+      // pattern assigns the symbol's own version (a no-op) but marks it so a
+      // lower-precedence local pattern in the same node cannot localize it.
+      buf.clear();
+      found |= assignWildcardVersion(
+          {(pat.name + "@@" + v.name).toStringRef(buf), pat.isExternCpp,
+           /*hasWildCard=*/false},
+          id, /*includeNonDefault=*/false, /*matchDefault=*/true);
       if (!found && !ctx.arg.undefinedVersion)
         Err(ctx) << "version script assignment of '" << ver << "' to symbol '"
                  << pat.name << "' failed: symbol not defined";
@@ -295,6 +320,13 @@ void SymbolTable::scanVersionScript() {
                            pat.isExternCpp, /*hasWildCard=*/true},
                           id,
                           /*includeNonDefault=*/true);
+    // Match default-versioned definitions (foo@@v) node-scoped: a global
+    // pattern protects them, a local pattern localizes them.
+    buf.clear();
+    assignWildcardVersion({(pat.name + "@@" + ver).toStringRef(buf),
+                           pat.isExternCpp, /*hasWildCard=*/true},
+                          id, /*includeNonDefault=*/false,
+                          /*matchDefault=*/true);
   };
   for (VersionDefinition &v : llvm::reverse(ctx.arg.versionDefinitions)) {
     for (SymbolVersion &pat : v.nonLocalPatterns)

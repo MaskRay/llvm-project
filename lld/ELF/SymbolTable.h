@@ -84,13 +84,14 @@ public:
 private:
   SmallVector<Symbol *, 0> findByVersion(SymbolVersion ver);
   SmallVector<Symbol *, 0> findAllByVersion(SymbolVersion ver,
-                                            bool includeNonDefault);
+                                            bool includeNonDefault,
+                                            bool matchDefault = false);
 
   llvm::StringMap<SmallVector<Symbol *, 0>> &getDemangledSyms();
   bool assignExactVersion(SymbolVersion ver, uint16_t versionId,
                           StringRef versionName, bool includeNonDefault);
-  void assignWildcardVersion(SymbolVersion ver, uint16_t versionId,
-                             bool includeNonDefault);
+  bool assignWildcardVersion(SymbolVersion ver, uint16_t versionId,
+                             bool includeNonDefault, bool matchDefault = false);
 
   Ctx &ctx;
 

@@ -21,6 +21,31 @@
 # WC-NEXT: [[#]] _start{{$}}
 # WC-NOT:  {{.}}
 
+## A wildcard local: pattern in the symbol's own version node localizes a
+## default-versioned definition (foo4@@v2), like an exact pattern and GNU ld.
+# RUN: echo 'v1 {}; v2 { local: foo4*; };' > %twc2.script
+# RUN: ld.lld --version-script %twc2.script -shared %t.o -o %twc2.so
+# RUN: llvm-readelf --dyn-syms %twc2.so | FileCheck --check-prefix=WC2 %s
+# WC2:      UND
+# WC2-NEXT: [[#]] foo1{{$}}
+# WC2-NEXT: [[#]] foo2{{$}}
+# WC2-NEXT: [[#]] _start{{$}}
+# WC2-NEXT: [[#]] foo3@v1
+# WC2-NOT:  {{.}}
+
+## A local: pattern in a different node does not localize foo4@@v2; its version
+## node (v2) takes precedence over the v1 pattern.
+# RUN: echo 'v1 { local: foo4; }; v2 {};' > %tother.script
+# RUN: ld.lld --version-script %tother.script -shared %t.o -o %tother.so
+# RUN: llvm-readelf --dyn-syms %tother.so | FileCheck --check-prefix=OTHER %s
+# OTHER:      UND
+# OTHER-NEXT: [[#]] foo1{{$}}
+# OTHER-NEXT: [[#]] foo2{{$}}
+# OTHER-NEXT: [[#]] foo4@@v2
+# OTHER-NEXT: [[#]] _start{{$}}
+# OTHER-NEXT: [[#]] foo3@v1
+# OTHER-NOT:  {{.}}
+
 # RUN: echo 'v1 { global: *; local: foo*; }; v2 {};' > %t3.script
 # RUN: ld.lld --version-script %t3.script -shared %t.o -o %t3.so
 # RUN: llvm-readelf --dyn-syms %t3.so | FileCheck --check-prefix=MIX1 %s
