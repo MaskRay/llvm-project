@@ -24,6 +24,16 @@ struct ArmCmseEntryFunction {
   Symbol *sym;
 };
 
+// Return the stem of a versioned symbol name: "foo@@v1" -> "foo". A name with
+// a single "@" (non-default version) is returned unchanged. This is a hot
+// path; StringRef::find(char) is much faster than find(StringRef).
+inline StringRef getVersionedStem(StringRef name) {
+  size_t pos = name.find('@');
+  if (pos != StringRef::npos && pos + 1 < name.size() && name[pos + 1] == '@')
+    return name.take_front(pos);
+  return name;
+}
+
 // SymbolTable is a bucket of all known symbols, including defined,
 // undefined, or lazy symbols (the last one is symbols in archive
 // files whose archive members are not yet loaded).
@@ -55,19 +65,49 @@ public:
   void scanVersionScript();
 
   Symbol *find(StringRef name);
+  Symbol *find(llvm::CachedHashStringRef key);
 
   void handleDynamicList();
 
   Symbol *addUnusedUndefined(StringRef name,
                              uint8_t binding = llvm::ELF::STB_GLOBAL);
 
+  // Install sharded symbol maps from parallel parse pipeline. After this call,
+  // find() and insert() route through the shard maps instead of symMap.
+  void installShardedSymbols(
+      std::unique_ptr<llvm::DenseMap<llvm::CachedHashStringRef, int>[]> maps,
+      unsigned numShards, SmallVector<Symbol *, 0> &&syms);
+
+  // Install sharded comdat-group maps from the parallel parse pipeline. After
+  // this call, findComdatOwner()/addComdatGroup() route through the shards
+  // instead of comdatGroups, so late-joining BitcodeFile::parse() calls
+  // interoperate with phase 4's pre-population.
+  void installComdatShards(
+      std::unique_ptr<
+          llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *>[]>
+          shards,
+      unsigned n) {
+    comdatGroupShards = std::move(shards);
+    numComdatShards = n;
+  }
+
   // Set of .so files to not link the same shared object file more than once.
   llvm::DenseMap<llvm::CachedHashStringRef, SharedFile *> soNames;
 
-  // Comdat groups define "link once" sections. If two comdat groups have the
-  // same name, only one of them is linked, and the other is ignored. This map
-  // is used to uniquify them.
-  llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *> comdatGroups;
+  const InputFile *findComdatOwner(llvm::CachedHashStringRef name) {
+    auto &m = comdatMapFor(name);
+    auto it = m.find(name);
+    return it != m.end() ? it->second : nullptr;
+  }
+
+  // Returns true if `f` is (or becomes) the owner of the comdat group named
+  // `name`. If no owner exists yet, `f` is registered as the owner. Matches
+  // the `isNew || owner == self` pattern used in the serial
+  // ObjFile<ELFT>::parse() path.
+  bool addComdatGroup(llvm::CachedHashStringRef name, const InputFile *f) {
+    auto [it, isNew] = comdatMapFor(name).try_emplace(name, f);
+    return isNew || it->second == f;
+  }
 
   // The Map of __acle_se_<sym>, <sym> pairs found in the input objects.
   // Key is the <sym> name.
@@ -99,6 +139,32 @@ private:
   // when cross linking.
   llvm::DenseMap<llvm::CachedHashStringRef, int> symMap;
   SmallVector<Symbol *, 0> symVector;
+
+  // Sharded mode: parallel parse installs per-bucket DenseMaps here.
+  // When numShards > 0, find()/insert() route through shardMaps.
+  unsigned numShards = 0;
+  std::unique_ptr<llvm::DenseMap<llvm::CachedHashStringRef, int>[]> shardMaps;
+
+  llvm::DenseMap<llvm::CachedHashStringRef, int> &
+  mapFor(llvm::CachedHashStringRef key) {
+    return numShards ? shardMaps[key.hash() % numShards] : symMap;
+  }
+
+  // Comdat groups define "link once" sections. If two comdat groups have the
+  // same name, only one of them is linked, and the other is ignored. This map
+  // is used to uniquify them. The parallel parse pipeline installs sharded
+  // maps used instead of comdatGroups.
+  llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *> comdatGroups;
+  std::unique_ptr<
+      llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *>[]>
+      comdatGroupShards;
+  unsigned numComdatShards = 0;
+
+  llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *> &
+  comdatMapFor(llvm::CachedHashStringRef name) {
+    return numComdatShards ? comdatGroupShards[name.hash() % numComdatShards]
+                           : comdatGroups;
+  }
 
   // A map from demangled symbol names to their symbol objects.
   // This mapping is 1:N because two symbols with different versions

@@ -750,6 +750,11 @@ struct Ctx : CommonLinkerContext {
   InputFile *internalFile = nullptr;
   // Dummy Undefined for relocations without a symbol.
   Undefined *dummySym = nullptr;
+  // True if the parallel parse pipeline was used (all non-relocatable
+  // links). Relaxes duplicate-definition diagnostics between archive
+  // members, which the pipeline activates more eagerly than serial
+  // extraction.
+  bool parallelParse = false;
   // True if symbols can be exported (isExported) or preemptible.
   bool hasDynsym = false;
   // True if there are TLS IE relocations. Set DF_STATIC_TLS if -shared.

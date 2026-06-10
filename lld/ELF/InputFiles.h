@@ -42,9 +42,16 @@ const ELFSyncStream &operator<<(const ELFSyncStream &, const InputFile *);
 // Opens a given file.
 std::optional<MemoryBufferRef> readFile(Ctx &, StringRef path);
 
+// Check that `file` is architecturally compatible with the target. Emits an
+// error and returns false otherwise. existingHint names a reference file in
+// diagnostics when ctx.objectFiles etc. are not yet populated.
+bool isCompatible(Ctx &, InputFile *file, InputFile *existingHint = nullptr);
+
 // Add symbols in File to the symbol table.
 void parseFile(Ctx &, InputFile *file);
-void parseFiles(Ctx &, const SmallVector<std::unique_ptr<InputFile>, 0> &);
+// The parallel parse pipeline (ParallelParse.cpp). May append
+// dependent-library files to `files`.
+void parseFiles(Ctx &, SmallVector<std::unique_ptr<InputFile>, 0> &);
 
 // The root class of input files.
 class InputFile {
@@ -171,6 +178,13 @@ private:
   mutable SmallString<0> nameForScriptCache;
 };
 
+// True if both files are archive members. The parallel parse pipeline
+// activates archive members more eagerly than serial extraction, so it
+// suppresses duplicate-definition diagnostics between two archive members.
+inline bool bothFromArchive(const InputFile *a, const InputFile *b) {
+  return a && b && !a->archiveName.empty() && !b->archiveName.empty();
+}
+
 class ELFFileBase : public InputFile {
 public:
   ELFFileBase(Ctx &ctx, Kind k, ELFKind ekind, MemoryBufferRef m);
@@ -209,6 +223,32 @@ public:
   template <typename ELFT> typename ELFT::SymRange getGlobalELFSyms() const {
     return getELFSyms<ELFT>().slice(firstGlobal);
   }
+
+  uint32_t getFirstGlobal() const { return firstGlobal; }
+  uint32_t getNumSymbols() const { return numSymbols; }
+
+  // Parallel parse: fill global symbols[] entries from globalToSym, which
+  // holds symVector indices (~0u = unused). Local symbols are initialized
+  // later by initSectionsAndLocalSyms.
+  void wireSymbols(const uint32_t *globalToSym, ArrayRef<Symbol *> syms) {
+    if (!symbols)
+      symbols = std::make_unique<Symbol *[]>(numSymbols);
+    for (size_t i = firstGlobal; i != numSymbols; ++i) {
+      uint32_t idx = globalToSym[i - firstGlobal];
+      if (idx != ~uint32_t(0))
+        symbols[i] = syms[idx];
+    }
+  }
+
+  // Section indices of SHT_ARM_ATTRIBUTES and SHT_LLVM_DEPENDENT_LIBRARIES
+  // sections, recorded by the serial parse() pre-pass or (preScanned) the
+  // parallel pipeline's phase 1 and handled by processDeferredSections() in
+  // command-line order. armAttrRetainedIdx marks the section that
+  // initializeSections wires to ctx.in.attributes instead of discarding.
+  SmallVector<uint32_t, 0> armAttrSecIdxs;
+  SmallVector<uint32_t, 0> deplibSecIdxs;
+  uint32_t armAttrRetainedIdx = UINT32_MAX;
+  bool preScanned = false;
 
   // Get cached DWARF information.
   DWARFCache *getDwarf();
@@ -258,12 +298,17 @@ public:
 
   void parse(bool ignoreComdats = false);
   void parseLazy();
+  // Scan section headers: invoke addComdat for each COMDAT group signature
+  // (tolerating malformed groups, which initializeSections diagnoses) and
+  // record ARM attributes and dependent-library sections for
+  // processDeferredSections(). Shared by the serial parse() pre-pass and the
+  // parallel pipeline's phase 1.
+  void scanEarlySections(llvm::function_ref<void(StringRef)> addComdat);
 
   StringRef getShtGroupSignature(ArrayRef<Elf_Shdr> sections,
                                  const Elf_Shdr &sec);
 
   uint32_t getSectionIndex(const Elf_Sym &sym) const;
-
 
   // Pointer to this input file's .llvm_addrsig section, if it has one.
   const Elf_Shdr *addrsigSec = nullptr;
@@ -284,6 +329,8 @@ public:
   // but had one or more functions with the no_split_stack attribute.
   bool someNoSplitStack = false;
 
+  void processDeferredSections();
+
   void initDwarf();
 
   void initSectionsAndLocalSyms(bool ignoreComdats);
@@ -294,7 +341,6 @@ private:
   void initializeSections(bool ignoreComdats,
                           const llvm::object::ELFFile<ELFT> &obj);
   void initializeSymbols(const llvm::object::ELFFile<ELFT> &obj);
-  void initializeJustSymbols();
 
   InputSectionBase *getRelocTarget(uint32_t idx, uint32_t info);
   InputSectionBase *createInputSection(uint32_t idx, const Elf_Shdr &sec,

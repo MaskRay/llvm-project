@@ -402,7 +402,7 @@ static void maybeReportDiscarded(Ctx &ctx, ELFSyncStream &msg, Undefined &sym) {
   // If the discarded section is a COMDAT.
   StringRef signature = file->getShtGroupSignature(objSections, elfSec);
   if (const InputFile *prevailing =
-          ctx.symtab->comdatGroups.lookup(CachedHashStringRef(signature))) {
+          ctx.symtab->findComdatOwner(CachedHashStringRef(signature))) {
     msg << "\n>>> section group signature: " << signature
         << "\n>>> prevailing definition is in " << prevailing;
     if (sym.nonPrevailing) {

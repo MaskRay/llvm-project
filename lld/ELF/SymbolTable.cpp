@@ -30,9 +30,13 @@ using namespace lld::elf;
 
 void SymbolTable::wrap(Symbol *sym, Symbol *real, Symbol *wrap) {
   // Redirect __real_foo to the original foo and foo to the original __wrap_foo.
-  int &idx1 = symMap[CachedHashStringRef(sym->getName())];
-  int &idx2 = symMap[CachedHashStringRef(real->getName())];
-  int &idx3 = symMap[CachedHashStringRef(wrap->getName())];
+  auto getIdx = [&](StringRef name) -> int & {
+    CachedHashStringRef key(name);
+    return mapFor(key)[key];
+  };
+  int &idx1 = getIdx(sym->getName());
+  int &idx2 = getIdx(real->getName());
+  int &idx3 = getIdx(wrap->getName());
 
   idx2 = idx1;
   idx1 = idx3;
@@ -63,16 +67,10 @@ void SymbolTable::wrap(Symbol *sym, Symbol *real, Symbol *wrap) {
 Symbol *SymbolTable::insert(StringRef name) {
   // <name>@@<version> means the symbol is the default version. In that
   // case <name>@@<version> will be used to resolve references to <name>.
-  //
-  // Since this is a hot path, the following string search code is
-  // optimized for speed. StringRef::find(char) is much faster than
-  // StringRef::find(StringRef).
-  StringRef stem = name;
-  size_t pos = name.find('@');
-  if (pos != StringRef::npos && pos + 1 < name.size() && name[pos + 1] == '@')
-    stem = name.take_front(pos);
+  StringRef stem = getVersionedStem(name);
+  CachedHashStringRef key(stem);
+  auto p = mapFor(key).insert({key, (int)symVector.size()});
 
-  auto p = symMap.insert({CachedHashStringRef(stem), (int)symVector.size()});
   if (!p.second) {
     Symbol *sym = symVector[p.first->second];
     if (stem.size() != name.size()) {
@@ -89,9 +87,17 @@ Symbol *SymbolTable::insert(StringRef name) {
   // are zero. Set the ones that need a non-zero value.
   sym->setName(name);
   sym->versionId = VER_NDX_GLOBAL;
-  if (pos != StringRef::npos)
+  if (stem.size() != name.size() || name.contains('@'))
     sym->hasVersionSuffix = true;
   return sym;
+}
+
+void SymbolTable::installShardedSymbols(
+    std::unique_ptr<DenseMap<CachedHashStringRef, int>[]> maps,
+    unsigned shardCount, SmallVector<Symbol *, 0> &&syms) {
+  shardMaps = std::move(maps);
+  numShards = shardCount;
+  symVector = std::move(syms);
 }
 
 // This variant of addSymbol is used by BinaryFile::parse to check duplicate
@@ -106,10 +112,13 @@ Symbol *SymbolTable::addAndCheckDuplicate(Ctx &ctx, const Defined &newSym) {
 }
 
 Symbol *SymbolTable::find(StringRef name) {
-  auto it = symMap.find(CachedHashStringRef(name));
-  if (it == symMap.end())
-    return nullptr;
-  return symVector[it->second];
+  return find(CachedHashStringRef(name));
+}
+
+Symbol *SymbolTable::find(CachedHashStringRef key) {
+  auto &m = mapFor(key);
+  auto it = m.find(key);
+  return it == m.end() ? nullptr : symVector[it->second];
 }
 
 // A version script/dynamic list is only meaningful for a Defined symbol.

@@ -263,6 +263,8 @@ void Symbol::parseSymbolVersion(Ctx &ctx) {
 void Symbol::extract(Ctx &ctx) const {
   assert(file->lazy);
   file->lazy = false;
+  if (ctx.arg.trace)
+    Msg(ctx) << file;
   parseFile(ctx, file);
 }
 
@@ -579,10 +581,13 @@ void elf::reportDuplicate(Ctx &ctx, const Symbol &sym, const InputFile *newFile,
 }
 
 void Symbol::checkDuplicate(Ctx &ctx, const Defined &other) const {
-  if (!isWeak() && !other.isWeak())
+  if (!isWeak() && !other.isWeak()) {
+    if (ctx.parallelParse && bothFromArchive(file, other.file))
+      return;
     reportDuplicate(ctx, *this, other.file,
                     dyn_cast_or_null<InputSectionBase>(other.section),
                     other.value);
+  }
 }
 
 void Symbol::resolve(Ctx &ctx, const CommonSymbol &other) {

@@ -263,7 +263,7 @@ std::optional<MemoryBufferRef> elf::readFile(Ctx &ctx, StringRef path) {
 // All input object files must be for the same architecture
 // (e.g. it does not make sense to link x86 object files with
 // MIPS object files.) This function checks for that error.
-static bool isCompatible(Ctx &ctx, InputFile *file) {
+bool elf::isCompatible(Ctx &ctx, InputFile *file, InputFile *existingHint) {
   if (!file->isElf() && !isa<BitcodeFile>(file))
     return true;
 
@@ -281,7 +281,7 @@ static bool isCompatible(Ctx &ctx, InputFile *file) {
     return false;
   }
 
-  InputFile *existing = nullptr;
+  InputFile *existing = existingHint;
   if (!ctx.objectFiles.empty())
     existing = ctx.objectFiles[0];
   else if (!ctx.sharedFiles.empty())
@@ -310,9 +310,6 @@ template <class ELFT> static void doParseFile(Ctx &ctx, InputFile *file) {
     return;
   }
 
-  if (ctx.arg.trace)
-    Msg(ctx) << file;
-
   if (file->kind() == InputFile::ObjKind) {
     ctx.objectFiles.push_back(cast<ELFFileBase>(file));
     cast<ObjFile<ELFT>>(file)->parse();
@@ -332,33 +329,6 @@ void elf::parseFile(Ctx &ctx, InputFile *file) {
   invokeELFT(doParseFile, ctx, file);
 }
 
-// This function is explicitly instantiated in ARM.cpp. Mark it extern here,
-// to avoid warnings when building with MSVC.
-extern template void ObjFile<ELF32LE>::importCmseSymbols();
-extern template void ObjFile<ELF32BE>::importCmseSymbols();
-extern template void ObjFile<ELF64LE>::importCmseSymbols();
-extern template void ObjFile<ELF64BE>::importCmseSymbols();
-
-template <class ELFT>
-static void
-doParseFiles(Ctx &ctx,
-             const SmallVector<std::unique_ptr<InputFile>, 0> &files) {
-  // Add all files to the symbol table. This will add almost all symbols that we
-  // need to the symbol table. This process might add files to the link due to
-  // addDependentLibrary.
-  for (size_t i = 0; i < files.size(); ++i) {
-    llvm::TimeTraceScope timeScope("Parse input files", files[i]->getName());
-    doParseFile<ELFT>(ctx, files[i].get());
-  }
-  if (ctx.driver.armCmseImpLib)
-    cast<ObjFile<ELFT>>(*ctx.driver.armCmseImpLib).importCmseSymbols();
-}
-
-void elf::parseFiles(Ctx &ctx,
-                     const SmallVector<std::unique_ptr<InputFile>, 0> &files) {
-  llvm::TimeTraceScope timeScope("Parse input files");
-  invokeELFT(doParseFiles, ctx, files);
-}
 
 // Concatenates arguments to construct a string representing an error location.
 StringRef InputFile::getNameForScript() const {
@@ -391,6 +361,46 @@ static void addDependentLibrary(Ctx &ctx, StringRef specifier,
     ErrAlways(ctx)
         << f << ": unable to find library from dependent library specifier: "
         << specifier;
+}
+
+// Parse a SHT_ARM_ATTRIBUTES section and merge its features into ctx.arg.
+// Returns false if the section is malformed. Shared by the serial parse()
+// pre-pass and the parallel initializeSections; the latter serializes calls
+// with a mutex since the updates mutate ctx.arg.
+template <class ELFT>
+static bool readArmAttributes(Ctx &ctx, ObjFile<ELFT> *f,
+                              const typename ELFT::Shdr &sec, StringRef name) {
+  ARMAttributeParser attributes;
+  ArrayRef<uint8_t> contents = check(f->getObj().getSectionContents(sec));
+  if (Error e = attributes.parse(contents, ELFT::Endianness)) {
+    InputSection isec(*f, sec, name);
+    Warn(ctx) << &isec << ": " << std::move(e);
+    return false;
+  }
+  updateSupportedARMFeatures(ctx, attributes);
+  updateARMVFPArgs(ctx, attributes, f);
+  return true;
+}
+
+// Register each library from a SHT_LLVM_DEPENDENT_LIBRARIES section, which
+// may append new input files.
+template <class ELFT>
+static void readDependentLibs(Ctx &ctx, ObjFile<ELFT> *f,
+                              const typename ELFT::Shdr &sec, StringRef name) {
+  ArrayRef<char> data =
+      CHECK2(f->getObj().template getSectionContentsAsArray<char>(sec), f);
+  if (!data.empty() && data.back() != '\0') {
+    Err(ctx)
+        << f
+        << ": corrupted dependent libraries section (unterminated string): "
+        << name;
+    return;
+  }
+  for (const char *d = data.begin(), *e = data.end(); d < e;) {
+    StringRef s(d);
+    addDependentLibrary(ctx, s, f);
+    d += s.size() + 1;
+  }
 }
 
 // Record the membership of a section group so that in the garbage collection
@@ -569,119 +579,58 @@ handleAArch64BAAndGnuProperties(ObjFile<ELFT> *file, Ctx &ctx,
 }
 
 template <class ELFT> void ObjFile<ELFT>::parse(bool ignoreComdats) {
-  object::ELFFile<ELFT> obj = this->getObj();
-  // Read a section table. justSymbols is usually false.
-  if (this->justSymbols) {
-    initializeJustSymbols();
-    initializeSymbols(obj);
-    return;
-  }
-
-  // Handle dependent libraries and selection of section groups as these are not
-  // done in parallel.
-  ArrayRef<Elf_Shdr> objSections = getELFShdrs<ELFT>();
-  StringRef shstrtab = CHECK2(obj.getSectionStringTable(objSections), this);
-  uint64_t size = objSections.size();
-  sections.resize(size);
-  for (size_t i = 0; i != size; ++i) {
-    const Elf_Shdr &sec = objSections[i];
-
-    if (LLVM_LIKELY(sec.sh_type == SHT_PROGBITS))
-      continue;
-    if (LLVM_LIKELY(sec.sh_type == SHT_GROUP)) {
-      StringRef signature = getShtGroupSignature(objSections, sec);
-      ArrayRef<Elf_Word> entries =
-          CHECK2(obj.template getSectionContentsAsArray<Elf_Word>(sec), this);
-      if (entries.empty())
-        Fatal(ctx) << this << ": empty SHT_GROUP";
-
-      Elf_Word flag = entries[0];
-      if (flag && flag != GRP_COMDAT)
-        Fatal(ctx) << this << ": unsupported SHT_GROUP format";
-
-      bool keepGroup = !flag || ignoreComdats ||
-                       ctx.symtab->comdatGroups
-                           .try_emplace(CachedHashStringRef(signature), this)
-                           .second;
-      if (keepGroup) {
-        if (!ctx.arg.resolveGroups)
-          sections[i] = createInputSection(
-              i, sec, check(obj.getSectionName(sec, shstrtab)));
-      } else {
-        // Otherwise, discard group members.
-        for (uint32_t secIndex : entries.slice(1)) {
-          if (secIndex >= size)
-            Fatal(ctx) << this
-                       << ": invalid section index in group: " << secIndex;
-          sections[secIndex] = &InputSection::discarded;
-        }
-      }
-      continue;
-    }
-
-    if (sec.sh_type == SHT_LLVM_DEPENDENT_LIBRARIES && !ctx.arg.relocatable) {
-      StringRef name = check(obj.getSectionName(sec, shstrtab));
-      ArrayRef<char> data = CHECK2(
-          this->getObj().template getSectionContentsAsArray<char>(sec), this);
-      if (!data.empty() && data.back() != '\0') {
-        Err(ctx)
-            << this
-            << ": corrupted dependent libraries section (unterminated string): "
-            << name;
-      } else {
-        for (const char *d = data.begin(), *e = data.end(); d < e;) {
-          StringRef s(d);
-          addDependentLibrary(ctx, s, this);
-          d += s.size() + 1;
-        }
-      }
-      sections[i] = &InputSection::discarded;
-      continue;
-    }
-
-    switch (ctx.arg.emachine) {
-    case EM_ARM:
-      if (sec.sh_type == SHT_ARM_ATTRIBUTES) {
-        ARMAttributeParser attributes;
-        ArrayRef<uint8_t> contents =
-            check(this->getObj().getSectionContents(sec));
-        StringRef name = check(obj.getSectionName(sec, shstrtab));
-        sections[i] = &InputSection::discarded;
-        if (Error e = attributes.parse(contents, ekind == ELF32LEKind
-                                                     ? llvm::endianness::little
-                                                     : llvm::endianness::big)) {
-          InputSection isec(*this, sec, name);
-          Warn(ctx) << &isec << ": " << std::move(e);
-        } else {
-          updateSupportedARMFeatures(ctx, attributes);
-          updateARMVFPArgs(ctx, attributes, this);
-
-          // FIXME: Retain the first attribute section we see. The eglibc ARM
-          // dynamic loaders require the presence of an attribute section for
-          // dlopen to work. In a full implementation we would merge all
-          // attribute sections.
-          if (ctx.in.attributes == nullptr) {
-            ctx.in.attributes =
-                std::make_unique<InputSection>(*this, sec, name);
-            sections[i] = ctx.in.attributes.get();
-          }
-        }
-      }
-      break;
-    case EM_AARCH64:
-      // Producing a static binary with MTE globals is not currently supported,
-      // remove all SHT_AARCH64_MEMTAG_GLOBALS_STATIC sections as they're unused
-      // medatada, and we don't want them to end up in the output file for
-      // static executables.
-      if (sec.sh_type == SHT_AARCH64_MEMTAG_GLOBALS_STATIC &&
-          !canHaveMemtagGlobals(ctx))
-        sections[i] = &InputSection::discarded;
-      break;
-    }
+  // Sections are initialized later by initSectionsAndLocalSyms. Register
+  // COMDAT group signatures (first-come-first-served) and record
+  // order-dependent sections, as these must happen in command-line order;
+  // the parallel pipeline performs this scan for its batch of files.
+  if (!this->justSymbols) {
+    scanEarlySections([&](StringRef signature) {
+      if (!ignoreComdats)
+        ctx.symtab->addComdatGroup(CachedHashStringRef(signature), this);
+    });
+    processDeferredSections();
   }
 
   // Read a symbol table.
-  initializeSymbols(obj);
+  initializeSymbols(this->getObj());
+}
+
+template <class ELFT>
+void ObjFile<ELFT>::scanEarlySections(
+    llvm::function_ref<void(StringRef)> addComdat) {
+  ArrayRef<Elf_Shdr> shdrs = getELFShdrs<ELFT>();
+  ArrayRef<Elf_Sym> eSyms = this->getELFSyms<ELFT>();
+  StringRef strtab = stringTable;
+  for (size_t i = 0, e = shdrs.size(); i != e; ++i) {
+    const Elf_Shdr &sec = shdrs[i];
+    if (!preScanned) {
+      if (LLVM_UNLIKELY(sec.sh_type == SHT_LLVM_DEPENDENT_LIBRARIES) &&
+          !ctx.arg.relocatable) {
+        deplibSecIdxs.push_back(i);
+        continue;
+      }
+      if (LLVM_UNLIKELY(sec.sh_type == SHT_ARM_ATTRIBUTES) &&
+          ctx.arg.emachine == EM_ARM) {
+        armAttrSecIdxs.push_back(i);
+        continue;
+      }
+    }
+    if (sec.sh_type != SHT_GROUP || sec.sh_info >= eSyms.size())
+      continue;
+    uint32_t nameOff = eSyms[sec.sh_info].st_name;
+    if (nameOff >= strtab.size())
+      continue;
+    // Elf_Word tolerates unaligned SHT_GROUP content. Skip malformed groups;
+    // initializeSections diagnoses them.
+    auto entries = getObj().template getSectionContentsAsArray<Elf_Word>(sec);
+    if (!entries) {
+      consumeError(entries.takeError());
+      continue;
+    }
+    if (!entries->empty() && ((*entries)[0] & GRP_COMDAT))
+      addComdat(StringRef(strtab.data() + nameOff));
+  }
+  preScanned = true;
 }
 
 // Sections with SHT_GROUP and comdat bits define comdat section groups.
@@ -740,19 +689,6 @@ bool ObjFile<ELFT>::shouldMerge(const Elf_Shdr &sec, StringRef name) {
   return true;
 }
 
-// This is for --just-symbols.
-//
-// --just-symbols is a very minor feature that allows you to link your
-// output against other existing program, so that if you load both your
-// program and the other program into memory, your output can refer the
-// other program's symbols.
-//
-// When the option is given, we link "just symbols". The section table is
-// initialized with null pointers.
-template <class ELFT> void ObjFile<ELFT>::initializeJustSymbols() {
-  sections.resize(numELFShdrs);
-}
-
 static bool isKnownSpecificSectionType(uint32_t t, uint32_t flags) {
   if (SHT_LOUSER <= t && t <= SHT_HIUSER && !(flags & SHF_ALLOC))
     return true;
@@ -768,6 +704,8 @@ void ObjFile<ELFT>::initializeSections(bool ignoreComdats,
   ArrayRef<Elf_Shdr> objSections = getELFShdrs<ELFT>();
   StringRef shstrtab = CHECK2(obj.getSectionStringTable(objSections), this);
   uint64_t size = objSections.size();
+  if (sections.size() != size)
+    sections.resize(size);
   SmallVector<ArrayRef<Elf_Word>, 0> selectedGroups;
   AArch64BuildAttrSubsections aarch64BAsubSections;
   bool hasAArch64BuildAttributes = false;
@@ -802,6 +740,27 @@ void ObjFile<ELFT>::initializeSections(bool ignoreComdats,
       continue;
     }
 
+    // ARM attributes and dependent-library sections were handled by
+    // processDeferredSections(); discard them here, wiring the retained ARM
+    // attributes section to ctx.in.attributes.
+    if (type == SHT_ARM_ATTRIBUTES && ctx.arg.emachine == EM_ARM) {
+      this->sections[i] = i == armAttrRetainedIdx ? ctx.in.attributes.get()
+                                                  : &InputSection::discarded;
+      continue;
+    }
+    if (type == SHT_LLVM_DEPENDENT_LIBRARIES && !ctx.arg.relocatable) {
+      this->sections[i] = &InputSection::discarded;
+      continue;
+    }
+    // Producing a static binary with MTE globals is not currently supported;
+    // remove all SHT_AARCH64_MEMTAG_GLOBALS_STATIC sections as they would be
+    // unused metadata in the output.
+    if (type == SHT_AARCH64_MEMTAG_GLOBALS_STATIC &&
+        ctx.arg.emachine == EM_AARCH64 && !canHaveMemtagGlobals(ctx)) {
+      this->sections[i] = &InputSection::discarded;
+      continue;
+    }
+
     // Processor-specific types that do not use the following switch statement.
     //
     // Extract Build Attributes section contents into aarch64BAsubSections.
@@ -826,14 +785,30 @@ void ObjFile<ELFT>::initializeSections(bool ignoreComdats,
     case SHT_GROUP: {
       if (!ctx.arg.relocatable)
         sections[i] = &InputSection::discarded;
-      StringRef signature =
-          cantFail(this->getELFSyms<ELFT>()[sec.sh_info].getName(stringTable));
       ArrayRef<Elf_Word> entries =
-          cantFail(obj.template getSectionContentsAsArray<Elf_Word>(sec));
+          CHECK2(obj.template getSectionContentsAsArray<Elf_Word>(sec), this);
+      if (entries.empty())
+        Fatal(ctx) << this << ": empty SHT_GROUP";
+      if (entries[0] && entries[0] != GRP_COMDAT)
+        Fatal(ctx) << this << ": unsupported SHT_GROUP format";
+      StringRef signature = getShtGroupSignature(objSections, sec);
       if ((entries[0] & GRP_COMDAT) == 0 || ignoreComdats ||
-          ctx.symtab->comdatGroups.find(CachedHashStringRef(signature))
-                  ->second == this)
+          ctx.symtab->findComdatOwner(CachedHashStringRef(signature)) == this) {
         selectedGroups.push_back(entries);
+        // For relocatable links without --force-group-allocation, pass the
+        // group section through.
+        if (ctx.arg.relocatable && !ctx.arg.resolveGroups && !sections[i])
+          sections[i] = createInputSection(
+              i, sec, check(obj.getSectionName(sec, shstrtab)));
+      } else {
+        // Discard group members.
+        for (uint32_t secIndex : entries.slice(1)) {
+          if (secIndex >= size)
+            Fatal(ctx) << this
+                       << ": invalid section index in group: " << secIndex;
+          this->sections[secIndex] = &InputSection::discarded;
+        }
+      }
       break;
     }
     case SHT_SYMTAB_SHNDX:
@@ -1248,11 +1223,19 @@ void ObjFile<ELFT>::initializeSymbols(const object::ELFFile<ELFT> &obj) {
 
 template <class ELFT>
 void ObjFile<ELFT>::initSectionsAndLocalSyms(bool ignoreComdats) {
-  if (!justSymbols)
+  // For --just-symbols, the section table is initialized with null pointers so
+  // that defined symbols resolve as absolute.
+  if (justSymbols)
+    sections.resize(numELFShdrs);
+  else
     initializeSections(ignoreComdats, getObj());
 
   if (!firstGlobal)
     return;
+  // In the parallel-parse path, initializeSymbols() is not called, so the
+  // symbols[] array may still be unallocated. Allocate it on demand.
+  if (!symbols)
+    symbols = std::make_unique<Symbol *[]>(numSymbols);
   SymbolUnion *locals = makeThreadLocalN<SymbolUnion>(firstGlobal);
 
   ArrayRef<Elf_Sym> eSyms = this->getELFSyms<ELFT>();
@@ -1291,6 +1274,31 @@ void ObjFile<ELFT>::initSectionsAndLocalSyms(bool ignoreComdats) {
                                eSym.st_value, eSym.st_size, sec);
     symbols[i]->isUsedInRegularObj = true;
   }
+}
+
+// Process recorded order-dependent sections. The serial path calls this at
+// the end of each parse(); the parallel pipeline calls it in a command-line-
+// order epilogue. Dependent-library processing may append new input files.
+template <class ELFT> void ObjFile<ELFT>::processDeferredSections() {
+  object::ELFFile<ELFT> obj = this->getObj();
+  ArrayRef<Elf_Shdr> objSections = getELFShdrs<ELFT>();
+  for (uint32_t i : armAttrSecIdxs) {
+    const Elf_Shdr &sec = objSections[i];
+    StringRef name = check(obj.getSectionName(sec));
+    // FIXME: Retain the first valid attribute section we see. The eglibc ARM
+    // dynamic loaders require the presence of an attribute section for dlopen
+    // to work. In a full implementation we would merge all attribute
+    // sections.
+    if (readArmAttributes(ctx, this, sec, name) && !ctx.in.attributes) {
+      ctx.in.attributes = std::make_unique<InputSection>(*this, sec, name);
+      armAttrRetainedIdx = i;
+    }
+  }
+  armAttrSecIdxs.clear();
+  for (uint32_t i : deplibSecIdxs)
+    readDependentLibs(ctx, this, objSections[i],
+                      check(obj.getSectionName(objSections[i])));
+  deplibSecIdxs.clear();
 }
 
 // Called after all ObjFile::parse is called for all ObjFiles. This checks
@@ -1354,6 +1362,8 @@ template <class ELFT> void ObjFile<ELFT>::postParse() {
     }
 
     if (sym.binding == STB_WEAK || binding == STB_WEAK)
+      continue;
+    if (ctx.parallelParse && bothFromArchive(this, sym.file))
       continue;
     std::lock_guard<std::mutex> lock(mu);
     ctx.duplicates.push_back({&sym, this, sec, eSym.st_value});
@@ -1893,8 +1903,7 @@ void BitcodeFile::parse() {
   for (std::pair<StringRef, Comdat::SelectionKind> s : obj->getComdatTable()) {
     keptComdats.push_back(
         s.second == Comdat::NoDeduplicate ||
-        ctx.symtab->comdatGroups.try_emplace(CachedHashStringRef(s.first), this)
-            .second);
+        ctx.symtab->addComdatGroup(CachedHashStringRef(s.first), this));
   }
 
   if (numSymbols == 0) {
