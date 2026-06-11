@@ -261,8 +261,12 @@ void Symbol::parseSymbolVersion(Ctx &ctx) {
 }
 
 void Symbol::extract(Ctx &ctx) const {
-  assert(file->lazy);
+  // The parallel parse pipeline may have already extracted the file.
+  if (!file->lazy)
+    return;
   file->lazy = false;
+  if (ctx.arg.trace)
+    Msg(ctx) << file;
   parseFile(ctx, file);
 }
 
@@ -395,17 +399,12 @@ void elf::parseVersionAndComputeIsPreemptible(Ctx &ctx) {
 // were not chosen still affect some symbol properties.
 void Symbol::mergeProperties(const Symbol &other) {
   // DSO symbols do not affect visibility in the output.
-  if (!other.isShared() && other.visibility() != STV_DEFAULT) {
-    uint8_t v = visibility(), ov = other.visibility();
-    setVisibility(v == STV_DEFAULT ? ov : std::min(v, ov));
-  }
+  if (!other.isShared())
+    mergeVisibility(other.visibility());
 }
 
 void Symbol::resolve(Ctx &ctx, const Undefined &other) {
-  if (other.visibility() != STV_DEFAULT) {
-    uint8_t v = visibility(), ov = other.visibility();
-    setVisibility(v == STV_DEFAULT ? ov : std::min(v, ov));
-  }
+  mergeVisibility(other.visibility());
   // An undefined symbol with non default visibility must be satisfied
   // in the same DSO.
   //
@@ -586,10 +585,7 @@ void Symbol::checkDuplicate(Ctx &ctx, const Defined &other) const {
 }
 
 void Symbol::resolve(Ctx &ctx, const CommonSymbol &other) {
-  if (other.visibility() != STV_DEFAULT) {
-    uint8_t v = visibility(), ov = other.visibility();
-    setVisibility(v == STV_DEFAULT ? ov : std::min(v, ov));
-  }
+  mergeVisibility(other.visibility());
   if (isDefined() && !isWeak()) {
     if (ctx.arg.warnCommon)
       Warn(ctx) << "common " << getName() << " is overridden";
@@ -622,10 +618,7 @@ void Symbol::resolve(Ctx &ctx, const CommonSymbol &other) {
 }
 
 void Symbol::resolve(Ctx &ctx, const Defined &other) {
-  if (other.visibility() != STV_DEFAULT) {
-    uint8_t v = visibility(), ov = other.visibility();
-    setVisibility(v == STV_DEFAULT ? ov : std::min(v, ov));
-  }
+  mergeVisibility(other.visibility());
   if (shouldReplace(ctx, other))
     other.overwrite(*this);
 }
