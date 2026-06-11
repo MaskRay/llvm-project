@@ -148,6 +148,13 @@ public:
   void setVisibility(uint8_t visibility) {
     stOther = (stOther & ~3) | visibility;
   }
+  // Merge an input symbol's visibility: the most constraining one wins.
+  void mergeVisibility(uint8_t ov) {
+    if (ov != llvm::ELF::STV_DEFAULT) {
+      uint8_t v = visibility();
+      setVisibility(v == llvm::ELF::STV_DEFAULT ? ov : std::min(v, ov));
+    }
+  }
 
   uint8_t computeBinding(Ctx &) const;
   bool isGlobal() const { return binding == llvm::ELF::STB_GLOBAL; }

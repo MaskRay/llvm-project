@@ -100,6 +100,12 @@ public:
     return {symbols.get(), numSymbols};
   }
 
+  // Allocate the symbols array (zero-initialized) if not already present.
+  void allocateSymbols() {
+    if (!symbols)
+      symbols = std::make_unique<Symbol *[]>(numSymbols);
+  }
+
   Symbol &getSymbol(uint32_t symbolIndex) const {
     assert(fileKind == ObjKind);
     if (symbolIndex >= numSymbols)
@@ -184,6 +190,8 @@ public:
 
   StringRef getStringTable() const { return stringTable; }
 
+  uint32_t getFirstGlobal() const { return firstGlobal; }
+
   ArrayRef<Symbol *> getLocalSymbols() {
     if (numSymbols == 0)
       return {};
@@ -240,6 +248,14 @@ public:
   std::optional<AArch64PauthAbiCoreInfo> aarch64PauthAbiCoreInfo;
 };
 
+// Information collected by an early scan over the section headers, shared by
+// the parallel parse pipeline and the serial ObjFile::parse.
+struct EarlySectionInfo {
+  SmallVector<StringRef, 0> comdats; // GRP_COMDAT signatures, section order
+  SmallVector<uint32_t, 0> deplibSections;    // SHT_LLVM_DEPENDENT_LIBRARIES
+  SmallVector<uint32_t, 0> attributeSections; // SHT_ARM_ATTRIBUTES
+};
+
 // .o file.
 template <class ELFT> class ObjFile : public ELFFileBase {
   LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
@@ -259,8 +275,8 @@ public:
   void parse(bool ignoreComdats = false);
   void parseLazy();
 
-  StringRef getShtGroupSignature(ArrayRef<Elf_Shdr> sections,
-                                 const Elf_Shdr &sec);
+  llvm::Expected<std::pair<StringRef, ArrayRef<Elf_Word>>>
+  getGroup(const Elf_Shdr &sec);
 
   uint32_t getSectionIndex(const Elf_Sym &sym) const;
 
@@ -290,7 +306,19 @@ public:
   void postParse();
   void importCmseSymbols();
 
+  // Tolerantly scan the section headers, collecting comdat group signatures
+  // and the section indices needed for serial post-processing. Diagnostics
+  // for malformed groups are emitted in initializeSections.
+  void scanEarlySections(EarlySectionInfo &out);
+  // Process dependent libraries and SHT_ARM_ATTRIBUTES (serial contexts
+  // only: may add input files and create the singleton attributes section).
+  void processEarlySections(const EarlySectionInfo &early);
+
 private:
+  // Section index of the retained SHT_ARM_ATTRIBUTES section, if this file
+  // provides ctx.in.attributes.
+  uint32_t armAttrSecIdx = UINT32_MAX;
+
   void initializeSections(bool ignoreComdats,
                           const llvm::object::ELFFile<ELFT> &obj);
   void initializeSymbols(const llvm::object::ELFFile<ELFT> &obj);
