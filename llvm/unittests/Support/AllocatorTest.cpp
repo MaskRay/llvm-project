@@ -117,7 +117,9 @@ TEST(AllocatorTest, TestZero) {
   void *Large = Alloc.Allocate(4096, 1);
   EXPECT_EQ(1u, Alloc.GetNumSlabs());
   EXPECT_EQ(4096u, Alloc.getBytesAllocated());
-  EXPECT_EQ(Empty, Large);
+  // Downward bump: the empty allocation sits at the slab top, the 4096-byte one
+  // just below it.
+  EXPECT_EQ(Empty, (char *)Large + 4096);
 
   void *Empty2 = Alloc.Allocate(0, 1);
   EXPECT_NE(Empty2, nullptr);
@@ -271,8 +273,10 @@ TEST(AllocatorTest, TestBigAlignment) {
   // First allocate a tiny bit to ensure we have to re-align things.
   (void)Alloc.Allocate(1, 1);
 
-  // Now the big chunk with a big alignment.
-  (void)Alloc.Allocate(3000, 2048);
+  // Now a chunk too big for the default slab, with a big alignment. (Downward
+  // bump would otherwise satisfy a merely big alignment within the slab by
+  // aligning down, so make the size itself exceed the slab.)
+  (void)Alloc.Allocate(5000, 2048);
 
   // We test that the last slab size is not the default 4096 byte slab, but
   // rather a custom sized slab that is larger.
