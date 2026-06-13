@@ -142,8 +142,8 @@ public:
 
     // Reset the state.
     BytesAllocated = 0;
-    CurPtr = (char *)Slabs.front();
-    End = CurPtr + SlabSize;
+    End = (char *)Slabs.front();
+    CurPtr = End + SlabSize;
 
     __asan_poison_memory_region(*Slabs.begin(), computeSlabSize(0));
     DeallocateSlabs(std::next(Slabs.begin()), Slabs.end());
@@ -168,26 +168,24 @@ public:
 #endif
     SizeToAllocate = alignToPowerOf2(SizeToAllocate, MinAlign);
 
-    // CurPtr is already MinAlign-aligned, so only a stricter request realigns.
-    char *Ptr = CurPtr;
+    // Bump down from CurPtr (the top of the free region); End is the lower
+    // bound. CurPtr stays MinAlign-aligned, so only a stricter request
+    // realigns.
+    uintptr_t NewPtr = uintptr_t(CurPtr) - SizeToAllocate;
     if (Alignment.value() > MinAlign)
-      Ptr = reinterpret_cast<char *>(alignAddr(Ptr, Alignment));
-    char *NewCurPtr = Ptr + SizeToAllocate;
-    assert(NewCurPtr >= Ptr && "Alignment + Size must not overflow");
+      NewPtr &= ~(Alignment.value() - 1);
 
-    // Check if we have enough space.
-    if (LLVM_LIKELY(
-            uintptr_t(NewCurPtr) <= uintptr_t(End) &&
-            //  We can't return nullptr even for a zero-sized allocation!
-            CurPtr != nullptr)) {
-      CurPtr = NewCurPtr;
+    // CurPtr != nullptr rejects an empty allocator, where the subtraction
+    // underflows NewPtr to above End.
+    if (LLVM_LIKELY(NewPtr >= uintptr_t(End) && CurPtr != nullptr)) {
+      CurPtr = reinterpret_cast<char *>(NewPtr);
       // Update the allocation point of this memory block in MemorySanitizer.
       // Without this, MemorySanitizer messages for values originated from here
       // will point to the allocation of the entire slab.
-      __msan_allocated_memory(Ptr, Size);
+      __msan_allocated_memory(CurPtr, Size);
       // Similarly, tell ASan about this space.
-      __asan_unpoison_memory_region(Ptr, Size);
-      return Ptr;
+      __asan_unpoison_memory_region(CurPtr, Size);
+      return CurPtr;
     }
 
     return AllocateSlow(Size, SizeToAllocate, Alignment);
@@ -215,14 +213,14 @@ public:
 
     // Otherwise, start a new slab and try again.
     StartNewSlab();
-    uintptr_t AlignedAddr = alignAddr(CurPtr, Alignment);
-    assert(AlignedAddr + SizeToAllocate <= (uintptr_t)End &&
-           "Unable to allocate memory!");
-    char *AlignedPtr = (char*)AlignedAddr;
-    CurPtr = AlignedPtr + SizeToAllocate;
-    __msan_allocated_memory(AlignedPtr, Size);
-    __asan_unpoison_memory_region(AlignedPtr, Size);
-    return AlignedPtr;
+    uintptr_t NewPtr = uintptr_t(CurPtr) - SizeToAllocate;
+    if (Alignment.value() > MinAlign)
+      NewPtr &= ~(Alignment.value() - 1);
+    assert(NewPtr >= (uintptr_t)End && "Unable to allocate memory!");
+    CurPtr = reinterpret_cast<char *>(NewPtr);
+    __msan_allocated_memory(CurPtr, Size);
+    __asan_unpoison_memory_region(CurPtr, Size);
+    return CurPtr;
   }
 
   inline LLVM_ATTRIBUTE_RETURNS_NONNULL void *
@@ -321,12 +319,10 @@ public:
   }
 
 private:
-  /// The current pointer into the current slab.
-  ///
-  /// This points to the next free byte in the slab.
+  /// The top of the free region in the current slab; allocations bump it down.
   char *CurPtr = nullptr;
 
-  /// The end of the current slab.
+  /// The lower bound (begin) of the current slab.
   char *End = nullptr;
 
   /// The slabs allocated so far.
@@ -365,8 +361,8 @@ private:
     __asan_poison_memory_region(NewSlab, AllocatedSlabSize);
 
     Slabs.push_back(NewSlab);
-    CurPtr = (char *)(NewSlab);
-    End = ((char *)NewSlab) + AllocatedSlabSize;
+    End = (char *)NewSlab;                        // lower bound
+    CurPtr = (char *)NewSlab + AllocatedSlabSize; // top, grows down
   }
 
   /// Deallocate a sequence of slabs.
@@ -427,8 +423,15 @@ public:
   /// current slab and reset the current pointer to the beginning of it, freeing
   /// all memory allocated so far.
   void DestroyAll() {
-    auto DestroyElements = [](char *Begin, char *End) {
-      assert(Begin == (char *)alignAddr(Begin, Align::Of<T>()));
+    // Objects are packed against the slab top (any remainder is at the bottom),
+    // so walk down from the top.
+    auto DestroyDown = [](char *Low, uintptr_t Top) {
+      Top &= ~(uintptr_t(alignof(T)) - 1);
+      for (; Top >= uintptr_t(Low) + sizeof(T); Top -= sizeof(T))
+        reinterpret_cast<T *>(Top - sizeof(T))->~T();
+    };
+    // Custom-sized slabs are placed forward from the aligned base.
+    auto DestroyUp = [](char *Begin, char *End) {
       for (char *Ptr = Begin; Ptr + sizeof(T) <= End; Ptr += sizeof(T))
         reinterpret_cast<T *>(Ptr)->~T();
     };
@@ -437,18 +440,15 @@ public:
          ++I) {
       size_t AllocatedSlabSize = BumpPtrAllocatorTy::computeSlabSize(
           std::distance(Allocator.Slabs.begin(), I));
-      char *Begin = (char *)alignAddr(*I, Align::Of<T>());
-      char *End = *I == Allocator.Slabs.back() ? Allocator.CurPtr
-                                               : (char *)*I + AllocatedSlabSize;
-
-      DestroyElements(Begin, End);
+      uintptr_t Top = uintptr_t(*I) + AllocatedSlabSize;
+      char *Low = *I == Allocator.Slabs.back() ? Allocator.CurPtr : (char *)*I;
+      DestroyDown(Low, Top);
     }
 
     for (auto &PtrAndSize : Allocator.CustomSizedSlabs) {
       void *Ptr = PtrAndSize.first;
       size_t Size = PtrAndSize.second;
-      DestroyElements((char *)alignAddr(Ptr, Align::Of<T>()),
-                      (char *)Ptr + Size);
+      DestroyUp((char *)alignAddr(Ptr, Align::Of<T>()), (char *)Ptr + Size);
     }
 
     Allocator.Reset();
