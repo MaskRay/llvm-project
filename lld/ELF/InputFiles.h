@@ -45,6 +45,8 @@ std::optional<MemoryBufferRef> readFile(Ctx &, StringRef path);
 // Add symbols in File to the symbol table.
 void parseFile(Ctx &, InputFile *file);
 void parseFiles(Ctx &, const SmallVector<std::unique_ptr<InputFile>, 0> &);
+// Extract still-lazy members defining the trigger symbols and resolve them.
+void reactivate(Ctx &, ArrayRef<Symbol *> triggers);
 
 // The root class of input files.
 class InputFile {

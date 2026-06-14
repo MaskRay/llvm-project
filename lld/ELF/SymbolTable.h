@@ -55,6 +55,13 @@ public:
   SymbolTable(Ctx &ctx) : ctx(ctx) {}
   ArrayRef<Symbol *> getSymbols() const { return symVector; }
 
+  // The installed per-shard name maps (key -> symVector index). A late parse
+  // batch seeds from these so its keys match the original registration stems,
+  // which may differ from a symbol's current name after version parsing.
+  ArrayRef<llvm::DenseMap<llvm::CachedHashStringRef, int>> getShards() const {
+    return shards;
+  }
+
   void wrap(Symbol *sym, Symbol *real, Symbol *wrap);
 
   Symbol *insert(StringRef name);

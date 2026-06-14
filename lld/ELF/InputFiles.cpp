@@ -2050,7 +2050,7 @@ struct REvent {
 
 template <class ELFT> struct Pipeline {
   Ctx &ctx;
-  const SmallVector<std::unique_ptr<InputFile>, 0> &driverFiles;
+  const SmallVector<std::unique_ptr<InputFile>, 0> *driverFiles;
   size_t firstFile, lastFile;        // process driverFiles[firstFile, lastFile)
   SmallVector<InputFile *, 0> files; // snapshot of the file range
   SmallVector<FileData, 0> fd;
@@ -2071,10 +2071,27 @@ template <class ELFT> struct Pipeline {
   SmallVector<Extraction, 0> extractions;
   uint32_t bucketBase[numShards + 1]; // global name id = base[bucket] + nameId
   bool hasTraced = false;
+  // A late batch extends the installed symbol table in place rather than
+  // rebuilding the whole symbol vector.
+  bool incremental = false;
+  // Files supplied directly rather than as a driverFiles range (a reactivate
+  // batch over the still-lazy members; they are not a contiguous range).
+  ArrayRef<InputFile *> explicitFiles;
+  // Reactivate: lazy symbols whose members should be extracted. activate seeds
+  // these (only) as pending references, so their members are pulled in.
+  ArrayRef<Symbol *> triggers;
 
+  // Initial / dependent-library batch: process driverFiles[first, last).
   Pipeline(Ctx &ctx, const SmallVector<std::unique_ptr<InputFile>, 0> &f,
            size_t first, size_t last)
-      : ctx(ctx), driverFiles(f), firstFile(first), lastFile(last) {}
+      : ctx(ctx), driverFiles(&f), firstFile(first), lastFile(last),
+        incremental(first != 0) {}
+
+  // Reactivate batch over explicit still-lazy members, extracting the members
+  // that define the trigger symbols (and, recursively, their references).
+  Pipeline(Ctx &ctx, ArrayRef<InputFile *> explicit_, ArrayRef<Symbol *> trig)
+      : ctx(ctx), driverFiles(nullptr), firstFile(0), lastFile(0),
+        incremental(true), explicitFiles(explicit_), triggers(trig) {}
 
   void run();
   void readSymbols();
@@ -2163,9 +2180,11 @@ static void bucketizeComdats(FileData &d, ArrayRef<StringRef> sigs) {
 } // namespace
 
 template <class ELFT> void Pipeline<ELFT>::readSymbols() {
-  files.reserve(lastFile - firstFile);
-  for (size_t i = firstFile; i != lastFile; ++i)
-    files.push_back(driverFiles[i].get());
+  if (!explicitFiles.empty())
+    files.assign(explicitFiles.begin(), explicitFiles.end());
+  else
+    for (size_t i = firstFile; i != lastFile; ++i)
+      files.push_back((*driverFiles)[i].get());
   fd.resize(files.size());
 
   // Diagnose incompatible files in command-line order; they are skipped
@@ -2432,10 +2451,31 @@ template <class ELFT> void Pipeline<ELFT>::readBitcode(uint32_t i) {
 }
 
 template <class ELFT> void Pipeline<ELFT>::buildNameDB() {
-  // Seed the buckets with pre-parseFiles symbols (-u, --trace-symbol) so they
-  // come first in the serial insertion order.
-  seeds.assign(ctx.symtab->getSymbols().begin(),
-               ctx.symtab->getSymbols().end());
+  // Seed the buckets with the already-resolved symbols so the batch resolves
+  // against them. A late batch (after installShardedSymbols) seeds from the
+  // shard maps, whose keys are the original registration stems: a symbol's
+  // current name may differ after version parsing, but a record still keys by
+  // the stem. The initial batch has no shards yet and only the
+  // -u/--trace-symbol seeds, whose names equal their keys.
+  ArrayRef<Symbol *> symVec = ctx.symtab->getSymbols();
+  if (incremental) {
+    for (const auto &shard : ctx.symtab->getShards())
+      for (const auto &kv : shard) {
+        seeds.push_back(symVec[kv.second]);
+        CachedHashStringRef key = kv.first;
+        seedKeys.push_back(
+            {key.val().data(), (uint32_t)key.val().size(), key.hash()});
+      }
+  } else {
+    seeds.assign(symVec.begin(), symVec.end());
+    seedKeys.reserve(seeds.size());
+    for (Symbol *s : seeds) {
+      StringRef stem =
+          s->getName().take_front(getSymbolStem(s->getName()).first);
+      seedKeys.push_back({stem.data(), (uint32_t)stem.size(),
+                          CachedHashStringRef(stem).hash()});
+    }
+  }
   for (Symbol *s : seeds)
     if (s->traced)
       hasTraced = true;
@@ -2443,14 +2483,6 @@ template <class ELFT> void Pipeline<ELFT>::buildNameDB() {
   size_t total = 0;
   for (FileData &d : fd)
     total += d.records.size();
-
-  // Hash seed stems once rather than in every bucket.
-  seedKeys.reserve(seeds.size());
-  for (Symbol *s : seeds) {
-    StringRef stem = s->getName().take_front(getSymbolStem(s->getName()).first);
-    seedKeys.push_back(
-        {stem.data(), (uint32_t)stem.size(), CachedHashStringRef(stem).hash()});
-  }
 
   parallelFor(0, numShards, [&](size_t b) {
     Bucket &bu = buckets[b];
@@ -2547,20 +2579,33 @@ template <class ELFT> void Pipeline<ELFT>::activate() {
     return bucketBase[rec.hash % numShards] + rec.nameId;
   };
 
-  // Seeded -u references act before all files. The sentinel trigger file
-  // index files.size() denotes ctx.internalFile.
-  for (auto [i, s] : llvm::enumerate(seeds))
-    if (s->isUndefined() && !s->isWeak()) {
-      auto it =
-          buckets[seedKeys[i].hash % numShards].map.find(seedKeys[i].ref());
-      if (it != buckets[seedKeys[i].hash % numShards].map.end()) {
-        uint32_t id = bucketBase[seedKeys[i].hash % numShards] + it->second;
-        if (state[id] == SNone) {
-          state[id] = SPending;
-          attr[id] = {(uint32_t)files.size(), (uint32_t)i};
-        }
-      }
+  auto markPending = [&](CachedHashStringRef key, uint32_t sym) {
+    auto &bu = buckets[key.hash() % numShards];
+    auto it = bu.map.find(key);
+    if (it == bu.map.end())
+      return;
+    uint32_t id = bucketBase[key.hash() % numShards] + it->second;
+    if (state[id] == SNone) {
+      state[id] = SPending;
+      attr[id] = {(uint32_t)files.size(), sym};
     }
+  };
+  // A reactivate batch pulls in only the members defining the explicit trigger
+  // symbols (and, transitively, their references); seeding every undefined
+  // symbol would extract members for references the main parse left lazy.
+  if (!triggers.empty()) {
+    for (Symbol *t : triggers) {
+      StringRef stem =
+          t->getName().take_front(getSymbolStem(t->getName()).first);
+      markPending(CachedHashStringRef(stem), 0);
+    }
+  } else {
+    // Seeded -u references act before all files. The sentinel trigger file
+    // index files.size() denotes ctx.internalFile.
+    for (auto [i, s] : llvm::enumerate(seeds))
+      if (s->isUndefined() && !s->isWeak())
+        markPending(seedKeys[i].ref(), i);
+  }
 
   uint32_t seq = 1;
   auto applyDef = [&](const SymRecord &rec, uint32_t f) {
@@ -2847,10 +2892,9 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
 }
 
 template <class ELFT> void Pipeline<ELFT>::resolveSymbols() {
-  // A late batch (firstFile != 0) extends an already-installed symbol table:
-  // pre-existing symbols are resolved in place and new names are appended,
-  // rather than rebuilding and reinstalling the whole vector.
-  bool incremental = firstFile != 0;
+  // A late batch extends an already-installed symbol table: pre-existing
+  // symbols are resolved in place and new names are appended, rather than
+  // rebuilding and reinstalling the whole vector.
 
   // Create and resolve symbols per bucket.
   {
@@ -3253,6 +3297,29 @@ void elf::parseFiles(Ctx &ctx,
                      const SmallVector<std::unique_ptr<InputFile>, 0> &files) {
   llvm::TimeTraceScope timeScope("Parse input files");
   invokeELFT(doParseFiles, ctx, files);
+}
+
+template <class ELFT>
+static void doReactivate(Ctx &ctx, ArrayRef<InputFile *> lazyFiles,
+                         ArrayRef<Symbol *> triggers) {
+  Pipeline<ELFT> p(ctx, lazyFiles, triggers);
+  p.run();
+}
+
+// Extract the still-lazy members that define the trigger symbols (e.g. a -u,
+// --entry, libcall or post-LTO reference), and resolve them, replacing the
+// serial Symbol::extract/parseFile path. References within an extracted member
+// pull in further members transitively (Pipeline::activate).
+void elf::reactivate(Ctx &ctx, ArrayRef<Symbol *> triggers) {
+  if (triggers.empty())
+    return;
+  SmallVector<InputFile *, 0> lazyFiles;
+  for (auto &f : ctx.driver.getFiles())
+    if (f->lazy)
+      lazyFiles.push_back(f.get());
+  if (lazyFiles.empty())
+    return;
+  invokeELFT(doReactivate, ctx, lazyFiles, triggers);
 }
 
 template class elf::ObjFile<ELF32LE>;

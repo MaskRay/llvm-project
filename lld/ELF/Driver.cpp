@@ -2481,7 +2481,8 @@ static void handleUndefined(Ctx &ctx, Symbol *sym, const char *option) {
 
   if (!sym->isLazy())
     return;
-  sym->extract(ctx);
+  Symbol *trig[] = {sym};
+  reactivate(ctx, trig);
   if (!ctx.arg.whyExtract.empty())
     ctx.whyExtractRecords.emplace_back(option, sym->file, *sym);
 }
@@ -2512,7 +2513,8 @@ static void handleLibcall(Ctx &ctx, StringRef name) {
   if (sym && sym->isLazy() && isa<BitcodeFile>(sym->file)) {
     if (!ctx.arg.whyExtract.empty())
       ctx.whyExtractRecords.emplace_back("<libcall>", sym->file, *sym);
-    sym->extract(ctx);
+    Symbol *trig[] = {sym};
+    reactivate(ctx, trig);
   }
 }
 
