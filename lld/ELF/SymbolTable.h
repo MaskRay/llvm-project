@@ -66,6 +66,14 @@ public:
       MutableArrayRef<llvm::DenseMap<llvm::CachedHashStringRef, int>> maps,
       SmallVector<Symbol *, 0> &&syms);
 
+  // Append a symbol resolved by a late parse batch (after
+  // installShardedSymbols), registering its name in the shard selected by the
+  // name hash. The pipeline calls this in the intended symVector order.
+  void appendShardedSymbol(llvm::CachedHashStringRef key, Symbol *sym) {
+    shards[key.hash() % numShards].try_emplace(key, (int)symVector.size());
+    symVector.push_back(sym);
+  }
+
   template <typename T> Symbol *addSymbol(const T &newSym) {
     Symbol *sym = insert(newSym.getName());
     sym->resolve(ctx, newSym);

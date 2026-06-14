@@ -2222,7 +2222,8 @@ struct REvent {
 template <class ELFT> struct Pipeline {
   Ctx &ctx;
   const SmallVector<std::unique_ptr<InputFile>, 0> &driverFiles;
-  SmallVector<InputFile *, 0> files; // snapshot of driverFiles
+  size_t firstFile, lastFile;        // process driverFiles[firstFile, lastFile)
+  SmallVector<InputFile *, 0> files; // snapshot of the file range
   SmallVector<FileData, 0> fd;
   std::array<Bucket, numShards> buckets;
   SmallVector<Symbol *, 0> seeds;      // pre-parseFiles symbols
@@ -2242,8 +2243,9 @@ template <class ELFT> struct Pipeline {
   uint32_t bucketBase[numShards + 1]; // global name id = base[bucket] + nameId
   bool hasTraced = false;
 
-  Pipeline(Ctx &ctx, const SmallVector<std::unique_ptr<InputFile>, 0> &f)
-      : ctx(ctx), driverFiles(f) {}
+  Pipeline(Ctx &ctx, const SmallVector<std::unique_ptr<InputFile>, 0> &f,
+           size_t first, size_t last)
+      : ctx(ctx), driverFiles(f), firstFile(first), lastFile(last) {}
 
   void run();
   void readSymbols();
@@ -2331,10 +2333,9 @@ static void bucketizeComdats(FileData &d, ArrayRef<StringRef> sigs) {
 } // namespace
 
 template <class ELFT> void Pipeline<ELFT>::readSymbols() {
-  size_t n = driverFiles.size();
-  files.reserve(n);
-  for (auto &f : driverFiles)
-    files.push_back(f.get());
+  files.reserve(lastFile - firstFile);
+  for (size_t i = firstFile; i != lastFile; ++i)
+    files.push_back(driverFiles[i].get());
   fd.resize(files.size());
 
   // Diagnose incompatible files in command-line order; they are skipped
@@ -2947,6 +2948,11 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
 }
 
 template <class ELFT> void Pipeline<ELFT>::resolveSymbols() {
+  // A late batch (firstFile != 0) extends an already-installed symbol table:
+  // pre-existing symbols are resolved in place and new names are appended,
+  // rather than rebuilding and reinstalling the whole vector.
+  bool incremental = firstFile != 0;
+
   // Create and resolve symbols per bucket.
   {
     llvm::TimeTraceScope scope1("Resolve buckets");
@@ -2959,10 +2965,17 @@ template <class ELFT> void Pipeline<ELFT>::resolveSymbols() {
       SmallVector<REvent, 0> order;
       for (size_t id = 0; id != n; ++id) {
         NameInfo &ni = bu.names[id];
-        SymbolUnion *su = &storage[id];
         if (ni.seedIdx != UINT32_MAX) {
-          memcpy(static_cast<void *>(su), ni.sym, sizeof(SymbolUnion));
+          // A pre-existing symbol. In a late batch resolve it in place so that
+          // references from already-parsed files stay valid; otherwise copy it
+          // into the contiguous storage that gets ordered and installed below.
+          if (!incremental) {
+            SymbolUnion *su = &storage[id];
+            memcpy(static_cast<void *>(su), ni.sym, sizeof(SymbolUnion));
+            ni.sym = reinterpret_cast<Symbol *>(su);
+          }
         } else {
+          SymbolUnion *su = &storage[id];
           memset(static_cast<void *>(su), 0, sizeof(SymbolUnion));
           auto *s = reinterpret_cast<Symbol *>(su);
           // Find the key for this name to set the initial name.
@@ -2971,11 +2984,50 @@ template <class ELFT> void Pipeline<ELFT>::resolveSymbols() {
           const RefNode &node = bu.refs[ni.firstRef];
           const SymRecord &rec = fd[node.fileIdx].records[node.recIdx];
           s->setName(rec.stem());
+          ni.sym = reinterpret_cast<Symbol *>(su);
         }
-        ni.sym = reinterpret_cast<Symbol *>(su);
         resolveName(bu, id, order);
       }
     });
+  }
+
+  if (incremental) {
+    // Seeds were resolved in place; append the new names in serial insertion
+    // order (their anchor rank), registering each in its hash shard.
+    llvm::TimeTraceScope scope2("Append symbols");
+    struct Item {
+      uint64_t ord, sub;
+      uint32_t bucket, nameId;
+    };
+    SmallVector<Item, 0> items;
+    for (size_t b = 0; b != numShards; ++b)
+      for (auto [id, ni] : llvm::enumerate(buckets[b].names))
+        if (ni.seedIdx == UINT32_MAX && ni.anchorRank != UINT32_MAX)
+          items.push_back(
+              {ni.anchorRank, ni.anchorSub, (uint32_t)b, (uint32_t)id});
+    llvm::sort(items, [](const Item &a, const Item &b) {
+      if (a.ord != b.ord)
+        return a.ord < b.ord;
+      if (a.sub != b.sub)
+        return a.sub < b.sub;
+      if (a.bucket != b.bucket)
+        return a.bucket < b.bucket;
+      return a.nameId < b.nameId;
+    });
+    SymbolUnion *out =
+        getSpecificAllocSingleton<SymbolUnion>().Allocate(items.size());
+    for (auto [i, it] : llvm::enumerate(items)) {
+      Bucket &bu = buckets[it.bucket];
+      NameInfo &ni = bu.names[it.nameId];
+      memcpy(static_cast<void *>(&out[i]), ni.sym, sizeof(SymbolUnion));
+      ni.sym = reinterpret_cast<Symbol *>(&out[i]);
+      const RefNode &node = bu.refs[ni.firstRef];
+      const SymRecord &rec = fd[node.fileIdx].records[node.recIdx];
+      ctx.symtab->appendShardedSymbol(CachedHashStringRef(rec.stem(), rec.hash),
+                                      ni.sym);
+    }
+    recordExtractions();
+    return;
   }
 
   llvm::TimeTraceScope scope2("Order symbols");
@@ -3159,15 +3211,6 @@ template <class ELFT> void Pipeline<ELFT>::epilogue() {
     }
     obj->processEarlySections(d.early);
   }
-
-  // Files can be appended during the epilogue (dependent libraries). Parse
-  // them with the serial machinery.
-  for (size_t i = files.size(); i < driverFiles.size(); ++i) {
-    InputFile *f = driverFiles[i].get();
-    if (ctx.arg.trace && !f->lazy)
-      Msg(ctx) << f;
-    parseFile(ctx, f);
-  }
 }
 
 template <class ELFT> void Pipeline<ELFT>::run() {
@@ -3196,8 +3239,6 @@ template <class ELFT> void Pipeline<ELFT>::run() {
     llvm::TimeTraceScope timeScope("Parse non-object files");
     epilogue();
   }
-  if (ctx.driver.armCmseImpLib)
-    cast<ObjFile<ELFT>>(*ctx.driver.armCmseImpLib).importCmseSymbols();
   // Free phase-local data in parallel; serial destruction measurably
   // serializes the frees.
   parallelFor(0, fd.size() + numShards, [&](size_t i) {
@@ -3215,23 +3256,18 @@ template <class ELFT>
 static void
 doParseFiles(Ctx &ctx,
              const SmallVector<std::unique_ptr<InputFile>, 0> &files) {
-  // With one thread the pipeline's record/replay overhead has no parallelism
-  // to pay for it; use the serial parse loop. Both paths produce identical
-  // output. Parsing may append files due to addDependentLibrary.
-  if (ctx.arg.threadCount == 1) {
-    for (size_t i = 0; i != files.size(); ++i) {
-      InputFile *f = files[i].get();
-      llvm::TimeTraceScope timeScope("Parse input files", f->getName());
-      if (ctx.arg.trace && !f->lazy)
-        Msg(ctx) << f;
-      parseFile(ctx, f);
-    }
-    if (ctx.driver.armCmseImpLib)
-      cast<ObjFile<ELFT>>(*ctx.driver.armCmseImpLib).importCmseSymbols();
-    return;
+  // Parse in batches. Parsing may append files (addDependentLibrary); a new
+  // batch over the appended files re-runs the pipeline, which seeds its name
+  // database from the symbols resolved so far (Pipeline::buildNameDB), so late
+  // references and archive extractions resolve against the existing symbols.
+  for (size_t done = 0; done < files.size();) {
+    size_t end = files.size();
+    Pipeline<ELFT> p(ctx, files, done, end);
+    p.run();
+    done = end;
   }
-  Pipeline<ELFT> p(ctx, files);
-  p.run();
+  if (ctx.driver.armCmseImpLib)
+    cast<ObjFile<ELFT>>(*ctx.driver.armCmseImpLib).importCmseSymbols();
 }
 
 void elf::parseFiles(Ctx &ctx,
