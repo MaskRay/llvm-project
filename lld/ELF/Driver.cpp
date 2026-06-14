@@ -2807,10 +2807,24 @@ void LinkerDriver::compileBitcodeFiles(bool skipLinkedOutput) {
     markBuffersAsDontNeed(ctx, skipLinkedOutput);
 
   ltoObjectFiles = lto->compile();
+
+  // Resolve the LTO outputs' symbols against the symbol table and register them
+  // in ctx.objectFiles (the parse pipeline, shared with regular objects). An
+  // LTO output may reference a runtime libcall defined in an archive member not
+  // loaded before LTO; extract such members via a reactivate batch.
+  SmallVector<InputFile *, 0> ltoFiles;
+  for (auto &file : ltoObjectFiles)
+    ltoFiles.push_back(file.get());
+  parseLtoObjectFiles(ctx, ltoFiles);
+  SmallVector<Symbol *, 0> triggers;
+  for (auto &file : ltoObjectFiles)
+    for (Symbol *sym : cast<ObjFile<ELFT>>(file.get())->getGlobalSymbols())
+      if (sym && sym->isLazy() && !sym->isWeak())
+        triggers.push_back(sym);
+  reactivate(ctx, triggers);
+
   for (auto &file : ltoObjectFiles) {
     auto *obj = cast<ObjFile<ELFT>>(file.get());
-    obj->parse(/*ignoreComdats=*/true);
-
     // This is only needed for AArch64 PAuth to set correct key in AUTH GOT
     // entry based on symbol type (STT_FUNC or not).
     // TODO: check if PAuth is actually used.
@@ -2834,7 +2848,6 @@ void LinkerDriver::compileBitcodeFiles(bool skipLinkedOutput) {
         if (sym->hasVersionSuffix)
           sym->parseSymbolVersion(ctx);
       }
-    ctx.objectFiles.push_back(obj);
   }
 }
 

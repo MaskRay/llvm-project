@@ -2074,8 +2074,11 @@ template <class ELFT> struct Pipeline {
   // A late batch extends the installed symbol table in place rather than
   // rebuilding the whole symbol vector.
   bool incremental = false;
-  // Files supplied directly rather than as a driverFiles range (a reactivate
-  // batch over the still-lazy members; they are not a contiguous range).
+  // LTO outputs are parsed with ignoreComdats: their comdat groups were already
+  // resolved before LTO and must not be re-registered.
+  bool ignoreComdats = false;
+  // Files supplied directly rather than as a driverFiles range (LTO outputs, or
+  // a reactivate batch over the still-lazy members).
   ArrayRef<InputFile *> explicitFiles;
   // Reactivate: lazy symbols whose members should be extracted. activate seeds
   // these (only) as pending references, so their members are pulled in.
@@ -2087,11 +2090,14 @@ template <class ELFT> struct Pipeline {
       : ctx(ctx), driverFiles(&f), firstFile(first), lastFile(last),
         incremental(first != 0) {}
 
-  // Reactivate batch over explicit still-lazy members, extracting the members
-  // that define the trigger symbols (and, recursively, their references).
-  Pipeline(Ctx &ctx, ArrayRef<InputFile *> explicit_, ArrayRef<Symbol *> trig)
+  // Late batch over explicit files: LTO outputs (ignoreComdats), or a
+  // reactivate batch extracting the members that define the trigger symbols
+  // (and, recursively, their references).
+  Pipeline(Ctx &ctx, ArrayRef<InputFile *> explicit_,
+           ArrayRef<Symbol *> trig = {}, bool ignoreComdats = false)
       : ctx(ctx), driverFiles(nullptr), firstFile(0), lastFile(0),
-        incremental(true), explicitFiles(explicit_), triggers(trig) {}
+        incremental(true), ignoreComdats(ignoreComdats),
+        explicitFiles(explicit_), triggers(trig) {}
 
   void run();
   void readSymbols();
@@ -2734,11 +2740,15 @@ template <class ELFT> void Pipeline<ELFT>::commitFiles() {
     if (!ev.full)
       continue;
     InputFile *f = files[ev.fileIdx];
-    if (ctx.arg.trace)
+    // -t traces the input files and extracted members, but not LTO outputs.
+    if (ctx.arg.trace && !ignoreComdats)
       Msg(ctx) << f;
     if (fd[ev.fileIdx].eligible && f->kind() == InputFile::ObjKind)
       ctx.objectFiles.push_back(cast<ELFFileBase>(f));
   }
+  // LTO outputs are parsed with ignoreComdats; their groups are not registered.
+  if (ignoreComdats)
+    return;
   // First-parsed file in serial order owns each comdat group.
   llvm::TimeTraceScope comdatScope("Pre-populate comdat groups");
   size_t numComdats = 0;
@@ -3297,6 +3307,18 @@ void elf::parseFiles(Ctx &ctx,
                      const SmallVector<std::unique_ptr<InputFile>, 0> &files) {
   llvm::TimeTraceScope timeScope("Parse input files");
   invokeELFT(doParseFiles, ctx, files);
+}
+
+template <class ELFT>
+static void doParseLtoObjectFiles(Ctx &ctx, ArrayRef<InputFile *> files) {
+  Pipeline<ELFT> p(ctx, files, /*triggers=*/{}, /*ignoreComdats=*/true);
+  p.run();
+}
+
+// Resolve the symbols of LTO output objects against the symbol table, sharing
+// the parallel resolution path with regular objects.
+void elf::parseLtoObjectFiles(Ctx &ctx, ArrayRef<InputFile *> files) {
+  invokeELFT(doParseLtoObjectFiles, ctx, files);
 }
 
 template <class ELFT>
