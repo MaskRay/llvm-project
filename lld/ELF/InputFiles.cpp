@@ -324,15 +324,15 @@ template <class ELFT> static void doParseFile(Ctx &ctx, InputFile *file) {
     return;
   }
 
+  // Only lazy object/bitcode members reach here (via Symbol::extract); binary
+  // and shared files are handled inline by the parse pipeline's epilogue.
   if (file->kind() == InputFile::ObjKind) {
     ctx.objectFiles.push_back(cast<ELFFileBase>(file));
     cast<ObjFile<ELFT>>(file)->parse();
-  } else if (auto *f = dyn_cast<BitcodeFile>(file)) {
+  } else {
+    auto *f = cast<BitcodeFile>(file);
     ctx.bitcodeFiles.push_back(f);
     f->parse();
-  } else {
-    ctx.binaryFiles.push_back(cast<BinaryFile>(file));
-    cast<BinaryFile>(file)->parse();
   }
 }
 
@@ -2797,10 +2797,18 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
       continue;
     }
     if (rec.flags & FBitcode) {
-      if (files[f]->lazy)
-        continue; // unextracted lazy bitcode contributes nothing
-      inserted = true;
       auto *bf = cast<BitcodeFile>(files[f]);
+      if (files[f]->lazy) {
+        // Unextracted lazy bitcode: only definitions are visible, as
+        // LazySymbols (BitcodeFile::parseLazy).
+        if (isDef) {
+          inserted = true;
+          if (sym->isPlaceholder() || (sym->isUndefined() && sym->isWeak()))
+            sym->resolve(ctx, LazySymbol{*bf});
+        }
+        continue;
+      }
+      inserted = true;
       createBitcodeSymbol(ctx, sym, bf->obj->symbols()[rec.elfIdx], *bf);
       continue;
     }
@@ -3045,14 +3053,19 @@ template <class ELFT> void Pipeline<ELFT>::wireSymbols() {
         Bucket &bu = buckets[rec.hash % numShards];
         syms[rec.elfIdx] = bu.names[rec.nameId].sym;
       }
-    } else if (f->kind() == InputFile::BitcodeKind && !f->lazy) {
-      // resolveName resolved a non-lazy bitcode file's symbols in place; wire
-      // its symbols array (an unextracted lazy file is left to parseLazy).
+    } else if (f->kind() == InputFile::BitcodeKind) {
+      // resolveName resolved the bitcode symbols in place; wire its symbols
+      // array. An unextracted lazy file has only its definitions wired
+      // (BitcodeFile::parseLazy).
       auto *bf = cast<BitcodeFile>(f);
+      bool inactiveLazy = f->lazy;
       bf->allocateSymbols(bf->obj->symbols().size());
       MutableArrayRef<Symbol *> syms = bf->getMutableSymbols();
-      for (const SymRecord &rec : fd[i].records)
+      for (const SymRecord &rec : fd[i].records) {
+        if (inactiveLazy && !(rec.flags & FDef))
+          continue;
         syms[rec.elfIdx] = buckets[rec.hash % numShards].names[rec.nameId].sym;
+      }
     } else if (f->kind() == InputFile::SharedKind &&
                ctx.arg.unresolvedSymbolsInShlib != UnresolvedPolicy::Ignore) {
       // Collect the DSO's strong undefined references (symbol-table order) for
@@ -3079,13 +3092,20 @@ template <class ELFT> void Pipeline<ELFT>::epilogue() {
       if (!d.eligible)
         continue;
       if (auto *bf = dyn_cast<BitcodeFile>(f)) {
-        if (bf->lazy) {
-          parseFile(ctx, bf); // parseLazy
-        } else if (fullRank[ev.fileIdx] != UINT32_MAX) {
-          // The serial linker ran parseLazy at this point before the member
-          // was extracted; keep the lazyBitcodeFiles registration order.
-          ctx.lazyBitcodeFiles.push_back(bf);
-        }
+        // resolveName/wireSymbols registered the LazySymbols; here keep the
+        // lazyBitcodeFiles order (BitcodeFile::parseLazy) and replay -y traced
+        // LazySymbol insertions. Unlike lazy objects, parseLazy has no early
+        // exit, so all definitions are visible.
+        ctx.lazyBitcodeFiles.push_back(bf);
+        if (hasTraced)
+          for (uint32_t ri : d.symOrder) {
+            const SymRecord &rec = d.records[ri];
+            if (!(rec.flags & FDef))
+              continue;
+            Symbol *sym = buckets[rec.hash % numShards].names[rec.nameId].sym;
+            if (sym->traced)
+              sym->resolve(ctx, LazySymbol{*bf});
+          }
         continue;
       }
       // Lazy object: replay LazySymbol insertions for traced names. symOrder
@@ -3147,8 +3167,11 @@ template <class ELFT> void Pipeline<ELFT>::epilogue() {
         }
       continue;
     }
-    if (!d.eligible || f->kind() != InputFile::ObjKind) {
-      parseFile(ctx, f); // BinaryFile
+    if (auto *bin = dyn_cast<BinaryFile>(f)) {
+      // A binary blob defines _binary_<name>_{start,end,size} against the
+      // already-installed symbol table; the pipeline tracks no records for it.
+      ctx.binaryFiles.push_back(bin);
+      bin->parse();
       continue;
     }
     auto *obj = cast<ObjFile<ELFT>>(f);
