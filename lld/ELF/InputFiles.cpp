@@ -327,8 +327,6 @@ template <class ELFT> static void doParseFile(Ctx &ctx, InputFile *file) {
   if (file->kind() == InputFile::ObjKind) {
     ctx.objectFiles.push_back(cast<ELFFileBase>(file));
     cast<ObjFile<ELFT>>(file)->parse();
-  } else if (auto *f = dyn_cast<SharedFile>(file)) {
-    f->parse<ELFT>();
   } else if (auto *f = dyn_cast<BitcodeFile>(file)) {
     ctx.bitcodeFiles.push_back(f);
     f->parse();
@@ -1593,200 +1591,27 @@ static uint64_t getAlignment(ArrayRef<typename ELFT::Shdr> sections,
   return (ret > UINT32_MAX) ? 0 : ret;
 }
 
-// Fully parse the shared object file.
-//
-// This function parses symbol versions. If a DSO has version information,
-// the file has a ".gnu.version_d" section which contains symbol version
-// definitions. Each symbol is associated to one version through a table in
-// ".gnu.version" section. That table is a parallel array for the symbol
-// table, and each table entry contains an index in ".gnu.version_d".
-//
-// The special index 0 is reserved for VERF_NDX_LOCAL and 1 is for
-// VER_NDX_GLOBAL. There's no table entry for these special versions in
-// ".gnu.version_d".
-//
-// The file format for symbol versioning is perhaps a bit more complicated
-// than necessary, but you can easily understand the code if you wrap your
-// head around the data structure described above.
-template <class ELFT> void SharedFile::parse() {
-  using Elf_Dyn = typename ELFT::Dyn;
-  using Elf_Shdr = typename ELFT::Shdr;
-  using Elf_Sym = typename ELFT::Sym;
-  using Elf_Verdef = typename ELFT::Verdef;
-  using Elf_Versym = typename ELFT::Versym;
-
-  ArrayRef<Elf_Dyn> dynamicTags;
-  const ELFFile<ELFT> obj = this->getObj<ELFT>();
-  ArrayRef<Elf_Shdr> sections = getELFShdrs<ELFT>();
-
-  const Elf_Shdr *versymSec = nullptr;
-  const Elf_Shdr *verdefSec = nullptr;
-  const Elf_Shdr *verneedSec = nullptr;
-  symbols = std::make_unique<Symbol *[]>(numSymbols);
-
-  // Search for .dynsym, .dynamic, .symtab, .gnu.version and .gnu.version_d.
-  for (const Elf_Shdr &sec : sections) {
-    switch (sec.sh_type) {
-    default:
-      continue;
-    case SHT_DYNAMIC:
-      dynamicTags =
-          CHECK2(obj.template getSectionContentsAsArray<Elf_Dyn>(sec), this);
-      break;
-    case SHT_GNU_versym:
-      versymSec = &sec;
-      break;
-    case SHT_GNU_verdef:
-      verdefSec = &sec;
-      break;
-    case SHT_GNU_verneed:
-      verneedSec = &sec;
-      break;
-    }
-  }
-
-  if (versymSec && numSymbols == 0) {
-    ErrAlways(ctx) << "SHT_GNU_versym should be associated with symbol table";
-    return;
-  }
-
-  // Search for a DT_SONAME tag to initialize this->soName.
-  for (const Elf_Dyn &dyn : dynamicTags) {
-    if (dyn.d_tag == DT_NEEDED) {
-      uint64_t val = dyn.getVal();
-      if (val >= this->stringTable.size()) {
-        Err(ctx) << this << ": invalid DT_NEEDED entry";
-        return;
-      }
-      dtNeeded.push_back(this->stringTable.data() + val);
-    } else if (dyn.d_tag == DT_SONAME) {
-      uint64_t val = dyn.getVal();
-      if (val >= this->stringTable.size()) {
-        Err(ctx) << this << ": invalid DT_SONAME entry";
-        return;
-      }
-      soName = this->stringTable.data() + val;
-    }
-  }
-
-  // DSOs are uniquified not by filename but by soname.
-  StringSaver &ss = ctx.saver;
-  DenseMap<CachedHashStringRef, SharedFile *>::iterator it;
-  bool wasInserted;
-  std::tie(it, wasInserted) =
-      ctx.symtab->soNames.try_emplace(CachedHashStringRef(soName), this);
-
-  // If a DSO appears more than once on the command line with and without
-  // --as-needed, --no-as-needed takes precedence over --as-needed because a
-  // user can add an extra DSO with --no-as-needed to force it to be added to
-  // the dependency list.
-  if (isNeeded)
-    it->second->isNeeded.store(true, std::memory_order_relaxed);
-  if (!wasInserted)
-    return;
-
-  ctx.sharedFiles.push_back(this);
-
-  verdefs = parseVerdefs<ELFT>(obj.base(), verdefSec);
-  std::vector<uint32_t> verneeds = parseVerneed<ELFT>(obj, verneedSec);
-  parseGnuAndFeatures<ELFT>(obj);
-
-  // Parse ".gnu.version" section which is a parallel array for the symbol
-  // table. If a given file doesn't have a ".gnu.version" section, we use
-  // VER_NDX_GLOBAL.
-  size_t size = numSymbols - firstGlobal;
-  std::vector<uint16_t> versyms(size, VER_NDX_GLOBAL);
-  if (versymSec) {
-    ArrayRef<Elf_Versym> versym =
-        CHECK2(obj.template getSectionContentsAsArray<Elf_Versym>(*versymSec),
-               this)
-            .slice(firstGlobal);
-    for (size_t i = 0; i < size; ++i)
-      versyms[i] = versym[i].vs_index;
-  }
-
-  // System libraries can have a lot of symbols with versions. Using a
-  // fixed buffer for computing the versions name (foo@ver) can save a
-  // lot of allocations.
-  SmallString<0> versionedNameBuffer;
-
-  // Add symbols to the symbol table.
-  ArrayRef<Elf_Sym> syms = this->getGlobalELFSyms<ELFT>();
-  for (size_t i = 0, e = syms.size(); i != e; ++i) {
-    const Elf_Sym &sym = syms[i];
-
-    // ELF spec requires that all local symbols precede weak or global
-    // symbols in each symbol table, and the index of first non-local symbol
-    // is stored to sh_info. If a local symbol appears after some non-local
-    // symbol, that's a violation of the spec.
-    StringRef name = CHECK2(sym.getName(stringTable), this);
-    if (sym.getBinding() == STB_LOCAL) {
-      Err(ctx) << this << ": invalid local symbol '" << name
-               << "' in global part of symbol table";
-      continue;
-    }
-
-    const uint16_t ver = versyms[i], idx = ver & ~VERSYM_HIDDEN;
-    if (sym.isUndefined()) {
-      if (!addsUnversionedName(true, ver, verdefs.size())) {
-        if (idx >= verneeds.size()) {
-          ErrAlways(ctx) << "corrupt input file: version need index " << idx
-                         << " for symbol " << name
-                         << " is out of bounds\n>>> defined in " << this;
-          continue;
-        }
-        StringRef verName = stringTable.data() + verneeds[idx];
-        versionedNameBuffer.clear();
-        name = ss.save((name + "@" + verName).toStringRef(versionedNameBuffer));
-      }
-      Symbol *s = ctx.symtab->addSymbol(
-          Undefined{this, name, sym.getBinding(), sym.st_other, sym.getType()});
-      s->isExported = true;
-      if (sym.getBinding() != STB_WEAK &&
-          ctx.arg.unresolvedSymbolsInShlib != UnresolvedPolicy::Ignore)
-        requiredSymbols.push_back(s);
-      continue;
-    }
-
-    if (ver == VER_NDX_LOCAL ||
-        (ver != VER_NDX_GLOBAL && idx >= verdefs.size())) {
-      // In GNU ld < 2.31 (before 3be08ea4728b56d35e136af4e6fd3086ade17764), the
-      // MIPS port puts _gp_disp symbol into DSO files and incorrectly assigns
-      // VER_NDX_LOCAL. Workaround this bug.
-      if (ctx.arg.emachine == EM_MIPS && name == "_gp_disp")
-        continue;
-      ErrAlways(ctx) << "corrupt input file: version definition index " << idx
-                     << " for symbol " << name
-                     << " is out of bounds\n>>> defined in " << this;
-      continue;
-    }
-
-    uint32_t alignment = getAlignment<ELFT>(sections, sym);
-    if (addsUnversionedName(false, ver, verdefs.size())) {
-      auto *s = ctx.symtab->addSymbol(
-          SharedSymbol{*this, name, sym.getBinding(), sym.st_other,
-                       sym.getType(), sym.st_value, sym.st_size, alignment});
-      s->dsoDefined = true;
-      if (s->file == this)
-        s->versionId = ver;
-    }
-
-    // Also add the symbol with the versioned name to handle undefined symbols
-    // with explicit versions.
-    if (ver == VER_NDX_GLOBAL)
-      continue;
-
-    StringRef verName =
-        stringTable.data() +
-        reinterpret_cast<const Elf_Verdef *>(verdefs[idx])->getAux()->vda_name;
-    versionedNameBuffer.clear();
-    name = (name + "@" + verName).toStringRef(versionedNameBuffer);
-    auto *s = ctx.symtab->addSymbol(
-        SharedSymbol{*this, ss.save(name), sym.getBinding(), sym.st_other,
-                     sym.getType(), sym.st_value, sym.st_size, alignment});
-    s->dsoDefined = true;
-    if (s->file == this)
-      s->versionId = idx;
+// Resolve one dynsym entry of a shared file into sym, mirroring the per-symbol
+// body of SharedFile::parse. Shared by the parallel resolution and the -y
+// traced replay. sym already holds the (possibly versioned) name.
+template <class ELFT>
+static void resolveSharedSymbol(Ctx &ctx, Symbol &sym, SharedFile &sf,
+                                uint32_t elfIdx, bool isDef,
+                                uint16_t versionId) {
+  const typename ELFT::Sym &eSym = sf.template getELFSyms<ELFT>()[elfIdx];
+  if (!isDef) {
+    sym.resolve(ctx, Undefined{&sf, sym.getName(), eSym.getBinding(),
+                               eSym.st_other, eSym.getType()});
+    sym.isExported = true;
+  } else {
+    uint32_t alignment =
+        getAlignment<ELFT>(sf.template getELFShdrs<ELFT>(), eSym);
+    sym.resolve(ctx, SharedSymbol{sf, sym.getName(), eSym.getBinding(),
+                                  eSym.st_other, eSym.getType(), eSym.st_value,
+                                  eSym.st_size, alignment});
+    sym.dsoDefined = true;
+    if (sym.file == &sf)
+      sym.versionId = versionId;
   }
 }
 
@@ -2144,11 +1969,12 @@ enum : uint8_t {
 
 struct SymRecord {
   const char *name;
-  uint32_t stemLen; // bucket key length (name minus a @@ suffix)
-  uint32_t nameLen; // full name length
-  uint32_t hash;    // DenseMap hash of the stem
-  uint32_t nameId;  // index into Bucket::names; written in phase 2
-  uint32_t elfIdx;  // symbol index within the file's symbol/IR table
+  uint32_t stemLen;   // bucket key length (name minus a @@ suffix)
+  uint32_t nameLen;   // full name length
+  uint32_t hash;      // DenseMap hash of the stem
+  uint32_t nameId;    // index into Bucket::names; written in phase 2
+  uint32_t elfIdx;    // symbol index within the file's symbol/IR table
+  uint16_t versionId; // shared symbol version (FShared records only)
   uint8_t flags;
 
   StringRef stem() const { return StringRef(name, stemLen); }
@@ -2271,7 +2097,7 @@ template <class ELFT> struct Pipeline {
   void epilogue();
 
   void addRecord(SmallVectorImpl<SymRecord> &tmp, StringRef name,
-                 uint32_t elfIdx, uint8_t flags) {
+                 uint32_t elfIdx, uint8_t flags, uint16_t versionId = 0) {
     SymRecord r;
     r.name = name.data();
     r.nameLen = name.size();
@@ -2282,6 +2108,7 @@ template <class ELFT> struct Pipeline {
     r.hash = CachedHashStringRef(StringRef(r.name, r.stemLen)).hash();
     r.nameId = UINT32_MAX;
     r.elfIdx = elfIdx;
+    r.versionId = versionId;
     r.flags = flags;
     tmp.push_back(r);
   }
@@ -2392,17 +2219,21 @@ template <class ELFT> void Pipeline<ELFT>::readSymbols() {
     }
   });
 
-  // DSOs are uniquified by soname: a duplicate contributes no symbols. The
-  // epilogue's SharedFile::parse performs the real deduplication.
+  // DSOs are uniquified by soname: a duplicate contributes no symbols (its
+  // records are dropped before resolution). The epilogue still records the
+  // canonical file in soNames and merges isNeeded. A duplicate may be within
+  // this batch or already linked by a prior batch.
   DenseSet<CachedHashStringRef> sonames;
   for (auto [i, f] : llvm::enumerate(files))
-    if (fd[i].eligible && isa<SharedFile>(f))
-      if (!sonames.insert(CachedHashStringRef(cast<SharedFile>(f)->soName))
-               .second) {
+    if (fd[i].eligible && isa<SharedFile>(f)) {
+      CachedHashStringRef soname(cast<SharedFile>(f)->soName);
+      if (ctx.symtab->soNames.contains(soname) ||
+          !sonames.insert(soname).second) {
         fd[i].records.clear();
         fd[i].symOrder.clear();
         memset(fd[i].bucketStart, 0, sizeof(fd[i].bucketStart));
       }
+    }
 }
 
 template <class ELFT> void Pipeline<ELFT>::readObj(uint32_t i) {
@@ -2438,20 +2269,27 @@ template <class ELFT> void Pipeline<ELFT>::readObj(uint32_t i) {
   fd[i].early.comdats = {};
 }
 
+// Digest a shared file: read its dynamic tags, version sections and GNU
+// property note, and record its dynsym entries (the per-symbol resolution
+// runs in resolveName; the symtab registration in the epilogue). This mirrors
+// SharedFile::parse minus the soname dedup and sharedFiles registration.
 template <class ELFT> void Pipeline<ELFT>::readShared(uint32_t i) {
+  using Elf_Dyn = typename ELFT::Dyn;
+  using Elf_Shdr = typename ELFT::Shdr;
+  using Elf_Sym = typename ELFT::Sym;
+  using Elf_Verdef = typename ELFT::Verdef;
+  using Elf_Versym = typename ELFT::Versym;
   auto *f = cast<SharedFile>(files[i]);
   const ELFFile<ELFT> obj = f->template getObj<ELFT>();
-  ArrayRef<typename ELFT::Shdr> sections = f->template getELFShdrs<ELFT>();
-  const typename ELFT::Shdr *versymSec = nullptr, *verdefSec = nullptr;
-  ArrayRef<typename ELFT::Dyn> dynamicTags;
-  for (const typename ELFT::Shdr &sec : sections) {
+  ArrayRef<Elf_Shdr> sections = f->template getELFShdrs<ELFT>();
+  const Elf_Shdr *versymSec = nullptr, *verdefSec = nullptr,
+                 *verneedSec = nullptr;
+  ArrayRef<Elf_Dyn> dynamicTags;
+  for (const Elf_Shdr &sec : sections) {
     switch (sec.sh_type) {
     case SHT_DYNAMIC:
-      if (Expected<ArrayRef<typename ELFT::Dyn>> tags =
-              obj.template getSectionContentsAsArray<typename ELFT::Dyn>(sec))
-        dynamicTags = *tags;
-      else
-        consumeError(tags.takeError());
+      dynamicTags =
+          CHECK2(obj.template getSectionContentsAsArray<Elf_Dyn>(sec), f);
       break;
     case SHT_GNU_versym:
       versymSec = &sec;
@@ -2459,55 +2297,115 @@ template <class ELFT> void Pipeline<ELFT>::readShared(uint32_t i) {
     case SHT_GNU_verdef:
       verdefSec = &sec;
       break;
+    case SHT_GNU_verneed:
+      verneedSec = &sec;
+      break;
     }
   }
-  // DT_SONAME determines the deduplication key.
-  for (const typename ELFT::Dyn &dyn : dynamicTags)
-    if (dyn.d_tag == DT_SONAME)
-      if (uint64_t val = dyn.getVal(); val < f->getStringTable().size())
-        f->soName = f->getStringTable().data() + val;
 
-  // The number of version definitions, for bounds checking below.
-  size_t verdefCount = parseVerdefs<ELFT>(obj.base(), verdefSec).size();
+  if (versymSec && f->template getELFSyms<ELFT>().empty()) {
+    ErrAlways(ctx) << "SHT_GNU_versym should be associated with symbol table";
+    return;
+  }
+
+  StringRef strtab = f->getStringTable();
+  // DT_SONAME (the deduplication key) and DT_NEEDED.
+  for (const Elf_Dyn &dyn : dynamicTags) {
+    if (dyn.d_tag == DT_NEEDED) {
+      uint64_t val = dyn.getVal();
+      if (val >= strtab.size()) {
+        Err(ctx) << f << ": invalid DT_NEEDED entry";
+        return;
+      }
+      f->dtNeeded.push_back(strtab.data() + val);
+    } else if (dyn.d_tag == DT_SONAME) {
+      uint64_t val = dyn.getVal();
+      if (val >= strtab.size()) {
+        Err(ctx) << f << ": invalid DT_SONAME entry";
+        return;
+      }
+      f->soName = strtab.data() + val;
+    }
+  }
+
+  f->verdefs = parseVerdefs<ELFT>(obj.base(), verdefSec);
+  std::vector<uint32_t> verneeds =
+      f->template parseVerneed<ELFT>(obj, verneedSec);
 
   uint32_t firstGlobal = f->getFirstGlobal();
   size_t size = f->template getELFSyms<ELFT>().size() - firstGlobal;
-  ArrayRef<typename ELFT::Versym> versyms;
+  std::vector<uint16_t> versyms(size, VER_NDX_GLOBAL);
   if (versymSec && size) {
-    if (Expected<ArrayRef<typename ELFT::Versym>> vs =
-            obj.template getSectionContentsAsArray<typename ELFT::Versym>(
-                *versymSec))
-      versyms = vs->slice(firstGlobal);
-    else
-      consumeError(vs.takeError());
+    ArrayRef<Elf_Versym> v =
+        CHECK2(obj.template getSectionContentsAsArray<Elf_Versym>(*versymSec),
+               f)
+            .slice(firstGlobal);
+    for (size_t j = 0; j < size; ++j)
+      versyms[j] = v[j].vs_index;
   }
 
-  ArrayRef<typename ELFT::Sym> syms = f->template getGlobalELFSyms<ELFT>();
-  StringRef strtab = f->getStringTable();
+  // Versioned names (foo@ver) are built in the thread-local arena so they
+  // outlive this parallel phase without touching the shared string saver.
+  auto saveVersioned = [](StringRef name, StringRef ver) {
+    size_t n = name.size() + 1 + ver.size();
+    char *buf = makeThreadLocalN<char>(n);
+    memcpy(buf, name.data(), name.size());
+    buf[name.size()] = '@';
+    memcpy(buf + name.size() + 1, ver.data(), ver.size());
+    return StringRef(buf, n);
+  };
+
+  ArrayRef<Elf_Sym> syms = f->template getGlobalELFSyms<ELFT>();
   SmallVector<SymRecord, 0> tmp;
   tmp.reserve(syms.size());
   for (size_t j = 0, e = syms.size(); j != e; ++j) {
-    const typename ELFT::Sym &sym = syms[j];
-    if (sym.getBinding() == STB_LOCAL)
-      continue;
-    Expected<StringRef> name = sym.getName(strtab);
-    if (!name) {
-      consumeError(name.takeError());
+    const Elf_Sym &sym = syms[j];
+    StringRef name = CHECK2(sym.getName(strtab), f);
+    if (sym.getBinding() == STB_LOCAL) {
+      Err(ctx) << f << ": invalid local symbol '" << name
+               << "' in global part of symbol table";
       continue;
     }
-    uint16_t ver = j < versyms.size() ? uint16_t(versyms[j].vs_index)
-                                      : uint16_t(VER_NDX_GLOBAL);
-    // Versioned undefined symbols and hidden or local-versioned definitions
-    // are registered under name@version (if at all) by the epilogue's
-    // SharedFile::parse, not under the unversioned name.
-    if (!addsUnversionedName(sym.isUndefined(), ver, verdefCount))
+    uint32_t elfIdx = firstGlobal + j;
+    const uint16_t ver = versyms[j], idx = ver & ~VERSYM_HIDDEN;
+    uint8_t base = FShared | (sym.getBinding() == STB_WEAK ? FWeak : 0);
+
+    if (sym.isUndefined()) {
+      if (!addsUnversionedName(true, ver, f->verdefs.size())) {
+        if (idx >= verneeds.size()) {
+          ErrAlways(ctx) << "corrupt input file: version need index " << idx
+                         << " for symbol " << name
+                         << " is out of bounds\n>>> defined in " << f;
+          continue;
+        }
+        name = saveVersioned(name, strtab.data() + verneeds[idx]);
+      }
+      addRecord(tmp, name, elfIdx, base);
       continue;
-    uint8_t flags = FShared;
-    if (!sym.isUndefined())
-      flags |= FDef;
-    if (sym.getBinding() == STB_WEAK)
-      flags |= FWeak;
-    addRecord(tmp, *name, firstGlobal + j, flags);
+    }
+
+    if (ver == VER_NDX_LOCAL ||
+        (ver != VER_NDX_GLOBAL && idx >= f->verdefs.size())) {
+      // In GNU ld < 2.31 the MIPS port put _gp_disp with VER_NDX_LOCAL.
+      if (ctx.arg.emachine == EM_MIPS && name == "_gp_disp")
+        continue;
+      ErrAlways(ctx) << "corrupt input file: version definition index " << idx
+                     << " for symbol " << name
+                     << " is out of bounds\n>>> defined in " << f;
+      continue;
+    }
+
+    if (addsUnversionedName(false, ver, f->verdefs.size()))
+      addRecord(tmp, name, elfIdx, base | FDef, ver);
+
+    // Also register the versioned name to satisfy explicitly versioned refs.
+    if (ver == VER_NDX_GLOBAL)
+      continue;
+    StringRef verName =
+        strtab.data() + reinterpret_cast<const Elf_Verdef *>(f->verdefs[idx])
+                            ->getAux()
+                            ->vda_name;
+    addRecord(tmp, saveVersioned(name, verName), elfIdx, base | FDef, idx);
   }
   bucketize(fd[i], tmp);
 }
@@ -2861,10 +2759,17 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
                              rec.elfIdx <= actDefIdx[node.fileIdx]
                          ? lazyRank[node.fileIdx]
                          : rank;
-    // Object/shared symbols are inserted in symbol-table order; bitcode files
-    // insert definitions before undefined references (BitcodeFile::parse).
-    uint64_t asub =
-        (rec.flags & FBitcode) ? (undefPhase << 32) | rec.elfIdx : rec.elfIdx;
+    // Object symbols are inserted in symbol-table order; bitcode files insert
+    // definitions before undefined references (BitcodeFile::parse); a shared
+    // file inserts each symbol's unversioned name before its versioned one
+    // (the versioned record carries FHasAt from its '@').
+    uint64_t asub;
+    if (rec.flags & FBitcode)
+      asub = (undefPhase << 32) | rec.elfIdx;
+    else if (rec.flags & FShared)
+      asub = (uint64_t(rec.elfIdx) << 1) | bool(rec.flags & FHasAt);
+    else
+      asub = rec.elfIdx;
     if (arank < anchorRank || (arank == anchorRank && asub < anchorSub)) {
       anchorRank = arank;
       anchorSub = asub;
@@ -2879,10 +2784,6 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
   if (sym->traced)
     return;
 
-  // Shared symbols are resolved later by the epilogue's SharedFile::parse;
-  // track whether a shared definition precedes so that an unextracted lazy
-  // object definition is not inserted over it.
-  bool nonObjDef = false;
   bool inserted = ni.seedIdx != UINT32_MAX;
   for (const REvent &e : order) {
     const RefNode &node = bu.refs[e.r];
@@ -2890,8 +2791,9 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
     const SymRecord &rec = fd[f].records[node.recIdx];
     bool isDef = rec.flags & FDef;
     if (rec.flags & FShared) {
-      inserted = true; // SharedFile::parse inserts the symbol in the epilogue
-      nonObjDef |= isDef;
+      inserted = true;
+      resolveSharedSymbol<ELFT>(ctx, *sym, *cast<SharedFile>(files[f]),
+                                rec.elfIdx, isDef, rec.versionId);
       continue;
     }
     if (rec.flags & FBitcode) {
@@ -2905,11 +2807,11 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
     auto *obj = cast<ObjFile<ELFT>>(files[f]);
     if (files[f]->lazy) {
       // Unextracted lazy object: only its definitions are visible, as
-      // LazySymbols (ObjFile::parseLazy).
+      // LazySymbols (ObjFile::parseLazy). An earlier shared or bitcode
+      // definition has already left sym defined, suppressing the LazySymbol.
       if (isDef) {
         inserted = true;
-        if (!nonObjDef &&
-            (sym->isPlaceholder() || (sym->isUndefined() && sym->isWeak())))
+        if (sym->isPlaceholder() || (sym->isUndefined() && sym->isWeak()))
           sym->resolve(ctx, LazySymbol{*obj});
       }
       continue;
@@ -3151,6 +3053,17 @@ template <class ELFT> void Pipeline<ELFT>::wireSymbols() {
       MutableArrayRef<Symbol *> syms = bf->getMutableSymbols();
       for (const SymRecord &rec : fd[i].records)
         syms[rec.elfIdx] = buckets[rec.hash % numShards].names[rec.nameId].sym;
+    } else if (f->kind() == InputFile::SharedKind &&
+               ctx.arg.unresolvedSymbolsInShlib != UnresolvedPolicy::Ignore) {
+      // Collect the DSO's strong undefined references (symbol-table order) for
+      // reportUndefinedSymbols, as SharedFile::parse did.
+      auto *sf = cast<SharedFile>(f);
+      for (uint32_t ri : fd[i].symOrder) {
+        const SymRecord &rec = fd[i].records[ri];
+        if (!(rec.flags & (FDef | FWeak)))
+          sf->requiredSymbols.push_back(
+              buckets[rec.hash % numShards].names[rec.nameId].sym);
+      }
     }
   });
 }
@@ -3211,8 +3124,31 @@ template <class ELFT> void Pipeline<ELFT>::epilogue() {
         addDependentLibrary(ctx, l, bf);
       continue;
     }
+    if (auto *sf = dyn_cast<SharedFile>(f); sf && d.eligible) {
+      // resolveName resolved the dynsym entries; here perform the soname
+      // deduplication and registration (SharedFile::parse's header) and replay
+      // -y traced resolutions in symbol-table order.
+      auto [it, inserted] =
+          ctx.symtab->soNames.try_emplace(CachedHashStringRef(sf->soName), sf);
+      if (sf->isNeeded)
+        it->second->isNeeded.store(true, std::memory_order_relaxed);
+      if (!inserted)
+        continue; // duplicate soname contributes nothing
+      ctx.sharedFiles.push_back(sf);
+      sf->allocateSymbols();
+      sf->parseGnuAndFeatures<ELFT>(sf->getObj<ELFT>());
+      if (hasTraced)
+        for (uint32_t ri : d.symOrder) {
+          const SymRecord &rec = d.records[ri];
+          Symbol *sym = buckets[rec.hash % numShards].names[rec.nameId].sym;
+          if (sym->traced)
+            resolveSharedSymbol<ELFT>(ctx, *sym, *sf, rec.elfIdx,
+                                      rec.flags & FDef, rec.versionId);
+        }
+      continue;
+    }
     if (!d.eligible || f->kind() != InputFile::ObjKind) {
-      parseFile(ctx, f); // SharedFile, BinaryFile
+      parseFile(ctx, f); // BinaryFile
       continue;
     }
     auto *obj = cast<ObjFile<ELFT>>(f);
@@ -3301,7 +3237,3 @@ template class elf::ObjFile<ELF32BE>;
 template class elf::ObjFile<ELF64LE>;
 template class elf::ObjFile<ELF64BE>;
 
-template void SharedFile::parse<ELF32LE>();
-template void SharedFile::parse<ELF32BE>();
-template void SharedFile::parse<ELF64LE>();
-template void SharedFile::parse<ELF64BE>();

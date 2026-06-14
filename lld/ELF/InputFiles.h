@@ -392,8 +392,6 @@ public:
 
   static bool classof(const InputFile *f) { return f->kind() == SharedKind; }
 
-  template <typename ELFT> void parse();
-
   // Used for --as-needed
   std::atomic<bool> isNeeded;
 
@@ -401,7 +399,7 @@ public:
   // parsed. Only filled for `--no-allow-shlib-undefined`.
   SmallVector<Symbol *, 0> requiredSymbols;
 
-private:
+  // Called by the parallel parse pipeline (Pipeline::readShared/epilogue).
   template <typename ELFT>
   std::vector<uint32_t> parseVerneed(const llvm::object::ELFFile<ELFT> &obj,
                                      const typename ELFT::Shdr *sec);
