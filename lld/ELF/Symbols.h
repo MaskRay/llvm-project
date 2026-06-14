@@ -148,6 +148,13 @@ public:
   void setVisibility(uint8_t visibility) {
     stOther = (stOther & ~3) | visibility;
   }
+  // Merge an input symbol's visibility: the most constraining one wins.
+  void mergeVisibility(uint8_t ov) {
+    if (ov != llvm::ELF::STV_DEFAULT) {
+      uint8_t v = visibility();
+      setVisibility(v == llvm::ELF::STV_DEFAULT ? ov : std::min(v, ov));
+    }
+  }
 
   uint8_t computeBinding(Ctx &) const;
   bool isGlobal() const { return binding == llvm::ELF::STB_GLOBAL; }
@@ -221,11 +228,6 @@ public:
   void resolve(Ctx &, const Defined &other);
   void resolve(Ctx &, const LazySymbol &other);
   void resolve(Ctx &, const SharedSymbol &other);
-
-  // If this is a lazy symbol, extract an input file and add the symbol
-  // in the file to the symbol table. Calling this function on
-  // non-lazy object causes a runtime error.
-  void extract(Ctx &) const;
 
   void checkDuplicate(Ctx &, const Defined &other) const;
 

@@ -2478,7 +2478,7 @@ static void handleUndefined(Ctx &ctx, Symbol *sym, const char *option) {
 
   if (!sym->isLazy())
     return;
-  sym->extract(ctx);
+  reactivate(ctx, sym);
   if (!ctx.arg.whyExtract.empty())
     ctx.whyExtractRecords.emplace_back(option, sym->file, *sym);
 }
@@ -2509,7 +2509,7 @@ static void handleLibcall(Ctx &ctx, StringRef name) {
   if (sym && sym->isLazy() && isa<BitcodeFile>(sym->file)) {
     if (!ctx.arg.whyExtract.empty())
       ctx.whyExtractRecords.emplace_back("<libcall>", sym->file, *sym);
-    sym->extract(ctx);
+    reactivate(ctx, sym);
   }
 }
 
@@ -2802,10 +2802,18 @@ void LinkerDriver::compileBitcodeFiles(bool skipLinkedOutput) {
     markBuffersAsDontNeed(ctx, skipLinkedOutput);
 
   ltoObjectFiles = lto->compile();
+
+  // Resolve the LTO outputs' symbols against the symbol table and register
+  // them in ctx.objectFiles (the parse pipeline, shared with regular objects),
+  // pulling in archive members newly referenced by the LTO outputs (e.g.
+  // runtime libcalls).
+  SmallVector<InputFile *, 0> ltoFiles;
+  for (auto &file : ltoObjectFiles)
+    ltoFiles.push_back(file.get());
+  parseLtoObjectFiles(ctx, ltoFiles);
+
   for (auto &file : ltoObjectFiles) {
     auto *obj = cast<ObjFile<ELFT>>(file.get());
-    obj->parse(/*ignoreComdats=*/true);
-
     // This is only needed for AArch64 PAuth to set correct key in AUTH GOT
     // entry based on symbol type (STT_FUNC or not).
     // TODO: check if PAuth is actually used.
@@ -2829,7 +2837,6 @@ void LinkerDriver::compileBitcodeFiles(bool skipLinkedOutput) {
         if (sym->hasVersionSuffix)
           sym->parseSymbolVersion(ctx);
       }
-    ctx.objectFiles.push_back(obj);
   }
 }
 
@@ -2857,6 +2864,15 @@ static std::vector<WrappedSymbol> addWrappedSymbols(Ctx &ctx,
   std::vector<WrappedSymbol> v;
   DenseSet<StringRef> seen;
   auto &ss = ctx.saver;
+  // A wrapper (or, when __real_ is referenced, the wrapped symbol) may live in
+  // a lazy archive member; pull it in. Extract inline so that a __real_
+  // reference inside a just-extracted wrapper is seen before the check below.
+  auto addUndef = [&](StringRef name, uint8_t binding = llvm::ELF::STB_GLOBAL) {
+    Symbol *s = ctx.symtab->addUnusedUndefined(name, binding);
+    if (s->isLazy() && !s->isWeak())
+      reactivate(ctx, s);
+    return s;
+  };
   for (auto *arg : args.filtered(OPT_wrap)) {
     StringRef name = arg->getValue();
     if (!seen.insert(name).second)
@@ -2866,20 +2882,19 @@ static std::vector<WrappedSymbol> addWrappedSymbols(Ctx &ctx,
     if (!sym)
       continue;
 
-    Symbol *wrap =
-        ctx.symtab->addUnusedUndefined(ss.save("__wrap_" + name), sym->binding);
+    Symbol *wrap = addUndef(ss.save("__wrap_" + name), sym->binding);
 
     // If __real_ is referenced, pull in the symbol if it is lazy. Do this after
     // processing __wrap_ as that may have referenced __real_.
     StringRef realName = ctx.saver.save("__real_" + name);
     if (Symbol *real = ctx.symtab->find(realName)) {
-      ctx.symtab->addUnusedUndefined(name, sym->binding);
+      addUndef(name, sym->binding);
       // Update sym's binding, which will replace real's later in
       // SymbolTable::wrap.
       sym->binding = real->binding;
     }
 
-    Symbol *real = ctx.symtab->addUnusedUndefined(realName);
+    Symbol *real = addUndef(realName);
     v.push_back({sym, real, wrap});
 
     // We want to tell LTO not to inline symbols to be overwritten
@@ -3192,25 +3207,6 @@ static void readSecurityNotes(Ctx &ctx) {
           << "dependencies have the GCS marking.";
 }
 
-static void initSectionsAndLocalSyms(ELFFileBase *file, bool ignoreComdats) {
-  switch (file->ekind) {
-  case ELF32LEKind:
-    cast<ObjFile<ELF32LE>>(file)->initSectionsAndLocalSyms(ignoreComdats);
-    break;
-  case ELF32BEKind:
-    cast<ObjFile<ELF32BE>>(file)->initSectionsAndLocalSyms(ignoreComdats);
-    break;
-  case ELF64LEKind:
-    cast<ObjFile<ELF64LE>>(file)->initSectionsAndLocalSyms(ignoreComdats);
-    break;
-  case ELF64BEKind:
-    cast<ObjFile<ELF64BE>>(file)->initSectionsAndLocalSyms(ignoreComdats);
-    break;
-  default:
-    llvm_unreachable("");
-  }
-}
-
 static void postParseObjectFile(ELFFileBase *file) {
   switch (file->ekind) {
   case ELF32LEKind:
@@ -3312,9 +3308,6 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
   // No more lazy bitcode can be extracted at this point. Do post parse work
   // like checking duplicate symbols.
-  parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
-    initSectionsAndLocalSyms(file, /*ignoreComdats=*/false);
-  });
   parallelForEach(ctx.objectFiles, postParseObjectFile);
   parallelForEach(ctx.bitcodeFiles,
                   [](BitcodeFile *file) { file->postParse(); });
@@ -3406,9 +3399,6 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   // compileBitcodeFiles may have produced lto.tmp object files. After this, no
   // more file will be added.
   auto newObjectFiles = ArrayRef(ctx.objectFiles).slice(numObjsBeforeLTO);
-  parallelForEach(newObjectFiles, [](ELFFileBase *file) {
-    initSectionsAndLocalSyms(file, /*ignoreComdats=*/true);
-  });
   parallelForEach(newObjectFiles, postParseObjectFile);
   for (const DuplicateSymbol &d : ctx.duplicates)
     reportDuplicate(ctx, *d.sym, d.file, d.section, d.value);

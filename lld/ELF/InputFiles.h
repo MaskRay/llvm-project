@@ -43,8 +43,19 @@ const ELFSyncStream &operator<<(const ELFSyncStream &, const InputFile *);
 std::optional<MemoryBufferRef> readFile(Ctx &, StringRef path);
 
 // Add symbols in File to the symbol table.
-void parseFile(Ctx &, InputFile *file);
 void parseFiles(Ctx &, const SmallVector<std::unique_ptr<InputFile>, 0> &);
+// Resolve the symbols of LTO output objects against the symbol table and pull
+// in archive members newly referenced by them (e.g. runtime libcalls).
+void parseLtoObjectFiles(Ctx &, ArrayRef<InputFile *>);
+// Extract still-lazy members defining the trigger symbols and resolve them.
+// secIgnoreComdats initializes the extracted members' sections with
+// ignoreComdats, matching the serial driver's post-LTO sweep; only
+// parseLtoObjectFiles passes true.
+void reactivate(Ctx &, ArrayRef<Symbol *> triggers,
+                bool secIgnoreComdats = false);
+inline void reactivate(Ctx &ctx, Symbol *trigger) {
+  reactivate(ctx, ArrayRef<Symbol *>(trigger));
+}
 
 // The root class of input files.
 class InputFile {
@@ -98,6 +109,22 @@ public:
     assert(fileKind == BinaryKind || fileKind == ObjKind ||
            fileKind == BitcodeKind);
     return {symbols.get(), numSymbols};
+  }
+
+  // Allocate the symbols array (zero-initialized) if not already present.
+  void allocateSymbols() {
+    if (!symbols)
+      symbols = std::make_unique<Symbol *[]>(numSymbols);
+  }
+
+  // Allocate a symbols array of n entries (used when the count is known before
+  // the file's own parse runs, e.g. the parallel parse pipeline wiring
+  // bitcode).
+  void allocateSymbols(size_t n) {
+    if (!symbols) {
+      numSymbols = n;
+      symbols = std::make_unique<Symbol *[]>(n);
+    }
   }
 
   Symbol &getSymbol(uint32_t symbolIndex) const {
@@ -184,6 +211,8 @@ public:
 
   StringRef getStringTable() const { return stringTable; }
 
+  uint32_t getFirstGlobal() const { return firstGlobal; }
+
   ArrayRef<Symbol *> getLocalSymbols() {
     if (numSymbols == 0)
       return {};
@@ -240,6 +269,14 @@ public:
   std::optional<AArch64PauthAbiCoreInfo> aarch64PauthAbiCoreInfo;
 };
 
+// Information collected by an early scan over the section headers, shared by
+// the parallel parse pipeline and the serial ObjFile::parse.
+struct EarlySectionInfo {
+  SmallVector<StringRef, 0> comdats; // GRP_COMDAT signatures, section order
+  SmallVector<uint32_t, 0> deplibSections;    // SHT_LLVM_DEPENDENT_LIBRARIES
+  SmallVector<uint32_t, 0> attributeSections; // SHT_ARM_ATTRIBUTES
+};
+
 // .o file.
 template <class ELFT> class ObjFile : public ELFFileBase {
   LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
@@ -256,11 +293,8 @@ public:
     this->archiveName = archiveName;
   }
 
-  void parse(bool ignoreComdats = false);
-  void parseLazy();
-
-  StringRef getShtGroupSignature(ArrayRef<Elf_Shdr> sections,
-                                 const Elf_Shdr &sec);
+  llvm::Expected<std::pair<StringRef, ArrayRef<Elf_Word>>>
+  getGroup(const Elf_Shdr &sec);
 
   uint32_t getSectionIndex(const Elf_Sym &sym) const;
 
@@ -290,10 +324,21 @@ public:
   void postParse();
   void importCmseSymbols();
 
+  // Tolerantly scan the section headers, collecting comdat group signatures
+  // and the section indices needed for serial post-processing. Diagnostics
+  // for malformed groups are emitted in initializeSections.
+  void scanEarlySections(EarlySectionInfo &out);
+  // Process dependent libraries and SHT_ARM_ATTRIBUTES (serial contexts
+  // only: may add input files and create the singleton attributes section).
+  void processEarlySections(const EarlySectionInfo &early);
+
 private:
+  // Section index of the retained SHT_ARM_ATTRIBUTES section, if this file
+  // provides ctx.in.attributes.
+  uint32_t armAttrSecIdx = UINT32_MAX;
+
   void initializeSections(bool ignoreComdats,
                           const llvm::object::ELFFile<ELFT> &obj);
-  void initializeSymbols(const llvm::object::ELFFile<ELFT> &obj);
   void initializeJustSymbols();
 
   InputSectionBase *getRelocTarget(uint32_t idx, uint32_t info);
@@ -315,10 +360,6 @@ private:
   // The following variable contains the contents of .symtab_shndx.
   // If the section does not exist (which is common), the array is empty.
   ArrayRef<Elf_Word> shndxTable;
-
-  // Section indices of kept SHT_GROUP sections, recorded by parse() in
-  // ascending order, to be used by the parallel initializeSections().
-  SmallVector<uint32_t, 0> keptGroups;
 };
 
 class BitcodeFile : public InputFile {
@@ -326,8 +367,7 @@ public:
   BitcodeFile(Ctx &, MemoryBufferRef m, StringRef archiveName,
               uint64_t offsetInArchive, bool lazy);
   static bool classof(const InputFile *f) { return f->kind() == BitcodeKind; }
-  void parse();
-  void parseLazy();
+  void parseComdats();
   void postParse();
   std::unique_ptr<llvm::lto::InputFile> obj;
   std::vector<bool> keptComdats;
@@ -357,8 +397,6 @@ public:
 
   static bool classof(const InputFile *f) { return f->kind() == SharedKind; }
 
-  template <typename ELFT> void parse();
-
   // Used for --as-needed
   std::atomic<bool> isNeeded;
 
@@ -366,7 +404,7 @@ public:
   // parsed. Only filled for `--no-allow-shlib-undefined`.
   SmallVector<Symbol *, 0> requiredSymbols;
 
-private:
+  // Called by the parallel parse pipeline (Pipeline::readShared/epilogue).
   template <typename ELFT>
   std::vector<uint32_t> parseVerneed(const llvm::object::ELFFile<ELFT> &obj,
                                      const typename ELFT::Shdr *sec);

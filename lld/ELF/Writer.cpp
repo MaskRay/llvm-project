@@ -455,7 +455,8 @@ static void demoteAndCopyLocalSymbols(Ctx &ctx) {
   parallelFor(0, ctx.objectFiles.size(), [&](size_t i) {
     DenseMap<SectionBase *, size_t> sectionIndexMap;
     for (Symbol *b : ctx.objectFiles[i]->getLocalSymbols()) {
-      assert(b->isLocal() && "should have been caught in initializeSymbols()");
+      assert(b->isLocal() &&
+             "should have been caught in initSectionsAndLocalSyms()");
       auto *dr = dyn_cast<Defined>(b);
       if (!dr)
         continue;

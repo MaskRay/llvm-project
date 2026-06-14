@@ -231,6 +231,10 @@ private:
   SmallVector<std::unique_ptr<InputFile>, 0> files, ltoObjectFiles;
 
 public:
+  // The command-line input files (and dependent libraries), some of which may
+  // still be lazy (un-pulled archive members / --start-lib objects).
+  ArrayRef<std::unique_ptr<InputFile>> getFiles() const { return files; }
+
   // See InputFile::groupId.
   uint32_t nextGroupId;
   bool isInGroup;

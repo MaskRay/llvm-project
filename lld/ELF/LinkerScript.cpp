@@ -1889,10 +1889,15 @@ void LinkerScript::checkFinalScriptConditions() const {
 void LinkerScript::addScriptReferencedSymbolsToSymTable() {
   // Some symbols (such as __ehdr_start) are defined lazily only when there
   // are undefined symbols for them, so we add these to trigger that logic.
-  auto reference = [&ctx = ctx](StringRef name) {
+  // A reference may also name a still-lazy archive member; collect those and
+  // pull them in below.
+  SmallVector<Symbol *, 0> triggers;
+  auto reference = [&](StringRef name) {
     Symbol *sym = ctx.symtab->addUnusedUndefined(name);
     sym->isUsedInRegularObj = true;
     sym->referenced = true;
+    if (sym->isLazy())
+      triggers.push_back(sym);
   };
   for (StringRef name : referencedSymbols)
     reference(name);
@@ -1916,6 +1921,7 @@ void LinkerScript::addScriptReferencedSymbolsToSymTable() {
       }
     }
   }
+  reactivate(ctx, triggers);
 }
 
 bool LinkerScript::shouldAddProvideSym(StringRef symName) {

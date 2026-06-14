@@ -30,9 +30,11 @@ using namespace lld::elf;
 
 void SymbolTable::wrap(Symbol *sym, Symbol *real, Symbol *wrap) {
   // Redirect __real_foo to the original foo and foo to the original __wrap_foo.
-  int &idx1 = symMap[CachedHashStringRef(sym->getName())];
-  int &idx2 = symMap[CachedHashStringRef(real->getName())];
-  int &idx3 = symMap[CachedHashStringRef(wrap->getName())];
+  CachedHashStringRef name1(sym->getName()), name2(real->getName()),
+      name3(wrap->getName());
+  int &idx1 = getMap(name1)[name1];
+  int &idx2 = getMap(name2)[name2];
+  int &idx3 = getMap(name3)[name3];
 
   idx2 = idx1;
   idx1 = idx3;
@@ -61,18 +63,11 @@ void SymbolTable::wrap(Symbol *sym, Symbol *real, Symbol *wrap) {
 
 // Find an existing symbol or create a new one.
 Symbol *SymbolTable::insert(StringRef name) {
-  // <name>@@<version> means the symbol is the default version. In that
-  // case <name>@@<version> will be used to resolve references to <name>.
-  //
-  // Since this is a hot path, the following string search code is
-  // optimized for speed. StringRef::find(char) is much faster than
-  // StringRef::find(StringRef).
-  StringRef stem = name;
-  size_t pos = name.find('@');
-  if (pos != StringRef::npos && pos + 1 < name.size() && name[pos + 1] == '@')
-    stem = name.take_front(pos);
+  auto [stemLen, hasAt] = getSymbolStem(name);
+  StringRef stem = name.take_front(stemLen);
 
-  auto p = symMap.insert({CachedHashStringRef(stem), (int)symVector.size()});
+  CachedHashStringRef chr(stem);
+  auto p = getMap(chr).insert({chr, (int)symVector.size()});
   if (!p.second) {
     Symbol *sym = symVector[p.first->second];
     if (stem.size() != name.size()) {
@@ -89,7 +84,7 @@ Symbol *SymbolTable::insert(StringRef name) {
   // are zero. Set the ones that need a non-zero value.
   sym->setName(name);
   sym->versionId = VER_NDX_GLOBAL;
-  if (pos != StringRef::npos)
+  if (hasAt)
     sym->hasVersionSuffix = true;
   return sym;
 }
@@ -106,10 +101,28 @@ Symbol *SymbolTable::addAndCheckDuplicate(Ctx &ctx, const Defined &newSym) {
 }
 
 Symbol *SymbolTable::find(StringRef name) {
-  auto it = symMap.find(CachedHashStringRef(name));
-  if (it == symMap.end())
+  CachedHashStringRef chr(name);
+  auto &map = getMap(chr);
+  auto it = map.find(chr);
+  if (it == map.end())
     return nullptr;
-  return symVector[it->second];
+  // The parallel parse pipeline creates placeholder entries for names that no
+  // file ended up defining or referencing (e.g. names only mentioned by DSO
+  // dynsym entries). Treat them as absent.
+  Symbol *sym = symVector[it->second];
+  if (!shards.empty() && sym->isPlaceholder())
+    return nullptr;
+  return sym;
+}
+
+void SymbolTable::installShardedSymbols(
+    MutableArrayRef<DenseMap<CachedHashStringRef, int>> maps,
+    SmallVector<Symbol *, 0> &&syms) {
+  assert(maps.size() == numShards);
+  shards.resize(numShards);
+  llvm::move(maps, shards.begin());
+  symVector = std::move(syms);
+  symMap.clear();
 }
 
 // A version script/dynamic list is only meaningful for a Defined symbol.
