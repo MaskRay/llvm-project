@@ -1947,14 +1947,17 @@ static void createBitcodeSymbol(Ctx &ctx, Symbol *&sym,
   }
 }
 
-void BitcodeFile::parse() {
-  // addComdatGroup is owner-idempotent: the parallel parse pipeline may have
-  // already registered this file as the owner.
-  for (std::pair<StringRef, Comdat::SelectionKind> s : obj->getComdatTable()) {
+// addComdatGroup is owner-idempotent: the parallel parse pipeline may have
+// already registered this file as the owner.
+void BitcodeFile::parseComdats() {
+  for (std::pair<StringRef, Comdat::SelectionKind> s : obj->getComdatTable())
     keptComdats.push_back(
         s.second == Comdat::NoDeduplicate ||
         ctx.symtab->addComdatGroup(CachedHashStringRef(s.first), this) == this);
-  }
+}
+
+void BitcodeFile::parse() {
+  parseComdats();
 
   if (numSymbols == 0) {
     numSymbols = obj->symbols().size();
@@ -2876,11 +2879,10 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
   if (sym->traced)
     return;
 
-  // Bitcode and shared symbols are resolved later by the epilogue's
-  // BitcodeFile/SharedFile::parse; here we only track an earlier bitcode
-  // definition, which suppresses a later object definition.
-  uint8_t bcDef = 0;      // 1: earlier weak bitcode def, 2: earlier strong
-  bool nonObjDef = false; // a shared or bitcode definition precedes here
+  // Shared symbols are resolved later by the epilogue's SharedFile::parse;
+  // track whether a shared definition precedes so that an unextracted lazy
+  // object definition is not inserted over it.
+  bool nonObjDef = false;
   bool inserted = ni.seedIdx != UINT32_MAX;
   for (const REvent &e : order) {
     const RefNode &node = bu.refs[e.r];
@@ -2894,13 +2896,10 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
     }
     if (rec.flags & FBitcode) {
       if (files[f]->lazy)
-        continue;      // unextracted lazy bitcode contributes nothing
-      inserted = true; // BitcodeFile::parse resolves the symbol in the epilogue
-      if (isDef) {
-        nonObjDef = true;
-        if (!(rec.flags & FCommon))
-          bcDef = std::max<uint8_t>(bcDef, rec.flags & FWeak ? 1 : 2);
-      }
+        continue; // unextracted lazy bitcode contributes nothing
+      inserted = true;
+      auto *bf = cast<BitcodeFile>(files[f]);
+      createBitcodeSymbol(ctx, sym, bf->obj->symbols()[rec.elfIdx], *bf);
       continue;
     }
     auto *obj = cast<ObjFile<ELFT>>(files[f]);
@@ -2930,16 +2929,6 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
         resolveSymbol(ctx, obj, eSym, *sym);
       }
       continue;
-    }
-    if (!(rec.flags & FCommon)) {
-      uint8_t binding = eSym.getBinding();
-      if (bcDef == 2 || (bcDef == 1 && binding == STB_WEAK)) {
-        sym->isUsedInRegularObj = true;
-        sym->mergeVisibility(eSym.st_other & 3);
-        continue;
-      }
-      if (bcDef == 1 && binding != STB_WEAK)
-        bcDef = 0;
     }
     resolveSymbol(ctx, obj, eSym, *sym);
   }
@@ -3139,19 +3128,29 @@ template <class ELFT> void Pipeline<ELFT>::recordExtractions() {
 
 template <class ELFT> void Pipeline<ELFT>::wireSymbols() {
   parallelFor(0, files.size(), [&](size_t i) {
-    if (!fd[i].eligible || files[i]->kind() != InputFile::ObjKind)
+    if (!fd[i].eligible)
       return;
     InputFile *f = files[i];
-    bool inactiveLazy = f->lazy;
-    f->allocateSymbols();
-    MutableArrayRef<Symbol *> syms = f->getMutableSymbols();
-    for (const SymRecord &rec : fd[i].records) {
-      // An unextracted lazy file has only its definitions wired, mirroring
-      // ObjFile::parseLazy.
-      if (inactiveLazy && !(rec.flags & FDef))
-        continue;
-      Bucket &bu = buckets[rec.hash % numShards];
-      syms[rec.elfIdx] = bu.names[rec.nameId].sym;
+    if (f->kind() == InputFile::ObjKind) {
+      bool inactiveLazy = f->lazy;
+      f->allocateSymbols();
+      MutableArrayRef<Symbol *> syms = f->getMutableSymbols();
+      for (const SymRecord &rec : fd[i].records) {
+        // An unextracted lazy file has only its definitions wired, mirroring
+        // ObjFile::parseLazy.
+        if (inactiveLazy && !(rec.flags & FDef))
+          continue;
+        Bucket &bu = buckets[rec.hash % numShards];
+        syms[rec.elfIdx] = bu.names[rec.nameId].sym;
+      }
+    } else if (f->kind() == InputFile::BitcodeKind && !f->lazy) {
+      // resolveName resolved a non-lazy bitcode file's symbols in place; wire
+      // its symbols array (an unextracted lazy file is left to parseLazy).
+      auto *bf = cast<BitcodeFile>(f);
+      bf->allocateSymbols(bf->obj->symbols().size());
+      MutableArrayRef<Symbol *> syms = bf->getMutableSymbols();
+      for (const SymRecord &rec : fd[i].records)
+        syms[rec.elfIdx] = buckets[rec.hash % numShards].names[rec.nameId].sym;
     }
   });
 }
@@ -3191,8 +3190,29 @@ template <class ELFT> void Pipeline<ELFT>::epilogue() {
       continue;
     }
     // Full parse events.
+    if (auto *bf = dyn_cast<BitcodeFile>(f); bf && d.eligible) {
+      // resolveName/wireSymbols already resolved and wired the symbols; here
+      // register the file, its comdat groups and dependent libraries, and
+      // replay -y traced resolutions (deferred by resolveName) in serial order.
+      ctx.bitcodeFiles.push_back(bf);
+      bf->parseComdats();
+      if (hasTraced)
+        for (int phase = 0; phase != 2; ++phase)
+          for (uint32_t ri : d.symOrder) {
+            const SymRecord &rec = d.records[ri];
+            if ((phase == 0) != bool(rec.flags & FDef))
+              continue;
+            Symbol *sym = buckets[rec.hash % numShards].names[rec.nameId].sym;
+            if (sym->traced)
+              createBitcodeSymbol(ctx, sym, bf->obj->symbols()[rec.elfIdx],
+                                  *bf);
+          }
+      for (auto l : bf->obj->getDependentLibraries())
+        addDependentLibrary(ctx, l, bf);
+      continue;
+    }
     if (!d.eligible || f->kind() != InputFile::ObjKind) {
-      parseFile(ctx, f); // SharedFile, BitcodeFile, BinaryFile
+      parseFile(ctx, f); // SharedFile, BinaryFile
       continue;
     }
     auto *obj = cast<ObjFile<ELFT>>(f);

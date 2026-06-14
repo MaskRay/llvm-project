@@ -106,6 +106,16 @@ public:
       symbols = std::make_unique<Symbol *[]>(numSymbols);
   }
 
+  // Allocate a symbols array of n entries (used when the count is known before
+  // the file's own parse runs, e.g. the parallel parse pipeline wiring
+  // bitcode).
+  void allocateSymbols(size_t n) {
+    if (!symbols) {
+      numSymbols = n;
+      symbols = std::make_unique<Symbol *[]>(n);
+    }
+  }
+
   Symbol &getSymbol(uint32_t symbolIndex) const {
     assert(fileKind == ObjKind);
     if (symbolIndex >= numSymbols)
@@ -351,6 +361,7 @@ public:
               uint64_t offsetInArchive, bool lazy);
   static bool classof(const InputFile *f) { return f->kind() == BitcodeKind; }
   void parse();
+  void parseComdats();
   void parseLazy();
   void postParse();
   std::unique_ptr<llvm::lto::InputFile> obj;
