@@ -2188,8 +2188,9 @@ struct NameInfo {
   // every versioned insertion.
   const char *verName = nullptr;
   Symbol *sym = nullptr;
-  // Anchor: serial insertion point (event rank, sub index). UINT32_MAX rank
-  // means no serial event would have inserted the name.
+  // Output order key: the visit rank and sub-index of the earliest resolution
+  // event; seeds use (0, seedIdx). UINT32_MAX rank means no file ended up
+  // inserting the name, so it is dropped.
   uint64_t anchorSub = UINT64_MAX;
   uint32_t anchorRank = UINT32_MAX;
   uint32_t firstRef = UINT32_MAX, lastRef = UINT32_MAX;
@@ -2198,9 +2199,6 @@ struct NameInfo {
   uint32_t seedIdx = UINT32_MAX;      // pre-parseFiles symVector index
   uint32_t firstLazyDef = UINT32_MAX; // first definition in a lazy file
   uint32_t outIdx = UINT32_MAX;       // final symVector index
-  // False if all references are from live object files with at most one
-  // reference per file: the chain is already in serial resolution order.
-  bool complex = false;
 };
 
 struct Bucket {
@@ -2214,21 +2212,11 @@ struct SerialEvent {
   bool full; // full parse event (vs lazy symbol insertion)
 };
 
-// Phase 4 per-name resolution events.
-enum class RK : uint8_t {
-  LazyInsert, // LazySymbol insertion by an (originally) lazy object
-  Def,
-  Common,
-  Undef,
-  BcDef,   // active bitcode definition: tracks suppression state
-  InfoDef, // shared def or bitcode common: tracks the non-object-def state
-};
-
+// A per-name resolution event, ordered by key = (visit rank << 33) |
+// (undefined-phase << 32) | symbol index. r indexes Bucket::refs.
 struct REvent {
-  uint64_t key; // (eventRank << 33) | (isUndefPhase << 32) | elfIdx
-  uint32_t fileIdx;
-  uint32_t recIdx;
-  RK kind;
+  uint64_t key;
+  uint32_t r;
 };
 
 template <class ELFT> struct Pipeline {
@@ -2266,7 +2254,13 @@ template <class ELFT> struct Pipeline {
   void activate();
   void commitFiles();
   void resolveSymbols();
-  void resolveName(Bucket &b, uint32_t nameId, SmallVectorImpl<REvent> &ev);
+  void resolveName(Bucket &b, uint32_t nameId, SmallVectorImpl<REvent> &order);
+
+  // The file's visit rank: extracted members rank at their extraction point,
+  // not their command-line position.
+  uint32_t effRank(uint32_t f) const {
+    return fullRank[f] != UINT32_MAX ? fullRank[f] : lazyRank[f];
+  }
   void wireSymbols();
   void recordExtractions();
   void epilogue();
@@ -2595,9 +2589,6 @@ template <class ELFT> void Pipeline<ELFT>::buildNameDB() {
         RefNode &node = bu.refs.emplace_back();
         node.fileIdx = i;
         node.recIdx = r;
-        if ((rec.flags & (FBitcode | FShared)) || lazy ||
-            (ni.lastRef != UINT32_MAX && bu.refs[ni.lastRef].fileIdx == i))
-          ni.complex = true;
         append(ni.firstRef, ni.lastRef, refIdx, &RefNode::next);
         if (rec.flags & FDef) {
           append(ni.firstDef, ni.lastDef, refIdx, &RefNode::nextDef);
@@ -2820,7 +2811,7 @@ template <class ELFT> void Pipeline<ELFT>::commitFiles() {
 
 template <class ELFT>
 void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
-                                 SmallVectorImpl<REvent> &ev) {
+                                 SmallVectorImpl<REvent> &order) {
   NameInfo &ni = bu.names[nameId];
   Symbol *sym = ni.sym;
 
@@ -2837,170 +2828,122 @@ void Pipeline<ELFT>::resolveName(Bucket &bu, uint32_t nameId,
     sym->hasVersionSuffix = true;
   }
 
-  // Fast path: all references come from live object files with at most one
-  // reference per file, so the chain is already in serial resolution order.
-  if (!ni.complex) {
-    if (ni.seedIdx != UINT32_MAX) {
-      ni.anchorRank = 0;
-      ni.anchorSub = ni.seedIdx;
-    } else {
-      const RefNode &first = bu.refs[ni.firstRef];
-      ni.anchorRank = fullRank[first.fileIdx];
-      ni.anchorSub = fd[first.fileIdx].records[first.recIdx].elfIdx;
-    }
-    if (sym->traced)
-      return;
-    for (uint32_t r = ni.firstRef; r != UINT32_MAX; r = bu.refs[r].next) {
-      const RefNode &node = bu.refs[r];
-      auto *f = cast<ObjFile<ELFT>>(files[node.fileIdx]);
-      const SymRecord &rec = fd[node.fileIdx].records[node.recIdx];
-      resolveSymbol(ctx, f, f->template getELFSyms<ELFT>()[rec.elfIdx], *sym);
-    }
-    return;
-  }
-
-  ev.clear();
-  uint32_t anchorRank = UINT32_MAX;
-  uint64_t anchorSub = UINT64_MAX;
-  if (ni.seedIdx != UINT32_MAX) {
-    anchorRank = 0;
-    anchorSub = ni.seedIdx;
-  }
-  auto anchorCand = [&](uint32_t rank, uint64_t sub) {
-    if (rank < anchorRank || (rank == anchorRank && sub < anchorSub)) {
-      anchorRank = rank;
-      anchorSub = sub;
-    }
-  };
-  auto push = [&](uint32_t rank, bool undefPhase, uint32_t elfIdx, uint32_t f,
-                  uint32_t recIdx, RK kind) {
-    ev.push_back(
-        {(uint64_t(rank) << 33) | (uint64_t(undefPhase) << 32) | elfIdx, f,
-         recIdx, kind});
-  };
-
+  // Order the references by their file's visit rank, then definitions before
+  // undefined references, then symbol index, so resolution matches the serial
+  // linker (extracted members resolve at their extraction point). The output
+  // order anchor is the earliest (rank, symbol index), ignoring the phase.
+  order.clear();
+  uint32_t anchorRank = ni.seedIdx == UINT32_MAX ? UINT32_MAX : 0;
+  uint64_t anchorSub = ni.seedIdx == UINT32_MAX ? UINT64_MAX : ni.seedIdx;
   for (uint32_t r = ni.firstRef; r != UINT32_MAX; r = bu.refs[r].next) {
     const RefNode &node = bu.refs[r];
-    uint32_t f = node.fileIdx;
-    const SymRecord &rec = fd[f].records[node.recIdx];
+    const SymRecord &rec = fd[node.fileIdx].records[node.recIdx];
     bool isDef = rec.flags & FDef;
-    bool origLazy = lazyRank[f] != UINT32_MAX;
-    bool activated = fullRank[f] != UINT32_MAX;
-    if (rec.flags & FShared) {
-      anchorCand(fullRank[f], rec.elfIdx);
-      if (isDef)
-        push(fullRank[f], false, rec.elfIdx, f, node.recIdx, RK::InfoDef);
+    // An unextracted lazy file contributes only its definitions (as
+    // LazySymbols); its undefined references are never inserted.
+    if (!isDef && files[node.fileIdx]->lazy)
       continue;
+    uint32_t rank = effRank(node.fileIdx);
+    uint64_t undefPhase = isDef ? 0 : 1;
+    order.push_back(
+        {(uint64_t(rank) << 33) | (undefPhase << 32) | rec.elfIdx, r});
+    // The output anchor is the insertion point: the file that first inserts the
+    // symbol, definitions before undefined references (as the serial parse
+    // processes them), then symbol index. parseLazy inserts a lazy file's
+    // definitions as LazySymbols at the lazy-visit rank, but only up to the
+    // definition that triggered extraction (actDefIdx); later definitions are
+    // inserted by the full parse at fullRank.
+    uint32_t arank = isDef && lazyRank[node.fileIdx] != UINT32_MAX &&
+                             rec.elfIdx <= actDefIdx[node.fileIdx]
+                         ? lazyRank[node.fileIdx]
+                         : rank;
+    // Object/shared symbols are inserted in symbol-table order; bitcode files
+    // insert definitions before undefined references (BitcodeFile::parse).
+    uint64_t asub =
+        (rec.flags & FBitcode) ? (undefPhase << 32) | rec.elfIdx : rec.elfIdx;
+    if (arank < anchorRank || (arank == anchorRank && asub < anchorSub)) {
+      anchorRank = arank;
+      anchorSub = asub;
     }
-    if (rec.flags & FBitcode) {
-      if (origLazy) {
-        if (isDef)
-          anchorCand(lazyRank[f], rec.elfIdx);
-        if (activated)
-          anchorCand(fullRank[f],
-                     isDef ? rec.elfIdx : (uint64_t(1) << 32) + rec.elfIdx);
-      } else {
-        anchorCand(fullRank[f],
-                   isDef ? rec.elfIdx : (uint64_t(1) << 32) + rec.elfIdx);
-      }
-      if (isDef && (!origLazy || activated))
-        push(fullRank[f], false, rec.elfIdx, f, node.recIdx,
-             rec.flags & FCommon ? RK::InfoDef : RK::BcDef);
-      continue;
-    }
-    // Object file.
-    if (origLazy) {
-      // For a member extracted at its own lazy visit, parseLazy stops at the
-      // triggering definition; later definitions are only inserted by the
-      // full parse.
-      if (isDef && rec.elfIdx <= actDefIdx[f]) {
-        anchorCand(lazyRank[f], rec.elfIdx);
-        push(lazyRank[f], false, rec.elfIdx, f, node.recIdx, RK::LazyInsert);
-      }
-      if (!activated)
-        continue;
-    }
-    anchorCand(fullRank[f], rec.elfIdx);
-    if (!isDef)
-      push(fullRank[f], true, rec.elfIdx, f, node.recIdx, RK::Undef);
-    else
-      push(fullRank[f], false, rec.elfIdx, f, node.recIdx,
-           rec.flags & FCommon ? RK::Common : RK::Def);
   }
+  llvm::sort(order,
+             [](const REvent &a, const REvent &b) { return a.key < b.key; });
   ni.anchorRank = anchorRank;
   ni.anchorSub = anchorSub;
-
-  // The keys are unique: ranks are unique per (file, lazy/full visit) and a
-  // record produces at most one event per rank and phase.
-  auto less = [](const REvent &a, const REvent &b) { return a.key < b.key; };
-  if (!llvm::is_sorted(ev, less))
-    llvm::sort(ev, less);
 
   // -y defers traced names to the serial replay in the epilogue.
   if (sym->traced)
     return;
 
-  uint8_t bcDef = 0;      // 1: weak bitcode def, 2: strong bitcode def
-  bool nonObjDef = false; // a shared or bitcode definition was seen
-  for (const REvent &re : ev) {
-    InputFile *file = files[re.fileIdx];
-    const SymRecord &rec = fd[re.fileIdx].records[re.recIdx];
-    switch (re.kind) {
-    case RK::BcDef:
-      bcDef = std::max<uint8_t>(bcDef, rec.flags & FWeak ? 1 : 2);
-      nonObjDef = true;
-      break;
-    case RK::InfoDef:
-      nonObjDef = true;
-      break;
-    case RK::LazyInsert:
-      // resolve(LazySymbol) is issued only when the serial state would be an
-      // unresolved reference; extraction itself was handled by the engine.
-      if (!nonObjDef &&
-          (sym->isPlaceholder() || (sym->isUndefined() && sym->isWeak())))
-        sym->resolve(ctx, LazySymbol{*file});
-      break;
-    case RK::Undef: {
-      auto *f = cast<ObjFile<ELFT>>(file);
-      const typename ELFT::Sym &eSym =
-          f->template getELFSyms<ELFT>()[rec.elfIdx];
+  // Bitcode and shared symbols are resolved later by the epilogue's
+  // BitcodeFile/SharedFile::parse; here we only track an earlier bitcode
+  // definition, which suppresses a later object definition.
+  uint8_t bcDef = 0;      // 1: earlier weak bitcode def, 2: earlier strong
+  bool nonObjDef = false; // a shared or bitcode definition precedes here
+  bool inserted = ni.seedIdx != UINT32_MAX;
+  for (const REvent &e : order) {
+    const RefNode &node = bu.refs[e.r];
+    uint32_t f = node.fileIdx;
+    const SymRecord &rec = fd[f].records[node.recIdx];
+    bool isDef = rec.flags & FDef;
+    if (rec.flags & FShared) {
+      inserted = true; // SharedFile::parse inserts the symbol in the epilogue
+      nonObjDef |= isDef;
+      continue;
+    }
+    if (rec.flags & FBitcode) {
+      if (files[f]->lazy)
+        continue;      // unextracted lazy bitcode contributes nothing
+      inserted = true; // BitcodeFile::parse resolves the symbol in the epilogue
+      if (isDef) {
+        nonObjDef = true;
+        if (!(rec.flags & FCommon))
+          bcDef = std::max<uint8_t>(bcDef, rec.flags & FWeak ? 1 : 2);
+      }
+      continue;
+    }
+    auto *obj = cast<ObjFile<ELFT>>(files[f]);
+    if (files[f]->lazy) {
+      // Unextracted lazy object: only its definitions are visible, as
+      // LazySymbols (ObjFile::parseLazy).
+      if (isDef) {
+        inserted = true;
+        if (!nonObjDef &&
+            (sym->isPlaceholder() || (sym->isUndefined() && sym->isWeak())))
+          sym->resolve(ctx, LazySymbol{*obj});
+      }
+      continue;
+    }
+    inserted = true;
+    const typename ELFT::Sym &eSym =
+        obj->template getELFSyms<ELFT>()[rec.elfIdx];
+    if (!isDef) {
+      // resolveSymbol would extract a lazy member; activate already made the
+      // extraction decision, so for a strong reference to a member it chose not
+      // to extract, only merge visibility (as resolve(Undefined) would).
       if (sym->isLazy() && eSym.getBinding() != STB_WEAK) {
-        // The serial linker would extract here; the engine already did. Merge
-        // the visibility like resolve(Undefined) does.
         sym->mergeVisibility(eSym.st_other & 3);
         sym->isUsedInRegularObj = true;
         sym->referenced = true;
       } else {
-        resolveSymbol(ctx, f, eSym, *sym);
+        resolveSymbol(ctx, obj, eSym, *sym);
       }
-      break;
+      continue;
     }
-    case RK::Common: {
-      auto *f = cast<ObjFile<ELFT>>(file);
-      resolveSymbol(ctx, f, f->template getELFSyms<ELFT>()[rec.elfIdx], *sym);
-      break;
-    }
-    case RK::Def: {
-      auto *f = cast<ObjFile<ELFT>>(file);
-      const typename ELFT::Sym &eSym =
-          f->template getELFSyms<ELFT>()[rec.elfIdx];
+    if (!(rec.flags & FCommon)) {
       uint8_t binding = eSym.getBinding();
-      // An earlier active bitcode definition wins over a later object
-      // definition (strong outright; weak-vs-weak first-wins): the object
-      // definition must not be applied since BitcodeFile::parse resolves
-      // later. COMMON is exempt (handled above).
       if (bcDef == 2 || (bcDef == 1 && binding == STB_WEAK)) {
         sym->isUsedInRegularObj = true;
         sym->mergeVisibility(eSym.st_other & 3);
-        break;
+        continue;
       }
       if (bcDef == 1 && binding != STB_WEAK)
         bcDef = 0;
-      resolveSymbol(ctx, f, eSym, *sym);
-      break;
     }
-    }
+    resolveSymbol(ctx, obj, eSym, *sym);
   }
+  if (!inserted)
+    ni.anchorRank = UINT32_MAX;
 }
 
 template <class ELFT> void Pipeline<ELFT>::resolveSymbols() {
@@ -3013,7 +2956,7 @@ template <class ELFT> void Pipeline<ELFT>::resolveSymbols() {
       if (!n)
         return;
       SymbolUnion *storage = makeThreadLocalN<SymbolUnion>(n);
-      SmallVector<REvent, 0> ev;
+      SmallVector<REvent, 0> order;
       for (size_t id = 0; id != n; ++id) {
         NameInfo &ni = bu.names[id];
         SymbolUnion *su = &storage[id];
@@ -3030,7 +2973,7 @@ template <class ELFT> void Pipeline<ELFT>::resolveSymbols() {
           s->setName(rec.stem());
         }
         ni.sym = reinterpret_cast<Symbol *>(su);
-        resolveName(bu, id, ev);
+        resolveName(bu, id, order);
       }
     });
   }
