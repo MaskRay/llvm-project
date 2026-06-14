@@ -43,7 +43,6 @@ const ELFSyncStream &operator<<(const ELFSyncStream &, const InputFile *);
 std::optional<MemoryBufferRef> readFile(Ctx &, StringRef path);
 
 // Add symbols in File to the symbol table.
-void parseFile(Ctx &, InputFile *file);
 void parseFiles(Ctx &, const SmallVector<std::unique_ptr<InputFile>, 0> &);
 // Resolve the symbols of LTO output objects against the symbol table.
 void parseLtoObjectFiles(Ctx &, ArrayRef<InputFile *>);
@@ -286,9 +285,6 @@ public:
     this->archiveName = archiveName;
   }
 
-  void parse(bool ignoreComdats = false);
-  void parseLazy();
-
   llvm::Expected<std::pair<StringRef, ArrayRef<Elf_Word>>>
   getGroup(const Elf_Shdr &sec);
 
@@ -335,7 +331,6 @@ private:
 
   void initializeSections(bool ignoreComdats,
                           const llvm::object::ELFFile<ELFT> &obj);
-  void initializeSymbols(const llvm::object::ELFFile<ELFT> &obj);
   void initializeJustSymbols();
 
   InputSectionBase *getRelocTarget(uint32_t idx, uint32_t info);
@@ -364,9 +359,7 @@ public:
   BitcodeFile(Ctx &, MemoryBufferRef m, StringRef archiveName,
               uint64_t offsetInArchive, bool lazy);
   static bool classof(const InputFile *f) { return f->kind() == BitcodeKind; }
-  void parse();
   void parseComdats();
-  void parseLazy();
   void postParse();
   std::unique_ptr<llvm::lto::InputFile> obj;
   std::vector<bool> keptComdats;

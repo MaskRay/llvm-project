@@ -300,47 +300,6 @@ static bool isCompatible(Ctx &ctx, InputFile *file, InputFile *firstObj,
   return false;
 }
 
-static bool isCompatible(Ctx &ctx, InputFile *file) {
-  return isCompatible(ctx, file,
-                      ctx.objectFiles.empty() ? nullptr : ctx.objectFiles[0],
-                      ctx.sharedFiles.empty() ? nullptr : ctx.sharedFiles[0],
-                      ctx.bitcodeFiles.empty() ? nullptr : ctx.bitcodeFiles[0]);
-}
-
-// -t traces are printed by Symbol::extract and the parallel parse pipeline
-// (commitFiles/epilogue), not here.
-template <class ELFT> static void doParseFile(Ctx &ctx, InputFile *file) {
-  if (!isCompatible(ctx, file))
-    return;
-
-  // Lazy object file
-  if (file->lazy) {
-    if (auto *f = dyn_cast<BitcodeFile>(file)) {
-      ctx.lazyBitcodeFiles.push_back(f);
-      f->parseLazy();
-    } else {
-      cast<ObjFile<ELFT>>(file)->parseLazy();
-    }
-    return;
-  }
-
-  // Only lazy object/bitcode members reach here (via Symbol::extract); binary
-  // and shared files are handled inline by the parse pipeline's epilogue.
-  if (file->kind() == InputFile::ObjKind) {
-    ctx.objectFiles.push_back(cast<ELFFileBase>(file));
-    cast<ObjFile<ELFT>>(file)->parse();
-  } else {
-    auto *f = cast<BitcodeFile>(file);
-    ctx.bitcodeFiles.push_back(f);
-    f->parse();
-  }
-}
-
-// Add symbols in File to the symbol table.
-void elf::parseFile(Ctx &ctx, InputFile *file) {
-  invokeELFT(doParseFile, ctx, file);
-}
-
 // Concatenates arguments to construct a string representing an error location.
 StringRef InputFile::getNameForScript() const {
   if (archiveName.empty())
@@ -547,26 +506,6 @@ handleAArch64BAAndGnuProperties(ObjFile<ELFT> *file, Ctx &ctx,
     }
     file->andFeatures = baInfo.AndFeatures;
   }
-}
-
-template <class ELFT> void ObjFile<ELFT>::parse(bool ignoreComdats) {
-  object::ELFFile<ELFT> obj = this->getObj();
-  // --just-symbols files have only their symbol table read here; the section
-  // table is initialized in initSectionsAndLocalSyms.
-  if (!this->justSymbols) {
-    // Register comdat group ownership and process dependent libraries and
-    // SHT_ARM_ATTRIBUTES, which are not done in parallel. Group selection,
-    // diagnostics, and section creation happen in initializeSections.
-    EarlySectionInfo early;
-    scanEarlySections(early);
-    if (!ignoreComdats)
-      for (StringRef sig : early.comdats)
-        ctx.symtab->addComdatGroup(CachedHashStringRef(sig), this);
-    processEarlySections(early);
-  }
-
-  // Read a symbol table.
-  initializeSymbols(obj);
 }
 
 template <class ELFT>
@@ -1248,42 +1187,6 @@ static void resolveSymbol(Ctx &ctx, ObjFile<ELFT> *f,
                       eSym.getType(), eSym.st_value, eSym.st_size, nullptr});
 }
 
-// Initialize symbols. symbols is a parallel array to the corresponding ELF
-// symbol table.
-template <class ELFT>
-void ObjFile<ELFT>::initializeSymbols(const object::ELFFile<ELFT> &obj) {
-  ArrayRef<Elf_Sym> eSyms = this->getELFSyms<ELFT>();
-  allocateSymbols();
-
-  // Some entries have been filled by LazyObjFile.
-  auto *symtab = ctx.symtab.get();
-  for (size_t i = firstGlobal, end = eSyms.size(); i != end; ++i)
-    if (!symbols[i])
-      symbols[i] = symtab->insert(CHECK2(eSyms[i].getName(stringTable), this));
-
-  // Perform symbol resolution on non-local symbols.
-  SmallVector<unsigned, 32> undefineds;
-  for (size_t i = firstGlobal, end = eSyms.size(); i != end; ++i) {
-    const Elf_Sym &eSym = eSyms[i];
-    if (eSym.st_shndx == SHN_UNDEF) {
-      undefineds.push_back(i);
-      continue;
-    }
-    if (LLVM_UNLIKELY(eSym.st_shndx == SHN_COMMON))
-      hasCommonSyms = true;
-    resolveSymbol(ctx, this, eSym, *symbols[i]);
-  }
-
-  // Undefined symbols (excluding those defined relative to non-prevailing
-  // sections) can trigger recursive extract. Process defined symbols first so
-  // that the relative order between a defined symbol and an undefined symbol
-  // does not change the symbol resolution behavior. In addition, a set of
-  // interconnected symbols will all be resolved to the same file, instead of
-  // being resolved to different files.
-  for (unsigned i : undefineds)
-    resolveSymbol(ctx, this, eSyms[i], *symbols[i]);
-}
-
 template <class ELFT>
 void ObjFile<ELFT>::initSectionsAndLocalSyms(bool ignoreComdats) {
   if (!justSymbols)
@@ -1781,44 +1684,6 @@ void BitcodeFile::parseComdats() {
         ctx.symtab->addComdatGroup(CachedHashStringRef(s.first), this) == this);
 }
 
-void BitcodeFile::parse() {
-  parseComdats();
-
-  if (numSymbols == 0) {
-    numSymbols = obj->symbols().size();
-    symbols = std::make_unique<Symbol *[]>(numSymbols);
-  }
-  // Process defined symbols first. See the comment in
-  // ObjFile<ELFT>::initializeSymbols.
-  for (auto [i, irSym] : llvm::enumerate(obj->symbols()))
-    if (!irSym.isUndefined())
-      createBitcodeSymbol(ctx, symbols[i], irSym, *this);
-  for (auto [i, irSym] : llvm::enumerate(obj->symbols()))
-    if (irSym.isUndefined())
-      createBitcodeSymbol(ctx, symbols[i], irSym, *this);
-
-  for (auto l : obj->getDependentLibraries())
-    addDependentLibrary(ctx, l, this);
-}
-
-void BitcodeFile::parseLazy() {
-  numSymbols = obj->symbols().size();
-  symbols = std::make_unique<Symbol *[]>(numSymbols);
-  for (auto [i, irSym] : llvm::enumerate(obj->symbols())) {
-    // Symbols can be duplicated in bitcode files because of '#include' and
-    // linkonce_odr. Use uniqueSaver to save symbol names for de-duplication.
-    // Update objSym.Name to reference (via StringRef) the string saver's copy;
-    // this way LTO can reference the same string saver's copy rather than
-    // keeping copies of its own.
-    irSym.Name = ctx.uniqueSaver.save(irSym.getName());
-    if (!irSym.isUndefined()) {
-      auto *sym = ctx.symtab->insert(irSym.getName());
-      sym->resolve(ctx, LazySymbol{*this});
-      symbols[i] = sym;
-    }
-  }
-}
-
 void BitcodeFile::postParse() {
   for (auto [i, irSym] : llvm::enumerate(obj->symbols())) {
     const Symbol &sym = *symbols[i];
@@ -1892,25 +1757,6 @@ std::unique_ptr<ELFFileBase> elf::createObjFile(Ctx &ctx, MemoryBufferRef mb,
   f->init();
   f->lazy = lazy;
   return f;
-}
-
-template <class ELFT> void ObjFile<ELFT>::parseLazy() {
-  const ArrayRef<typename ELFT::Sym> eSyms = this->getELFSyms<ELFT>();
-  numSymbols = eSyms.size();
-  symbols = std::make_unique<Symbol *[]>(numSymbols);
-
-  // resolve() may trigger this->extract() if an existing symbol is an undefined
-  // symbol. If that happens, this function has served its purpose, and we can
-  // exit from the loop early.
-  auto *symtab = ctx.symtab.get();
-  for (size_t i = firstGlobal, end = eSyms.size(); i != end; ++i) {
-    if (eSyms[i].st_shndx == SHN_UNDEF)
-      continue;
-    symbols[i] = symtab->insert(CHECK2(eSyms[i].getName(stringTable), this));
-    symbols[i]->resolve(ctx, LazySymbol{*this});
-    if (!lazy)
-      break;
-  }
 }
 
 bool InputFile::shouldExtractForCommon(StringRef name) const {

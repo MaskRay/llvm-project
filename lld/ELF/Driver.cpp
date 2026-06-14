@@ -2875,6 +2875,17 @@ static std::vector<WrappedSymbol> addWrappedSymbols(Ctx &ctx,
   std::vector<WrappedSymbol> v;
   DenseSet<StringRef> seen;
   auto &ss = ctx.saver;
+  // A wrapper (or, when __real_ is referenced, the wrapped symbol) may live in
+  // a lazy archive member; pull it in. Extract inline so that a __real_
+  // reference inside a just-extracted wrapper is seen before the check below.
+  auto addUndef = [&](StringRef name, uint8_t binding = llvm::ELF::STB_GLOBAL) {
+    Symbol *s = ctx.symtab->addUnusedUndefined(name, binding);
+    if (s->isLazy() && !s->isWeak()) {
+      Symbol *trig[] = {s};
+      reactivate(ctx, trig);
+    }
+    return s;
+  };
   for (auto *arg : args.filtered(OPT_wrap)) {
     StringRef name = arg->getValue();
     if (!seen.insert(name).second)
@@ -2884,20 +2895,19 @@ static std::vector<WrappedSymbol> addWrappedSymbols(Ctx &ctx,
     if (!sym)
       continue;
 
-    Symbol *wrap =
-        ctx.symtab->addUnusedUndefined(ss.save("__wrap_" + name), sym->binding);
+    Symbol *wrap = addUndef(ss.save("__wrap_" + name), sym->binding);
 
     // If __real_ is referenced, pull in the symbol if it is lazy. Do this after
     // processing __wrap_ as that may have referenced __real_.
     StringRef realName = ctx.saver.save("__real_" + name);
     if (Symbol *real = ctx.symtab->find(realName)) {
-      ctx.symtab->addUnusedUndefined(name, sym->binding);
+      addUndef(name, sym->binding);
       // Update sym's binding, which will replace real's later in
       // SymbolTable::wrap.
       sym->binding = real->binding;
     }
 
-    Symbol *real = ctx.symtab->addUnusedUndefined(realName);
+    Symbol *real = addUndef(realName);
     v.push_back({sym, real, wrap});
 
     // We want to tell LTO not to inline symbols to be overwritten

@@ -229,11 +229,6 @@ public:
   void resolve(Ctx &, const LazySymbol &other);
   void resolve(Ctx &, const SharedSymbol &other);
 
-  // If this is a lazy symbol, extract an input file and add the symbol
-  // in the file to the symbol table. Calling this function on
-  // non-lazy object causes a runtime error.
-  void extract(Ctx &) const;
-
   void checkDuplicate(Ctx &, const Defined &other) const;
 
 private:
