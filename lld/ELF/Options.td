@@ -222,7 +222,7 @@ def enable_non_contiguous_regions : FF<"enable-non-contiguous-regions">,
   HelpText<"Spill input sections to later matching output sections to avoid memory region overflow">;
 
 def end_group: F<"end-group">,
-  HelpText<"Ignored for compatibility with GNU unless you pass --warn-backrefs">;
+  HelpText<"Ignored for compatibility with GNU">;
 
 def end_lib: F<"end-lib">,
   HelpText<"End a grouping of objects that should be treated as if they were together in an archive">;
@@ -470,7 +470,7 @@ defm sort_section:
   Eq<"sort-section", "Specifies sections sorting rule when linkerscript is used">;
 
 def start_group: F<"start-group">,
-  HelpText<"Ignored for compatibility with GNU unless you pass --warn-backrefs">;
+  HelpText<"Ignored for compatibility with GNU">;
 
 def start_lib: F<"start-lib">,
   HelpText<"Start a grouping of objects that should be treated as if they were together in an archive">;
@@ -550,16 +550,6 @@ def no_power10_stubs: FF<"no-power10-stubs">, Alias<power10_stubs_eq>, AliasArgs
   HelpText<"Alias for --power10-stubs=no">;
 
 defm version_script: Eq<"version-script", "Read a version script">;
-
-defm warn_backrefs: BB<"warn-backrefs",
-    "Warn about backward symbol references to extract archive members",
-    "Do not warn about backward symbol references to extract archive members (default)">;
-
-defm warn_backrefs_exclude
-    : EEq<"warn-backrefs-exclude",
-         "Glob describing an archive (or an object file within --start-lib) "
-         "which should be ignored for --warn-backrefs.">,
-      MetaVarName<"<glob>">;
 
 defm warn_common: B<"warn-common",
     "Warn about duplicate common symbols",

@@ -748,14 +748,6 @@ Verbose mode.
 .It Fl -version-script Ns = Ns Ar file
 Read version script from
 .Ar file .
-.It Fl -warn-backrefs
-Warn about reverse or cyclic dependencies to or between static archives.
-This can be used to ensure linker invocation remains compatible with
-traditional Unix-like linkers.
-.It Fl -warn-backrefs-exclude Ns = Ns Ar glob
-Glob describing an archive (or an object file within --start-lib)
-which should be ignored for
-.Fl -warn-backrefs
 .It Fl -warn-common
 Warn about duplicate common symbols.
 .It Fl -warn-ifunc-textrel
@@ -1076,8 +1068,3 @@ may produce different results compared to traditional linkers.
 In practice, large bodies of third party software have been linked with
 .Nm
 without material issues.
-.Pp
-The
-.Fl -warn-backrefs
-option may be used to identify a linker invocation that may be incompatible
-with traditional Unix-like linker behavior.

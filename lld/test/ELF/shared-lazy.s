@@ -6,30 +6,32 @@
 # RUN: llvm-mc -filetype=obj -triple=x86_64-pc-linux ref.s -o ref.o
 # RUN: llvm-mc -filetype=obj -triple=x86_64-pc-linux ref2.s -o ref2.o
 # RUN: llvm-mc -filetype=obj -triple=x86_64-pc-linux weakref2.s -o weakref2.o
-# RUN: ld.lld a.a b.so ref.o -shared -o 1.so
-# RUN: llvm-readelf --dyn-syms 1.so | FileCheck %s
+## A shared definition seen before the archive satisfies the reference, so the
+## archive member is not extracted; the shared definitions are used.
 # RUN: ld.lld a.so a.a ref.o -shared -o 1.so
 # RUN: llvm-readelf --dyn-syms 1.so | FileCheck %s
-
-## The definitions from a.so are used and we don't extract a member from the
-## archive.
 
 # CHECK:      0000000000000000     0 NOTYPE  GLOBAL DEFAULT UND x1
 # CHECK-NEXT: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT UND x2
 
-## The extracted x1 is defined as STB_GLOBAL.
+## The archive is extracted in preference to a shared definition.
+# RUN: ld.lld a.a b.so ref.o -o 2.so -shared
+# RUN: llvm-readelf --dyn-symbols 2.so | FileCheck %s --check-prefix=CHECK2
 # RUN: ld.lld ref.o a.a b.so -o 2.so -shared
 # RUN: llvm-readelf --dyn-symbols 2.so | FileCheck %s --check-prefix=CHECK2
 # RUN: ld.lld a.a ref.o b.so -o 2.so -shared
+# RUN: llvm-readelf --dyn-symbols 2.so | FileCheck %s --check-prefix=CHECK2
+# RUN: ld.lld a.a a.so ref2.o -o 2.so -shared
 # RUN: llvm-readelf --dyn-symbols 2.so | FileCheck %s --check-prefix=CHECK2
 
 # CHECK2:      {{.*}}               0 NOTYPE  GLOBAL DEFAULT [[#]] x1
 # CHECK2-NEXT: {{.*}}               0 NOTYPE  WEAK   DEFAULT [[#]] x2
 
-## The extracted x2 is defined as STB_WEAK. x1 is not referenced by any relocatable object file.
-# RUN: ld.lld a.a ref2.o b.so -o 2.so -shared
-# RUN: llvm-readelf --dyn-syms 2.so | FileCheck %s --check-prefix=CHECK2
-# RUN: ld.lld a.a a.so ref2.o -o 3.so -shared
+## ref2.o references only x2. The member is not pulled in when a stronger
+## definition exists (b.so's strong x2) or a shared definition of equal strength
+## is seen first (a.so before a.a); x2 resolves to the shared definition and x1
+## is absent.
+# RUN: ld.lld a.a ref2.o b.so -o 3.so -shared
 # RUN: llvm-readelf --dyn-syms 3.so | FileCheck %s --check-prefix=CHECK3
 # RUN: ld.lld a.so a.a ref2.o -o 3.so -shared
 # RUN: llvm-readelf --dyn-syms 3.so | FileCheck %s --check-prefix=CHECK3

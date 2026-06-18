@@ -128,7 +128,6 @@ ReleaseNotes
 ELF/large_sections
 ELF/linker_script
 ELF/start-stop-gc
-ELF/warn_backrefs
 MachO/index
 DTLTO
 ```

@@ -15,6 +15,7 @@
 #include "lld/Common/LLVM.h"
 #include "lld/Common/Reproduce.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/BinaryFormat/Magic.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/MemoryBufferRef.h"
@@ -43,8 +44,12 @@ const ELFSyncStream &operator<<(const ELFSyncStream &, const InputFile *);
 std::optional<MemoryBufferRef> readFile(Ctx &, StringRef path);
 
 // Add symbols in File to the symbol table.
-void parseFile(Ctx &, InputFile *file);
 void parseFiles(Ctx &, const SmallVector<std::unique_ptr<InputFile>, 0> &);
+// Resolve the symbols of LTO output objects against the symbol table.
+void parseLtoObjectFiles(Ctx &, ArrayRef<InputFile *>);
+// Extract still-lazy members defining the trigger symbols and resolve them.
+// References within an extracted member pull in further members transitively.
+void reactivate(Ctx &, ArrayRef<Symbol *> triggers);
 
 // The root class of input files.
 class InputFile {
@@ -100,6 +105,19 @@ public:
     return {symbols.get(), numSymbols};
   }
 
+  // Allocate the symbols array (zero-initialized) if not already present.
+  void allocateSymbols() {
+    if (!symbols)
+      symbols = std::make_unique<Symbol *[]>(numSymbols);
+  }
+
+  void allocateSymbols(size_t n) {
+    if (!symbols) {
+      numSymbols = n;
+      symbols = std::make_unique<Symbol *[]>(n);
+    }
+  }
+
   Symbol &getSymbol(uint32_t symbolIndex) const {
     assert(fileKind == ObjKind);
     if (symbolIndex >= numSymbols)
@@ -115,22 +133,12 @@ public:
   // Get filename to use for linker script processing.
   StringRef getNameForScript() const;
 
-  // Check if a non-common symbol should be extracted to override a common
-  // definition.
-  bool shouldExtractForCommon(StringRef name) const;
-
   // .got2 in the current file. This is used by PPC32 -fPIC/-fPIE to compute
   // offsets in PLT call stubs.
   InputSection *ppc32Got2 = nullptr;
 
   // Index of MIPS GOT built for this file.
   uint32_t mipsGotIndex = -1;
-
-  // groupId is used for --warn-backrefs which is an optional error
-  // checking feature. All files within the same --{start,end}-group or
-  // --{start,end}-lib get the same group ID. Otherwise, each file gets a new
-  // group ID. For more info, see checkDependency() in SymbolTable.cpp.
-  uint32_t groupId = 0;
 
   // If this is an architecture-specific file, the following members
   // have ELF type (i.e. ELF{32,64}{LE,BE}) and target machine type.
@@ -221,7 +229,6 @@ protected:
   const void *elfShdrs = nullptr;
   const void *elfSyms = nullptr;
   uint32_t numELFShdrs = 0;
-  uint32_t firstGlobal = 0;
 
   // Below are ObjFile specific members.
 
@@ -235,10 +242,18 @@ protected:
 public:
   // Name of source file obtained from STT_FILE, if present.
   StringRef sourceFile;
+  uint32_t firstGlobal = 0;
   uint32_t andFeatures = 0;
   bool hasCommonSyms = false;
   std::optional<AArch64PauthAbiCoreInfo> aarch64PauthAbiCoreInfo;
 };
+
+// Run fn over each item with unit-size dynamic grabs, largest cost first.
+// parallelFor's fixed-size chunks leave a straggler tail when the per-item
+// cost is heavy-tailed.
+void parallelForLPT(size_t numItems,
+                    llvm::function_ref<uint64_t(uint32_t)> cost,
+                    llvm::function_ref<void(uint32_t)> fn);
 
 // .o file.
 template <class ELFT> class ObjFile : public ELFFileBase {
@@ -256,11 +271,8 @@ public:
     this->archiveName = archiveName;
   }
 
-  void parse(bool ignoreComdats = false);
-  void parseLazy();
-
-  StringRef getShtGroupSignature(ArrayRef<Elf_Shdr> sections,
-                                 const Elf_Shdr &sec);
+  llvm::Expected<std::pair<StringRef, ArrayRef<Elf_Word>>>
+  getGroup(const Elf_Shdr &sec);
 
   uint32_t getSectionIndex(const Elf_Sym &sym) const;
 
@@ -270,6 +282,10 @@ public:
 
   // Embedded unoptimized dynamic debug input section.
   std::unique_ptr<InputSection> dynDbgSec;
+  // Add the embedded object's undefined symbols; lazy ones are appended to
+  // triggers for reactivate(). Runs once per file, after the parse pipeline.
+  void initDynDbgSymbols(llvm::SmallVectorImpl<Symbol *> &triggers);
+  bool dynDbgSymbolsAdded = false;
 
   // SHT_LLVM_CALL_GRAPH_PROFILE section index.
   uint32_t cgProfileSectionIndex = 0;
@@ -293,11 +309,36 @@ public:
   void postParse();
   void importCmseSymbols();
 
+  // Tolerantly scan the section headers; diagnostics for malformed groups are
+  // emitted later, in initializeSections.
+  void scanEarlySections();
+  // Process dependent libraries, SHT_ARM_ATTRIBUTES and the dynamic debugging
+  // section (serial contexts only: may add input files and create the
+  // singleton attributes section).
+  void processEarlySections();
+
+  // Set when the file has a section processEarlySections must handle.
+  bool needsSerialScan = false;
+
+  // A SHT_GROUP section: its index, its signature symbol (UINT32_MAX unless
+  // the group is a decodable GRP_COMDAT), and whether this file owns the
+  // group. initializeSections consumes and frees this.
+  struct ComdatSec {
+    uint32_t secIdx;
+    uint32_t sigSym;
+    uint32_t prevailing = 1;
+  };
+  SmallVector<ComdatSec, 0> comdatSecs;
+
 private:
+  // Retained SHT_ARM_ATTRIBUTES section, if this file provides
+  // ctx.in.attributes.
+  uint32_t armAttrSecIdx = UINT32_MAX;
+  // The dynDbgSec section index.
+  uint32_t dynDbgSecIdx = UINT32_MAX;
+
   void initializeSections(bool ignoreComdats,
                           const llvm::object::ELFFile<ELFT> &obj);
-  void initializeSymbols(const llvm::object::ELFFile<ELFT> &obj);
-  void initDynDbgSymbols();
   void initializeJustSymbols();
 
   InputSectionBase *getRelocTarget(uint32_t idx, uint32_t info);
@@ -319,10 +360,6 @@ private:
   // The following variable contains the contents of .symtab_shndx.
   // If the section does not exist (which is common), the array is empty.
   ArrayRef<Elf_Word> shndxTable;
-
-  // Section indices of kept SHT_GROUP sections, recorded by parse() in
-  // ascending order, to be used by the parallel initializeSections().
-  SmallVector<uint32_t, 0> keptGroups;
 };
 
 class BitcodeFile : public InputFile {
@@ -330,8 +367,7 @@ public:
   BitcodeFile(Ctx &, MemoryBufferRef m, StringRef archiveName,
               uint64_t offsetInArchive, bool lazy);
   static bool classof(const InputFile *f) { return f->kind() == BitcodeKind; }
-  void parse();
-  void parseLazy();
+  void parseComdats();
   void postParse();
   std::unique_ptr<llvm::lto::InputFile> obj;
   std::vector<bool> keptComdats;
@@ -361,8 +397,6 @@ public:
 
   static bool classof(const InputFile *f) { return f->kind() == SharedKind; }
 
-  template <typename ELFT> void parse();
-
   // Used for --as-needed
   std::atomic<bool> isNeeded;
 
@@ -370,7 +404,7 @@ public:
   // parsed. Only filled for `--no-allow-shlib-undefined`.
   SmallVector<Symbol *, 0> requiredSymbols;
 
-private:
+  // Called by the parallel parse pipeline (Pipeline::readShared/epilogue).
   template <typename ELFT>
   std::vector<uint32_t> parseVerneed(const llvm::object::ELFFile<ELFT> &obj,
                                      const typename ELFT::Shdr *sec);

@@ -391,8 +391,6 @@ void ScriptParser::readExtern() {
 void ScriptParser::readGroup() {
   SaveAndRestore saved(ctx.driver.isInGroup, true);
   readInput();
-  if (!saved.get())
-    ++ctx.driver.nextGroupId;
 }
 
 void ScriptParser::readInclude(llvm::function_ref<void()> parse) {

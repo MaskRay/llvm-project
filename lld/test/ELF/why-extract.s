@@ -26,6 +26,11 @@
 # RUN: rm -f why2.txt && not ld.lld main.o a_b.a b.a err.o --why-extract=why2.txt
 # RUN: FileCheck %s --input-file=why2.txt --check-prefix=CHECK2 --match-full-lines --strict-whitespace
 
+## -y replays a traced symbol's resolution serially; the extraction is still
+## recorded.
+# RUN: rm -f why2.txt && ld.lld main.o a_b.a b.a -y a -y _Z1bv --why-extract=why2.txt
+# RUN: FileCheck %s --input-file=why2.txt --check-prefix=CHECK2 --match-full-lines --strict-whitespace
+
 #      CHECK2:reference	extracted	symbol
 # CHECK2-NEXT:main.o	a_b.a(a_b.o)	a
 # CHECK2-NEXT:a_b.a(a_b.o)	b.a(b.o)	b()
@@ -42,8 +47,8 @@
 # CHECK3-NEXT:main.o	a_b.a(a_b.o)	a
 
 #      CHECK4:reference	extracted	symbol
-# CHECK4-NEXT:a_b.a(a_b.o)	b.a(b.o)	b()
 # CHECK4-NEXT:main.o	a_b.a(a_b.o)	a
+# CHECK4-NEXT:a_b.a(a_b.o)	b.a(b.o)	b()
 
 # RUN: ld.lld main.o a_b.a b.a --no-demangle --why-extract=- | FileCheck %s --check-prefix=MANGLED
 

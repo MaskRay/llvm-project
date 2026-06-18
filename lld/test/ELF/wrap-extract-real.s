@@ -29,6 +29,20 @@
 # WRAP_REAL-NEXT:        {{.*}}               0 NOTYPE  GLOBAL DEFAULT [[#]] __wrap_foo
 # WRAP_REAL-NEXT:        {{.*}}               0 NOTYPE  GLOBAL DEFAULT [[#]] foo
 
+## A __real_ reference inside a member extracted for another --wrap entry is
+## seen as well, whatever the --wrap order.
+# RUN: llvm-mc -filetype=obj -triple=x86_64 foo_real_bar.s -o foo_real_bar.o
+# RUN: llvm-mc -filetype=obj -triple=x86_64 bar.s -o bar.o
+# RUN: ld.lld _start.o ref__real_foo.o --start-lib foo_real_bar.o --end-lib \
+# RUN:   --start-lib bar.o --end-lib --wrap foo --wrap bar -o cross1.elf
+# RUN: llvm-readelf --symbols cross1.elf | FileCheck %s --check-prefix=CROSS
+# RUN: ld.lld _start.o ref__real_foo.o --start-lib foo_real_bar.o --end-lib \
+# RUN:   --start-lib bar.o --end-lib --wrap bar --wrap foo -o cross2.elf
+# RUN: llvm-readelf --symbols cross2.elf | FileCheck %s --check-prefix=CROSS
+
+# CROSS-DAG: {{.*}} 0 NOTYPE  GLOBAL DEFAULT [[#]] foo
+# CROSS-DAG: {{.*}} 0 NOTYPE  GLOBAL DEFAULT [[#]] bar
+
 #--- _start.s
 .global _start; _start:; ret
 
@@ -40,3 +54,9 @@ call __real_foo
 
 #--- foo.s
 .global foo; foo:; ret
+
+#--- foo_real_bar.s
+.global foo; foo:; call __real_bar
+
+#--- bar.s
+.global bar; bar:; ret
