@@ -18,14 +18,19 @@
 ; CHECK-UNUSED: lib.a(unused.o at {{[1-9][0-9]+}})
 
 ;; Index files emitted from object files in a thin archive should have the
-;; offset in the archive specified to avoid collisions
+;; offset in the archive specified to avoid collisions. The two same-basename
+;; "thin.o" members must get distinct offsets.
+;; With order-independent extraction the archive members are resolved before
+;; ./dir1/main.o (the archive precedes main.o on the command line).
 ; RUN: FileCheck %s < c.resolution.txt --check-prefix CHECK-COLLISION
 
+; CHECK-COLLISION: dir2/lib.a(thin.o at [[#%u,FOO:]])
+; CHECK-COLLISION-NEXT: -r=./dir2/lib.a(thin.o at [[#FOO]]),foo,pl
+;; The second "thin.o" member must use a different offset (no collision).
+; CHECK-COLLISION-NOT: thin.o at [[#FOO]])
+; CHECK-COLLISION: dir2/lib.a(thin.o at [[#%u,BLAH:]])
+; CHECK-COLLISION-NEXT: -r=./dir2/lib.a(thin.o at [[#BLAH]]),blah,pl
 ; CHECK-COLLISION: dir1/main.o
-; CHECK-COLLISION: dir2/lib.a(thin.o at {{[1-9][0-9]+}})
-; CHECK-COLLISION-NEXT: -r=./dir2/lib.a(thin.o at {{[1-9][0-9]+}}),blah,pl
-; CHECK-COLLISION: dir2/lib.a(thin.o at {{[1-9][0-9]+}})
-; CHECK-COLLISION-NEXT: -r=./dir2/lib.a(thin.o at {{[1-9][0-9]+}}),foo,pl
 
 ;; Clean up
 ; RUN: rm -rf ./dir1/*.thinlto.bc

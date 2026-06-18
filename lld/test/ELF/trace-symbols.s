@@ -68,9 +68,13 @@
 # ARCHIVEDCOMMON-NOT: trace-symbols.s.tmp1.a(trace-symbols.s.tmp1): definition of \
 # common
 
+## Extraction is order-independent: the strong foo from %t2.so satisfies the
+## reference, so the archive member providing a weak foo is not extracted and
+## does not appear in the trace.
 # RUN: ld.lld -y foo %t %t1.a %t2.so -o %t3 | \
-# RUN:   FileCheck -check-prefix=ARCHIVED1FOO %s
-# ARCHIVED1FOO: trace-symbols.s.tmp1.a(trace-symbols.s.tmp1): definition of foo
+# RUN:   FileCheck -check-prefix=ARCHIVED1FOO %s --implicit-check-not=foo
+# ARCHIVED1FOO:      trace-symbols.s.tmp: reference to foo
+# ARCHIVED1FOO-NEXT: trace-symbols.s.tmp2.so: shared definition of foo
 
 # RUN: ld.lld -y foo %t %t1.a %t2.a -o %t3 | \
 # RUN:   FileCheck -check-prefix=ARCHIVED2FOO %s
@@ -86,7 +90,8 @@
 
 # RUN: ld.lld -y foo -y bar %t -u bar --start-lib %t1 %t2 --end-lib -o %t3 | \
 # RUN:   FileCheck -check-prefix=STARTLIB %s
-# STARTLIB: trace-symbols.s.tmp1: reference to bar
+## bar is defined by %t2 (the strong definition wins), so -u bar extracts %t2.
+# STARTLIB: trace-symbols.s.tmp2: definition of bar
 
 ## Check we do not crash when trying to trace special symbol.
 # RUN: ld.lld -trace-symbol=_end %t %t1 %t2 -o /dev/null

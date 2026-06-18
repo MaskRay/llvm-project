@@ -13,6 +13,7 @@
 #include "llvm/ADT/CachedHashString.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Compiler.h"
+#include <array>
 
 namespace lld::elf {
 struct Ctx;
@@ -23,6 +24,17 @@ struct ArmCmseEntryFunction {
   Symbol *acleSeSym;
   Symbol *sym;
 };
+
+// <name>@@<version> means the symbol is the default version, and
+// <name>@@<version> resolves references to <name>: the symbol table key is
+// the stem with the suffix removed. Returns the stem length and whether the
+// name contains '@'.
+inline std::pair<size_t, bool> getSymbolStem(StringRef name) {
+  size_t pos = name.find('@');
+  if (pos != StringRef::npos && pos + 1 < name.size() && name[pos + 1] == '@')
+    return {pos, true};
+  return {name.size(), pos != StringRef::npos};
+}
 
 // SymbolTable is a bucket of all known symbols, including defined,
 // undefined, or lazy symbols (the last one is symbols in archive
@@ -38,12 +50,35 @@ struct ArmCmseEntryFunction {
 // is one add* function per symbol type.
 class SymbolTable {
 public:
+  static constexpr size_t numShards = 32;
+
   SymbolTable(Ctx &ctx) : ctx(ctx) {}
   ArrayRef<Symbol *> getSymbols() const { return symVector; }
+
+  // The per-shard name maps (key -> symVector index). A parse batch seeds
+  // from these so its keys match the original registration stems, which may
+  // differ from a symbol's current name after version parsing.
+  ArrayRef<llvm::DenseMap<llvm::CachedHashStringRef, int>> getShards() const {
+    return ArrayRef(shards);
+  }
 
   void wrap(Symbol *sym, Symbol *real, Symbol *wrap);
 
   Symbol *insert(StringRef name);
+
+  // Replace the per-shard name maps and the symbol vector with the
+  // pre-ordered ones built by the parallel parse pipeline.
+  void installShardedSymbols(
+      MutableArrayRef<llvm::DenseMap<llvm::CachedHashStringRef, int>> maps,
+      SmallVector<Symbol *, 0> &&syms);
+
+  // Append a symbol resolved by a late parse batch (after
+  // installShardedSymbols), registering its name in the shard selected by the
+  // name hash. The pipeline calls this in the intended symVector order.
+  void appendShardedSymbol(llvm::CachedHashStringRef key, Symbol *sym) {
+    shards[key.hash() % numShards].try_emplace(key, (int)symVector.size());
+    symVector.push_back(sym);
+  }
 
   template <typename T> Symbol *addSymbol(const T &newSym) {
     Symbol *sym = insert(newSym.getName());
@@ -65,9 +100,22 @@ public:
   llvm::DenseMap<llvm::CachedHashStringRef, SharedFile *> soNames;
 
   // Comdat groups define "link once" sections. If two comdat groups have the
-  // same name, only one of them is linked, and the other is ignored. This map
-  // is used to uniquify them.
-  llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *> comdatGroups;
+  // same name, only one of them is linked, and the other is ignored. The maps
+  // are sharded by signature hash so that the parallel parse pipeline can
+  // pre-populate them in parallel; the first registered file owns the group.
+  // Returns the owner.
+  const InputFile *addComdatGroup(llvm::CachedHashStringRef sig,
+                                  const InputFile *f) {
+    return comdatGroups[sig.hash() % numShards]
+        .try_emplace(sig, f)
+        .first->second;
+  }
+  const InputFile *findComdatGroup(llvm::CachedHashStringRef sig) const {
+    return comdatGroups[sig.hash() % numShards].lookup(sig);
+  }
+  std::array<llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *>,
+             numShards>
+      comdatGroups;
 
   // The Map of __acle_se_<sym>, <sym> pairs found in the input objects.
   // Key is the <sym> name.
@@ -94,10 +142,15 @@ private:
 
   Ctx &ctx;
 
-  // Global symbols and a map from symbol name to the index. The order is not
-  // defined. We can use an arbitrary order, but it has to be deterministic even
-  // when cross linking.
-  llvm::DenseMap<llvm::CachedHashStringRef, int> symMap;
+  llvm::DenseMap<llvm::CachedHashStringRef, int> &
+  getMap(llvm::CachedHashStringRef name) {
+    return shards[name.hash() % numShards];
+  }
+
+  // Global symbols: per-shard maps from name (registration stem) to symVector
+  // index, routed by name hash. The order is not defined. We can use an
+  // arbitrary order, but it has to be deterministic even when cross linking.
+  std::array<llvm::DenseMap<llvm::CachedHashStringRef, int>, numShards> shards;
   SmallVector<Symbol *, 0> symVector;
 
   // A map from demangled symbol names to their symbol objects.

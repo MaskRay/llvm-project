@@ -231,6 +231,10 @@ private:
   SmallVector<std::unique_ptr<InputFile>, 0> files, ltoObjectFiles;
 
 public:
+  // The command-line input files (and dependent libraries), some of which may
+  // still be lazy (un-pulled archive members / --start-lib objects).
+  ArrayRef<std::unique_ptr<InputFile>> getFiles() const { return files; }
+
   // See InputFile::groupId.
   uint32_t nextGroupId;
   bool isInGroup;
@@ -421,8 +425,6 @@ struct Config {
   bool undefinedVersion;
   bool unique;
   bool useAndroidRelrTags = false;
-  bool warnBackrefs;
-  llvm::SmallVector<llvm::GlobPattern, 0> warnBackrefsExclude;
   bool warnCommon;
   bool warnMissingEntry;
   bool warnSymbolOrdering;
@@ -738,11 +740,6 @@ struct Ctx : CommonLinkerContext {
   // A tuple of (reference, extractedFile, sym). Used by --why-extract=.
   SmallVector<std::tuple<std::string, const InputFile *, const Symbol &>, 0>
       whyExtractRecords;
-  // A mapping from a symbol to an InputFile referencing it backward. Used by
-  // --warn-backrefs.
-  llvm::DenseMap<const Symbol *,
-                 std::pair<const InputFile *, const InputFile *>>
-      backwardReferences;
   llvm::SmallSet<llvm::StringRef, 0> auxiliaryFiles;
   // If --reproduce is specified, all input files are written to this tar
   // archive.

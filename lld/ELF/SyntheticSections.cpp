@@ -3794,8 +3794,13 @@ void MergeNoTailSection::finalizeContents() {
 template <class ELFT> void elf::splitSections(Ctx &ctx) {
   llvm::TimeTraceScope timeScope("Split sections");
   // splitIntoPieces needs to be called on each MergeInputSection
-  // before calling finalizeContents().
-  parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
+  // before calling finalizeContents(). Schedule the biggest files first: the
+  // per-file cost is heavy-tailed (one big .debug_str can dominate).
+  auto cost = [&](uint32_t i) -> uint64_t {
+    return ctx.objectFiles[i]->mb.getBufferSize();
+  };
+  parallelForLPT(ctx.objectFiles.size(), cost, [&](uint32_t i) {
+    ELFFileBase *file = ctx.objectFiles[i];
     for (InputSectionBase *sec : file->getSections()) {
       if (!sec)
         continue;

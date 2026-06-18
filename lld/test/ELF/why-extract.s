@@ -42,8 +42,8 @@
 # CHECK3-NEXT:main.o	a_b.a(a_b.o)	a
 
 #      CHECK4:reference	extracted	symbol
-# CHECK4-NEXT:a_b.a(a_b.o)	b.a(b.o)	b()
 # CHECK4-NEXT:main.o	a_b.a(a_b.o)	a
+# CHECK4-NEXT:a_b.a(a_b.o)	b.a(b.o)	b()
 
 # RUN: ld.lld main.o a_b.a b.a --no-demangle --why-extract=- | FileCheck %s --check-prefix=MANGLED
 

@@ -1623,8 +1623,6 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
   ctx.arg.unique = args.hasArg(OPT_unique);
   ctx.arg.useAndroidRelrTags = args.hasFlag(
       OPT_use_android_relr_tags, OPT_no_use_android_relr_tags, false);
-  ctx.arg.warnBackrefs =
-      args.hasFlag(OPT_warn_backrefs, OPT_no_warn_backrefs, false);
   ctx.arg.warnCommon = args.hasFlag(OPT_warn_common, OPT_no_warn_common, false);
   ctx.arg.warnSymbolOrdering =
       args.hasFlag(OPT_warn_symbol_ordering, OPT_no_warn_symbol_ordering, true);
@@ -1969,15 +1967,6 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
         ctx.arg.retainSymbols->insert(s);
   }
 
-  for (opt::Arg *arg : args.filtered(OPT_warn_backrefs_exclude)) {
-    StringRef pattern(arg->getValue());
-    if (Expected<GlobPattern> pat = GlobPattern::create(pattern))
-      ctx.arg.warnBackrefsExclude.push_back(std::move(*pat));
-    else
-      ErrAlways(ctx) << arg->getSpelling() << ": " << pat.takeError() << ": "
-                     << pattern;
-  }
-
   // For -no-pie and -pie, --export-dynamic-symbol specifies defined symbols
   // which should be exported. For -shared, references to matched non-local
   // STV_DEFAULT symbols are not bound to definitions within the shared object,
@@ -2151,9 +2140,7 @@ void LinkerDriver::loadFiles() {
       case LoadJob::Archive: {
         // Scan all archive members rather than using the archive symbol
         // index. We assume the archive symbol table order matches the order
-        // of symbols in the member symbol tables. All files within the
-        // archive share the same group ID to allow mutual references for
-        // --warn-backrefs.
+        // of symbols in the member symbol tables.
         auto members = getArchiveMembers(ctx, job);
         job.out.reserve(members.size());
         bool lazy = !job.inWholeArchive;
@@ -2186,8 +2173,6 @@ void LinkerDriver::loadFiles() {
         job.out.push_back(std::make_unique<BinaryFile>(ctx, job.mbref));
         break;
       }
-      for (auto &m : job.out)
-        m->groupId = job.groupId;
     });
   }
 
@@ -2478,7 +2463,7 @@ static void handleUndefined(Ctx &ctx, Symbol *sym, const char *option) {
 
   if (!sym->isLazy())
     return;
-  sym->extract(ctx);
+  reactivate(ctx, sym);
   if (!ctx.arg.whyExtract.empty())
     ctx.whyExtractRecords.emplace_back(option, sym->file, *sym);
 }
@@ -2493,24 +2478,19 @@ static void handleUndefinedGlob(Ctx &ctx, StringRef arg) {
     return;
   }
 
-  // Calling sym->extract() in the loop is not safe because it may add new
-  // symbols to the symbol table, invalidating the current iterator.
-  SmallVector<Symbol *, 0> syms;
+  // Mark all matches as used (so LTO does not eliminate them) and extract
+  // the lazy ones in a single batch.
+  SmallVector<Symbol *, 0> lazy;
   for (Symbol *sym : ctx.symtab->getSymbols())
-    if (!sym->isPlaceholder() && pat->match(sym->getName()))
-      syms.push_back(sym);
-
-  for (Symbol *sym : syms)
-    handleUndefined(ctx, sym, "--undefined-glob");
-}
-
-static void handleLibcall(Ctx &ctx, StringRef name) {
-  Symbol *sym = ctx.symtab->find(name);
-  if (sym && sym->isLazy() && isa<BitcodeFile>(sym->file)) {
-    if (!ctx.arg.whyExtract.empty())
-      ctx.whyExtractRecords.emplace_back("<libcall>", sym->file, *sym);
-    sym->extract(ctx);
-  }
+    if (!sym->isPlaceholder() && pat->match(sym->getName())) {
+      sym->isUsedInRegularObj = true;
+      if (sym->isLazy())
+        lazy.push_back(sym);
+    }
+  reactivate(ctx, lazy);
+  if (!ctx.arg.whyExtract.empty())
+    for (Symbol *sym : lazy)
+      ctx.whyExtractRecords.emplace_back("--undefined-glob", sym->file, *sym);
 }
 
 static void writeArchiveStats(Ctx &ctx) {
@@ -2558,25 +2538,6 @@ static void writeWhyExtract(Ctx &ctx) {
   for (auto &entry : ctx.whyExtractRecords) {
     os << std::get<0>(entry) << '\t' << toStr(ctx, std::get<1>(entry)) << '\t'
        << toStr(ctx, std::get<2>(entry)) << '\n';
-  }
-}
-
-static void reportBackrefs(Ctx &ctx) {
-  for (auto &ref : ctx.backwardReferences) {
-    const Symbol &sym = *ref.first;
-    std::string to = toStr(ctx, ref.second.second);
-    // Some libraries have known problems and can cause noise. Filter them out
-    // with --warn-backrefs-exclude=. The value may look like (for --start-lib)
-    // *.o or (archive member) *.a(*.o).
-    bool exclude = false;
-    for (const llvm::GlobPattern &pat : ctx.arg.warnBackrefsExclude)
-      if (pat.match(to)) {
-        exclude = true;
-        break;
-      }
-    if (!exclude)
-      Warn(ctx) << "backward reference detected: " << sym.getName() << " in "
-                << ref.second.first << " refers to " << to;
   }
 }
 
@@ -2802,10 +2763,18 @@ void LinkerDriver::compileBitcodeFiles(bool skipLinkedOutput) {
     markBuffersAsDontNeed(ctx, skipLinkedOutput);
 
   ltoObjectFiles = lto->compile();
+
+  // Resolve the LTO outputs' symbols against the symbol table and register
+  // them in ctx.objectFiles (the parse pipeline, shared with regular objects),
+  // pulling in archive members newly referenced by the LTO outputs (e.g.
+  // runtime libcalls).
+  SmallVector<InputFile *, 0> ltoFiles;
+  for (auto &file : ltoObjectFiles)
+    ltoFiles.push_back(file.get());
+  parseLtoObjectFiles(ctx, ltoFiles);
+
   for (auto &file : ltoObjectFiles) {
     auto *obj = cast<ObjFile<ELFT>>(file.get());
-    obj->parse(/*ignoreComdats=*/true);
-
     // This is only needed for AArch64 PAuth to set correct key in AUTH GOT
     // entry based on symbol type (STT_FUNC or not).
     // TODO: check if PAuth is actually used.
@@ -2829,7 +2798,6 @@ void LinkerDriver::compileBitcodeFiles(bool skipLinkedOutput) {
         if (sym->hasVersionSuffix)
           sym->parseSymbolVersion(ctx);
       }
-    ctx.objectFiles.push_back(obj);
   }
 }
 
@@ -2857,6 +2825,15 @@ static std::vector<WrappedSymbol> addWrappedSymbols(Ctx &ctx,
   std::vector<WrappedSymbol> v;
   DenseSet<StringRef> seen;
   auto &ss = ctx.saver;
+  // A wrapper (or, when __real_ is referenced, the wrapped symbol) may live in
+  // a lazy archive member; pull it in. Extract inline so that a __real_
+  // reference inside a just-extracted wrapper is seen before the check below.
+  auto addUndef = [&](StringRef name, uint8_t binding = llvm::ELF::STB_GLOBAL) {
+    Symbol *s = ctx.symtab->addUnusedUndefined(name, binding);
+    if (s->isLazy() && !s->isWeak())
+      reactivate(ctx, s);
+    return s;
+  };
   for (auto *arg : args.filtered(OPT_wrap)) {
     StringRef name = arg->getValue();
     if (!seen.insert(name).second)
@@ -2866,20 +2843,19 @@ static std::vector<WrappedSymbol> addWrappedSymbols(Ctx &ctx,
     if (!sym)
       continue;
 
-    Symbol *wrap =
-        ctx.symtab->addUnusedUndefined(ss.save("__wrap_" + name), sym->binding);
+    Symbol *wrap = addUndef(ss.save("__wrap_" + name), sym->binding);
 
     // If __real_ is referenced, pull in the symbol if it is lazy. Do this after
     // processing __wrap_ as that may have referenced __real_.
     StringRef realName = ctx.saver.save("__real_" + name);
     if (Symbol *real = ctx.symtab->find(realName)) {
-      ctx.symtab->addUnusedUndefined(name, sym->binding);
+      addUndef(name, sym->binding);
       // Update sym's binding, which will replace real's later in
       // SymbolTable::wrap.
       sym->binding = real->binding;
     }
 
-    Symbol *real = ctx.symtab->addUnusedUndefined(realName);
+    Symbol *real = addUndef(realName);
     v.push_back({sym, real, wrap});
 
     // We want to tell LTO not to inline symbols to be overwritten
@@ -3192,25 +3168,6 @@ static void readSecurityNotes(Ctx &ctx) {
           << "dependencies have the GCS marking.";
 }
 
-static void initSectionsAndLocalSyms(ELFFileBase *file, bool ignoreComdats) {
-  switch (file->ekind) {
-  case ELF32LEKind:
-    cast<ObjFile<ELF32LE>>(file)->initSectionsAndLocalSyms(ignoreComdats);
-    break;
-  case ELF32BEKind:
-    cast<ObjFile<ELF32BE>>(file)->initSectionsAndLocalSyms(ignoreComdats);
-    break;
-  case ELF64LEKind:
-    cast<ObjFile<ELF64LE>>(file)->initSectionsAndLocalSyms(ignoreComdats);
-    break;
-  case ELF64BEKind:
-    cast<ObjFile<ELF64BE>>(file)->initSectionsAndLocalSyms(ignoreComdats);
-    break;
-  default:
-    llvm_unreachable("");
-  }
-}
-
 static void postParseObjectFile(ELFFileBase *file) {
   switch (file->ekind) {
   case ELF32LEKind:
@@ -3303,8 +3260,16 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   // object file to the link.
   if (!ctx.bitcodeFiles.empty()) {
     llvm::Triple TT(ctx.bitcodeFiles.front()->obj->getTargetTriple());
-    for (auto *s : lto::LTO::getRuntimeLibcallSymbols(TT))
-      handleLibcall(ctx, s);
+    SmallVector<Symbol *, 0> libcalls;
+    for (auto *s : lto::LTO::getRuntimeLibcallSymbols(TT)) {
+      Symbol *sym = ctx.symtab->find(s);
+      if (sym && sym->isLazy() && isa<BitcodeFile>(sym->file)) {
+        if (!ctx.arg.whyExtract.empty())
+          ctx.whyExtractRecords.emplace_back("<libcall>", sym->file, *sym);
+        libcalls.push_back(sym);
+      }
+    }
+    reactivate(ctx, libcalls);
   }
 
   // Archive members defining __wrap symbols may be extracted.
@@ -3312,9 +3277,6 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
   // No more lazy bitcode can be extracted at this point. Do post parse work
   // like checking duplicate symbols.
-  parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
-    initSectionsAndLocalSyms(file, /*ignoreComdats=*/false);
-  });
   parallelForEach(ctx.objectFiles, postParseObjectFile);
   parallelForEach(ctx.bitcodeFiles,
                   [](BitcodeFile *file) { file->postParse(); });
@@ -3391,9 +3353,8 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   const size_t numInputFilesBeforeLTO = ctx.driver.files.size();
   compileBitcodeFiles<ELFT>(skipLinkedOutput);
 
-  // Symbol resolution finished. Report backward reference problems,
-  // --print-archive-stats=, and --why-extract=.
-  reportBackrefs(ctx);
+  // Symbol resolution finished. Report --print-archive-stats= and
+  // --why-extract=.
   writeArchiveStats(ctx);
   writeWhyExtract(ctx);
   if (errCount(ctx))
@@ -3406,9 +3367,6 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   // compileBitcodeFiles may have produced lto.tmp object files. After this, no
   // more file will be added.
   auto newObjectFiles = ArrayRef(ctx.objectFiles).slice(numObjsBeforeLTO);
-  parallelForEach(newObjectFiles, [](ELFFileBase *file) {
-    initSectionsAndLocalSyms(file, /*ignoreComdats=*/true);
-  });
   parallelForEach(newObjectFiles, postParseObjectFile);
   for (const DuplicateSymbol &d : ctx.duplicates)
     reportDuplicate(ctx, *d.sym, d.file, d.section, d.value);
