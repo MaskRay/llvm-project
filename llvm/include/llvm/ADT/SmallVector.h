@@ -421,14 +421,20 @@ protected:
 
 public:
   void push_back(const T &Elt) {
-    const T *EltPtr = reserveForParamAndGetAddress(Elt);
-    ::new ((void *)this->end()) T(*EltPtr);
+    if (LLVM_UNLIKELY(this->size() >= this->capacity())) {
+      growAndEmplaceBack(Elt);
+      return;
+    }
+    ::new ((void *)this->end()) T(Elt);
     this->set_size(this->size() + 1);
   }
 
   void push_back(T &&Elt) {
-    T *EltPtr = reserveForParamAndGetAddress(Elt);
-    ::new ((void *)this->end()) T(::std::move(*EltPtr));
+    if (LLVM_UNLIKELY(this->size() >= this->capacity())) {
+      growAndEmplaceBack(::std::move(Elt));
+      return;
+    }
+    ::new ((void *)this->end()) T(::std::move(Elt));
     this->set_size(this->size() + 1);
   }
 
