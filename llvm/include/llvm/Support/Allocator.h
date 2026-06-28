@@ -330,7 +330,7 @@ private:
   uintptr_t EndSentinel = 0;
 
   /// The slabs allocated so far.
-  SmallVector<void *, 4> Slabs;
+  SmallVector<void *, 1> Slabs;
 
   /// Custom-sized slabs allocated for too-large allocation requests.
   SmallVector<std::pair<void *, size_t>, 0> CustomSizedSlabs;
