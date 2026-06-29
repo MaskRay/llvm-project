@@ -164,6 +164,21 @@ void SmallVectorBase<Size_T>::grow_pod(void *FirstEl, size_t MinSize,
   this->set_allocation_range(NewElts, NewCapacity);
 }
 
+// Note: Moving this function into the header may cause performance regression.
+template <class Size_T>
+void SmallVectorBase<Size_T>::assign_pod(void *FirstEl, const void *RHSBeginX,
+                                         size_t RHSSize, size_t TSize) {
+  if (RHSSize > capacity()) {
+    // Discard the current elements before growing so grow_pod does not bother
+    // copying data we are about to overwrite.
+    Size = 0;
+    grow_pod(FirstEl, RHSSize, TSize);
+  }
+  if (RHSSize)
+    memcpy(this->BeginX, RHSBeginX, RHSSize * TSize);
+  Size = static_cast<Size_T>(RHSSize);
+}
+
 template class llvm::SmallVectorBase<uint32_t>;
 
 // Disable the uint64_t instantiation for 32-bit builds.

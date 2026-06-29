@@ -79,6 +79,13 @@ protected:
   /// This function will report a fatal error if it cannot increase capacity.
   LLVM_ABI void grow_pod(void *FirstEl, size_t MinSize, size_t TSize);
 
+  /// Out-of-line, type-erased copy-assignment for trivially-copyable elements:
+  /// replace this vector's contents with the \p RHSSize elements at
+  /// \p RHSBeginX, growing if needed.  Keyed on \p TSize so a single
+  /// instantiation per \c Size_T serves every element type of a given size.
+  LLVM_ABI void assign_pod(void *FirstEl, const void *RHSBeginX, size_t RHSSize,
+                           size_t TSize);
+
 public:
   size_t size() const { return Size; }
   size_t capacity() const { return Capacity; }
@@ -340,6 +347,7 @@ class SmallVectorTemplateBase : public SmallVectorTemplateCommon<T> {
 
 protected:
   static constexpr bool TakesParamByValue = false;
+  static constexpr bool kIsTriviallyCopyable = false;
   using ValueParamT = const T &;
 
   SmallVectorTemplateBase(size_t SizeArg)
@@ -489,6 +497,7 @@ protected:
   /// True if it's cheap enough to take parameters by value. Doing so avoids
   /// overhead related to mitigations for reference invalidation.
   static constexpr bool TakesParamByValue = sizeof(T) <= 2 * sizeof(void *);
+  static constexpr bool kIsTriviallyCopyable = true;
 
   /// Either const T& or T, depending on whether it's cheap enough to take
   /// parameters by value.
@@ -757,7 +766,16 @@ public:
     append(IL);
   }
 
-  void assign(const SmallVectorImpl &RHS) { assign(RHS.begin(), RHS.end()); }
+  void assign(const SmallVectorImpl &RHS) {
+    // Trivially-copyable elements share the type-erased copy core.
+    if constexpr (SuperClass::kIsTriviallyCopyable) {
+      if (this != &RHS)
+        this->assign_pod(this->getFirstEl(), RHS.begin(), RHS.size(),
+                         sizeof(T));
+    } else {
+      assign(RHS.begin(), RHS.end());
+    }
+  }
 
   template <typename U,
             typename = std::enable_if_t<std::is_convertible_v<U, T>>>
@@ -1046,6 +1064,15 @@ SmallVectorImpl<T> &SmallVectorImpl<T>::
   // Avoid self-assignment.
   if (this == &RHS) return *this;
 
+  // For trivially-copyable elements the assignment is a memcpy that depends
+  // only on sizeof(T), so route it to the out-of-line, type-erased core.  This
+  // collapses the per-element-type copies down to one instantiation per
+  // Size_T.
+  if constexpr (SuperClass::kIsTriviallyCopyable) {
+    this->assign_pod(this->getFirstEl(), RHS.begin(), RHS.size(), sizeof(T));
+    return *this;
+  }
+
   // If we already have sufficient space, assign the common elements, then
   // destroy any excess.
   size_t RHSSize = RHS.size();
@@ -1096,6 +1123,15 @@ SmallVectorImpl<T> &SmallVectorImpl<T>::operator=(SmallVectorImpl<T> &&RHS) {
   // If the RHS isn't small, clear this vector and then steal its buffer.
   if (!RHS.isSmall()) {
     this->assignRemote(std::move(RHS));
+    return *this;
+  }
+
+  // For trivially-copyable elements moving is a copy, so route the small-RHS
+  // case to the shared, type-erased core (the non-small case already stole the
+  // buffer above).
+  if constexpr (SuperClass::kIsTriviallyCopyable) {
+    this->assign_pod(this->getFirstEl(), RHS.begin(), RHS.size(), sizeof(T));
+    RHS.clear();
     return *this;
   }
 
