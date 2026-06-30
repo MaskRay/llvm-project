@@ -277,13 +277,14 @@ template <typename DomTreeT> struct SemiNCAInfo {
   // This function requires DFS to be run before calling it.
   void runSemiNCA() {
     const unsigned NextDFSNum(NumToNode.size());
-    SmallVector<InfoRec *, 8> NumToInfo = {nullptr};
+    SmallVector<InfoRec *, 32> NumToInfo = {nullptr};
     NumToInfo.reserve(NextDFSNum);
-    // Initialize IDoms to spanning tree parents.
+    // Immediate dominators in DFS-number space, initialized to spanning tree
+    // parents.
+    SmallVector<unsigned, 32> IDoms(NextDFSNum);
     for (unsigned i = 1; i < NextDFSNum; ++i) {
-      const NodePtr V = NumToNode[i];
-      auto &VInfo = getNodeInfo(V);
-      VInfo.IDom = NumToNode[VInfo.Parent];
+      auto &VInfo = getNodeInfo(NumToNode[i]);
+      IDoms[i] = VInfo.Parent;
       NumToInfo.push_back(&VInfo);
     }
 
@@ -303,21 +304,15 @@ template <typename DomTreeT> struct SemiNCAInfo {
 
     // Step #2: Explicitly define the immediate dominator of each vertex.
     //          IDom[i] = NCA(SDom[i], SpanningTreeParent(i)).
-    // Note that the parents were stored in IDoms and later got invalidated
-    // during path compression in Eval.
+    // SDom[i]'s DFS number is just Semi.
     for (unsigned i = 2; i < NextDFSNum; ++i) {
       auto &WInfo = *NumToInfo[i];
       assert(WInfo.Semi != 0);
-      const unsigned SDomNum = NumToInfo[WInfo.Semi]->DFSNum;
-      NodePtr WIDomCandidate = WInfo.IDom;
-      while (true) {
-        auto &WIDomCandidateInfo = getNodeInfo(WIDomCandidate);
-        if (WIDomCandidateInfo.DFSNum <= SDomNum)
-          break;
-        WIDomCandidate = WIDomCandidateInfo.IDom;
-      }
-
-      WInfo.IDom = WIDomCandidate;
+      unsigned WIDomCandidate = IDoms[i];
+      while (WIDomCandidate > WInfo.Semi)
+        WIDomCandidate = IDoms[WIDomCandidate];
+      IDoms[i] = WIDomCandidate;
+      WInfo.IDom = NumToNode[WIDomCandidate];
     }
   }
 
