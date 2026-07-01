@@ -212,6 +212,19 @@ template <typename DomTreeT> struct SemiNCAInfo {
       NumToNode.push_back(BB);
 
       constexpr bool Direction = IsReverse != IsPostDom; // XOR.
+      // Fast path: iterate the successors lazily, in the same order as
+      // getChildren() would produce. Materializing them is only needed to sort
+      // by SuccOrder or to consult a batch update view.
+      if (!SuccOrder && !BatchUpdates) {
+        using DirectedNodeT =
+            std::conditional_t<Direction, Inverse<NodePtr>, NodePtr>;
+        for (const NodePtr Succ :
+             detail::reverse_if<!Direction>(children<DirectedNodeT>(BB)))
+          if (Succ && Condition(BB, Succ))
+            WorkList.push_back({Succ, LastNum});
+        continue;
+      }
+
       auto Successors = getChildren<Direction>(BB, BatchUpdates);
       if (SuccOrder && Successors.size() > 1)
         llvm::sort(
