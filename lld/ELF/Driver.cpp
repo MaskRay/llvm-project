@@ -3317,8 +3317,22 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   // like checking duplicate symbols.
   {
     llvm::TimeTraceScope timeScope("Initialize sections");
-    parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
-      initSectionsAndLocalSyms(file, /*ignoreComdats=*/false);
+    // The per-file cost is heavily skewed (in a clang link, median ~30us,
+    // largest file ~4ms). parallelFor's contiguous chunking leaves workers
+    // idle for the duration of the last multi-millisecond chunk: process
+    // files largest-first with unit-size dynamic dispatch instead (LPT
+    // scheduling). Files only mutate their own state here, so execution
+    // order does not affect output.
+    SmallVector<ELFFileBase *, 0> files(ctx.objectFiles.begin(),
+                                        ctx.objectFiles.end());
+    llvm::stable_sort(files, [](const ELFFileBase *a, const ELFFileBase *b) {
+      return a->sectionsInitCost() > b->sectionsInitCost();
+    });
+    std::atomic<size_t> next = 0;
+    parallelFor(0, llvm::parallel::getThreadCount(), [&](size_t) {
+      for (size_t i;
+           (i = next.fetch_add(1, std::memory_order_relaxed)) < files.size();)
+        initSectionsAndLocalSyms(files[i], /*ignoreComdats=*/false);
     });
   }
   {

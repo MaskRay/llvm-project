@@ -213,6 +213,10 @@ public:
   // Get cached DWARF information.
   DWARFCache *getDwarf();
 
+  // Rough proxy for the cost of initializing this file's sections and local
+  // symbols, used for parallel scheduling.
+  size_t sectionsInitCost() const { return numELFShdrs + firstGlobal / 2; }
+
 protected:
   // Initializes this class's member variables.
   template <typename ELFT> void init(InputFile::Kind k);
