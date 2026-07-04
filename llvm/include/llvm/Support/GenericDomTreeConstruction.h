@@ -77,15 +77,15 @@ template <typename DomTreeT> struct SemiNCAInfo {
 
   // Map a 0-based DFS number to the node. 0 is the DFS root, or the virtual
   // root for postdominators.
-  SmallVector<NodePtr, 64> NumToNode;
+  SmallVector<NodePtr, 32> NumToNode;
   // If blocks have numbers (e.g., BasicBlock, MachineBasicBlock), store node
   // infos in a vector. Otherwise, store them in a map.
-  std::conditional_t<GraphHasNodeNumbers<NodePtr>, SmallVector<InfoRec, 64>,
+  std::conditional_t<GraphHasNodeNumbers<NodePtr>, SmallVector<InfoRec, 32>,
                      DenseMap<NodePtr, InfoRec>>
       NodeInfos;
   // Reverse children of nodes; pairs of (DFSNum (predecessor), next-or-zero);
   // forms a linked list in this vector.
-  SmallVector<std::pair<unsigned, unsigned>> ReverseChildren;
+  SmallVector<std::pair<unsigned, unsigned>, 32> ReverseChildren;
 
   using UpdateT = typename DomTreeT::UpdateType;
   using UpdateKind = typename DomTreeT::UpdateKind;
