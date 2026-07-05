@@ -966,7 +966,8 @@ ModuleSummaryIndex llvm::buildModuleSummaryIndex(
     const Module &M,
     std::function<BlockFrequencyInfo *(const Function &F)> GetBFICallback,
     ProfileSummaryInfo *PSI,
-    std::function<const StackSafetyInfo *(const Function &F)> GetSSICallback) {
+    std::function<const StackSafetyInfo *(const Function &F)> GetSSICallback,
+    std::function<DominatorTree &(const Function &F)> GetDTCallback) {
   assert(PSI);
   bool EnableSplitLTOUnit = false;
   bool UnifiedLTO = false;
@@ -1077,19 +1078,26 @@ ModuleSummaryIndex llvm::buildModuleSummaryIndex(
     if (F.isDeclaration())
       continue;
 
-    DominatorTree DT(const_cast<Function &>(F));
+    std::optional<DominatorTree> LocalDT;
+    DominatorTree *DT;
+    if (GetDTCallback)
+      DT = &GetDTCallback(F);
+    else {
+      LocalDT.emplace(const_cast<Function &>(F));
+      DT = &*LocalDT;
+    }
     BlockFrequencyInfo *BFI = nullptr;
     std::unique_ptr<BlockFrequencyInfo> BFIPtr;
     if (GetBFICallback)
       BFI = GetBFICallback(F);
     else if (F.hasProfileData()) {
-      LoopInfo LI{DT};
+      LoopInfo LI{*DT};
       BranchProbabilityInfo BPI{F, LI};
       BFIPtr = std::make_unique<BlockFrequencyInfo>(F, BPI, LI);
       BFI = BFIPtr.get();
     }
 
-    computeFunctionSummary(Index, M, F, BFI, PSI, DT,
+    computeFunctionSummary(Index, M, F, BFI, PSI, *DT,
                            !LocalsUsed.empty() || HasLocalInlineAsmSymbol,
                            CantBePromoted, IsThinLTO, GetSSICallback);
   }
@@ -1192,6 +1200,9 @@ ModuleSummaryIndexAnalysis::run(Module &M, ModuleAnalysisManager &AM) {
         return NeedSSI ? &FAM.getResult<StackSafetyAnalysis>(
                              const_cast<Function &>(F))
                        : nullptr;
+      },
+      [&FAM](const Function &F) -> DominatorTree & {
+        return FAM.getResult<DominatorTreeAnalysis>(const_cast<Function &>(F));
       });
 }
 
@@ -1228,6 +1239,11 @@ bool ModuleSummaryIndexWrapperPass::runOnModule(Module &M) {
                               const_cast<Function &>(F))
                               .getResult()
                        : nullptr;
+      },
+      [this](const Function &F) -> DominatorTree & {
+        return this
+            ->getAnalysis<DominatorTreeWrapperPass>(*const_cast<Function *>(&F))
+            .getDomTree();
       }));
   return false;
 }
@@ -1242,6 +1258,7 @@ void ModuleSummaryIndexWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<BlockFrequencyInfoWrapperPass>();
   AU.addRequired<ProfileSummaryInfoWrapperPass>();
   AU.addRequired<StackSafetyInfoWrapperPass>();
+  AU.addRequired<DominatorTreeWrapperPass>();
 }
 
 char ImmutableModuleSummaryIndexWrapperPass::ID = 0;

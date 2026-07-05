@@ -23,6 +23,7 @@
 namespace llvm {
 
 class BlockFrequencyInfo;
+class DominatorTree;
 class Function;
 class Module;
 class ProfileSummaryInfo;
@@ -34,12 +35,19 @@ class StackSafetyInfo;
 /// BlockFrequencyInfo for a given function, that can be provided via
 /// a std::function callback. Otherwise, this routine will manually construct
 /// that information.
+///
+/// Likewise, if the pass manager already has a \c DominatorTree cached for a
+/// function (e.g. because it is also needed to compute \c BlockFrequencyInfo),
+/// that can be provided via \p GetDTCallback to avoid building a second,
+/// redundant \c DominatorTree. Otherwise, this routine will manually
+/// construct one.
 LLVM_ABI ModuleSummaryIndex buildModuleSummaryIndex(
     const Module &M,
     std::function<BlockFrequencyInfo *(const Function &F)> GetBFICallback,
     ProfileSummaryInfo *PSI,
     std::function<const StackSafetyInfo *(const Function &F)> GetSSICallback =
-        [](const Function &F) -> const StackSafetyInfo * { return nullptr; });
+        [](const Function &F) -> const StackSafetyInfo * { return nullptr; },
+    std::function<DominatorTree &(const Function &F)> GetDTCallback = nullptr);
 
 /// Analysis pass to provide the ModuleSummaryIndex object.
 class ModuleSummaryIndexAnalysis
