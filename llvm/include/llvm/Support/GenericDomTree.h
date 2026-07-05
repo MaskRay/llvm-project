@@ -62,9 +62,12 @@ template <class NodeT> class DomTreeNodeBase {
   NodeT *TheBB;
   DomTreeNodeBase *IDom;
   unsigned Level;
-  DomTreeNodeBase *FirstChild = nullptr;
+  // Children form a circular singly-linked list through Sibling: LastChild is
+  // the most recently added child (null if there are none) and
+  // LastChild->Sibling is the first child. This keeps addChild O(1) and in
+  // insertion order without a separate tail cursor.
+  DomTreeNodeBase *LastChild = nullptr;
   DomTreeNodeBase *Sibling = nullptr;
-  DomTreeNodeBase **AppendPtr = &FirstChild;
   mutable unsigned DFSNumIn = ~0;
   mutable unsigned DFSNumOut = ~0;
 
@@ -78,16 +81,19 @@ template <class NodeT> class DomTreeNodeBase {
   class const_iterator
       : public iterator_facade_base<const_iterator, std::forward_iterator_tag,
                                     DomTreeNodeBase *> {
-    DomTreeNodeBase *Node;
+    DomTreeNodeBase *Node; // Current child, or null past the end.
+    DomTreeNodeBase *Last; // Last child, where iteration stops.
 
   public:
-    const_iterator(DomTreeNodeBase *Node = nullptr) : Node(Node) {}
+    const_iterator() : Node(nullptr), Last(nullptr) {}
+    const_iterator(DomTreeNodeBase *Node, DomTreeNodeBase *Last)
+        : Node(Node), Last(Last) {}
     bool operator==(const const_iterator &Other) const {
       return Other.Node == Node;
     }
     DomTreeNodeBase *operator*() const { return Node; }
     const_iterator &operator++() {
-      Node = Node->Sibling;
+      Node = Node == Last ? nullptr : Node->Sibling;
       return *this;
     }
     const_iterator operator++(int) {
@@ -99,7 +105,9 @@ template <class NodeT> class DomTreeNodeBase {
   // We don't permit modifications through the iterator.
   using iterator = const_iterator;
 
-  iterator begin() const { return iterator{FirstChild}; }
+  iterator begin() const {
+    return LastChild ? iterator{LastChild->Sibling, LastChild} : iterator{};
+  }
   iterator end() const { return iterator{}; }
 
   iterator_range<iterator> children() { return make_range(begin(), end()); }
@@ -114,28 +122,34 @@ template <class NodeT> class DomTreeNodeBase {
   // TODO: make these private once NewGVN doesn't require these anymore.
   void addChild(DomTreeNodeBase *C) {
     assert(!C->Sibling && "cannot add child that already has siblings");
-    assert(!*AppendPtr && "sibling of last child must be nullptr");
-    *AppendPtr = C;
-    AppendPtr = &C->Sibling;
+    if (LastChild) {
+      C->Sibling = LastChild->Sibling; // New tail points at the first child.
+      LastChild->Sibling = C;
+    } else {
+      C->Sibling = C; // Sole child links to itself.
+    }
+    LastChild = C;
   }
 
   // TODO: make these private once NewGVN doesn't require these anymore.
   void removeChild(DomTreeNodeBase *C) {
-    DomTreeNodeBase **It = &FirstChild;
-    while (*It != C) {
-      assert(*It != nullptr && "Not in immediate dominator children list!");
-      It = &(*It)->Sibling;
+    // Find C's predecessor in the circular sibling list.
+    DomTreeNodeBase *Prev = LastChild;
+    while (Prev->Sibling != C) {
+      Prev = Prev->Sibling;
+      assert(Prev != LastChild && "Not in immediate dominator children list!");
     }
-    assert(!*AppendPtr && "sibling of last child must be nullptr");
-    assert(C->Sibling || AppendPtr == &C->Sibling);
-    *It = C->Sibling;
-    if (C->Sibling)
-      C->Sibling = nullptr;
-    else
-      AppendPtr = It;
+    if (C->Sibling == C) {
+      LastChild = nullptr; // C was the only child.
+    } else {
+      Prev->Sibling = C->Sibling;
+      if (C == LastChild)
+        LastChild = Prev;
+    }
+    C->Sibling = nullptr;
   }
 
-  bool isLeaf() const { return FirstChild == nullptr; }
+  bool isLeaf() const { return LastChild == nullptr; }
 
   bool compare(const DomTreeNodeBase *Other) const {
     if (Level != Other->Level) return true;
