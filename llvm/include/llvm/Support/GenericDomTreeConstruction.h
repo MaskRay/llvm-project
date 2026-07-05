@@ -67,8 +67,6 @@ template <typename DomTreeT> struct SemiNCAInfo {
   struct InfoRec {
     unsigned DFSNumPlus1 = 0;
     unsigned Parent = 0;
-    unsigned Semi = 0;
-    unsigned Label = 0;
     NodePtr IDom = nullptr;
     // Head index + 1 into ReverseChildren; 0: empty list.
     unsigned ReverseChildrenStart = 0;
@@ -226,7 +224,6 @@ template <typename DomTreeT> struct SemiNCAInfo {
         continue;
       BBInfo.Parent = ParentNum;
       unsigned Num = LastNum++;
-      BBInfo.Semi = BBInfo.Label = Num;
       BBInfo.DFSNumPlus1 = Num + 1;
       NumToNode.push_back(BB);
 
@@ -259,9 +256,10 @@ template <typename DomTreeT> struct SemiNCAInfo {
     return LastNum;
   }
 
-  // V is a predecessor of W. eval() returns V if V < W, otherwise the minimum
-  // of sdom(U), where U > W and there is a virtual forest path from U to V. The
-  // virtual forest consists of linked edges of processed vertices.
+  // All state is kept in dense arrays indexed by DFS number. V is a predecessor
+  // of W. eval() returns Labels[V] if V < W, otherwise the minimum of sdom(U),
+  // where U > W and there is a virtual forest path from U to V. The virtual
+  // forest consists of linked edges of processed vertices.
   //
   // We can follow Parent pointers (virtual forest edges) to determine the
   // ancestor U with minimum sdom(U). But it is slow and thus we employ the path
@@ -270,82 +268,81 @@ template <typename DomTreeT> struct SemiNCAInfo {
   // O(m*alpha(m,n)) running time. But it requires two auxiliary arrays (Size
   // and Child) and is unlikely to be faster than the simple implementation.
   //
-  // For each vertex V, its Label points to the vertex with the minimal sdom(U)
-  // (Semi) in its path from V (included) to NodeToInfo[V].Parent (excluded).
+  // For each vertex V, Labels[V] is the minimal sdom on its path from V
+  // (included) to Parents[V] (excluded), held directly as a DFS number.
   unsigned eval(unsigned V, unsigned LastLinked,
-                SmallVectorImpl<InfoRec *> &Stack,
-                ArrayRef<InfoRec *> NumToInfo) {
-    InfoRec *VInfo = NumToInfo[V];
-    if (VInfo->Parent < LastLinked)
-      return VInfo->Label;
+                SmallVectorImpl<unsigned> &Stack,
+                MutableArrayRef<unsigned> Parents,
+                MutableArrayRef<unsigned> Labels) {
+    if (Parents[V] < LastLinked)
+      return Labels[V];
 
     // Store ancestors except the last (root of a virtual tree) into a stack.
     assert(Stack.empty());
     do {
-      Stack.push_back(VInfo);
-      VInfo = NumToInfo[VInfo->Parent];
-    } while (VInfo->Parent >= LastLinked);
+      Stack.push_back(V);
+      V = Parents[V];
+    } while (Parents[V] >= LastLinked);
 
     // Path compression. Point each vertex's Parent to the root and update its
-    // Label if any of its ancestors (PInfo->Label) has a smaller Semi.
-    const InfoRec *PInfo = VInfo;
-    const InfoRec *PLabelInfo = NumToInfo[PInfo->Label];
+    // Label if any of its ancestors (PLabel) has a smaller sdom.
+    unsigned P = V;
+    unsigned PLabel = Labels[P];
     do {
-      VInfo = Stack.pop_back_val();
-      VInfo->Parent = PInfo->Parent;
-      const InfoRec *VLabelInfo = NumToInfo[VInfo->Label];
-      if (PLabelInfo->Semi < VLabelInfo->Semi)
-        VInfo->Label = PInfo->Label;
+      V = Stack.pop_back_val();
+      Parents[V] = Parents[P];
+      unsigned VLabel = Labels[V];
+      if (PLabel < VLabel)
+        Labels[V] = PLabel;
       else
-        PLabelInfo = VLabelInfo;
-      PInfo = VInfo;
+        PLabel = VLabel;
+      P = V;
     } while (!Stack.empty());
-    return VInfo->Label;
+    return Labels[V];
   }
 
   // This function requires DFS to be run before calling it.
   void runSemiNCA() {
     const unsigned NextDFSNum(NumToNode.size());
-    // NumToInfo and IDoms are indexed by DFS number; 0 is the root. IDoms holds
-    // immediate dominators in DFS-number space, initialized below to spanning
-    // tree parents.
-    SmallVector<InfoRec *, 32> NumToInfo;
-    NumToInfo.resize_for_overwrite(NextDFSNum);
-    SmallVector<unsigned, 32> IDoms;
+    // States are indexed by DFS number; 0 is the root. IDoms
+    // holds immediate dominators, seeded with the parent. Semis and Labels
+    // start as the identity. RCHeads caches each node's reverse-children list.
+    SmallVector<unsigned, 32> Parents, SDoms, Labels, IDoms, RCHeads;
+    Parents.resize_for_overwrite(NextDFSNum);
+    SDoms.resize_for_overwrite(NextDFSNum);
+    Labels.resize_for_overwrite(NextDFSNum);
     IDoms.resize_for_overwrite(NextDFSNum);
+    RCHeads.resize_for_overwrite(NextDFSNum);
     for (unsigned i = 0; i < NextDFSNum; ++i) {
-      auto &VInfo = getNodeInfo(NumToNode[i]);
-      IDoms[i] = VInfo.Parent;
-      NumToInfo[i] = &VInfo;
+      const InfoRec &VInfo = getNodeInfo(NumToNode[i]);
+      Parents[i] = IDoms[i] = VInfo.Parent;
+      SDoms[i] = Labels[i] = i;
+      RCHeads[i] = VInfo.ReverseChildrenStart;
     }
 
     // Step #1: Calculate the semidominators of all vertices.
-    SmallVector<InfoRec *, 32> EvalStack;
+    SmallVector<unsigned, 32> EvalStack;
     for (unsigned i = NextDFSNum; --i;) {
-      auto &WInfo = *NumToInfo[i];
-
       // Initialize the semi dominator to point to the parent node.
-      WInfo.Semi = WInfo.Parent;
-      for (unsigned RCIdx = WInfo.ReverseChildrenStart; RCIdx != 0;) {
+      unsigned SemiW = Parents[i];
+      for (unsigned RCIdx = RCHeads[i]; RCIdx != 0;) {
         const auto &Entry = ReverseChildren[RCIdx - 1];
         RCIdx = Entry.second;
-        unsigned SemiU =
-            NumToInfo[eval(Entry.first, i + 1, EvalStack, NumToInfo)]->Semi;
-        if (SemiU < WInfo.Semi)
-          WInfo.Semi = SemiU;
+        unsigned SemiU = eval(Entry.first, i + 1, EvalStack, Parents, Labels);
+        if (SemiU < SemiW)
+          SemiW = SemiU;
       }
+      SDoms[i] = Labels[i] = SemiW;
     }
 
     // Step #2: Explicitly define the immediate dominator of each vertex.
     //          IDom[i] = NCA(SDom[i], SpanningTreeParent(i)).
-    // SDom[i]'s DFS number is just Semi.
     for (unsigned i = 1; i < NextDFSNum; ++i) {
-      auto &WInfo = *NumToInfo[i];
       unsigned WIDom = IDoms[i];
-      while (WIDom > WInfo.Semi)
+      while (WIDom > SDoms[i])
         WIDom = IDoms[WIDom];
       IDoms[i] = WIDom;
-      WInfo.IDom = NumToNode[WIDom];
+      getNodeInfo(NumToNode[i]).IDom = NumToNode[WIDom];
     }
   }
 
@@ -359,7 +356,6 @@ template <typename DomTreeT> struct SemiNCAInfo {
     assert(NumToNode.empty() && "SNCAInfo must be freshly constructed");
 
     auto &BBInfo = getNodeInfo(nullptr);
-    BBInfo.Semi = BBInfo.Label = 0;
     BBInfo.DFSNumPlus1 = 1;
 
     NumToNode.push_back(nullptr); // NumToNode[0] = nullptr;
