@@ -64,7 +64,10 @@ template <class BlockT, class LoopT> class LoopBase {
   // The list of blocks in this loop. First entry is the header node.
   std::vector<BlockT *> Blocks;
 
-  SmallPtrSet<const BlockT *, 8> DenseBlockSet;
+  // The LoopInfo that owns this loop. Used to answer contains(BlockT *) from
+  // the central block-number-indexed block-to-loop map rather than a per-loop
+  // block set.
+  LoopInfoBase<BlockT, LoopT> *LI = nullptr;
 
 #if LLVM_ENABLE_ABI_BREAKING_CHECKS
   /// Indicator that this loop is no longer a valid loop.
@@ -130,10 +133,16 @@ public:
     return contains(L->getParentLoop());
   }
 
-  /// Return true if the specified basic block is in this loop.
+  /// Return true if the specified basic block is in this loop, using LoopInfo's
+  /// block-to-loop map.
+  ///
+  /// This is only valid when that map agrees with the block lists. Avoid when
+  /// the loop nest is being restructured, when a block may appear in a loop's
+  /// block list before it is mapped to that loop. Code in such a transient
+  /// state must scan getBlocks() directly instead.
   bool contains(const BlockT *BB) const {
     assert(!isInvalid() && "Loop not in a valid state!");
-    return DenseBlockSet.count(BB);
+    return contains(LI->getLoopForTolerant(BB));
   }
 
   /// Return true if the specified instruction is in this loop.
@@ -195,19 +204,6 @@ public:
     assert(!isInvalid() && "Loop not in a valid state!");
     return Blocks;
   }
-  /// Return a direct, mutable handle to the blocks set so that we can
-  /// mutate it efficiently.
-  SmallPtrSetImpl<const BlockT *> &getBlocksSet() {
-    assert(!isInvalid() && "Loop not in a valid state!");
-    return DenseBlockSet;
-  }
-
-  /// Return a direct, immutable handle to the blocks set.
-  const SmallPtrSetImpl<const BlockT *> &getBlocksSet() const {
-    assert(!isInvalid() && "Loop not in a valid state!");
-    return DenseBlockSet;
-  }
-
   /// Return true if this loop is no longer valid.  The only valid use of this
   /// helper is "assert(L.isInvalid())" or equivalent, since IsInvalid is set to
   /// true by the destructor.  In other words, if this accessor returns true,
@@ -419,7 +415,6 @@ public:
   void addBlockEntry(BlockT *BB) {
     assert(!isInvalid() && "Loop not in a valid state!");
     Blocks.push_back(BB);
-    DenseBlockSet.insert(BB);
   }
 
   /// interface to reverse Blocks[from, end of loop] in this loop
@@ -458,8 +453,6 @@ public:
     auto I = find(Blocks, BB);
     assert(I != Blocks.end() && "N is not in this list!");
     Blocks.erase(I);
-
-    DenseBlockSet.erase(BB);
   }
 
   /// Verify loop structure
@@ -486,7 +479,6 @@ protected:
 
   explicit LoopBase(BlockT *BB) : ParentLoop(nullptr) {
     Blocks.push_back(BB);
-    DenseBlockSet.insert(BB);
   }
 
   // Since loop passes like SCEV are allowed to key analysis results off of
@@ -507,7 +499,6 @@ protected:
 #endif
     SubLoops.clear();
     Blocks.clear();
-    DenseBlockSet.clear();
     ParentLoop = nullptr;
   }
 };
@@ -552,6 +543,7 @@ public:
         LoopAllocator(std::move(Arg.LoopAllocator)) {
     ParentPtr = Arg.ParentPtr;
     BlockNumberEpoch = Arg.BlockNumberEpoch;
+    resetLoopInfoOwners();
     // We have to clear the arguments top level loops as we've taken ownership.
     Arg.TopLevelLoops.clear();
   }
@@ -565,6 +557,7 @@ public:
 
     TopLevelLoops = std::move(RHS.TopLevelLoops);
     LoopAllocator = std::move(RHS.LoopAllocator);
+    resetLoopInfoOwners();
     RHS.TopLevelLoops.clear();
     return *this;
   }
@@ -580,7 +573,9 @@ public:
 
   template <typename... ArgsTy> LoopT *AllocateLoop(ArgsTy &&...Args) {
     LoopT *Storage = LoopAllocator.Allocate<LoopT>();
-    return new (Storage) LoopT(std::forward<ArgsTy>(Args)...);
+    LoopT *L = new (Storage) LoopT(std::forward<ArgsTy>(Args)...);
+    L->LI = this;
+    return L;
   }
 
   /// iterator/begin/end - The interface to the top-level loops in the current
@@ -613,6 +608,18 @@ public:
   SmallVector<LoopT *, 4> getLoopsInReverseSiblingPreorder() const;
 
 private:
+  // Point every loop's owning-LoopInfo back-pointer at this object. Called
+  // after a move.
+  void resetLoopInfoOwners() {
+    SmallVector<LoopT *, 8> Worklist(TopLevelLoops.begin(),
+                                     TopLevelLoops.end());
+    while (!Worklist.empty()) {
+      LoopT *L = Worklist.pop_back_val();
+      L->LI = this;
+      Worklist.append(L->begin(), L->end());
+    }
+  }
+
   /// Verify that used block numbers are still valid.
   void verifyBlockNumberEpoch(ParentT BBParent) const {
     if constexpr (GraphHasNodeNumbers<BlockT *>) {
@@ -624,16 +631,37 @@ private:
     }
   }
 
-public:
-  /// Return the inner most loop that BB lives in. If a basic block is in no
-  /// loop (for example the entry node), null is returned.
-  LoopT *getLoopFor(const BlockT *BB) const {
+  // Look up BB's innermost loop in the block-to-loop map. Does not check that
+  // BB belongs to this function; callers must ensure that (see getLoopFor and
+  // getLoopForTolerant).
+  LoopT *lookupLoopFor(const BlockT *BB) const {
     if constexpr (GraphHasNodeNumbers<const BlockT *>) {
-      verifyBlockNumberEpoch(BB->getParent());
       unsigned Number = GraphTraits<const BlockT *>::getNumber(BB);
       return Number < BBMap.size() ? BBMap[Number] : nullptr;
     } else
       return BBMap.lookup(BB);
+  }
+
+  // Like getLoopFor, but tolerates a block from another function (or one not
+  // yet inserted) by returning nullptr rather than asserting. Used by
+  // LoopBase::contains(BlockT *), which may be queried with a block outside
+  // this LoopInfo's function (e.g. a use of a global in another function).
+  LoopT *getLoopForTolerant(const BlockT *BB) const {
+    // A foreign block's number would index this function's map and could
+    // return an unrelated loop, so filter by function first.
+    if constexpr (GraphHasNodeNumbers<const BlockT *>)
+      if (BB->getParent() != ParentPtr)
+        return nullptr;
+    return lookupLoopFor(BB);
+  }
+
+public:
+  /// Return the inner most loop that BB lives in. If a basic block is in no
+  /// loop (for example the entry node), null is returned.
+  LoopT *getLoopFor(const BlockT *BB) const {
+    if constexpr (GraphHasNodeNumbers<const BlockT *>)
+      verifyBlockNumberEpoch(BB->getParent());
+    return lookupLoopFor(BB);
   }
 
   /// Same as getLoopFor.
