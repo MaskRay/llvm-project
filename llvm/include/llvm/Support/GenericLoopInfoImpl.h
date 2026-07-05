@@ -17,7 +17,6 @@
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/GenericLoopInfo.h"
 
 namespace llvm {
@@ -735,13 +734,6 @@ static void compareLoops(const LoopT *L, const LoopT *OtherL,
   std::vector<BlockT *> OtherBBs = OtherL->getBlocks();
   assert(compareVectors(BBs, OtherBBs) &&
          "Mismatched basic blocks in the loops!");
-
-  const SmallPtrSetImpl<const BlockT *> &BlocksSet = L->getBlocksSet();
-  const SmallPtrSetImpl<const BlockT *> &OtherBlocksSet =
-      OtherL->getBlocksSet();
-  assert(BlocksSet.size() == OtherBlocksSet.size() &&
-         llvm::set_is_subset(BlocksSet, OtherBlocksSet) &&
-         "Mismatched basic blocks in BlocksSets!");
 }
 #endif
 
@@ -756,6 +748,10 @@ void LoopInfoBase<BlockT, LoopT>::verify(
 
 // Verify that blocks are mapped to valid loops.
 #ifndef NDEBUG
+  // Every loop must point back at this LoopInfo (see resetLoopInfoOwners).
+  for (const LoopT *L : Loops)
+    assert(L->LI == this && "Loop has a stale owning-LoopInfo back-pointer");
+
   if constexpr (GraphHasNodeNumbers<const BlockT *>) {
     for (auto It : enumerate(BBMap)) {
       LoopT *L = It.value();
