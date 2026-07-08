@@ -235,37 +235,59 @@ template <typename ContextT> class GenericCycleInfoCompute {
 
   CycleInfoT &Info;
 
-  struct DFSInfo {
-    unsigned Start = 0; // DFS start; positive if block is found
-    unsigned End = 0;   // DFS end
-
-    DFSInfo() = default;
-    explicit DFSInfo(unsigned Start) : Start(Start) {}
-
-    explicit operator bool() const { return Start; }
-
-    /// Whether this node is an ancestor (or equal to) the node \p Other
-    /// in the DFS tree.
-    bool isAncestorOf(const DFSInfo &Other) const {
-      return Start <= Other.Start && Other.End <= End;
-    }
+  // Per-block state indexed by block number. The cycle computation follows the
+  // single-pass DFS loop-identification algorithm of Wei et al., "A New
+  // Algorithm for Identifying Loops in Decompilation" (SAS 2007), which tags
+  // every block with its innermost loop header on the fly. The fields are
+  // packed into one struct (as in tpde's Analyzer) so the DFS and header
+  // tagging, which touch several of them per block, hit a single cache line.
+  struct BlockInfo {
+    BlockT *ILoopHeader =
+        nullptr;            // Innermost loop header, null if in no cycle.
+    unsigned DFSPPos = 0;   // 1-based position on the current DFS path;
+                            // 0 once the block leaves it.
+    bool Traversed = false; // Block has been visited by the DFS.
+    bool SelfLoop = false;  // Block has an edge to itself.
   };
-
-  // Indexed by block number.
-  SmallVector<DFSInfo, 8> BlockDFSInfo;
-  SmallVector<BlockT *, 8> BlockPreorder;
+  SmallVector<BlockInfo, 8> BlockInfos;
+  SmallVector<BlockT *, 8> Preorder; // Blocks in DFS preorder.
 
   GenericCycleInfoCompute(const GenericCycleInfoCompute &) = delete;
   GenericCycleInfoCompute &operator=(const GenericCycleInfoCompute &) = delete;
 
-  DFSInfo getDFSInfo(BlockT *B) const {
-    unsigned Number = GraphTraits<BlockT *>::getNumber(B);
-    return BlockDFSInfo[Number];
+  static unsigned num(const BlockT *B) {
+    return GraphTraits<const BlockT *>::getNumber(B);
   }
 
-  DFSInfo &getOrInsertDFSInfo(BlockT *B) {
-    unsigned Number = GraphTraits<BlockT *>::getNumber(B);
-    return BlockDFSInfo[Number];
+  BlockInfo &info(const BlockT *B) { return BlockInfos[num(B)]; }
+
+  /// Weave loop header \p H (and its own header chain) into the loop header
+  /// chain of \p B. Each node's chain (B, ILoopHeader(B), ...) is a singly
+  /// linked list of its loop headers, sorted innermost-first by DFS-path
+  /// position; this is an in-place merge of B's chain and H's chain, replacing
+  /// the UNION-FIND merge of the classical Havlak algorithm. Both chains are
+  /// paths toward the root of the loop-nesting forest and share an outer
+  /// suffix, so the merge is done once \p B reaches the pending head \p H
+  /// (which also makes the degenerate B == H a no-op). Invariant: DFSPPos(B) >=
+  /// DFSPPos(H).
+  void tagLoopHeader(BlockT *B, BlockT *H) {
+    if (!H)
+      return;
+    while (B != H) {
+      BlockT *IH = info(B).ILoopHeader;
+      if (!IH) {
+        info(B).ILoopHeader = H; // B's chain ended: append the rest of H's.
+        return;
+      }
+      if (info(IH).DFSPPos >= info(H).DFSPPos) {
+        B = IH; // IH is the inner one: keep it and walk on.
+      } else {
+        info(B).ILoopHeader =
+            H; // H is inner: splice it in, then walk H's list,
+        B = H; // with the displaced IH now pending.
+        H = IH;
+      }
+    }
   }
 
 public:
@@ -276,7 +298,7 @@ public:
   static void updateDepth(CycleT *SubTree);
 
 private:
-  void dfs(FunctionT *F, BlockT *EntryBlock);
+  void dfs(BlockT *EntryBlock);
 };
 
 template <typename ContextT>
@@ -355,103 +377,104 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
   BlockT *EntryBlock = GraphTraits<FunctionT *>::getEntryNode(F);
   LLVM_DEBUG(errs() << "Entry block: " << Info.Context.print(EntryBlock)
                     << "\n");
-  dfs(F, EntryBlock);
 
-  SmallVector<BlockT *, 8> Worklist;
+  unsigned MaxNumber = GraphTraits<FunctionT *>::getMaxNumber(F);
+  BlockInfos.assign(MaxNumber, BlockInfo{});
 
-  for (BlockT *HeaderCandidate : llvm::reverse(BlockPreorder)) {
-    const DFSInfo CandidateInfo = getDFSInfo(HeaderCandidate);
+  // Single depth-first traversal that tags every block with its innermost loop
+  // header (ILoopHeader) on the fly.
+  dfs(EntryBlock);
 
-    for (BlockT *Pred : predecessors(HeaderCandidate)) {
-      const DFSInfo PredDFSInfo = getDFSInfo(Pred);
-      // This automatically ignores unreachable predecessors since they have
-      // zeros in their DFSInfo.
-      if (CandidateInfo.isAncestorOf(PredDFSInfo))
-        Worklist.push_back(Pred);
+  // A block is a loop header if it is the innermost loop header of some block,
+  // or if it has a self-edge. Create one cycle per header, keyed by block
+  // number. Cycles are created in preorder of their headers.
+  SmallVector<CycleT *, 8> HeaderToCycle(MaxNumber, nullptr);
+  SmallVector<std::unique_ptr<CycleT>, 8> Cycles;
+
+  auto getOrCreateCycle = [&](BlockT *Header) {
+    CycleT *&C = HeaderToCycle[num(Header)];
+    if (!C) {
+      Cycles.push_back(std::make_unique<CycleT>());
+      C = Cycles.back().get();
+      C->appendEntry(Header); // The header is always an entry.
+      LLVM_DEBUG(errs() << "Found cycle for header: "
+                        << Info.Context.print(Header) << "\n");
     }
-    if (Worklist.empty()) {
-      continue;
-    }
+  };
 
-    // Found a cycle with the candidate as its header.
-    LLVM_DEBUG(errs() << "Found cycle for header: "
-                      << Info.Context.print(HeaderCandidate) << "\n");
-    std::unique_ptr<CycleT> NewCycle = std::make_unique<CycleT>();
-    NewCycle->appendEntry(HeaderCandidate);
-    NewCycle->appendBlock(HeaderCandidate);
-    Info.addToBlockMap(HeaderCandidate, NewCycle.get());
-
-    // Helper function to process (non-back-edge) predecessors of a discovered
-    // block and either add them to the worklist or recognize that the given
-    // block is an additional cycle entry.
-    auto ProcessPredecessors = [&](BlockT *Block) {
-      LLVM_DEBUG(errs() << "  block " << Info.Context.print(Block) << ": ");
-
-      bool IsEntry = false;
-      for (BlockT *Pred : predecessors(Block)) {
-        const DFSInfo PredDFSInfo = getDFSInfo(Pred);
-        if (CandidateInfo.isAncestorOf(PredDFSInfo)) {
-          Worklist.push_back(Pred);
-        } else if (!PredDFSInfo) {
-          // Ignore an unreachable predecessor. It will will incorrectly cause
-          // Block to be treated as a cycle entry.
-          LLVM_DEBUG(errs() << " skipped unreachable predecessor.\n");
-        } else {
-          IsEntry = true;
-        }
-      }
-      if (IsEntry) {
-        assert(!NewCycle->isEntry(Block));
-        LLVM_DEBUG(errs() << "append as entry\n");
-        NewCycle->appendEntry(Block);
-      } else {
-        LLVM_DEBUG(errs() << "append as child\n");
-      }
-    };
-
-    do {
-      BlockT *Block = Worklist.pop_back_val();
-      if (Block == HeaderCandidate)
-        continue;
-
-      // If the block has already been discovered by some cycle
-      // (possibly by ourself), then the outermost cycle containing it
-      // should become our child.
-      if (auto *BlockParent = Info.getTopLevelParentCycle(Block)) {
-        LLVM_DEBUG(errs() << "  block " << Info.Context.print(Block) << ": ");
-
-        if (BlockParent != NewCycle.get()) {
-          LLVM_DEBUG(errs()
-                     << "discovered child cycle "
-                     << Info.Context.print(BlockParent->getHeader()) << "\n");
-          // Make BlockParent the child of NewCycle.
-          Info.moveTopLevelCycleToNewParent(NewCycle.get(), BlockParent);
-
-          for (auto *ChildEntry : BlockParent->entries())
-            ProcessPredecessors(ChildEntry);
-        } else {
-          LLVM_DEBUG(errs()
-                     << "known child cycle "
-                     << Info.Context.print(BlockParent->getHeader()) << "\n");
-        }
-      } else {
-        Info.addToBlockMap(Block, NewCycle.get());
-        assert(!is_contained(NewCycle->Blocks, Block));
-        NewCycle->Blocks.insert(Block);
-        ProcessPredecessors(Block);
-      }
-    } while (!Worklist.empty());
-
-    Info.TopLevelCycles.push_back(std::move(NewCycle));
+  for (BlockT *Block : Preorder) {
+    if (BlockT *Header = info(Block).ILoopHeader)
+      getOrCreateCycle(Header);
+    if (info(Block).SelfLoop)
+      getOrCreateCycle(Block);
   }
 
-  // Fix top-level cycle links and compute cycle depths.
+  // The innermost cycle containing \p B: the cycle B heads if B is itself a
+  // header, otherwise the cycle headed by B's innermost loop header.
+  auto innermostHeader = [&](BlockT *B) -> BlockT * {
+    if (HeaderToCycle[num(B)])
+      return B;
+    return info(B).ILoopHeader;
+  };
+
+  // Populate each cycle's block set (which includes the blocks of nested
+  // cycles) and the block-to-innermost-cycle map. Iterating in preorder makes
+  // each cycle's header its first block.
+  for (BlockT *Block : Preorder) {
+    BlockT *H = innermostHeader(Block);
+    if (!H)
+      continue;
+    Info.BlockMap[num(Block)] = HeaderToCycle[num(H)];
+    for (BlockT *C = H; C; C = info(C).ILoopHeader)
+      HeaderToCycle[num(C)]->appendBlock(Block);
+  }
+
+  // Compute the entries of each cycle. A block B in a cycle C is an entry iff
+  // it is the header or it has a reachable predecessor outside C. Since cycles
+  // are nested, walking B's header chain from innermost outward, an edge from
+  // Pred makes B an entry of every cycle up to (but excluding) the first one
+  // that contains Pred.
+  for (BlockT *Block : Preorder) {
+    BlockT *H = innermostHeader(Block);
+    if (!H)
+      continue;
+    for (BlockT *Pred : predecessors(Block)) {
+      if (!info(Pred).Traversed)
+        continue; // Ignore unreachable predecessors.
+      for (BlockT *C = H; C; C = info(C).ILoopHeader) {
+        CycleT *Cycle = HeaderToCycle[num(C)];
+        if (Cycle->contains(Pred))
+          break;
+        if (!Cycle->isEntry(Block))
+          Cycle->appendEntry(Block);
+      }
+    }
+  }
+
+  // Wire up the cycle forest. A cycle headed by H is nested in the cycle headed
+  // by ILoopHeader[H]; otherwise it is a top-level cycle. Transferring
+  // ownership in reverse preorder (children before parents) keeps the top-level
+  // and child lists in reverse preorder of their headers.
+  for (auto &UP : Cycles)
+    if (BlockT *ParentHeader = info(UP->getHeader()).ILoopHeader)
+      UP->ParentCycle = HeaderToCycle[num(ParentHeader)];
+  for (std::unique_ptr<CycleT> &UP : llvm::reverse(Cycles)) {
+    CycleT *C = UP.get();
+    if (C->ParentCycle)
+      C->ParentCycle->Children.push_back(std::move(UP));
+    else
+      Info.TopLevelCycles.push_back(std::move(UP));
+  }
+
+  // Set the top-level-cycle back-pointers and compute cycle depths.
   for (auto *TLC : Info.toplevel_cycles()) {
     LLVM_DEBUG(errs() << "top-level cycle: "
                       << Info.Context.print(TLC->getHeader()) << "\n");
-
     TLC->ParentCycle = nullptr;
-    updateDepth(TLC);
+    for (CycleT *C : depth_first(TLC)) {
+      C->TopLevelCycle = TLC;
+      C->Depth = C->ParentCycle ? C->ParentCycle->Depth + 1 : 1;
+    }
   }
 }
 
@@ -462,57 +485,77 @@ void GenericCycleInfoCompute<ContextT>::updateDepth(CycleT *SubTree) {
     Cycle->Depth = Cycle->ParentCycle ? Cycle->ParentCycle->Depth + 1 : 1;
 }
 
-/// \brief Compute a DFS of basic blocks starting at the function entry.
+/// \brief Single-pass DFS that tags every block with its innermost loop header.
 ///
-/// Fills BlockDFSInfo with start/end counters and BlockPreorder.
+/// This is an iterative rendering of \c trav_loops_DFS from Wei et al. Each
+/// block \p B0 in the DFS classifies each successor \p B1 as:
+///   - a tree edge (B1 unvisited): recurse, then propagate B1's loop header;
+///   - a back edge (B1 on the current DFS path): B1 is a loop header of B0;
+///   - a re-entry into an already-finished loop (irreducible control flow):
+///     walk B1's header chain to the nearest header still on the DFS path.
+/// Forward/cross edges into loop-free code are ignored. Fills ILoopHeader,
+/// SelfLoop and Preorder.
 template <typename ContextT>
-void GenericCycleInfoCompute<ContextT>::dfs(FunctionT *F, BlockT *EntryBlock) {
-  SmallVector<unsigned, 8> DFSTreeStack;
-  SmallVector<BlockT *, 8> TraverseStack;
+void GenericCycleInfoCompute<ContextT>::dfs(BlockT *EntryBlock) {
+  // Successors are visited in reverse order to match the historical
+  // stack-based traversal order (and thus the cycle print order). The
+  // successor iterators remain valid on their own, so they are stored in the
+  // frame directly rather than copying the successor list into it.
+  using SuccIterT = decltype(successors(std::declval<BlockT *>()).begin());
+  struct Frame {
+    BlockT *Block;
+    std::reverse_iterator<SuccIterT> SuccIt;
+    std::reverse_iterator<SuccIterT> SuccEnd;
+  };
+  SmallVector<Frame, 8> Stack;
   unsigned Counter = 0;
-  TraverseStack.emplace_back(EntryBlock);
 
-  BlockDFSInfo.resize(GraphTraits<FunctionT *>::getMaxNumber(F));
-  do {
-    BlockT *Block = TraverseStack.back();
+  auto pushNode = [&](BlockT *Block) {
     LLVM_DEBUG(errs() << "DFS visiting block: " << Info.Context.print(Block)
                       << "\n");
-    DFSInfo &Info = getOrInsertDFSInfo(Block);
-    if (Info.Start == 0) {
-      Info.Start = ++Counter;
+    BlockInfo &BI = info(Block);
+    BI.Traversed = true;
+    BI.DFSPPos = ++Counter;
+    Preorder.push_back(Block);
+    auto Succs = successors(Block);
+    Stack.push_back(Frame{Block, std::make_reverse_iterator(Succs.end()),
+                          std::make_reverse_iterator(Succs.begin())});
+  };
 
-      // We're visiting the block for the first time. Open its DFSInfo, add
-      // successors to the traversal stack, and remember the traversal stack
-      // depth at which the block was opened, so that we can correctly record
-      // its end time.
-      LLVM_DEBUG(errs() << "  first encountered at depth "
-                        << TraverseStack.size() << "\n");
-
-      DFSTreeStack.emplace_back(TraverseStack.size());
-      llvm::append_range(TraverseStack, successors(Block));
-
-      BlockPreorder.push_back(Block);
-      LLVM_DEBUG(errs() << "  preorder number: " << Counter << "\n");
-    } else {
-      assert(!DFSTreeStack.empty());
-      if (DFSTreeStack.back() == TraverseStack.size()) {
-        LLVM_DEBUG(errs() << "  ended at " << Counter << "\n");
-        Info.End = Counter;
-        DFSTreeStack.pop_back();
-      } else {
-        LLVM_DEBUG(errs() << "  already done\n");
+  pushNode(EntryBlock);
+  while (!Stack.empty()) {
+    Frame &F = Stack.back();
+    if (F.SuccIt != F.SuccEnd) {
+      BlockT *B0 = F.Block;
+      BlockT *B1 = *F.SuccIt++;
+      if (B1 == B0)
+        info(B0).SelfLoop = true;
+      BlockInfo &B1Info = info(B1);
+      if (!B1Info.Traversed) {
+        // Tree edge: descend. Propagation happens when B1's frame is popped.
+        pushNode(B1);
+      } else if (B1Info.DFSPPos > 0) {
+        // Back edge: B1 is an ancestor on the DFS path, hence a loop header.
+        tagLoopHeader(B0, B1);
+      } else if (BlockT *H = B1Info.ILoopHeader) {
+        // B1 is finished but belongs to a loop: re-entry / cross edge into an
+        // already-closed (possibly irreducible) loop. Tag B0 with the nearest
+        // header in B1's chain still on the DFS path; tagLoopHeader is a no-op
+        // if the walk runs off the end (H == nullptr).
+        while (H && info(H).DFSPPos == 0)
+          H = info(H).ILoopHeader;
+        tagLoopHeader(B0, H);
       }
-      TraverseStack.pop_back();
+    } else {
+      // Finished B0: leave the DFS path and propagate its loop header to the
+      // parent (the tree-edge tagging of Wei's algorithm).
+      BlockT *B0 = F.Block;
+      info(B0).DFSPPos = 0;
+      Stack.pop_back();
+      if (!Stack.empty())
+        tagLoopHeader(Stack.back().Block, info(B0).ILoopHeader);
     }
-  } while (!TraverseStack.empty());
-  assert(DFSTreeStack.empty());
-
-  LLVM_DEBUG(
-    errs() << "Preorder:\n";
-    for (int i = 0, e = BlockPreorder.size(); i != e; ++i) {
-      errs() << "  " << Info.Context.print(BlockPreorder[i]) << ": " << i << "\n";
-    }
-  );
+  }
 }
 
 /// \brief Reset the object to its initial state.
