@@ -67,10 +67,14 @@ private:
   std::vector<std::unique_ptr<GenericCycle>> Children;
 
   /// Basic blocks that are contained in the cycle, including entry blocks,
-  /// and including blocks that are part of a child cycle.
-  using BlockSetVectorT = SetVector<BlockT *, SmallVector<BlockT *, 8>,
-                                    DenseSet<const BlockT *>, 8>;
-  BlockSetVectorT Blocks;
+  /// and including blocks that are part of a child cycle. Stored as a plain
+  /// ordered list; membership is answered via the innermost-cycle map and the
+  /// cycle tree (see \ref contains), so no per-cycle hash set is needed.
+  SmallVector<BlockT *, 8> Blocks;
+
+  /// The cycle info that owns this cycle, used by contains(BlockT*) to map a
+  /// block to its innermost cycle. Fixed up when the GenericCycleInfo moves.
+  const GenericCycleInfo<ContextT> *CI = nullptr;
 
   /// Depth of the cycle in the tree. The root "cycle" is at depth 0.
   ///
@@ -97,7 +101,7 @@ private:
   }
 
   void appendBlock(BlockT *Block) {
-    Blocks.insert(Block);
+    Blocks.push_back(Block);
     clearCache();
   }
 
@@ -137,7 +141,9 @@ public:
   }
 
   /// \brief Return whether \p Block is contained in the cycle.
-  bool contains(const BlockT *Block) const { return Blocks.contains(Block); }
+  ///
+  /// Derived from the innermost-cycle map and the cycle tree; O(nesting depth).
+  bool contains(const BlockT *Block) const;
 
   /// \brief Returns true iff this cycle contains \p C.
   ///
@@ -203,14 +209,11 @@ public:
 
   /// Iteration over blocks in the cycle (including entry blocks).
   //@{
-  using const_block_iterator = typename BlockSetVectorT::const_iterator;
+  using const_block_iterator =
+      typename SmallVector<BlockT *, 8>::const_iterator;
 
-  const_block_iterator block_begin() const {
-    return const_block_iterator{Blocks.begin()};
-  }
-  const_block_iterator block_end() const {
-    return const_block_iterator{Blocks.end()};
-  }
+  const_block_iterator block_begin() const { return Blocks.begin(); }
+  const_block_iterator block_end() const { return Blocks.end(); }
   size_t getNumBlocks() const { return Blocks.size(); }
   iterator_range<const_block_iterator> blocks() const {
     return llvm::make_range(block_begin(), block_end());
@@ -288,8 +291,27 @@ private:
 
 public:
   GenericCycleInfo() = default;
-  GenericCycleInfo(GenericCycleInfo &&) = default;
-  GenericCycleInfo &operator=(GenericCycleInfo &&) = default;
+  GenericCycleInfo(GenericCycleInfo &&Other) { *this = std::move(Other); }
+  GenericCycleInfo &operator=(GenericCycleInfo &&Other) {
+    if (this == &Other)
+      return *this;
+    Context = std::move(Other.Context);
+    BlockNumberEpoch = Other.BlockNumberEpoch;
+    BlockMap = std::move(Other.BlockMap);
+    TopLevelCycles = std::move(Other.TopLevelCycles);
+    // The moved cycles carry a back-reference to their owning info (used by
+    // GenericCycle::contains(BlockT*)); re-point it at this object.
+    SmallVector<CycleT *, 8> Worklist;
+    for (auto &TLC : TopLevelCycles)
+      Worklist.push_back(TLC.get());
+    while (!Worklist.empty()) {
+      CycleT *C = Worklist.pop_back_val();
+      C->CI = this;
+      for (auto &Child : C->Children)
+        Worklist.push_back(Child.get());
+    }
+    return *this;
+  }
 
   void clear();
   void compute(FunctionT &F);

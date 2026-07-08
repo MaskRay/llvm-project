@@ -45,6 +45,14 @@ bool GenericCycle<ContextT>::contains(const GenericCycle *C) const {
 }
 
 template <typename ContextT>
+bool GenericCycle<ContextT>::contains(const BlockT *Block) const {
+  assert(CI && "cycle is not associated with a GenericCycleInfo");
+  // Block is in this cycle iff its innermost cycle is this cycle or nested in
+  // it.
+  return contains(CI->getCycle(Block));
+}
+
+template <typename ContextT>
 void GenericCycle<ContextT>::getExitBlocks(
     SmallVectorImpl<BlockT *> &TmpStorage) const {
   if (!ExitBlocksCache.empty()) {
@@ -327,7 +335,7 @@ void GenericCycleInfo<ContextT>::moveTopLevelCycleToNewParent(CycleT *NewParent,
   for (CycleT *Cycle : depth_first(Child))
     Cycle->TopLevelCycle = NewParent;
 
-  NewParent->Blocks.insert_range(Child->blocks());
+  llvm::append_range(NewParent->Blocks, Child->blocks());
   NewParent->clearCache();
   Child->clearCache();
 }
@@ -396,6 +404,7 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
     if (!C) {
       Cycles.push_back(std::make_unique<CycleT>());
       C = Cycles.back().get();
+      C->CI = &Info;
       C->appendEntry(Header); // The header is always an entry.
       LLVM_DEBUG(errs() << "Found cycle for header: "
                         << Info.Context.print(Header) << "\n");
@@ -429,28 +438,6 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
       HeaderToCycle[num(C)]->appendBlock(Block);
   }
 
-  // Compute the entries of each cycle. A block B in a cycle C is an entry iff
-  // it is the header or it has a reachable predecessor outside C. Since cycles
-  // are nested, walking B's header chain from innermost outward, an edge from
-  // Pred makes B an entry of every cycle up to (but excluding) the first one
-  // that contains Pred.
-  for (BlockT *Block : Preorder) {
-    BlockT *H = innermostHeader(Block);
-    if (!H)
-      continue;
-    for (BlockT *Pred : predecessors(Block)) {
-      if (!info(Pred).Traversed)
-        continue; // Ignore unreachable predecessors.
-      for (BlockT *C = H; C; C = info(C).ILoopHeader) {
-        CycleT *Cycle = HeaderToCycle[num(C)];
-        if (Cycle->contains(Pred))
-          break;
-        if (!Cycle->isEntry(Block))
-          Cycle->appendEntry(Block);
-      }
-    }
-  }
-
   // Wire up the cycle forest. A cycle headed by H is nested in the cycle headed
   // by ILoopHeader[H]; otherwise it is a top-level cycle. Transferring
   // ownership in reverse preorder (children before parents) keeps the top-level
@@ -474,6 +461,30 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
     for (CycleT *C : depth_first(TLC)) {
       C->TopLevelCycle = TLC;
       C->Depth = C->ParentCycle ? C->ParentCycle->Depth + 1 : 1;
+    }
+  }
+
+  // Compute the entries of each cycle. A block B in a cycle C is an entry iff
+  // it is the header or it has a reachable predecessor outside C. Cycle depths
+  // are set above, so containment is answered through the innermost-cycle map.
+  // Walking B's header chain from innermost outward, an edge from Pred makes B
+  // an entry of every cycle up to (but excluding) the first one that contains
+  // Pred.
+  for (BlockT *Block : Preorder) {
+    BlockT *H = innermostHeader(Block);
+    if (!H)
+      continue;
+    for (BlockT *Pred : predecessors(Block)) {
+      if (!info(Pred).Traversed)
+        continue; // Ignore unreachable predecessors.
+      CycleT *PredCycle = Info.getCycle(Pred);
+      for (BlockT *C = H; C; C = info(C).ILoopHeader) {
+        CycleT *Cycle = HeaderToCycle[num(C)];
+        if (Cycle->contains(PredCycle))
+          break;
+        if (!Cycle->isEntry(Block))
+          Cycle->appendEntry(Block);
+      }
     }
   }
 }
