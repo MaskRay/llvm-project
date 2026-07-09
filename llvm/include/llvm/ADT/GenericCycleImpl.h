@@ -45,6 +45,26 @@ bool GenericCycle<ContextT>::contains(const GenericCycle *C) const {
 }
 
 template <typename ContextT>
+bool GenericCycle<ContextT>::contains(const BlockT *Block) const {
+  assert(CI && "cycle is not associated with a GenericCycleInfo");
+  // Block is in this cycle iff its innermost cycle is this cycle or nested in
+  // it.
+  return contains(CI->getCycle(Block));
+}
+
+template <typename ContextT>
+auto GenericCycle<ContextT>::block_begin() const -> const_block_iterator {
+  assert(CI && "cycle is not associated with a GenericCycleInfo");
+  return CI->BlockLayout.begin() + BlocksBegin;
+}
+
+template <typename ContextT>
+auto GenericCycle<ContextT>::block_end() const -> const_block_iterator {
+  assert(CI && "cycle is not associated with a GenericCycleInfo");
+  return CI->BlockLayout.begin() + BlocksEnd;
+}
+
+template <typename ContextT>
 void GenericCycle<ContextT>::getExitBlocks(
     SmallVectorImpl<BlockT *> &TmpStorage) const {
   if (!ExitBlocksCache.empty()) {
@@ -126,7 +146,7 @@ auto GenericCycle<ContextT>::getCyclePredecessor() const -> BlockT * {
 /// \brief Verify that this is actually a well-formed cycle in the CFG.
 template <typename ContextT> void GenericCycle<ContextT>::verifyCycle() const {
 #ifndef NDEBUG
-  assert(!Blocks.empty() && "Cycle cannot be empty.");
+  assert(getNumBlocks() != 0 && "Cycle cannot be empty.");
   DenseSet<BlockT *> Blocks;
   for (BlockT *BB : blocks()) {
     assert(Blocks.insert(BB).second); // duplicates in block list?
@@ -305,7 +325,8 @@ void GenericCycleInfo<ContextT>::moveTopLevelCycleToNewParent(CycleT *NewParent,
   for (CycleT *Cycle : depth_first(Child))
     Cycle->TopLevelCycle = NewParent;
 
-  NewParent->Blocks.insert_range(Child->blocks());
+  // Blocks are not stored per cycle during construction; the shared layout is
+  // built once at the end of run(), so only the tree links change here.
   NewParent->clearCache();
   Child->clearCache();
 }
@@ -333,20 +354,105 @@ void GenericCycleInfo<ContextT>::addBlockToCycle(BlockT *Block, CycleT *Cycle) {
   if (Number >= BlockMap.size())
     BlockMap.resize(GraphTraits<FunctionT *>::getMaxNumber(Block->getParent()));
 
-  // FixMe: Appending NewBlock is fine as a set of blocks in a cycle. When
-  // printing, cycle NewBlock is at the end of list but it should be in the
-  // middle to represent actual traversal of a cycle.
-  Cycle->appendBlock(Block);
+  // Insert Block into the shared layout at the end of Cycle's slice, then widen
+  // the slices for the insertion at Pos. The new block belongs to Cycle and its
+  // ancestors only (never a nested cycle), so:
+  //   - every cycle laid out entirely after Pos (begin >= Pos) shifts right;
+  //   - Cycle and its ancestors additionally contain the new block (end grows).
+  // A nested cycle on Cycle's rightmost spine also ends at Pos but must NOT
+  // gain the block, so its end is left untouched.
+  //
+  // FixMe: Block is appended at the end of Cycle's slice; to mirror an actual
+  // traversal it should be placed in the middle.
+  unsigned Pos = Cycle->BlocksEnd;
+  BlockLayout.insert(BlockLayout.begin() + Pos, Block);
+  for (CycleT *TLC : toplevel_cycles())
+    for (CycleT *C : depth_first(TLC))
+      if (C->BlocksBegin >= Pos) {
+        ++C->BlocksBegin;
+        ++C->BlocksEnd;
+      }
+  for (CycleT *A = Cycle; A; A = A->getParentCycle())
+    ++A->BlocksEnd;
+  // Block's innermost cycle is now Cycle; keep its own-block tally in sync.
+  ++Cycle->OwnBlocks;
   addToBlockMap(Block, Cycle);
 
-  CycleT *ParentCycle = Cycle->getParentCycle();
-  while (ParentCycle) {
-    Cycle = ParentCycle;
-    Cycle->appendBlock(Block);
-    ParentCycle = Cycle->getParentCycle();
+  for (CycleT *C = Cycle; C; C = C->getParentCycle())
+    C->clearCache();
+}
+
+/// \brief (Re)build the shared block layout and every cycle's slice.
+///
+/// Lays out BlockLayout so that each cycle's blocks (its own plus those of all
+/// nested cycles) form a contiguous half-open range [BlocksBegin, BlocksEnd),
+/// with nested ranges contained in their parent's. A cycle's slice holds its
+/// own blocks first (header first, in \p Order), followed by each child's
+/// slice, so the total storage is O(number of blocks) regardless of nesting
+/// depth. Scratch state is keyed by each cycle's dense preorder index.
+template <typename ContextT>
+void GenericCycleInfo<ContextT>::layoutBlocks(ArrayRef<BlockT *> Order) {
+  // The common case is an acyclic function with no cycles at all; skip the
+  // scratch allocation entirely (BlockLayout stays empty).
+  if (TopLevelCycles.empty())
+    return;
+
+  // Gather cycles in preorder across the whole forest (parent before its
+  // children) and give each a dense index (stored on the cycle) so the
+  // per-cycle scratch below is sized by the (usually small) cycle count rather
+  // than the block count, and mapping an arbitrary cycle to that scratch is a
+  // single field load rather than a block-number-keyed side-table lookup.
+  SmallVector<CycleT *, 8> Cycles;
+  for (CycleT *TLC : toplevel_cycles())
+    for (CycleT *C : depth_first(TLC)) {
+      C->LayoutIndex = Cycles.size();
+      Cycles.push_back(C);
+    }
+  const unsigned NumCycles = Cycles.size();
+  auto dense = [](const CycleT *C) { return C->LayoutIndex; };
+
+  SmallVector<unsigned, 8> Total(NumCycles); // OwnBlocks + nested totals
+  SmallVector<unsigned, 8> Fill(NumCycles);  // next slot in C's own region
+  SmallVector<unsigned, 8> ChildCursor(NumCycles); // next slot for a child
+
+  // Each cycle's own-block count is maintained as blocks are discovered (see
+  // GenericCycle::OwnBlocks), so no separate counting pass over Order is
+  // needed.
+  unsigned NumInCycle = 0;
+  for (unsigned I = 0; I != NumCycles; ++I) {
+    Total[I] = Cycles[I]->OwnBlocks;
+    NumInCycle += Cycles[I]->OwnBlocks;
   }
 
-  Cycle->clearCache();
+  // Accumulate subtree totals: a child (later in preorder) folds into its
+  // parent, so iterating in reverse propagates counts up to the roots.
+  for (unsigned I = NumCycles; I--;)
+    if (CycleT *P = Cycles[I]->ParentCycle)
+      Total[dense(P)] += Total[I];
+
+  // Assign each cycle its contiguous slice: own blocks first, then children.
+  unsigned Cursor = 0;
+  for (unsigned I = 0; I != NumCycles; ++I) {
+    CycleT *C = Cycles[I];
+    unsigned Begin;
+    if (CycleT *P = C->ParentCycle) {
+      Begin = ChildCursor[dense(P)];
+      ChildCursor[dense(P)] += Total[I];
+    } else {
+      Begin = Cursor;
+      Cursor += Total[I];
+    }
+    C->BlocksBegin = Begin;
+    C->BlocksEnd = Begin + Total[I];
+    Fill[I] = Begin;                       // own region [Begin, +Own)
+    ChildCursor[I] = Begin + C->OwnBlocks; // child region [+Own, End)
+  }
+
+  // Place every block into its innermost cycle's own region, in \p Order.
+  BlockLayout.assign(NumInCycle, nullptr);
+  for (BlockT *B : Order)
+    if (CycleT *C = getCycle(B))
+      BlockLayout[Fill[dense(C)]++] = B;
 }
 
 /// \brief Main function of the cycle info computations.
@@ -377,9 +483,12 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
     LLVM_DEBUG(errs() << "Found cycle for header: "
                       << Info.Context.print(HeaderCandidate) << "\n");
     std::unique_ptr<CycleT> NewCycle = std::make_unique<CycleT>();
+    NewCycle->CI = &Info;
     NewCycle->appendEntry(HeaderCandidate);
-    NewCycle->appendBlock(HeaderCandidate);
     Info.addToBlockMap(HeaderCandidate, NewCycle.get());
+    // The header is this cycle's first own block; count it (see
+    // GenericCycle::OwnBlocks) so layoutBlocks needs no separate counting pass.
+    ++NewCycle->OwnBlocks;
 
     // Helper function to process (non-back-edge) predecessors of a discovered
     // block and either add them to the worklist or recognize that the given
@@ -436,8 +545,7 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
         }
       } else {
         Info.addToBlockMap(Block, NewCycle.get());
-        assert(!is_contained(NewCycle->Blocks, Block));
-        NewCycle->Blocks.insert(Block);
+        ++NewCycle->OwnBlocks; // Block's innermost cycle is NewCycle.
         ProcessPredecessors(Block);
       }
     } while (!Worklist.empty());
@@ -453,6 +561,10 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
     TLC->ParentCycle = nullptr;
     updateDepth(TLC);
   }
+
+  // The cycle tree and the block-to-innermost-cycle map are complete; lay out
+  // every cycle's blocks into the shared contiguous BlockLayout in one pass.
+  Info.layoutBlocks(BlockPreorder);
 }
 
 /// \brief Recompute depth values of \p SubTree and all descendants.
@@ -519,6 +631,7 @@ void GenericCycleInfoCompute<ContextT>::dfs(FunctionT *F, BlockT *EntryBlock) {
 template <typename ContextT> void GenericCycleInfo<ContextT>::clear() {
   TopLevelCycles.clear();
   BlockMap.clear();
+  BlockLayout.clear();
 }
 
 /// \brief Compute the cycle info for a function.

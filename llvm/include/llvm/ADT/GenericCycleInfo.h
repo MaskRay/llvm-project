@@ -66,11 +66,30 @@ private:
   /// Child cycles, if any.
   std::vector<std::unique_ptr<GenericCycle>> Children;
 
-  /// Basic blocks that are contained in the cycle, including entry blocks,
-  /// and including blocks that are part of a child cycle.
-  using BlockSetVectorT = SetVector<BlockT *, SmallVector<BlockT *, 8>,
-                                    DenseSet<const BlockT *>, 8>;
-  BlockSetVectorT Blocks;
+  /// The blocks contained in this cycle (including entry blocks and the blocks
+  /// of nested child cycles) occupy the half-open range
+  /// [BlocksBegin, BlocksEnd) of GenericCycleInfo::BlockLayout. A child cycle's
+  /// range is nested within its parent's, so the layout holds every block once
+  /// (O(N) total) rather than once per containing cycle. Membership is answered
+  /// via the innermost-cycle map and the cycle tree (see \ref contains),
+  /// independently of this range.
+  unsigned BlocksBegin = 0, BlocksEnd = 0;
+
+  /// Number of blocks whose innermost containing cycle is this one (i.e. this
+  /// cycle's own blocks, excluding those owned by nested child cycles). Kept up
+  /// to date as blocks are discovered and added, so layoutBlocks can size each
+  /// cycle's slice without a separate counting pass over the blocks.
+  unsigned OwnBlocks = 0;
+
+  /// Scratch dense preorder index used only while (re)building the block layout
+  /// (see GenericCycleInfo::layoutBlocks); lets that routine key its per-cycle
+  /// scratch off a direct field instead of a block-number-sized side table.
+  unsigned LayoutIndex = 0;
+
+  /// The cycle info that owns this cycle. Used by contains(BlockT*) to map a
+  /// block to its innermost cycle and by blocks() to reach BlockLayout. Fixed
+  /// up when the GenericCycleInfo moves.
+  const GenericCycleInfo<ContextT> *CI = nullptr;
 
   /// Depth of the cycle in the tree. The root "cycle" is at depth 0.
   ///
@@ -85,7 +104,8 @@ private:
   void clear() {
     Entries.clear();
     Children.clear();
-    Blocks.clear();
+    BlocksBegin = BlocksEnd = 0;
+    OwnBlocks = 0;
     Depth = 0;
     ParentCycle = nullptr;
     clearCache();
@@ -93,11 +113,6 @@ private:
 
   void appendEntry(BlockT *Block) {
     Entries.push_back(Block);
-    clearCache();
-  }
-
-  void appendBlock(BlockT *Block) {
-    Blocks.insert(Block);
     clearCache();
   }
 
@@ -137,7 +152,9 @@ public:
   }
 
   /// \brief Return whether \p Block is contained in the cycle.
-  bool contains(const BlockT *Block) const { return Blocks.contains(Block); }
+  ///
+  /// Derived from the innermost-cycle map and the cycle tree; O(nesting depth).
+  bool contains(const BlockT *Block) const;
 
   /// \brief Returns true iff this cycle contains \p C.
   ///
@@ -203,15 +220,12 @@ public:
 
   /// Iteration over blocks in the cycle (including entry blocks).
   //@{
-  using const_block_iterator = typename BlockSetVectorT::const_iterator;
+  using const_block_iterator =
+      typename SmallVector<BlockT *, 8>::const_iterator;
 
-  const_block_iterator block_begin() const {
-    return const_block_iterator{Blocks.begin()};
-  }
-  const_block_iterator block_end() const {
-    return const_block_iterator{Blocks.end()};
-  }
-  size_t getNumBlocks() const { return Blocks.size(); }
+  const_block_iterator block_begin() const;
+  const_block_iterator block_end() const;
+  size_t getNumBlocks() const { return BlocksEnd - BlocksBegin; }
   iterator_range<const_block_iterator> blocks() const {
     return llvm::make_range(block_begin(), block_end());
   }
@@ -245,7 +259,7 @@ public:
     return Printable([this, &Ctx](raw_ostream &Out) {
       Out << "depth=" << Depth << ": entries(" << printEntries(Ctx) << ')';
 
-      for (auto *Block : Blocks) {
+      for (auto *Block : blocks()) {
         if (isEntry(Block))
           continue;
 
@@ -271,6 +285,13 @@ private:
   /// Map basic block numbers to their inner-most containing cycle.
   SmallVector<CycleT *> BlockMap;
 
+  /// Shared storage for the block lists of every cycle. Each cycle owns the
+  /// contiguous slice [BlocksBegin, BlocksEnd) of this array (see
+  /// GenericCycle::BlocksBegin); nested cycles' slices are contained within
+  /// their parent's, so a block that lies in D cycles is stored once here
+  /// rather than D times.
+  SmallVector<BlockT *, 8> BlockLayout;
+
   /// Top-level cycles discovered by any DFS.
   ///
   /// Note: The implementation treats the nullptr as the parent of
@@ -286,10 +307,37 @@ private:
   void verifyBlockNumberEpoch(const FunctionT *Fn) const;
   void addToBlockMap(BlockT *Block, CycleT *Cycle);
 
+  /// (Re)build BlockLayout and every cycle's [BlocksBegin, BlocksEnd) slice
+  /// from the innermost-cycle map and the current cycle tree. \p Order lists
+  /// each in-cycle block once and fixes the relative order of blocks within a
+  /// cycle. Requires BlockMap and the tree (ParentCycle/Children) to be set.
+  void layoutBlocks(ArrayRef<BlockT *> Order);
+
 public:
   GenericCycleInfo() = default;
-  GenericCycleInfo(GenericCycleInfo &&) = default;
-  GenericCycleInfo &operator=(GenericCycleInfo &&) = default;
+  GenericCycleInfo(GenericCycleInfo &&Other) { *this = std::move(Other); }
+  GenericCycleInfo &operator=(GenericCycleInfo &&Other) {
+    if (this == &Other)
+      return *this;
+    Context = std::move(Other.Context);
+    BlockNumberEpoch = Other.BlockNumberEpoch;
+    BlockMap = std::move(Other.BlockMap);
+    BlockLayout = std::move(Other.BlockLayout);
+    TopLevelCycles = std::move(Other.TopLevelCycles);
+    // The moved cycles carry a back-reference to their owning info (used by
+    // GenericCycle::contains(BlockT*) and blocks()); re-point it at this
+    // object.
+    SmallVector<CycleT *, 8> Worklist;
+    for (auto &TLC : TopLevelCycles)
+      Worklist.push_back(TLC.get());
+    while (!Worklist.empty()) {
+      CycleT *C = Worklist.pop_back_val();
+      C->CI = this;
+      for (auto &Child : C->Children)
+        Worklist.push_back(Child.get());
+    }
+    return *this;
+  }
 
   void clear();
   void compute(FunctionT &F);
