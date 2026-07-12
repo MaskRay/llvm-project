@@ -284,9 +284,12 @@ void llvm::parallelFor(size_t Begin, size_t End,
       }
     };
 
+    // Run one worker on the calling thread. This avoids a spawn/wakeup and
+    // starts work immediately, which matters most at low thread counts.
     TaskGroup TG;
-    for (size_t I = 0; I != NumWorkers; ++I)
+    while (--NumWorkers)
       TG.spawn(Worker);
+    Worker();
     return;
   }
 #endif

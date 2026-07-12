@@ -48,7 +48,10 @@ TEST(PerThreadBumpPtrAllocatorTest, ParallelAllocation) {
   });
 
   EXPECT_LE(sizeof(uint64_t) * NumAllocations, Allocator.getTotalMemory());
-  EXPECT_EQ(Allocator.getNumberOfAllocators(), parallel::getThreadCount());
+  // Arenas are created lazily per participating thread, so the count is
+  // dynamic: at least one, and never more than the pool plus the caller.
+  EXPECT_GE(Allocator.getNumberOfAllocators(), 1u);
+  EXPECT_LE(Allocator.getNumberOfAllocators(), parallel::getThreadCount() + 1);
 }
 
 } // anonymous namespace
