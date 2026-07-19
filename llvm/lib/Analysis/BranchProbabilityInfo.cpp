@@ -948,6 +948,7 @@ void BPIConstruction::estimateBlockWeights(const Function &F, DominatorTree *DT,
                                            PostDominatorTree *PDT) {
   SmallVector<BasicBlock *, 8> BlockWorkList;
   SmallVector<LoopBlock, 8> LoopWorkList;
+  SmallVector<LoopBlock, 8> DeferredLoopWorkList;
   SmallDenseMap<LoopData, SmallVector<BasicBlock *, 4>> LoopExitBlocks;
 
   // By doing RPO we make sure that all predecessors already have weights
@@ -962,9 +963,10 @@ void BPIConstruction::estimateBlockWeights(const Function &F, DominatorTree *DT,
 
   // BlockWorklist/LoopWorkList contains blocks/loops with at least one
   // successor/exit having estimated weight. Try to propagate weight to such
-  // blocks/loops from successors/exits.
-  // Process loops and blocks. Order is not important.
-  do {
+  // blocks/loops from successors/exits. The result depends on the processing
+  // order, as the first weight estimated for a block wins.
+  size_t NumEstimated = 0;
+  for (;;) {
     while (!LoopWorkList.empty()) {
       const LoopBlock LoopBB = LoopWorkList.pop_back_val();
       const LoopData LD = LoopBB.getLoopData();
@@ -986,6 +988,11 @@ void BPIConstruction::estimateBlockWeights(const Function &F, DominatorTree *DT,
         EstimatedLoopWeight.insert({LD, *LoopWeight});
         // Add all blocks entering the loop into working list.
         getLoopEnterBlocks(LoopBB, BlockWorkList);
+      } else {
+        // An exit edge entering another loop needs that loop's weight, which
+        // may only be estimated later. Nothing re-enqueues this loop when that
+        // happens, so park it for a retry.
+        DeferredLoopWorkList.push_back(LoopBB);
       }
     }
 
@@ -1008,7 +1015,19 @@ void BPIConstruction::estimateBlockWeights(const Function &F, DominatorTree *DT,
         propagateEstimatedBlockWeight(LoopBB, DT, PDT, *MaxWeight,
                                       BlockWorkList, LoopWorkList);
     }
-  } while (!BlockWorkList.empty() || !LoopWorkList.empty());
+    if (!BlockWorkList.empty() || !LoopWorkList.empty())
+      continue;
+
+    // Retry the deferred loops for as long as the previous round estimated
+    // something new, which is what a retry needs to make progress. Loops whose
+    // weights depend on each other cyclically are left unestimated.
+    size_t Estimated = EstimatedBlockWeight.size() + EstimatedLoopWeight.size();
+    if (DeferredLoopWorkList.empty() || Estimated == NumEstimated)
+      break;
+    NumEstimated = Estimated;
+    LoopWorkList.append(DeferredLoopWorkList);
+    DeferredLoopWorkList.clear();
+  }
 }
 
 // Calculate edge probabilities based on block's estimated weight.

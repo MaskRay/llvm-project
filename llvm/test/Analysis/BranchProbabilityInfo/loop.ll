@@ -723,3 +723,41 @@ exit:
 
 
 
+
+; %loopA exits into %loopB, so estimating %loopA's weight needs %loopB's. When
+; %loopA is processed first that weight is not known yet and %loopA must be
+; retried, otherwise it keeps no estimate at all and %entry -> %loopA.header
+; wrongly gets the default weight instead of the cold one.
+define void @test19(i1 %arg) {
+; CHECK: edge %entry -> %loopA.header probability is 0x00008000 / 0x80000000 = 0.00%
+; CHECK: edge %entry -> %cold.exit probability is 0x7fff8000 / 0x80000000 = 100.00% [HOT edge]
+; CHECK: edge %loopA.header -> %loopA.latch probability is 0x7ffff800 / 0x80000000 = 100.00% [HOT edge]
+; CHECK: edge %loopA.header -> %loopB.header probability is 0x00000800 / 0x80000000 = 0.00%
+; CHECK: edge %loopA.latch -> %loopA.header probability is 0x80000000 / 0x80000000 = 100.00% [HOT edge]
+; CHECK: edge %loopA.latch -> %exit probability is 0x00000000 / 0x80000000 = 0.00%
+; CHECK: edge %loopB.header -> %loopB.latch probability is 0x80000000 / 0x80000000 = 100.00% [HOT edge]
+; CHECK: edge %loopB.latch -> %loopB.header probability is 0x80000000 / 0x80000000 = 100.00% [HOT edge]
+; CHECK: edge %loopB.latch -> %exit probability is 0x00000000 / 0x80000000 = 0.00%
+
+entry:
+  br i1 %arg, label %loopA.header, label %cold.exit
+
+cold.exit:
+  call void @cold()
+  ret void
+
+loopA.header:
+  br i1 %arg, label %loopA.latch, label %loopB.header
+
+loopA.latch:
+  br i1 %arg, label %loopA.header, label %exit
+
+loopB.header:
+  br label %loopB.latch
+
+loopB.latch:
+  br i1 %arg, label %loopB.header, label %exit
+
+exit:
+  unreachable
+}
