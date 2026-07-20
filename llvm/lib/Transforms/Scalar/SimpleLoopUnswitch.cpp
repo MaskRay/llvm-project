@@ -1846,8 +1846,10 @@ static void deleteDeadBlocksFromLoop(Loop &L,
                    [&](BasicBlock *BB) { return DeadBlockSet.count(BB); });
   }
 
-  // Now delete the dead child loops. This raw delete will clear them
-  // recursively.
+  // Now delete the dead child loops. Unlink them all from the loop forest
+  // first: the per-child callbacks below may reach code that walks the forest,
+  // which must not see a destroyed loop still linked into it.
+  SmallVector<Loop *, 4> DeadChildren;
   llvm::erase_if(L.getSubLoopsVector(), [&](Loop *ChildL) {
     if (!DeadBlockSet.count(ChildL->getHeader()))
       return false;
@@ -1858,12 +1860,15 @@ static void deleteDeadBlocksFromLoop(Loop &L,
                         }) &&
            "If the child loop header is dead all blocks in the child loop must "
            "be dead as well!");
+    DeadChildren.push_back(ChildL);
+    return true;
+  });
+  for (Loop *ChildL : DeadChildren) {
     LoopUpdater.markLoopAsDeleted(*ChildL, ChildL->getName());
     if (SE)
       SE->forgetBlockAndLoopDispositions();
     LI.destroy(ChildL);
-    return true;
-  });
+  }
 
   // Remove the loop mappings for the dead blocks and drop all the references
   // from these blocks to others to handle cyclic references as we start
