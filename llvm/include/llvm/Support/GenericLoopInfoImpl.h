@@ -318,6 +318,7 @@ void LoopBase<BlockT, LoopT>::replaceChildLoopWith(LoopT *OldChild,
   *I = NewChild;
   OldChild->ParentLoop = nullptr;
   NewChild->ParentLoop = static_cast<LoopT *>(this);
+  invalidateDFSNumbers();
 }
 
 /// verifyLoop - Verify loop structure
