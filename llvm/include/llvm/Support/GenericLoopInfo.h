@@ -69,6 +69,16 @@ template <class BlockT, class LoopT> class LoopBase {
   // block set.
   LoopInfoBase<BlockT, LoopT> *LI = nullptr;
 
+  // Euler-tour interval of this loop within the loop forest, assigned by
+  // LoopInfoBase::updateDFSNumbers(). While LI->DFSInfoValid, contains(const
+  // LoopT *) answers with the interval test [DFSNumIn, DFSNumOut] in O(1)
+  // instead of walking parent pointers. The numbering is structural, so only
+  // changes to the forest shape (not to a loop's block list) invalidate it.
+  // Numbers come from a monotonically increasing counter, so a stale number
+  // (never assigned, or assigned before this loop was detached from the
+  // forest) is below LI->DFSBase and is never used.
+  unsigned DFSNumIn = 0, DFSNumOut = 0;
+
 #if LLVM_ENABLE_ABI_BREAKING_CHECKS
   /// Indicator that this loop is no longer a valid loop.
   bool IsInvalid = false;
@@ -77,6 +87,13 @@ template <class BlockT, class LoopT> class LoopBase {
   LoopBase(const LoopBase<BlockT, LoopT> &) = delete;
   const LoopBase<BlockT, LoopT> &
   operator=(const LoopBase<BlockT, LoopT> &) = delete;
+
+  // Invalidate the owning LoopInfo's Euler-tour numbering after a change to the
+  // loop-forest structure.
+  void invalidateDFSNumbers() {
+    if (LI)
+      LI->DFSInfoValid = false;
+  }
 
 public:
   /// Return the nesting level of this loop.  An outer-most loop has depth 1,
@@ -121,6 +138,7 @@ public:
   void setParentLoop(LoopT *L) {
     assert(!isInvalid() && "Loop not in a valid state!");
     ParentLoop = L;
+    invalidateDFSNumbers();
   }
 
   /// Return true if the specified loop is contained within in this loop.
@@ -130,6 +148,18 @@ public:
       return true;
     if (!L)
       return false;
+    // O(1) Euler-tour interval test when the numbering is current and covered
+    // both loops; otherwise walk parent pointers, counting the slow steps and
+    // renumbering the forest past a threshold, as DominatorTreeBase::dominates
+    // does. The DFSBase checks keep a loop that the latest numbering did not
+    // reach (detached from the forest when it ran) on the walk path.
+    if (LI) {
+      if (!LI->DFSInfoValid && ++LI->SlowQueries > 32)
+        LI->updateDFSNumbers();
+      if (LI->DFSInfoValid && LI == L->LI && DFSNumIn >= LI->DFSBase &&
+          L->DFSNumIn >= LI->DFSBase)
+        return DFSNumIn <= L->DFSNumIn && L->DFSNumOut <= DFSNumOut;
+    }
     return contains(L->getParentLoop());
   }
 
@@ -161,6 +191,9 @@ public:
   }
   std::vector<LoopT *> &getSubLoopsVector() {
     assert(!isInvalid() && "Loop not in a valid state!");
+    // The caller may reshape the child list, which would move loops in the
+    // Euler tour; conservatively drop the numbering.
+    invalidateDFSNumbers();
     return SubLoops;
   }
   using iterator = typename std::vector<LoopT *>::const_iterator;
@@ -393,6 +426,7 @@ public:
     assert(!NewChild->ParentLoop && "NewChild already has a parent!");
     NewChild->ParentLoop = static_cast<LoopT *>(this);
     SubLoops.push_back(NewChild);
+    invalidateDFSNumbers();
   }
 
   /// This removes the specified child from being a subloop of this loop. The
@@ -404,6 +438,7 @@ public:
     assert(Child->ParentLoop == this && "Child is not a child of this loop!");
     SubLoops.erase(SubLoops.begin() + (I - begin()));
     Child->ParentLoop = nullptr;
+    invalidateDFSNumbers();
     return Child;
   }
 
@@ -534,6 +569,22 @@ template <class BlockT, class LoopT> class LoopInfoBase {
   std::vector<LoopT *> TopLevelLoops;
   BumpPtrAllocator LoopAllocator;
 
+  // Whether every loop's [DFSNumIn, DFSNumOut] interval reflects the current
+  // loop forest. Set by updateDFSNumbers(); cleared by any structural change to
+  // the forest. Mutable, with the fields below, so that contains(const LoopT *)
+  // can maintain the numbering lazily, as DominatorTreeBase does.
+  mutable bool DFSInfoValid = false;
+  // Parent-walk steps taken by contains(const LoopT *) while the numbering is
+  // stale; past a threshold the forest is renumbered.
+  mutable unsigned SlowQueries = 0;
+  // First number assigned by the latest numbering. The counter below is never
+  // reset, so DFSNumIn < DFSBase identifies a loop that numbering did not
+  // cover.
+  mutable unsigned DFSBase = 1;
+  // Monotonically increasing source of DFS numbers, starting at 1 so that a
+  // fresh loop's 0-initialized numbers are always stale.
+  mutable unsigned NextDFSNum = 1;
+
   friend class LoopBase<BlockT, LoopT>;
   friend class LoopInfo;
 
@@ -550,6 +601,9 @@ public:
         LoopAllocator(std::move(Arg.LoopAllocator)) {
     ParentPtr = Arg.ParentPtr;
     BlockNumberEpoch = Arg.BlockNumberEpoch;
+    DFSInfoValid = Arg.DFSInfoValid;
+    DFSBase = Arg.DFSBase;
+    NextDFSNum = Arg.NextDFSNum;
     resetLoopInfoOwners();
     // We have to clear the arguments top level loops as we've taken ownership.
     Arg.TopLevelLoops.clear();
@@ -558,6 +612,9 @@ public:
     BBMap = std::move(RHS.BBMap);
     ParentPtr = RHS.ParentPtr;
     BlockNumberEpoch = RHS.BlockNumberEpoch;
+    DFSInfoValid = RHS.DFSInfoValid;
+    DFSBase = RHS.DFSBase;
+    NextDFSNum = RHS.NextDFSNum;
 
     for (auto *L : TopLevelLoops)
       L->~LoopT();
@@ -571,6 +628,8 @@ public:
 
   void releaseMemory() {
     BBMap.clear();
+    DFSInfoValid = false;
+    SlowQueries = 0;
 
     for (auto *L : TopLevelLoops)
       L->~LoopT();
@@ -613,6 +672,40 @@ public:
   /// Also note that this is *not* a reverse preorder. Only the siblings are in
   /// reverse program order.
   SmallVector<LoopT *, 4> getLoopsInReverseSiblingPreorder() const;
+
+  /// Assign each loop an Euler-tour interval [DFSNumIn, DFSNumOut] over the
+  /// loop forest so that LoopBase::contains(const LoopT *) is answered in O(1).
+  /// Computed lazily: contains() calls this once enough slow queries have
+  /// accumulated; structural changes invalidate the numbering.
+  void updateDFSNumbers() const {
+    if (DFSInfoValid)
+      return;
+
+    SmallVector<std::pair<LoopT *, typename LoopT::iterator>, 32> WorkStack;
+    unsigned DFSNum = NextDFSNum;
+    DFSBase = DFSNum;
+    for (LoopT *Root : TopLevelLoops) {
+      WorkStack.push_back({Root, Root->begin()});
+      Root->DFSNumIn = DFSNum++;
+      while (!WorkStack.empty()) {
+        LoopT *N = WorkStack.back().first;
+        const typename LoopT::iterator ChildIt = WorkStack.back().second;
+        if (ChildIt == N->end()) {
+          N->DFSNumOut = DFSNum;
+          WorkStack.pop_back();
+        } else {
+          LoopT *Child = *ChildIt;
+          // Advance the stored iterator before push_back may reallocate.
+          ++WorkStack.back().second;
+          WorkStack.push_back({Child, Child->begin()});
+          Child->DFSNumIn = DFSNum++;
+        }
+      }
+    }
+    NextDFSNum = DFSNum + 1;
+    SlowQueries = 0;
+    DFSInfoValid = true;
+  }
 
 private:
   // Point every loop's owning-LoopInfo back-pointer at this object. Called
@@ -682,7 +775,12 @@ public:
   const std::vector<LoopT *> &getTopLevelLoops() const { return TopLevelLoops; }
 
   /// Return the top-level loops.
-  std::vector<LoopT *> &getTopLevelLoopsVector() { return TopLevelLoops; }
+  std::vector<LoopT *> &getTopLevelLoopsVector() {
+    // The caller may reshape the top-level list; conservatively drop the
+    // Euler-tour numbering.
+    DFSInfoValid = false;
+    return TopLevelLoops;
+  }
 
   /// This removes the specified top-level loop from this loop info object.
   /// The loop is not deleted, as it will presumably be inserted into
@@ -692,6 +790,7 @@ public:
     LoopT *L = *I;
     assert(L->isOutermost() && "Not a top-level loop!");
     TopLevelLoops.erase(TopLevelLoops.begin() + (I - begin()));
+    DFSInfoValid = false;
     return L;
   }
 
@@ -716,6 +815,7 @@ public:
     auto I = find(TopLevelLoops, OldLoop);
     assert(I != TopLevelLoops.end() && "Old loop not at top level!");
     *I = NewLoop;
+    DFSInfoValid = false;
     assert(!NewLoop->ParentLoop && !OldLoop->ParentLoop &&
            "Loops already embedded into a subloop!");
   }
@@ -724,6 +824,7 @@ public:
   void addTopLevelLoop(LoopT *New) {
     assert(New->isOutermost() && "Loop already in subloop!");
     TopLevelLoops.push_back(New);
+    DFSInfoValid = false;
   }
 
   /// This method completely removes BB from all data structures,
