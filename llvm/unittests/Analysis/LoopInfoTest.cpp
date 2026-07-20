@@ -232,6 +232,83 @@ TEST(LoopInfoTest, PreorderTraversals) {
   EXPECT_EQ(&L_0_0, ReverseSiblingPreorder[7]);
 }
 
+// The Euler-tour numbering behind Loop::contains(const Loop *) is computed
+// lazily once enough parent-walk queries accumulate, and must keep using the
+// walk for loops the numbering did not cover (detached from the forest when it
+// ran).
+TEST(LoopInfoTest, LazyEulerTourContains) {
+  const char *ModuleStr = "define void @f() {\n"
+                          "entry:\n"
+                          "  br label %a\n"
+                          "a:\n"
+                          "  br label %b\n"
+                          "b:\n"
+                          "  br label %c\n"
+                          "c:\n"
+                          "  br i1 undef, label %c, label %b.latch\n"
+                          "b.latch:\n"
+                          "  br i1 undef, label %b, label %a.latch\n"
+                          "a.latch:\n"
+                          "  br i1 undef, label %a, label %d\n"
+                          "d:\n"
+                          "  br i1 undef, label %d, label %end\n"
+                          "end:\n"
+                          "  ret void\n"
+                          "}\n";
+  LLVMContext Context;
+  std::unique_ptr<Module> M = makeLLVMModule(Context, ModuleStr);
+  Function &F = *M->begin();
+
+  DominatorTree DT(F);
+  LoopInfo LI;
+  LI.analyze(DT);
+
+  Function::iterator I = F.begin();
+  ASSERT_EQ("entry", I->getName());
+  ++I;
+  Loop *A = LI.getLoopFor(&*I++);
+  ASSERT_EQ("a", A->getHeader()->getName());
+  Loop *B = LI.getLoopFor(&*I++);
+  ASSERT_EQ("b", B->getHeader()->getName());
+  Loop *C = LI.getLoopFor(&*I++);
+  ASSERT_EQ("c", C->getHeader()->getName());
+  ++I;
+  ++I;
+  Loop *D = LI.getLoopFor(&*I);
+  ASSERT_EQ("d", D->getHeader()->getName());
+
+  // Cross the renumbering threshold; answers must not change once the interval
+  // test takes over from the parent walk.
+  for (int It = 0; It < 100; ++It) {
+    EXPECT_TRUE(A->contains(C));
+    EXPECT_TRUE(B->contains(C));
+    EXPECT_FALSE(C->contains(A));
+    EXPECT_FALSE(A->contains(D));
+    EXPECT_FALSE(D->contains(C));
+  }
+
+  // Detach B (with C inside), then detach C from B. The queries below
+  // retrigger renumbering, which does not reach the two orphans; their stale
+  // intervals still claim C is inside B and must not be consulted.
+  A->removeChildLoop(B);
+  B->removeChildLoop(C);
+  for (int It = 0; It < 100; ++It) {
+    EXPECT_FALSE(A->contains(B));
+    EXPECT_FALSE(A->contains(C));
+    EXPECT_FALSE(B->contains(C));
+    EXPECT_FALSE(D->contains(B));
+  }
+
+  // Reattach and query through another renumbering.
+  B->addChildLoop(C);
+  A->addChildLoop(B);
+  for (int It = 0; It < 100; ++It) {
+    EXPECT_TRUE(A->contains(C));
+    EXPECT_TRUE(B->contains(C));
+    EXPECT_FALSE(D->contains(C));
+  }
+}
+
 TEST(LoopInfoTest, CanonicalLoop) {
   const char *ModuleStr =
       "define void @foo(ptr %A, i32 %ub) {\n"
