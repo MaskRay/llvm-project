@@ -4107,6 +4107,34 @@ InputSection *ThunkSection::getTargetInputSection() const {
   return t->getTargetInputSection();
 }
 
+// Sort thunks so that a thunk promoted to its long form cannot push any other
+// thunk out of range: otherwise one promotion can force another on the next
+// pass, and such cascades may exceed the pass limit in
+// finalizeAddressDependentContent (#61250).
+//
+// A forward destination lies beyond the section end and moves with the
+// section's growth: growth below a thunk's offset shifts the thunk and its
+// destination together, while growth above it moves the destination away. A
+// backward destination stays put: growth below the thunk's offset moves the
+// thunk away from it, and growth above it has no effect. Placing backward
+// thunks first and ordering each group by descending destination address puts
+// the thunks most likely to grow (those with the farthest destinations) at
+// the end of the backward group and the start of the forward group, where
+// their growth changes no other thunk's distance.
+void ThunkSection::sortByDestination() {
+  uint64_t base = getVA();
+  SmallVector<std::pair<uint64_t, Thunk *>, 0> keys;
+  keys.reserve(thunks.size());
+  for (Thunk *t : thunks)
+    keys.push_back({t->getDestVA(), t});
+  llvm::stable_sort(keys, [base](const auto &a, const auto &b) {
+    bool aFwd = a.first > base, bFwd = b.first > base;
+    return aFwd != bFwd ? bFwd : a.first > b.first;
+  });
+  for (auto [i, p] : llvm::enumerate(keys))
+    thunks[i] = p.second;
+}
+
 bool ThunkSection::assignOffsets() {
   uint64_t off = 0;
   bool changed = false;

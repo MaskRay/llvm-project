@@ -29,6 +29,11 @@ from the [LLVM releases web site](https://llvm.org/releases/).
 
 ### ELF Improvements
 
+* Thunks in a thunk section are now sorted by descending destination address,
+  preventing cascaded short-to-long thunk promotions from exceeding the
+  address assignment pass limit.
+  ([#61250](https://github.com/llvm/llvm-project/issues/61250))
+
 ### Breaking changes
 
 ### COFF Improvements

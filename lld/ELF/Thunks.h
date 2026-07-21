@@ -60,6 +60,10 @@ public:
   // enabled.
   virtual bool needsSyntheticLandingPad() { return false; }
 
+  // The address the thunk must reach: the PLT entry if the branch is routed
+  // through the PLT, otherwise the destination itself.
+  uint64_t getDestVA() const;
+
   Defined *getThunkTargetSym() const { return syms[0]; }
 
   Ctx &ctx;
