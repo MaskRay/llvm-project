@@ -390,19 +390,19 @@ static void populateWorklist(Loop &L, LoopVector &LoopList) {
                     << L.getHeader()->getName() << '\n');
   assert(LoopList.empty() && "LoopList should initially be empty!");
   Loop *CurrentLoop = &L;
-  const std::vector<Loop *> *Vec = &CurrentLoop->getSubLoops();
-  while (!Vec->empty()) {
+  ArrayRef<Loop *> Vec = CurrentLoop->getSubLoops();
+  while (!Vec.empty()) {
     // The current loop has multiple subloops in it hence it is not tightly
     // nested.
     // Discard all loops above it added into Worklist.
-    if (Vec->size() != 1) {
+    if (Vec.size() != 1) {
       LoopList = {};
       return;
     }
 
     LoopList.push_back(CurrentLoop);
-    CurrentLoop = Vec->front();
-    Vec = &CurrentLoop->getSubLoops();
+    CurrentLoop = Vec.front();
+    Vec = CurrentLoop->getSubLoops();
   }
   LoopList.push_back(CurrentLoop);
 }

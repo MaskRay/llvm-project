@@ -44,6 +44,7 @@
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/GenericDomTree.h"
 
@@ -60,10 +61,10 @@ template <class N, class M> class PopulateLoopsDFS;
 template <class BlockT, class LoopT> class LoopBase {
   LoopT *ParentLoop;
   // Loops contained entirely within this one.
-  std::vector<LoopT *> SubLoops;
+  SmallVector<LoopT *, 0> SubLoops;
 
   // The list of blocks in this loop. First entry is the header node.
-  std::vector<BlockT *> Blocks;
+  SmallVector<BlockT *, 0> Blocks;
 
   // The LoopInfo that owns this loop. Used to answer contains(BlockT *) from
   // the central block-to-loop map.
@@ -160,13 +161,12 @@ public:
   }
 
   /// Return the loops contained entirely within this loop.
-  const std::vector<LoopT *> &getSubLoops() const {
+  ArrayRef<LoopT *> getSubLoops() const {
     assert(!isInvalid() && "Loop not in a valid state!");
     return SubLoops;
   }
-  using iterator = typename std::vector<LoopT *>::const_iterator;
-  using reverse_iterator =
-      typename std::vector<LoopT *>::const_reverse_iterator;
+  using iterator = LoopT *const *;
+  using reverse_iterator = std::reverse_iterator<iterator>;
   iterator begin() const { return getSubLoops().begin(); }
   iterator end() const { return getSubLoops().end(); }
   reverse_iterator rbegin() const { return getSubLoops().rbegin(); }
@@ -524,7 +524,7 @@ template <class BlockT, class LoopT> class LoopInfoBase {
   ParentT ParentPtr = nullptr;
   unsigned BlockNumberEpoch;
 
-  std::vector<LoopT *> TopLevelLoops;
+  SmallVector<LoopT *, 0> TopLevelLoops;
   BumpPtrAllocator LoopAllocator;
 
   friend class LoopBase<BlockT, LoopT>;
@@ -581,9 +581,8 @@ public:
   /// iterator/begin/end - The interface to the top-level loops in the current
   /// function.
   ///
-  using iterator = typename std::vector<LoopT *>::const_iterator;
-  using reverse_iterator =
-      typename std::vector<LoopT *>::const_reverse_iterator;
+  using iterator = LoopT *const *;
+  using reverse_iterator = std::reverse_iterator<iterator>;
   iterator begin() const { return TopLevelLoops.begin(); }
   iterator end() const { return TopLevelLoops.end(); }
   reverse_iterator rbegin() const { return TopLevelLoops.rbegin(); }
@@ -690,7 +689,7 @@ public:
   /// Both the remaining and the returned children keep their relative order.
   template <typename PredicateT>
   SmallVector<LoopT *, 4> takeChildrenIf(LoopT *Parent, PredicateT Pred) {
-    std::vector<LoopT *> &List = Parent ? Parent->SubLoops : TopLevelLoops;
+    SmallVectorImpl<LoopT *> &List = Parent ? Parent->SubLoops : TopLevelLoops;
     SmallVector<LoopT *, 4> Taken;
     llvm::erase_if(List, [&](LoopT *Child) {
       if (!Pred(Child))
@@ -720,7 +719,7 @@ public:
   }
 
   /// Return the top-level loops.
-  const std::vector<LoopT *> &getTopLevelLoops() const { return TopLevelLoops; }
+  ArrayRef<LoopT *> getTopLevelLoops() const { return TopLevelLoops; }
 
   /// This removes the specified top-level loop from this loop info object.
   /// The loop is not deleted, as it will presumably be inserted into

@@ -302,12 +302,10 @@ static Loop *separateNestedLoop(Loop *L, BasicBlock *Preheader,
 
   // Scan all of the loop children of L, moving them to OuterLoop if they are
   // not part of the inner loop.
-  const std::vector<Loop*> &SubLoops = L->getSubLoops();
-  for (size_t I = 0; I != SubLoops.size(); )
-    if (BlocksInL.count(SubLoops[I]->getHeader()))
-      ++I;   // Loop remains in L
-    else
-      NewOuter->addChildLoop(L->removeChildLoop(SubLoops.begin() + I));
+  for (Loop *Child : LI->takeChildrenIf(L, [&](Loop *Child) {
+         return !BlocksInL.count(Child->getHeader());
+       }))
+    NewOuter->addChildLoop(Child);
 
   SmallVector<BasicBlock *, 8> OuterLoopBlocks;
   OuterLoopBlocks.push_back(NewBB);

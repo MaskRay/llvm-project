@@ -1418,8 +1418,7 @@ ScopDetection::countBeneficialLoops(Region *R, ScalarEvolution &SE,
     L = L->getParentLoop();
   }
 
-  auto SubLoops =
-      L ? L->getSubLoops() : std::vector<Loop *>(LI.begin(), LI.end());
+  ArrayRef<Loop *> SubLoops = L ? L->getSubLoops() : LI.getTopLevelLoops();
 
   for (auto &SubLoop : SubLoops)
     if (R->contains(SubLoop)) {

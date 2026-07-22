@@ -244,7 +244,7 @@ LoopNest::getPerfectLoops(ScalarEvolution &SE) const {
     if (PerfectNest.empty())
       PerfectNest.push_back(L);
 
-    auto &SubLoops = L->getSubLoops();
+    ArrayRef<Loop *> SubLoops = L->getSubLoops();
     if (SubLoops.size() == 1 && arePerfectlyNested(*L, *SubLoops.front(), SE)) {
       PerfectNest.push_back(SubLoops.front());
     } else {
@@ -261,11 +261,11 @@ unsigned LoopNest::getMaxPerfectDepth(const Loop &Root, ScalarEvolution &SE) {
                     << Root.getName() << "'\n");
 
   const Loop *CurrentLoop = &Root;
-  const auto *SubLoops = &CurrentLoop->getSubLoops();
+  ArrayRef<Loop *> SubLoops = CurrentLoop->getSubLoops();
   unsigned CurrentDepth = 1;
 
-  while (SubLoops->size() == 1) {
-    const Loop *InnerLoop = SubLoops->front();
+  while (SubLoops.size() == 1) {
+    const Loop *InnerLoop = SubLoops.front();
     if (!arePerfectlyNested(*CurrentLoop, *InnerLoop, SE)) {
       LLVM_DEBUG({
         dbgs() << "Not a perfect nest: loop '" << CurrentLoop->getName()
@@ -276,7 +276,7 @@ unsigned LoopNest::getMaxPerfectDepth(const Loop &Root, ScalarEvolution &SE) {
     }
 
     CurrentLoop = InnerLoop;
-    SubLoops = &CurrentLoop->getSubLoops();
+    SubLoops = CurrentLoop->getSubLoops();
     ++CurrentDepth;
   }
 
