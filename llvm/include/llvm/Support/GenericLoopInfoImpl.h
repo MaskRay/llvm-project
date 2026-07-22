@@ -456,16 +456,16 @@ void LoopBase<BlockT, LoopT>::print(raw_ostream &OS, bool Verbose,
 /// this loop are mapped to this loop or a subloop. And all subloops within this
 /// loop have their parent loop set to this loop or a subloop.
 template <class BlockT, class LoopT>
-static void discoverAndMapSubloop(LoopT *L, ArrayRef<BlockT *> Backedges,
-                                  LoopInfoBase<BlockT, LoopT> *LI,
-                                  const DomTreeBase<BlockT> &DomTree) {
-  using InvBlockTraits = GraphTraits<Inverse<BlockT *>>;
-
+static void
+discoverAndMapSubloop(LoopT *L, ArrayRef<BlockT *> Backedges,
+                      LoopInfoBase<BlockT, LoopT> *LI,
+                      const DomTreeBase<BlockT> &DomTree,
+                      SmallVectorImpl<BlockT *> &ReverseCFGWorklist) {
   unsigned NumBlocks = 0;
   unsigned NumSubloops = 0;
 
   // Perform a backward CFG traversal using a worklist.
-  std::vector<BlockT *> ReverseCFGWorklist(Backedges.begin(), Backedges.end());
+  ReverseCFGWorklist.assign(Backedges.begin(), Backedges.end());
   while (!ReverseCFGWorklist.empty()) {
     BlockT *PredBB = ReverseCFGWorklist.back();
     ReverseCFGWorklist.pop_back();
@@ -481,9 +481,8 @@ static void discoverAndMapSubloop(LoopT *L, ArrayRef<BlockT *> Backedges,
       if (PredBB == L->getHeader())
         continue;
       // Push all block predecessors on the worklist.
-      ReverseCFGWorklist.insert(ReverseCFGWorklist.end(),
-                                InvBlockTraits::child_begin(PredBB),
-                                InvBlockTraits::child_end(PredBB));
+      for (BlockT *Pred : inverse_children<BlockT *>(PredBB))
+        ReverseCFGWorklist.push_back(Pred);
     } else {
       // This is a discovered block. Find its outermost discovered loop.
       Subloop = Subloop->getOutermostLoop();
@@ -513,15 +512,12 @@ static void discoverAndMapSubloop(LoopT *L, ArrayRef<BlockT *> Backedges,
 
 /// Populate all loop data in a stable order during a single forward DFS.
 template <class BlockT, class LoopT> class PopulateLoopsDFS {
-  using BlockTraits = GraphTraits<BlockT *>;
-  using SuccIterTy = typename BlockTraits::ChildIteratorType;
-
   LoopInfoBase<BlockT, LoopT> *LI;
 
 public:
   PopulateLoopsDFS(LoopInfoBase<BlockT, LoopT> *li) : LI(li) {}
 
-  void traverse(BlockT *EntryBlock);
+  void traverse(BlockT *EntryBlock, unsigned MaxBlockNumber);
 
 protected:
   void insertIntoLoop(BlockT *Block);
@@ -529,8 +525,12 @@ protected:
 
 /// Top-level driver for the forward DFS within the loop.
 template <class BlockT, class LoopT>
-void PopulateLoopsDFS<BlockT, LoopT>::traverse(BlockT *EntryBlock) {
-  for (BlockT *BB : post_order(EntryBlock))
+void PopulateLoopsDFS<BlockT, LoopT>::traverse(BlockT *EntryBlock,
+                                               unsigned MaxBlockNumber) {
+  // Presize the visited set so the traversal does not grow it edge by edge.
+  po_detail::NumberSet<BlockT *> Visited;
+  Visited.reserve(MaxBlockNumber);
+  for (BlockT *BB : post_order_ext(EntryBlock, Visited))
     insertIntoLoop(BB);
 }
 
@@ -588,9 +588,11 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
   for (const DomTreeNodeBase<BlockT> *Node : DomTree.nodes())
     PreorderNodes[Node->getDFSNumIn()] = Node;
 
+  SmallVector<BlockT *, 4> Backedges;
+  SmallVector<BlockT *, 32> ReverseCFGWorklist;
   for (const DomTreeNodeBase<BlockT> *DomNode : llvm::reverse(PreorderNodes)) {
     BlockT *Header = DomNode->getBlock();
-    SmallVector<BlockT *, 4> Backedges;
+    Backedges.clear();
 
     // Check each predecessor of the potential loop header.
     for (const auto Backedge : inverse_children<BlockT *>(Header)) {
@@ -602,13 +604,15 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
     // Perform a backward CFG traversal to discover and map blocks in this loop.
     if (!Backedges.empty()) {
       LoopT *L = AllocateLoop(Header);
-      discoverAndMapSubloop(L, ArrayRef<BlockT *>(Backedges), this, DomTree);
+      discoverAndMapSubloop(L, ArrayRef<BlockT *>(Backedges), this, DomTree,
+                            ReverseCFGWorklist);
     }
   }
   // Perform a single forward CFG traversal to populate block and subloop
-  // vectors for all loops.
+  // vectors for all loops, reusing BBMap's block-number bound for the DFS
+  // visited set.
   PopulateLoopsDFS<BlockT, LoopT> DFS(this);
-  DFS.traverse(DomRoot->getBlock());
+  DFS.traverse(DomRoot->getBlock(), BBMap.size());
 }
 
 template <class BlockT, class LoopT>

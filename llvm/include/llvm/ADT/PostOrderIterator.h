@@ -32,7 +32,7 @@ template <typename NodeRef> class NumberSet {
 
 public:
   void reserve(size_t Size) {
-    if (Size < Data.size())
+    if (Size > Data.size())
       Data.resize(Size, false);
   }
 
