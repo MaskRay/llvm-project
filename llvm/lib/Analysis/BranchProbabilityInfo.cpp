@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/BranchProbabilityInfo.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
@@ -58,6 +60,11 @@ static cl::opt<std::string> PrintBranchProbFuncName(
     "print-bpi-func-name", cl::Hidden,
     cl::desc("The option to specify the name of the function "
              "whose branch probability info is printed."));
+
+static cl::opt<bool> UseLegacyLoopForest(
+    "bpi-legacy-loop-forest", cl::init(false), cl::Hidden,
+    cl::desc("Use the loop forest BPI used before it moved to CycleInfo "
+             "(natural loops plus maximal SCCs). For A/B comparison only."));
 
 INITIALIZE_PASS_BEGIN(BranchProbabilityInfoWrapperPass, "branch-prob",
                       "Branch Probability Analysis", false, true)
@@ -162,6 +169,183 @@ enum class BlockExecWeight : std::uint32_t {
 };
 
 namespace {
+/// The loop forest BPI used before it moved to CycleInfo: LoopInfo's natural
+/// loops, with maximal SCCs as a flat fallback for the blocks no natural loop
+/// claims. Derived from CycleInfo and the dominator tree so that LoopInfo is
+/// not needed. Every path into a single-entry cycle goes through its header,
+/// so such a cycle already is a natural loop and only headers of irreducible
+/// cycles need the backward walk from their latches.
+class LegacyLoopForest {
+public:
+  /// A block's loop identity: {innermost natural loop, maximal SCC}, at most
+  /// one of which is set.
+  using LoopData = std::pair<int, int>;
+
+  LegacyLoopForest(const Function &F, const CycleInfo &CI,
+                   const DominatorTree &DT);
+
+  /// Innermost natural loop containing \p BB, or -1.
+  int getLoopNum(const BasicBlock *BB) const {
+    auto It = LoopNumOf.find(BB);
+    return It == LoopNumOf.end() ? -1 : It->second;
+  }
+  /// Maximal SCC of \p BB. Only consulted for blocks no natural loop claims,
+  /// matching how SccInfo was queried.
+  int getSccNum(const BasicBlock *BB) const {
+    return getLoopNum(BB) == -1 ? rawSccNum(BB) : -1;
+  }
+  LoopData getLoopData(const BasicBlock *BB) const {
+    return {getLoopNum(BB), getSccNum(BB)};
+  }
+  bool loopContains(int Outer, int Inner) const {
+    return Inner != -1 && Loops[Outer].Body.contains(Loops[Inner].Header);
+  }
+  bool loopContains(int LoopNum, const BasicBlock *BB) const {
+    return LoopNum != -1 && Loops[LoopNum].Body.contains(BB);
+  }
+  bool isLoopEnteringEdge(const BasicBlock *Src, const BasicBlock *Dst) const {
+    LoopData SrcLD = getLoopData(Src);
+    LoopData DstLD = getLoopData(Dst);
+    return (DstLD.first != -1 && !loopContains(DstLD.first, SrcLD.first)) ||
+           // SCCs can't be nested.
+           (DstLD.second != -1 && SrcLD.second != DstLD.second);
+  }
+  void getEnterBlocks(const BasicBlock *BB,
+                      SmallVectorImpl<const BasicBlock *> &Enters) const;
+  void getExitBlocks(const BasicBlock *BB,
+                     SmallVectorImpl<BasicBlock *> &Exits) const;
+
+private:
+  struct NaturalLoop {
+    const BasicBlock *Header = nullptr;
+    DenseSet<const BasicBlock *> Body;
+    SmallVector<const BasicBlock *, 8> Blocks;
+  };
+
+  int rawSccNum(const BasicBlock *BB) const {
+    auto It = SccNumOf.find(BB);
+    return It == SccNumOf.end() ? -1 : It->second;
+  }
+
+  SmallVector<NaturalLoop, 4> Loops;
+  SmallVector<SmallVector<const BasicBlock *, 8>, 2> SccBlocks;
+  DenseMap<const BasicBlock *, int> LoopNumOf;
+  DenseMap<const BasicBlock *, int> SccNumOf;
+};
+
+LegacyLoopForest::LegacyLoopForest(const Function &F, const CycleInfo &CI,
+                                   const DominatorTree &DT) {
+  // A natural loop header is the target of a back edge, i.e. an edge whose
+  // destination dominates its source. Loops sharing a header are one loop.
+  MapVector<const BasicBlock *, SmallVector<const BasicBlock *, 4>> Latches;
+  for (const BasicBlock &BB : F) {
+    // Unreachable blocks are dominated by everything, so a self-loop in one
+    // would look like a back edge. LoopInfo only covers reachable blocks.
+    if (!DT.isReachableFromEntry(&BB))
+      continue;
+    for (const BasicBlock *Succ : successors(&BB))
+      if (DT.dominates(Succ, &BB))
+        Latches[Succ].push_back(&BB);
+  }
+
+  for (const auto &[Header, LatchList] : Latches) {
+    NaturalLoop L;
+    L.Header = Header;
+    CycleRef C = CI.getCycle(Header);
+    if (C.isValid() && CI.isReducible(C) && CI.getHeader(C) == Header) {
+      // Single entry: the cycle's blocks (nested ones included) are exactly
+      // the natural loop's body.
+      L.Body.insert_range(CI.getBlocks(C));
+    } else {
+      // The header of an irreducible cycle: the natural loop is a strict
+      // subset of that cycle, so walk back from the latches, stopping at the
+      // header.
+      L.Body.insert(Header);
+      SmallVector<const BasicBlock *, 8> Stack;
+      for (const BasicBlock *A : LatchList)
+        if (L.Body.insert(A).second)
+          Stack.push_back(A);
+      while (!Stack.empty()) {
+        const BasicBlock *X = Stack.pop_back_val();
+        for (const BasicBlock *Pred : predecessors(X))
+          if (L.Body.insert(Pred).second)
+            Stack.push_back(Pred);
+      }
+    }
+    Loops.push_back(std::move(L));
+  }
+
+  for (NaturalLoop &L : Loops)
+    for (const BasicBlock &BB : F)
+      if (L.Body.contains(&BB))
+        L.Blocks.push_back(&BB);
+
+  // The innermost loop containing a block is the smallest one that has it.
+  for (const BasicBlock &BB : F) {
+    int Best = -1;
+    for (unsigned I = 0, E = Loops.size(); I != E; ++I)
+      if (Loops[I].Body.contains(&BB) &&
+          (Best == -1 || Loops[I].Body.size() < Loops[Best].Body.size()))
+        Best = I;
+    if (Best != -1)
+      LoopNumOf[&BB] = Best;
+  }
+
+  // SccInfo's maximal SCCs are CycleInfo's top-level cycles. Single-block ones
+  // are ignored, as SccInfo ignored them.
+  DenseMap<CycleRef, int> SccOfCycle;
+  for (const BasicBlock &BB : F) {
+    CycleRef C = CI.getCycle(&BB);
+    if (!C.isValid())
+      continue;
+    for (CycleRef P = CI.getParentCycle(C); P.isValid();
+         P = CI.getParentCycle(P))
+      C = P;
+    if (CI.getNumBlocks(C) < 2)
+      continue;
+    auto [It, Inserted] = SccOfCycle.try_emplace(C, SccBlocks.size());
+    if (Inserted)
+      SccBlocks.emplace_back();
+    SccNumOf[&BB] = It->second;
+    SccBlocks[It->second].push_back(&BB);
+  }
+}
+
+void LegacyLoopForest::getEnterBlocks(
+    const BasicBlock *BB, SmallVectorImpl<const BasicBlock *> &Enters) const {
+  auto [LoopNum, SccNum] = getLoopData(BB);
+  if (LoopNum != -1) {
+    // The pre-CycleInfo code appended every predecessor of the header,
+    // including in-loop latches.
+    const BasicBlock *Header = Loops[LoopNum].Header;
+    Enters.append(pred_begin(Header), pred_end(Header));
+    return;
+  }
+  assert(SccNum != -1 && "block belongs to no loop?");
+  // An SCC contributes the block inside it, once per edge from outside.
+  for (const BasicBlock *SccBB : SccBlocks[SccNum])
+    for (const BasicBlock *Pred : predecessors(SccBB))
+      if (rawSccNum(Pred) != SccNum)
+        Enters.push_back(SccBB);
+}
+
+void LegacyLoopForest::getExitBlocks(
+    const BasicBlock *BB, SmallVectorImpl<BasicBlock *> &Exits) const {
+  auto [LoopNum, SccNum] = getLoopData(BB);
+  if (LoopNum != -1) {
+    for (const BasicBlock *LoopB : Loops[LoopNum].Blocks)
+      for (const BasicBlock *Succ : successors(LoopB))
+        if (!Loops[LoopNum].Body.contains(Succ))
+          Exits.push_back(const_cast<BasicBlock *>(Succ));
+    return;
+  }
+  assert(SccNum != -1 && "block belongs to no loop?");
+  for (const BasicBlock *SccBB : SccBlocks[SccNum])
+    for (const BasicBlock *Succ : successors(SccBB))
+      if (rawSccNum(Succ) != SccNum)
+        Exits.push_back(const_cast<BasicBlock *>(Succ));
+}
+
 class BPIConstruction {
 public:
   BPIConstruction(BranchProbabilityInfo &BPI) : BPI(BPI) {}
@@ -192,10 +376,16 @@ private:
   /// weight.
   std::optional<uint32_t> getEstimatedBlockWeight(const BasicBlock *BB) const;
 
-  /// Returns estimated weight to enter \p L. In other words it is weight of
-  /// loop's header block not scaled by trip count. Returns std::nullopt if \p C
-  /// has no no estimated weight.
-  std::optional<uint32_t> getEstimatedLoopWeight(CycleRef C) const;
+  /// Returns estimated weight to enter the loop \p BB belongs to, i.e. weight
+  /// of the loop's header block not scaled by trip count. Returns std::nullopt
+  /// if the loop has no estimated weight.
+  std::optional<uint32_t> getEstimatedLoopWeight(const BasicBlock *BB) const;
+
+  /// Returns true if the loop \p BB belongs to has an estimated weight.
+  bool hasEstimatedLoopWeight(const BasicBlock *BB) const;
+
+  /// Records \p Weight for the loop \p BB belongs to.
+  void setEstimatedLoopWeight(const BasicBlock *BB, uint32_t Weight);
 
   /// Return estimated weight for \p Edge. Returns std::nullopt if estimated
   /// weight is unknown.
@@ -249,9 +439,16 @@ private:
 
   /// Keeps mapping of a loop to estimated weight to enter the loop.
   SmallDenseMap<CycleRef, uint32_t> EstimatedLoopWeight;
+
+  /// Non-null iff -bpi-legacy-loop-forest. Loop queries then use the legacy
+  /// forest and EstimatedLegacyLoopWeight instead of CycleInfo.
+  std::unique_ptr<const LegacyLoopForest> LF;
+  SmallDenseMap<LegacyLoopForest::LoopData, uint32_t> EstimatedLegacyLoopWeight;
 };
 
 bool BPIConstruction::isLoopEnteringEdge(const LoopEdge &Edge) const {
+  if (LF)
+    return LF->isLoopEnteringEdge(Edge.first, Edge.second);
   CycleRef SrcCycle = CI->getCycle(Edge.first);
   CycleRef DstCycle = CI->getCycle(Edge.second);
   if (!DstCycle) // Edge into no-cycle is not entering.
@@ -271,6 +468,8 @@ bool BPIConstruction::isLoopEnteringExitingEdge(const LoopEdge &Edge) const {
 
 void BPIConstruction::getLoopEnterBlocks(
     const BasicBlock *BB, SmallVectorImpl<const BasicBlock *> &Enters) const {
+  if (LF)
+    return LF->getEnterBlocks(BB, Enters);
   CycleRef C = CI->getCycle(BB);
   for (BasicBlock *Entry : CI->getEntries(C))
     for (const auto *Pred : predecessors(Entry))
@@ -446,11 +645,12 @@ bool BPIConstruction::calcPointerHeuristics(const BasicBlock *BB) {
   }
 }
 
-// Compute the unlikely successors to the block BB in the cycle C, specifically
-// those that are unlikely because this is a loop, and add them to the
-// UnlikelyBlocks set.
+// Compute the unlikely successors to the block BB in its loop (whose
+// membership \p LoopContains tests), specifically those that are unlikely
+// because this is a loop, and add them to the UnlikelyBlocks set.
 static void
-computeUnlikelySuccessors(const BasicBlock *BB, const CycleInfo &CI, CycleRef C,
+computeUnlikelySuccessors(const BasicBlock *BB,
+                          function_ref<bool(const BasicBlock *)> LoopContains,
                           SmallPtrSetImpl<const BasicBlock *> &UnlikelyBlocks) {
   // Sometimes in a loop we have a branch whose condition is made false by
   // taking it. This is typically something like
@@ -494,14 +694,14 @@ computeUnlikelySuccessors(const BasicBlock *BB, const CycleInfo &CI, CycleRef C,
   while (!CmpPHI && CmpLHS && isa<BinaryOperator>(CmpLHS) &&
          isa<Constant>(CmpLHS->getOperand(1))) {
     // Stop if the chain extends outside of the loop
-    if (!CI.contains(C, CmpLHS->getParent()))
+    if (!LoopContains(CmpLHS->getParent()))
       return;
     InstChain.push_back(cast<BinaryOperator>(CmpLHS));
     CmpLHS = dyn_cast<Instruction>(CmpLHS->getOperand(0));
     if (CmpLHS)
       CmpPHI = dyn_cast<PHINode>(CmpLHS);
   }
-  if (!CmpPHI || !CI.contains(C, CmpPHI->getParent()))
+  if (!CmpPHI || !LoopContains(CmpPHI->getParent()))
     return;
 
   // Trace the phi node to find all values that come from successors of BB
@@ -513,7 +713,7 @@ computeUnlikelySuccessors(const BasicBlock *BB, const CycleInfo &CI, CycleRef C,
     PHINode *P = WorkList.pop_back_val();
     for (BasicBlock *B : P->blocks()) {
       // Skip blocks that aren't part of the loop
-      if (!CI.contains(C, B))
+      if (!LoopContains(B))
         continue;
       Value *V = P->getIncomingValueForBlock(B);
       // If the source is a PHI add it to the work list if we haven't
@@ -560,20 +760,39 @@ BPIConstruction::getEstimatedBlockWeight(const BasicBlock *BB) const {
 }
 
 std::optional<uint32_t>
-BPIConstruction::getEstimatedLoopWeight(CycleRef C) const {
-  auto WeightIt = EstimatedLoopWeight.find(C);
+BPIConstruction::getEstimatedLoopWeight(const BasicBlock *BB) const {
+  if (LF) {
+    auto WeightIt = EstimatedLegacyLoopWeight.find(LF->getLoopData(BB));
+    if (WeightIt == EstimatedLegacyLoopWeight.end())
+      return std::nullopt;
+    return WeightIt->second;
+  }
+  auto WeightIt = EstimatedLoopWeight.find(CI->getCycle(BB));
   if (WeightIt == EstimatedLoopWeight.end())
     return std::nullopt;
   return WeightIt->second;
+}
+
+bool BPIConstruction::hasEstimatedLoopWeight(const BasicBlock *BB) const {
+  if (LF)
+    return EstimatedLegacyLoopWeight.count(LF->getLoopData(BB));
+  return EstimatedLoopWeight.count(CI->getCycle(BB));
+}
+
+void BPIConstruction::setEstimatedLoopWeight(const BasicBlock *BB,
+                                             uint32_t Weight) {
+  if (LF)
+    EstimatedLegacyLoopWeight.insert({LF->getLoopData(BB), Weight});
+  else
+    EstimatedLoopWeight.insert({CI->getCycle(BB), Weight});
 }
 
 std::optional<uint32_t>
 BPIConstruction::getEstimatedEdgeWeight(const LoopEdge &Edge) const {
   // For edges entering a loop take weight of a loop rather than an individual
   // block in the loop.
-  return isLoopEnteringEdge(Edge)
-             ? getEstimatedLoopWeight(CI->getCycle(Edge.second))
-             : getEstimatedBlockWeight(Edge.second);
+  return isLoopEnteringEdge(Edge) ? getEstimatedLoopWeight(Edge.second)
+                                  : getEstimatedBlockWeight(Edge.second);
 }
 
 template <class IterT>
@@ -611,7 +830,7 @@ bool BPIConstruction::updateEstimatedBlockWeight(
   for (const BasicBlock *PredBlock : predecessors(BB)) {
     // Add affected block/loop to a working list.
     if (isLoopExitingEdge({PredBlock, BB})) {
-      if (!EstimatedLoopWeight.count(CI->getCycle(PredBlock)))
+      if (!hasEstimatedLoopWeight(PredBlock))
         LoopWorkList.push_back(PredBlock);
     } else if (!EstimatedBlockWeight.count(PredBlock))
       BlockWorkList.push_back(PredBlock);
@@ -708,6 +927,8 @@ void BPIConstruction::estimateBlockWeights(const Function &F, DominatorTree *DT,
   SmallVector<const BasicBlock *, 8> BlockWorkList;
   SmallVector<const BasicBlock *, 8> LoopWorkList;
   SmallDenseMap<CycleRef, SmallVector<BasicBlock *, 4>> LoopExitBlocks;
+  SmallDenseMap<LegacyLoopForest::LoopData, SmallVector<BasicBlock *, 4>>
+      LegacyLoopExitBlocks;
 
   // By doing RPO we make sure that all predecessors already have weights
   // calculated before visiting theirs successors.
@@ -726,23 +947,31 @@ void BPIConstruction::estimateBlockWeights(const Function &F, DominatorTree *DT,
   do {
     while (!LoopWorkList.empty()) {
       const BasicBlock *LoopBB = LoopWorkList.pop_back_val();
-      CycleRef C = CI->getCycle(LoopBB);
-      if (EstimatedLoopWeight.count(C))
+      if (hasEstimatedLoopWeight(LoopBB))
         continue;
 
-      auto Res = LoopExitBlocks.try_emplace(C);
-      SmallVectorImpl<BasicBlock *> &Exits = Res.first->second;
-      if (Res.second)
-        CI->getExitBlocks(C, Exits);
+      SmallVectorImpl<BasicBlock *> *Exits;
+      if (LF) {
+        auto Res = LegacyLoopExitBlocks.try_emplace(LF->getLoopData(LoopBB));
+        Exits = &Res.first->second;
+        if (Res.second)
+          LF->getExitBlocks(LoopBB, *Exits);
+      } else {
+        CycleRef C = CI->getCycle(LoopBB);
+        auto Res = LoopExitBlocks.try_emplace(C);
+        Exits = &Res.first->second;
+        if (Res.second)
+          CI->getExitBlocks(C, *Exits);
+      }
       auto LoopWeight = getMaxEstimatedEdgeWeight(
-          LoopBB, make_range(Exits.begin(), Exits.end()));
+          LoopBB, make_range(Exits->begin(), Exits->end()));
 
       if (LoopWeight) {
         // If we never exit the loop then we can enter it once at maximum.
         if (LoopWeight <= static_cast<uint32_t>(BlockExecWeight::UNREACHABLE))
           LoopWeight = static_cast<uint32_t>(BlockExecWeight::LOWEST_NON_ZERO);
 
-        EstimatedLoopWeight.insert({C, *LoopWeight});
+        setEstimatedLoopWeight(LoopBB, *LoopWeight);
         // Add all blocks entering the loop into working list.
         getLoopEnterBlocks(LoopBB, BlockWorkList);
       }
@@ -776,12 +1005,24 @@ bool BPIConstruction::calcEstimatedHeuristics(const BasicBlock *BB) {
   assert(BB->getTerminator()->getNumSuccessors() > 1 &&
          "expected more than one successor!");
 
-  CycleRef BBCycle = CI->getCycle(BB);
-
   SmallPtrSet<const BasicBlock *, 8> UnlikelyBlocks;
   uint32_t TC = LBH_TAKEN_WEIGHT / LBH_NONTAKEN_WEIGHT;
-  if (BBCycle)
-    computeUnlikelySuccessors(BB, *CI, BBCycle, UnlikelyBlocks);
+  bool InLoop;
+  if (LF) {
+    int LoopNum = LF->getLoopNum(BB);
+    InLoop = LoopNum != -1;
+    if (InLoop)
+      computeUnlikelySuccessors(
+          BB, [&](const BasicBlock *B) { return LF->loopContains(LoopNum, B); },
+          UnlikelyBlocks);
+  } else {
+    CycleRef BBCycle = CI->getCycle(BB);
+    InLoop = BBCycle.isValid();
+    if (InLoop)
+      computeUnlikelySuccessors(
+          BB, [&](const BasicBlock *B) { return CI->contains(BBCycle, B); },
+          UnlikelyBlocks);
+  }
 
   // Changed to 'true' if at least one successor has estimated weight.
   bool FoundEstimatedWeight = false;
@@ -803,7 +1044,7 @@ bool BPIConstruction::calcEstimatedHeuristics(const BasicBlock *BB) {
           Weight.value_or(static_cast<uint32_t>(BlockExecWeight::DEFAULT)) /
               TC);
     }
-    bool IsUnlikelyEdge = BBCycle && UnlikelyBlocks.contains(SuccBB);
+    bool IsUnlikelyEdge = InLoop && UnlikelyBlocks.contains(SuccBB);
     if (IsUnlikelyEdge &&
         // Avoid adjustment of ZERO weight since it should remain unchanged.
         Weight != static_cast<uint32_t>(BlockExecWeight::ZERO)) {
@@ -997,6 +1238,9 @@ void BPIConstruction::calculate(const Function &F, const CycleInfo &CycleI,
     PDTPtr = std::make_unique<PostDominatorTree>(const_cast<Function &>(F));
     PDT = PDTPtr.get();
   }
+
+  if (UseLegacyLoopForest)
+    LF = std::make_unique<LegacyLoopForest>(F, CycleI, *DT);
 
   estimateBlockWeights(F, DT, PDT);
 
