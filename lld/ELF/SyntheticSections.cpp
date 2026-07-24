@@ -4107,25 +4107,33 @@ InputSection *ThunkSection::getTargetInputSection() const {
   return t->getTargetInputSection();
 }
 
-bool ThunkSection::assignOffsets(bool sort) {
-  if (sort) {
-    // Sorting rearranges thunk sequence from:
-    // destA, destB, ..., [backwards A, B], [forward C, D], ..., destC, destD
-    // to
-    // destA, destB, ..., [backwards B, A], [forwards D, C], ..., destC, destD
-    //
-    // Since we iterate on thunks from first to last in a thunk section while
-    // doing upgradation, any thunk that is found to be out of range is
-    // guarranted to not invalidate thunks that we have already iterated on.
-    // This allows quicker convergence.
-    uint64_t sectionVA = getVA();
-    llvm::stable_sort(thunks, [sectionVA](const Thunk *a, const Thunk *b) {
-      bool aFwd = a->getDestVA() > sectionVA;
-      bool bFwd = b->getDestVA() > sectionVA;
-      return aFwd != bFwd ? bFwd : a->getDestVA() > b->getDestVA();
-    });
-  }
+// Move forward thunks to the right half and sort them by destination VA:
+//
+// dstA, dstB, [backward A, B], [forward D, C], dstC, dstD
+//
+// A forward thunk's distance grows when a thunk after it grows. Ordering
+// forward thunks by descending destination keeps the most promotable ones
+// lowest, where their growth stays below the rest. A backward thunk's distance
+// grows only with a promotion before it, already applied when we reach it, so
+// backward thunks need no ordering and stay ahead of forward thunks in creation
+// order.
+void ThunkSection::sortByDestination() {
+  uint64_t base = getVA();
+  SmallVector<std::pair<uint64_t, Thunk *>, 0> keys;
+  keys.resize_for_overwrite(thunks.size());
+  for (auto [i, t] : enumerate(thunks))
+    keys[i] = {t->getDestVA(), t};
+  auto *forward =
+      std::stable_partition(keys.begin(), keys.end(),
+                            [base](const auto &k) { return k.first <= base; });
+  std::stable_sort(forward, keys.end(), [](const auto &a, const auto &b) {
+    return a.first > b.first;
+  });
+  for (auto [i, p] : llvm::enumerate(keys))
+    thunks[i] = p.second;
+}
 
+bool ThunkSection::assignOffsets() {
   uint64_t off = 0;
   bool changed = false;
   for (Thunk *t : thunks) {

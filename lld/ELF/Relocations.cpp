@@ -1742,6 +1742,7 @@ ThunkSection *ThunkCreator::addThunkSection(OutputSection *os,
                                             uint64_t off, bool isPrefix) {
   auto *ts = make<ThunkSection>(ctx, os, off);
   ts->partition = os->partition;
+  ts->isPrefix = isPrefix;
   if ((ctx.arg.fixCortexA53Errata843419 || ctx.arg.fixCortexA8) &&
       !isd->sections.empty() && !isPrefix) {
     // The errata fixes are sensitive to addresses modulo 4 KiB. When we add
@@ -1968,11 +1969,12 @@ bool ThunkCreator::createThunks(uint32_t pass,
           }
 
         for (auto &p : isd->thunkSections) {
-          // Ordering thunks by their destination allows for quicker
-          // convergence. Bulk of thunks are created in pass 0. So sorting them
-          // then has most impact and should be sufficient in most cases.
-          addressesChanged |=
-              p.first->assignOffsets(pass == 0 && ctx.arg.zSortThunkSection);
+          // Sort thunks for quicker convergence. Sort only in pass 0, which
+          // creates the bulk of thunks. Prefix thunk sections hold alternative
+          // entry points whose order is meaningful and must not be reordered.
+          if (pass == 0 && ctx.arg.zSortThunkSection && !p.first->isPrefix)
+            p.first->sortByDestination();
+          addressesChanged |= p.first->assignOffsets();
         }
       });
 
