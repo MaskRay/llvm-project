@@ -506,8 +506,8 @@ void LoopInfoBase<BlockT, LoopT>::discoverAndMapSubloop(
   L->reserveSubLoops(NumSubloops);
 }
 
-/// Analyze LoopInfo discovers loops during a reverse preorder DominatorTree
-/// traversal interleaved with backward CFG traversals within each subloop
+/// Analyze LoopInfo discovers loops during a single forward depth-first search
+/// of the CFG interleaved with backward CFG traversals within each subloop
 /// (discoverAndMapSubloop). The backward traversal skips inner subloops, so
 /// this part of the algorithm is linear in the number of CFG edges.
 ///
@@ -517,25 +517,79 @@ void LoopInfoBase<BlockT, LoopT>::discoverAndMapSubloop(
 /// program order.
 template <class BlockT, class LoopT>
 void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
+  using BlockTraits = GraphTraits<BlockT *>;
+  auto Number = [](const BlockT *BB) {
+    return GraphTraits<const BlockT *>::getNumber(BB);
+  };
+
   const DomTreeNodeBase<BlockT> *DomRoot = DomTree.getRootNode();
   ParentPtr = DomRoot->getBlock()->getParent();
   BlockNumberEpoch = GraphTraits<ParentT>::getNumberEpoch(ParentPtr);
-  BBMap.resize(GraphTraits<ParentT>::getMaxNumber(ParentPtr));
+  unsigned MaxNumber = GraphTraits<ParentT>::getMaxNumber(ParentPtr);
+  BBMap.resize(MaxNumber);
 
-  // Visit dominator tree nodes in reverse preorder: like postorder, this
-  // guarantees a sub-loop is discovered before the outer loop.
+  // A header dominates its latches, so it precedes them in every depth-first
+  // search tree and each of its backedges is a retreating edge. Flag the
+  // retreating edge targets as header candidates during a forward search, and
+  // record its postorder for the layout below.
+  enum : uint8_t {
+    Unvisited = 0,
+    OnPath = 1,
+    Done = 2,
+    StateMask = 3,
+    Candidate = 4,
+  };
+  SmallVector<uint8_t, 32> State(MaxNumber, Unvisited);
+  SmallVector<BlockT *, 32> Postorder;
+  Postorder.reserve(MaxNumber);
+  struct Frame {
+    BlockT *Block;
+    typename BlockTraits::ChildIteratorType Cur, End;
+  };
+  SmallVector<Frame, 8> Stack;
+  bool HasCandidate = false;
+  auto push = [&](BlockT *BB) {
+    State[Number(BB)] = OnPath;
+    Stack.push_back(
+        {BB, BlockTraits::child_begin(BB), BlockTraits::child_end(BB)});
+  };
+
+  push(GraphTraits<ParentT>::getEntryNode(ParentPtr));
+  while (!Stack.empty()) {
+    Frame &Top = Stack.back();
+    if (Top.Cur == Top.End) {
+      uint8_t &S = State[Number(Top.Block)];
+      S = (S & ~StateMask) | Done;
+      Postorder.push_back(Top.Block);
+      Stack.pop_back();
+      continue;
+    }
+    BlockT *Succ = *Top.Cur++;
+    uint8_t &S = State[Number(Succ)];
+    if ((S & StateMask) == Unvisited) {
+      push(Succ);
+    } else if ((S & StateMask) == OnPath) {
+      S |= Candidate;
+      HasCandidate = true;
+    }
+  }
+  // Most functions have no loops; skip the layout construction.
+  if (!HasCandidate)
+    return;
+
+  // Visit candidates in postorder: a subloop's header is dominated by the outer
+  // header, hence leaves the search path first, so a sub-loop is discovered
+  // before the outer loop.
   DomTree.updateDFSNumbers();
-  SmallVector<const DomTreeNodeBase<BlockT> *, 32> PreorderNodes(
-      DomRoot->getDFSNumOut());
-  for (const DomTreeNodeBase<BlockT> *Node : DomTree.nodes())
-    PreorderNodes[Node->getDFSNumIn()] = Node;
-
   bool HasLoops = false;
-  for (const DomTreeNodeBase<BlockT> *DomNode : llvm::reverse(PreorderNodes)) {
-    BlockT *Header = DomNode->getBlock();
-    SmallVector<BlockT *, 4> Backedges;
+  SmallVector<BlockT *, 4> Backedges;
+  for (BlockT *Header : Postorder) {
+    if (!(State[Number(Header)] & Candidate))
+      continue;
 
     // Check each predecessor of the potential loop header.
+    const DomTreeNodeBase<BlockT> *DomNode = DomTree.getNode(Header);
+    Backedges.clear();
     for (const auto Backedge : inverse_children<BlockT *>(Header)) {
       // If Header dominates predBB, this is a new loop. Collect the backedges.
       const DomTreeNodeBase<BlockT> *BackedgeNode = DomTree.getNode(Backedge);
@@ -549,7 +603,7 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
       discoverAndMapSubloop(L, Header, Backedges, DomTree);
     }
   }
-  // Most functions have no loops; skip the layout construction.
+  // An irreducible retreating edge is not a backedge and forms no loop.
   if (!HasLoops)
     return;
 
@@ -557,8 +611,8 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
   // and build the loop list in PO.
   SmallVector<std::pair<BlockT *, LoopT *>, 32> PO;
   SmallVector<LoopT *, 4> LoopsPO;
-  PO.reserve(BBMap.size());
-  for (BlockT *BB : post_order(ParentPtr)) {
+  PO.reserve(Postorder.size());
+  for (BlockT *BB : Postorder) {
     LoopT *L = lookupLoopFor(BB);
     if (!L)
       continue;
