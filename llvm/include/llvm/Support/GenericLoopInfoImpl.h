@@ -506,10 +506,11 @@ void LoopInfoBase<BlockT, LoopT>::discoverAndMapSubloop(
   L->reserveSubLoops(NumSubloops);
 }
 
-/// Analyze LoopInfo discovers loops during a single forward depth-first search
-/// of the CFG interleaved with backward CFG traversals within each subloop
-/// (discoverAndMapSubloop). The backward traversal skips inner subloops, so
-/// this part of the algorithm is linear in the number of CFG edges.
+/// Analyze LoopInfo identifies the loops during a single forward depth-first
+/// search of the CFG, falling back for an irreducible CFG to backward
+/// traversals within each subloop (discoverAndMapSubloop). The backward
+/// traversal skips inner subloops, so this part of the algorithm is linear in
+/// the number of CFG edges.
 ///
 /// Then build a loop-contiguous reverse postorder for in-loops blocks. Lists
 /// are header-first with each subloop's blocks contiguous, ordered by first
@@ -528,18 +529,64 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
   unsigned MaxNumber = GraphTraits<ParentT>::getMaxNumber(ParentPtr);
   BBMap.resize(MaxNumber);
 
-  // A header dominates its latches, so it precedes them in every depth-first
-  // search tree and each of its backedges is a retreating edge. Flag the
-  // retreating edge targets as header candidates during a forward search, and
-  // record its postorder for the layout below.
-  enum : uint8_t {
-    Unvisited = 0,
-    OnPath = 1,
-    Done = 2,
-    StateMask = 3,
-    Candidate = 4,
+  // Sentinel block number meaning "no block".
+  constexpr unsigned NoBlock = ~0u;
+  // Search path positions start above the states a block takes outside the
+  // path, so that comparing them, the innermost step of tagHeader, needs no
+  // masking.
+  constexpr unsigned Unvisited = 0;
+  constexpr unsigned OffPath = 1;
+  constexpr unsigned IsHeader = 2;
+
+  // Per-block search state, indexed by block number.
+  struct BlockDFS {
+    // Unvisited, OffPath, or the position on the current search path. Once the
+    // search is over every block is off it, and the headers are marked
+    // IsHeader.
+    unsigned Pos = Unvisited;
+    // Block number of the innermost enclosing header; NoBlock if none. Set to
+    // NoBlock when the block is visited, then woven by tagHeader.
+    unsigned Head = 0;
   };
-  SmallVector<uint8_t, 32> State(MaxNumber, Unvisited);
+  SmallVector<BlockDFS, 32> Info(MaxNumber);
+  // The loop headers, repeated once per backedge.
+  SmallVector<unsigned, 4> Headers;
+
+  // Weave header \p H, and its own chain, into \p B's chain of enclosing
+  // headers, keeping the chain ordered innermost first by search path
+  // position. Building the chain during the search is what lets loop
+  // membership fall out without a union-find structure.
+  auto tagHeader = [&](unsigned B, unsigned H) {
+    // Invariant: Info[B].Pos >= Info[H].Pos.
+    while (B != H) {
+      unsigned IH = Info[B].Head;
+      if (IH == NoBlock) {
+        // B's chain ended: append the rest of H's chain.
+        Info[B].Head = H;
+        return;
+      }
+      // Keep whichever candidate header is inner.
+      if (Info[IH].Pos >= Info[H].Pos) {
+        B = IH;
+      } else {
+        Info[B].Head = H;
+        B = H;
+        H = IH;
+      }
+    }
+  };
+
+  // A header dominates its latches, so it precedes them in every depth-first
+  // search tree and each of its backedges is a retreating edge. One forward
+  // search therefore finds every header, and identifies the loops with the
+  // algorithm of Wei et al., "A New Algorithm for Identifying Loops in
+  // Decompilation" (SAS 2007): tag each block with its innermost enclosing
+  // header. It also records the postorder the layout below needs.
+  //
+  // An edge entering a loop whose header has left the search path enters it at
+  // a block other than its header, which proves the CFG irreducible. The tags
+  // are then dropped for the backward traversals of discoverAndMapSubloop,
+  // which alone compute exact membership there.
   SmallVector<BlockT *, 32> Postorder;
   Postorder.reserve(MaxNumber);
   struct Frame {
@@ -547,9 +594,12 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
     typename BlockTraits::ChildIteratorType Cur, End;
   };
   SmallVector<Frame, 8> Stack;
-  bool HasCandidate = false;
+  unsigned Counter = IsHeader;
+  bool Irreducible = false;
   auto push = [&](BlockT *BB) {
-    State[Number(BB)] = OnPath;
+    unsigned B = Number(BB);
+    Info[B].Pos = ++Counter;
+    Info[B].Head = NoBlock;
     Stack.push_back(
         {BB, BlockTraits::child_begin(BB), BlockTraits::child_end(BB)});
   };
@@ -558,54 +608,97 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
   while (!Stack.empty()) {
     Frame &Top = Stack.back();
     if (Top.Cur == Top.End) {
-      uint8_t &S = State[Number(Top.Block)];
-      S = (S & ~StateMask) | Done;
+      // Leave the search path, and weave into the parent's chain.
+      unsigned B0 = Number(Top.Block);
+      Info[B0].Pos = OffPath;
       Postorder.push_back(Top.Block);
       Stack.pop_back();
+      if (!Stack.empty() && Info[B0].Head != NoBlock)
+        tagHeader(Number(Stack.back().Block), Info[B0].Head);
       continue;
     }
-    BlockT *Succ = *Top.Cur++;
-    uint8_t &S = State[Number(Succ)];
-    if ((S & StateMask) == Unvisited) {
-      push(Succ);
-    } else if ((S & StateMask) == OnPath) {
-      S |= Candidate;
-      HasCandidate = true;
+    BlockT *B0P = Top.Block;
+    BlockT *B1P = *Top.Cur++;
+    unsigned B1 = Number(B1P);
+    if (Info[B1].Pos == Unvisited) {
+      // Tree edge; the weaving happens when B1's frame is popped.
+      push(B1P);
+    } else if (Info[B1].Pos > IsHeader) {
+      // Retreating edge, including a self edge: B1 heads a loop.
+      Headers.push_back(B1);
+      if (!Irreducible)
+        tagHeader(Number(B0P), B1);
+    } else if (!Irreducible) {
+      // Cross or forward edge. Tagging B1's innermost header adds B0 to that
+      // loop and, through its chain, to the ones enclosing it. That header
+      // having left the search path instead means this edge enters its loop
+      // from outside at a block other than its header.
+      unsigned H = Info[B1].Head;
+      if (H == NoBlock)
+        continue;
+      if (Info[H].Pos > IsHeader)
+        tagHeader(Number(B0P), H);
+      else
+        Irreducible = true;
     }
   }
   // Most functions have no loops; skip the layout construction.
-  if (!HasCandidate)
+  if (Headers.empty())
     return;
+  // Every block is off the search path now, so marking the headers cannot be
+  // mistaken for a position on it.
+  for (unsigned H : Headers)
+    Info[H].Pos = IsHeader;
 
-  // Visit candidates in postorder: a subloop's header is dominated by the outer
-  // header, hence leaves the search path first, so a sub-loop is discovered
-  // before the outer loop.
-  DomTree.updateDFSNumbers();
   bool HasLoops = false;
-  SmallVector<BlockT *, 4> Backedges;
-  for (BlockT *Header : Postorder) {
-    if (!(State[Number(Header)] & Candidate))
-      continue;
+  if (!Irreducible) {
+    // Resolve the chains in reverse postorder: a block's innermost header is
+    // one of its search tree ancestors, so it is mapped to its loop first.
+    for (BlockT *BB : llvm::reverse(Postorder)) {
+      unsigned B = Number(BB);
+      unsigned Head = Info[B].Head;
+      LoopT *Enclosing = Head == NoBlock ? nullptr : BBMap[Head];
+      if (Info[B].Pos != IsHeader) {
+        BBMap[B] = Enclosing;
+        continue;
+      }
+      LoopT *L = allocateLoop(BB);
+      L->setParentLoop(Enclosing);
+      BBMap[B] = L;
+    }
+    HasLoops = true;
+  } else {
+    // Visit headers in postorder: a subloop's header is dominated by the outer
+    // header, hence leaves the search path first, so a sub-loop is discovered
+    // before the outer loop.
+    DomTree.updateDFSNumbers();
+    SmallVector<BlockT *, 4> Backedges;
+    for (BlockT *Header : Postorder) {
+      if (Info[Number(Header)].Pos != IsHeader)
+        continue;
 
-    // Check each predecessor of the potential loop header.
-    const DomTreeNodeBase<BlockT> *DomNode = DomTree.getNode(Header);
-    Backedges.clear();
-    for (const auto Backedge : inverse_children<BlockT *>(Header)) {
-      // If Header dominates predBB, this is a new loop. Collect the backedges.
-      const DomTreeNodeBase<BlockT> *BackedgeNode = DomTree.getNode(Backedge);
-      if (BackedgeNode && DomTree.dominates(DomNode, BackedgeNode))
-        Backedges.push_back(Backedge);
+      // Check each predecessor of the potential loop header.
+      const DomTreeNodeBase<BlockT> *DomNode = DomTree.getNode(Header);
+      Backedges.clear();
+      for (const auto Backedge : inverse_children<BlockT *>(Header)) {
+        // If Header dominates predBB, this is a new loop. Collect the
+        // backedges.
+        const DomTreeNodeBase<BlockT> *BackedgeNode = DomTree.getNode(Backedge);
+        if (BackedgeNode && DomTree.dominates(DomNode, BackedgeNode))
+          Backedges.push_back(Backedge);
+      }
+      // Perform a backward CFG traversal to discover and map blocks in this
+      // loop.
+      if (!Backedges.empty()) {
+        HasLoops = true;
+        LoopT *L = allocateLoop(Header);
+        discoverAndMapSubloop(L, Header, Backedges, DomTree);
+      }
     }
-    // Perform a backward CFG traversal to discover and map blocks in this loop.
-    if (!Backedges.empty()) {
-      HasLoops = true;
-      LoopT *L = allocateLoop(Header);
-      discoverAndMapSubloop(L, Header, Backedges, DomTree);
-    }
+    // An irreducible retreating edge is not a backedge and forms no loop.
+    if (!HasLoops)
+      return;
   }
-  // An irreducible retreating edge is not a backedge and forms no loop.
-  if (!HasLoops)
-    return;
 
   // Record each in-loop block with its innermost loop in forward CFG postorder,
   // and build the loop list in PO.
