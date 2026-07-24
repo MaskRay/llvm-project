@@ -1135,6 +1135,20 @@ public:
                                const MCPseudoProbeInlineStack &InlineStack,
                                MCSymbol *FnSym);
 
+  /// Enable aligned instruction bundling with the given bundle size, from
+  /// this point onward. Once enabled, bundling cannot be disabled and the
+  /// bundle size cannot be changed.
+  virtual void emitBundleAlignMode(Align Alignment);
+
+  /// The following instructions are a bundle-locked group.
+  ///
+  /// \param AlignToEnd - If true, the bundle-locked group will be aligned to
+  ///                     the end of a bundle.
+  virtual void emitBundleLock(bool AlignToEnd, const MCSubtargetInfo &STI);
+
+  /// Ends a bundle-locked group.
+  virtual void emitBundleUnlock(const MCSubtargetInfo &STI);
+
   /// If this file is backed by a assembly streamer, this dumps the
   /// specified string in the output .s file.  This capability is indicated by
   /// the hasRawTextSupport() predicate.  By default this aborts.

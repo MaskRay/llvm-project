@@ -396,6 +396,39 @@ void MCAssembler::addRelocDirective(RelocDirective RD) {
   relocDirectives.push_back(RD);
 }
 
+/// Largest nop that fits in the remaining bytes without crossing a bundle
+/// boundary at Offset.
+static uint64_t maxNopBytesAt(const MCAssembler &Asm, uint64_t Remaining,
+                              uint64_t MaxNopSize, uint64_t Offset) {
+  uint64_t Bytes = std::min(Remaining, MaxNopSize);
+  if (Asm.isBundlingEnabled()) {
+    uint64_t BundleSize = Asm.getBundleAlign().value();
+    Bytes = std::min(Bytes, BundleSize - (Offset & (BundleSize - 1)));
+  }
+  return Bytes;
+}
+
+/// Write NOPs while limiting the maximum NOP size.
+static void writeControlledNops(raw_ostream &OS, const MCAssembler &Asm,
+                                uint64_t NumBytes, uint64_t FragmentOffset,
+                                uint64_t MaxNopSize,
+                                const MCSubtargetInfo *STI) {
+  uint64_t NumBytesToEmit = 0;
+  for (uint64_t NumBytesEmitted = 0; NumBytesEmitted < NumBytes;
+       NumBytesEmitted += NumBytesToEmit) {
+    NumBytesToEmit = maxNopBytesAt(Asm, NumBytes - NumBytesEmitted, MaxNopSize,
+                                   FragmentOffset + NumBytesEmitted);
+    assert(NumBytesToEmit && "try to emit zero-sized NOP");
+
+    if (!Asm.getBackend().writeNopData(OS, NumBytesToEmit, STI)) {
+      reportFatalInternalError(
+          "unable to write NOP sequence of the remaining " +
+          Twine(NumBytesToEmit) + " bytes");
+      return;
+    }
+  }
+}
+
 /// Write the fragment \p F to the output file.
 static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
                           const MCFragment &F) {
@@ -441,9 +474,16 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
 
     // In the nops mode, call the backend hook to write `Count` nops.
     if (F.hasAlignEmitNops()) {
-      if (!Asm.getBackend().writeNopData(OS, Count, F.getSubtargetInfo()))
-        reportFatalInternalError("unable to write nop sequence of " +
-                                 Twine(Count) + " bytes");
+      if (!Asm.isBundlingEnabled()) {
+        if (!Asm.getBackend().writeNopData(OS, Count, F.getSubtargetInfo()))
+          reportFatalInternalError("unable to write nop sequence of " +
+                                   Twine(Count) + " bytes");
+      } else {
+        // Ensure that no nop of the fill crosses a bundle boundary.
+        writeControlledNops(OS, Asm, Count,
+                            Asm.getFragmentOffset(F) + F.getFixedSize(), Count,
+                            F.getSubtargetInfo());
+      }
     } else {
       // Otherwise, write out in multiples of the value size.
       for (uint64_t i = 0; i != Count; ++i) {
@@ -544,26 +584,22 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
     if (!ControlledNopLength)
       ControlledNopLength = MaximumNopLength;
 
-    while (NumBytes) {
-      uint64_t NumBytesToEmit =
-          (uint64_t)std::min(NumBytes, ControlledNopLength);
-      assert(NumBytesToEmit && "try to emit empty NOP instruction");
-      if (!Asm.getBackend().writeNopData(OS, NumBytesToEmit,
-                                         NF.getSubtargetInfo())) {
-        report_fatal_error("unable to write nop sequence of the remaining " +
-                           Twine(NumBytesToEmit) + " bytes");
-        break;
-      }
-      NumBytes -= NumBytesToEmit;
-    }
+    writeControlledNops(OS, Asm, (uint64_t)NumBytes, Asm.getFragmentOffset(NF),
+                        (uint64_t)ControlledNopLength, NF.getSubtargetInfo());
     break;
   }
 
   case MCFragment::FT_BoundaryAlign: {
     const MCBoundaryAlignFragment &BF = cast<MCBoundaryAlignFragment>(F);
-    if (!Asm.getBackend().writeNopData(OS, FragmentSize, BF.getSubtargetInfo()))
-      report_fatal_error("unable to write nop sequence of " +
-                         Twine(FragmentSize) + " bytes");
+    if (!Asm.isBundlingEnabled()) {
+      if (!Asm.getBackend().writeNopData(OS, FragmentSize,
+                                         BF.getSubtargetInfo()))
+        reportFatalInternalError("unable to write nop sequence of " +
+                                 Twine(FragmentSize) + " bytes");
+    } else {
+      writeControlledNops(OS, Asm, FragmentSize, Asm.getFragmentOffset(BF),
+                          FragmentSize, BF.getSubtargetInfo());
+    }
     break;
   }
 
@@ -969,11 +1005,10 @@ static bool needPadding(uint64_t StartAddr, uint64_t Size,
          isAgainstBoundary(StartAddr, Size, BoundaryAlignment);
 }
 
-void MCAssembler::relaxBoundaryAlign(MCBoundaryAlignFragment &BF) {
-  // BoundaryAlignFragment that doesn't need to align any fragment should not be
-  // relaxed.
+uint64_t
+MCAssembler::computeBoundaryAlignSize(const MCBoundaryAlignFragment &BF) {
   if (!BF.getLastFragment())
-    return;
+    return 0;
 
   uint64_t AlignedOffset = getFragmentOffset(BF);
   uint64_t AlignedSize = 0;
@@ -984,9 +1019,27 @@ void MCAssembler::relaxBoundaryAlign(MCBoundaryAlignFragment &BF) {
   }
 
   Align BoundaryAlignment = BF.getAlignment();
-  uint64_t NewSize = needPadding(AlignedOffset, AlignedSize, BoundaryAlignment)
-                         ? offsetToAlignment(AlignedOffset, BoundaryAlignment)
-                         : 0U;
+
+  if (!isBundlingEnabled())
+    return needPadding(AlignedOffset, AlignedSize, BoundaryAlignment)
+               ? offsetToAlignment(AlignedOffset, BoundaryAlignment)
+               : 0U;
+  if (BF.isAlignToEnd())
+    return offsetToAlignment(AlignedOffset + AlignedSize, BoundaryAlignment);
+
+  // For bundle alignment, we only pad instructions that cross the boundary.
+  return mayCrossBoundary(AlignedOffset, AlignedSize, BoundaryAlignment)
+             ? offsetToAlignment(AlignedOffset, BoundaryAlignment)
+             : 0U;
+}
+
+void MCAssembler::relaxBoundaryAlign(MCBoundaryAlignFragment &BF) {
+  // BoundaryAlignFragment that doesn't need to align any fragment should not be
+  // relaxed.
+  if (!BF.getLastFragment())
+    return;
+
+  uint64_t NewSize = computeBoundaryAlignSize(BF);
   if (NewSize == BF.getSize())
     return;
   BF.setSize(NewSize);
@@ -1054,7 +1107,10 @@ void MCAssembler::relaxFragment(MCFragment &F) {
     relaxAlign(F);
     break;
   case MCFragment::FT_Relaxable:
-    assert(!getRelaxAll() && "Did not expect a FT_Relaxable in RelaxAll mode");
+    // Bundling emits every instruction as relaxable, so FT_Relaxable is
+    // expected with RelaxAll mode once bundling is enabled.
+    assert((isBundlingEnabled() || !getRelaxAll()) &&
+           "Did not expect a FT_Relaxable in RelaxAll mode");
     relaxInstruction(F);
     break;
   case MCFragment::FT_LEB:
