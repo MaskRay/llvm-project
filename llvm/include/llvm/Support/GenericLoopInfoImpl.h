@@ -460,13 +460,19 @@ void LoopBase<BlockT, LoopT>::print(raw_ostream &OS, bool Verbose,
 /// program order.
 template <class BlockT, class LoopT>
 void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
+  analyze(DomTree.getRootNode()->getBlock()->getParent(),
+          [&]() -> const DomTreeBase<BlockT> & { return DomTree; });
+}
+
+template <class BlockT, class LoopT>
+void LoopInfoBase<BlockT, LoopT>::analyze(
+    ParentT F, function_ref<const DomTreeBase<BlockT> &()> GetDomTree) {
   using BlockTraits = GraphTraits<BlockT *>;
   auto num = [](const BlockT *BB) {
     return GraphTraits<const BlockT *>::getNumber(BB);
   };
 
-  const DomTreeNodeBase<BlockT> *DomRoot = DomTree.getRootNode();
-  ParentPtr = DomRoot->getBlock()->getParent();
+  ParentPtr = F;
   BlockNumberEpoch = GraphTraits<ParentT>::getNumberEpoch(ParentPtr);
   unsigned MaxNumber = GraphTraits<ParentT>::getMaxNumber(ParentPtr);
 
@@ -539,7 +545,7 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
         {BB, BlockTraits::child_begin(BB), BlockTraits::child_end(BB)});
   };
 
-  push(DomRoot->getBlock());
+  push(GraphTraits<ParentT>::getEntryNode(ParentPtr));
   while (!Stack.empty()) {
     Frame &Top = Stack.back();
     if (Top.Cur == Top.End) {
@@ -592,6 +598,10 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
     // loop excludes.
     for (unsigned H : Reentries)
       Info[H].Pos = IsReentered;
+    const DomTreeBase<BlockT> &DomTree = GetDomTree();
+    assert(DomTree.getRootNode()->getBlock() ==
+               GraphTraits<ParentT>::getEntryNode(ParentPtr) &&
+           "the dominator tree describes another function");
     DomTree.updateDFSNumbers();
     SmallVector<unsigned, 0> Mark(MaxNumber, NoBlock);
     SmallVector<BlockT *, 8> Worklist;
