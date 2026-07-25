@@ -840,7 +840,17 @@ public:
     return isNotAlreadyContainedIn(SubLoop->getParentLoop(), ParentLoop);
   }
 
-  /// Create the loop forest using a stable algorithm.
+  /// Create the loop forest for \p F, building a dominator tree only for an
+  /// irreducible CFG.
+  void analyze(ParentT F);
+
+  /// Create the loop forest using a stable algorithm. \p GetDomTree is called
+  /// only for an irreducible CFG.
+  void
+  analyze(ParentT F,
+          function_ref<const DominatorTreeBase<BlockT, false> &()> GetDomTree);
+
+  /// Create the loop forest for the function \p DomTree describes.
   void analyze(const DominatorTreeBase<BlockT, false> &DomTree);
 
   // Debugging
