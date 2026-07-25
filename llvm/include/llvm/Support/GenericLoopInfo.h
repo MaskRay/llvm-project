@@ -668,10 +668,6 @@ private:
   /// builds the block list.
   static BlockT *pendingHeader(const LoopT *L) { return L->PendingHeader; }
 
-  void discoverAndMapSubloop(LoopT *L, BlockT *Header,
-                             ArrayRef<BlockT *> Backedges,
-                             const DominatorTreeBase<BlockT, false> &DomTree);
-
   /// True if \p L borrows its block list from BlockLayout.
   static bool hasBorrowedBlocks(const LoopT &L) {
     return L.BlockCapacity == LoopT::BorrowedCapacity;

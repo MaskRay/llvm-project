@@ -139,12 +139,12 @@ entry:
                               i2 2, label %c2 ], !prof !3
 
 c1:
-; CHECK-NEXT: c1: float = 1.0,
+; CHECK-NEXT: c1: float = 1.1429,
   switch i2 %x, label %exit [ i2 1, label %c1
                               i2 2, label %c2 ], !prof !3
 
 c2:
-; CHECK-NEXT: c2: float = 1.0,
+; CHECK-NEXT: c2: float = 0.68571,
   switch i2 %x, label %exit [ i2 1, label %c1
                               i2 2, label %c2 ], !prof !3
 

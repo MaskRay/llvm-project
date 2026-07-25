@@ -36,8 +36,7 @@ define dso_local void @fn() {
 ; CHECK-NEXT:    movzbl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 1-byte Folded Reload
 ; CHECK-NEXT:    movb %al, {{[-0-9]+}}(%e{{[sb]}}p) # 1-byte Spill
 ; CHECK-NEXT:  .LBB0_1: # %for.cond
-; CHECK-NEXT:    # =>This Loop Header: Depth=1
-; CHECK-NEXT:    # Child Loop BB0_19 Depth 2
+; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    testb %bl, %bl
 ; CHECK-NEXT:    jne .LBB0_3
 ; CHECK-NEXT:  # %bb.2: # %if.then
@@ -106,6 +105,7 @@ define dso_local void @fn() {
 ; CHECK-NEXT:    # in Loop: Header=BB0_1 Depth=1
 ; CHECK-NEXT:    testb %bl, %bl
 ; CHECK-NEXT:    je .LBB0_12
+; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  # %bb.9: # in Loop: Header=BB0_1 Depth=1
 ; CHECK-NEXT:    # implicit-def: $eax
 ; CHECK-NEXT:    testb %bl, %bl
@@ -127,8 +127,7 @@ define dso_local void @fn() {
 ; CHECK-NEXT:    # implicit-def: $ebp
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_19: # %for.cond47
-; CHECK-NEXT:    # Parent Loop BB0_1 Depth=1
-; CHECK-NEXT:    # => This Inner Loop Header: Depth=2
+; CHECK-NEXT:    # in Loop: Header=BB0_1 Depth=1
 ; CHECK-NEXT:    testb %bl, %bl
 ; CHECK-NEXT:    jne .LBB0_19
 ; CHECK-NEXT:    jmp .LBB0_8

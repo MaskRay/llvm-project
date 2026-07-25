@@ -15,7 +15,6 @@ define i32 @simulator_kernel() {
 ; CHECK-NEXT:    jmp %g0
 ; CHECK-NEXT:    ld [%g0], %o0
 ; CHECK-NEXT:  .LBB1_1: ! %dispatch
-; CHECK-NEXT:    ! =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    jmp %g0
 ; CHECK-NEXT:    nop
 ; CHECK-NEXT:  .LBB1_2: ! %store_block

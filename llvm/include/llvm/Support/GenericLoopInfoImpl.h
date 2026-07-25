@@ -451,66 +451,8 @@ void LoopBase<BlockT, LoopT>::print(raw_ostream &OS, bool Verbose,
 /// result does / not depend on use list (block predecessor) order.
 ///
 
-/// Discover a subloop with the specified backedges such that: All blocks within
-/// this loop are mapped to this loop or a subloop. And all subloops within this
-/// loop have their parent loop set to this loop or a subloop.
-template <class BlockT, class LoopT>
-void LoopInfoBase<BlockT, LoopT>::discoverAndMapSubloop(
-    LoopT *L, BlockT *Header, ArrayRef<BlockT *> Backedges,
-    const DominatorTreeBase<BlockT, false> &DomTree) {
-  using InvBlockTraits = GraphTraits<Inverse<BlockT *>>;
-
-  unsigned NumSubloops = 0;
-
-  // Perform a backward CFG traversal using a worklist.
-  std::vector<BlockT *> ReverseCFGWorklist(Backedges.begin(), Backedges.end());
-  while (!ReverseCFGWorklist.empty()) {
-    BlockT *PredBB = ReverseCFGWorklist.back();
-    ReverseCFGWorklist.pop_back();
-
-    LoopT *Subloop = getLoopFor(PredBB);
-    if (!Subloop) {
-      if (!DomTree.isReachableFromEntry(PredBB))
-        continue;
-
-      // This is an undiscovered block. Map it to the current loop.
-      changeLoopFor(PredBB, L);
-      if (PredBB == Header)
-        continue;
-      // Push all block predecessors on the worklist.
-      ReverseCFGWorklist.insert(ReverseCFGWorklist.end(),
-                                InvBlockTraits::child_begin(PredBB),
-                                InvBlockTraits::child_end(PredBB));
-    } else {
-      // This is a discovered block. Find its outermost discovered loop.
-      Subloop = Subloop->getOutermostLoop();
-
-      // If it is already discovered to be a subloop of this loop, continue.
-      if (Subloop == L)
-        continue;
-
-      // Discover a subloop of this loop.
-      Subloop->setParentLoop(L);
-      ++NumSubloops;
-      PredBB = pendingHeader(Subloop);
-      // Continue traversal along predecessors that are not loop-back edges from
-      // within this subloop tree itself. Note that a predecessor may directly
-      // reach another subloop that is not yet discovered to be a subloop of
-      // this loop, which we must traverse.
-      for (const auto Pred : inverse_children<BlockT *>(PredBB)) {
-        if (getLoopFor(Pred) != Subloop)
-          ReverseCFGWorklist.push_back(Pred);
-      }
-    }
-  }
-  L->reserveSubLoops(NumSubloops);
-}
-
 /// Analyze LoopInfo identifies the loops during a single forward depth-first
-/// search of the CFG, falling back for an irreducible CFG to backward
-/// traversals within each subloop (discoverAndMapSubloop). The backward
-/// traversal skips inner subloops, so this part of the algorithm is linear in
-/// the number of CFG edges.
+/// search of the CFG, so it is linear in the number of CFG edges.
 ///
 /// Then build a loop-contiguous reverse postorder for in-loops blocks. Lists
 /// are header-first with each subloop's blocks contiguous, ordered by first
@@ -551,6 +493,8 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
   SmallVector<BlockDFS, 32> Info(MaxNumber);
   // The loop headers, repeated once per backedge.
   SmallVector<unsigned, 4> Headers;
+  // Headers of loops re-entered from outside, repeated once per such edge.
+  SmallVector<unsigned, 4> Reentries;
 
   // Weave header \p H, and its own chain, into \p B's chain of enclosing
   // headers, keeping the chain ordered innermost first by search path
@@ -584,9 +528,9 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
   // header. It also records the postorder the layout below needs.
   //
   // An edge entering a loop whose header has left the search path enters it at
-  // a block other than its header, which proves the CFG irreducible. The tags
-  // are then dropped for the backward traversals of discoverAndMapSubloop,
-  // which alone compute exact membership there.
+  // a block other than its header, so that loop has more than one entry and is
+  // not a natural loop. Its header is dissolved below, leaving its blocks to
+  // the enclosing loop.
   SmallVector<BlockT *, 32> Postorder;
   Postorder.reserve(MaxNumber);
   struct Frame {
@@ -595,7 +539,6 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
   };
   SmallVector<Frame, 8> Stack;
   unsigned Counter = IsHeader;
-  bool Irreducible = false;
   auto push = [&](BlockT *BB) {
     unsigned B = Number(BB);
     Info[B].Pos = ++Counter;
@@ -626,20 +569,19 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
     } else if (Info[B1].Pos > IsHeader) {
       // Retreating edge, including a self edge: B1 heads a loop.
       Headers.push_back(B1);
-      if (!Irreducible)
-        tagHeader(Number(B0P), B1);
-    } else if (!Irreducible) {
-      // Cross or forward edge. Tagging B1's innermost header adds B0 to that
-      // loop and, through its chain, to the ones enclosing it. That header
-      // having left the search path instead means this edge enters its loop
-      // from outside at a block other than its header.
-      unsigned H = Info[B1].Head;
-      if (H == NoBlock)
-        continue;
-      if (Info[H].Pos > IsHeader)
-        tagHeader(Number(B0P), H);
-      else
-        Irreducible = true;
+      tagHeader(Number(B0P), B1);
+    } else {
+      // Cross or forward edge. Each enclosing header already off the search
+      // path heads a closed loop that this edge re-enters at a block other
+      // than its header. Attribute B0 to the innermost header still on the
+      // path.
+      for (unsigned H = Info[B1].Head; H != NoBlock; H = Info[H].Head) {
+        if (Info[H].Pos > IsHeader) {
+          tagHeader(Number(B0P), H);
+          break;
+        }
+        Reentries.push_back(H);
+      }
     }
   }
   // Most functions have no loops; skip the layout construction.
@@ -650,54 +592,26 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
   for (unsigned H : Headers)
     Info[H].Pos = IsHeader;
 
-  bool HasLoops = false;
-  if (!Irreducible) {
-    // Resolve the chains in reverse postorder: a block's innermost header is
-    // one of its search tree ancestors, so it is mapped to its loop first.
-    for (BlockT *BB : llvm::reverse(Postorder)) {
-      unsigned B = Number(BB);
-      unsigned Head = Info[B].Head;
-      LoopT *Enclosing = Head == NoBlock ? nullptr : BBMap[Head];
-      if (Info[B].Pos != IsHeader) {
-        BBMap[B] = Enclosing;
-        continue;
-      }
-      LoopT *L = allocateLoop(BB);
-      L->setParentLoop(Enclosing);
-      BBMap[B] = L;
-    }
-    HasLoops = true;
-  } else {
-    // Visit headers in postorder: a subloop's header is dominated by the outer
-    // header, hence leaves the search path first, so a sub-loop is discovered
-    // before the outer loop.
-    DomTree.updateDFSNumbers();
-    SmallVector<BlockT *, 4> Backedges;
-    for (BlockT *Header : Postorder) {
-      if (Info[Number(Header)].Pos != IsHeader)
-        continue;
+  // A re-entered loop has no single entry, so it is not a natural loop.
+  // Dissolve its header: the chains resolve its blocks to the enclosing loop.
+  for (unsigned H : Reentries)
+    Info[H].Pos = OffPath;
+  if (none_of(Headers, [&](unsigned H) { return Info[H].Pos == IsHeader; }))
+    return;
 
-      // Check each predecessor of the potential loop header.
-      const DomTreeNodeBase<BlockT> *DomNode = DomTree.getNode(Header);
-      Backedges.clear();
-      for (const auto Backedge : inverse_children<BlockT *>(Header)) {
-        // If Header dominates predBB, this is a new loop. Collect the
-        // backedges.
-        const DomTreeNodeBase<BlockT> *BackedgeNode = DomTree.getNode(Backedge);
-        if (BackedgeNode && DomTree.dominates(DomNode, BackedgeNode))
-          Backedges.push_back(Backedge);
-      }
-      // Perform a backward CFG traversal to discover and map blocks in this
-      // loop.
-      if (!Backedges.empty()) {
-        HasLoops = true;
-        LoopT *L = allocateLoop(Header);
-        discoverAndMapSubloop(L, Header, Backedges, DomTree);
-      }
+  // Resolve the chains in reverse postorder: a block's innermost header is
+  // one of its search tree ancestors, so it is mapped to its loop first.
+  for (BlockT *BB : llvm::reverse(Postorder)) {
+    unsigned B = Number(BB);
+    unsigned Head = Info[B].Head;
+    LoopT *Enclosing = Head == NoBlock ? nullptr : BBMap[Head];
+    if (Info[B].Pos != IsHeader) {
+      BBMap[B] = Enclosing;
+      continue;
     }
-    // An irreducible retreating edge is not a backedge and forms no loop.
-    if (!HasLoops)
-      return;
+    LoopT *L = allocateLoop(BB);
+    L->setParentLoop(Enclosing);
+    BBMap[B] = L;
   }
 
   // Record each in-loop block with its innermost loop in forward CFG postorder,

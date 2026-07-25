@@ -131,7 +131,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Analysis/CycleAnalysis.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
-#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
@@ -156,7 +155,6 @@ struct FixIrreducible : public FunctionPass {
     AU.addRequired<CycleInfoWrapperPass>();
     AU.addPreserved<DominatorTreeWrapperPass>();
     AU.addPreserved<CycleInfoWrapperPass>();
-    AU.addPreserved<LoopInfoWrapperPass>();
   }
 
   bool runOnFunction(Function &F) override;
@@ -171,108 +169,14 @@ INITIALIZE_PASS_BEGIN(FixIrreducible, "fix-irreducible",
                       "Convert irreducible control-flow into natural loops",
                       false /* Only looks at CFG */, false /* Analysis Pass */)
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
 INITIALIZE_PASS_END(FixIrreducible, "fix-irreducible",
                     "Convert irreducible control-flow into natural loops",
                     false /* Only looks at CFG */, false /* Analysis Pass */)
 
-// When a new loop is created, existing children of the parent loop may now be
-// fully inside the new loop. Reconnect these as children of the new loop.
-static void reconnectChildLoops(LoopInfo &LI, Loop *ParentLoop, Loop *NewLoop,
-                                BasicBlock *OldHeader) {
-  // Any candidate (sibling of NewLoop, or top-level loop if there is no
-  // parent) is a child iff its header is owned by the new loop. The new loop's
-  // block list is already populated but its subloops are not yet attached, so
-  // query the block list directly rather than contains(), which would derive
-  // from the not-yet-updated block-to-loop map.
-  SmallVector<Loop *, 4> ChildLoops =
-      LI.takeChildrenIf(ParentLoop, [&](Loop *L) {
-        return NewLoop != L &&
-               llvm::is_contained(NewLoop->getBlocks(), L->getHeader());
-      });
-
-  for (Loop *Child : ChildLoops) {
-    LLVM_DEBUG(dbgs() << "child loop: " << Child->getHeader()->getName()
-                      << "\n");
-    // A child loop whose header was the old cycle header gets destroyed since
-    // its backedges are removed.
-    if (Child->getHeader() == OldHeader) {
-      for (auto *BB : Child->blocks()) {
-        if (LI.getLoopFor(BB) != Child)
-          continue;
-        LI.changeLoopFor(BB, NewLoop);
-        LLVM_DEBUG(dbgs() << "moved block from child: " << BB->getName()
-                          << "\n");
-      }
-      for (Loop *GrandChildLoop :
-           LI.takeChildrenIf(Child, [](const Loop *) { return true; }))
-        NewLoop->addChildLoop(GrandChildLoop);
-      LI.destroy(Child);
-      LLVM_DEBUG(dbgs() << "subsumed child loop (common header)\n");
-      continue;
-    }
-
-    NewLoop->addChildLoop(Child);
-    LLVM_DEBUG(dbgs() << "added child loop to new loop\n");
-  }
-}
-
-static void updateLoopInfo(CycleInfo &CI, LoopInfo &LI, CycleRef C,
-                           ArrayRef<BasicBlock *> GuardBlocks) {
-  // The parent loop is a natural loop L mapped to the cycle header H as long as
-  // H is not also the header of L. In the latter case, L is destroyed and we
-  // seek its parent instead.
-  BasicBlock *CycleHeader = CI.getHeader(C);
-  Loop *ParentLoop = LI.getLoopFor(CycleHeader);
-  if (ParentLoop && ParentLoop->getHeader() == CycleHeader)
-    ParentLoop = ParentLoop->getParentLoop();
-
-  // Create a new loop from the now-transformed cycle
-  auto *NewLoop = LI.AllocateLoop();
-  if (ParentLoop) {
-    ParentLoop->addChildLoop(NewLoop);
-  } else {
-    LI.addTopLevelLoop(NewLoop);
-  }
-
-  // Add the guard blocks to the new loop. The first guard block is
-  // the head of all the backedges, and it is the first to be inserted
-  // in the loop. This ensures that it is recognized as the
-  // header. Since the new loop is already in LoopInfo, the new blocks
-  // are also propagated up the chain of parent loops.
-  for (auto *G : GuardBlocks) {
-    LLVM_DEBUG(dbgs() << "added guard block to loop: " << G->getName() << "\n");
-    NewLoop->addBasicBlockToLoop(G, LI);
-  }
-
-  for (auto *BB : CI.getBlocks(C)) {
-    NewLoop->addBlockEntry(BB);
-    if (LI.getLoopFor(BB) == ParentLoop) {
-      LLVM_DEBUG(dbgs() << "moved block from parent: " << BB->getName()
-                        << "\n");
-      LI.changeLoopFor(BB, NewLoop);
-    } else {
-      LLVM_DEBUG(dbgs() << "added block from child: " << BB->getName() << "\n");
-    }
-  }
-  LLVM_DEBUG(dbgs() << "header for new loop: "
-                    << NewLoop->getHeader()->getName() << "\n");
-
-  reconnectChildLoops(LI, ParentLoop, NewLoop, CI.getHeader(C));
-
-  LLVM_DEBUG(dbgs() << "Verify new loop.\n"; NewLoop->print(dbgs()));
-  NewLoop->verifyLoop();
-  if (ParentLoop) {
-    LLVM_DEBUG(dbgs() << "Verify parent loop.\n"; ParentLoop->print(dbgs()));
-    ParentLoop->verifyLoop();
-  }
-}
-
 // Given a set of blocks and headers in an irreducible SCC, convert it into a
 // natural loop. Also insert this new loop at its appropriate place in the
 // hierarchy of loops.
-static bool fixIrreducible(CycleRef C, CycleInfo &CI, DominatorTree &DT,
-                           LoopInfo *LI) {
+static bool fixIrreducible(CycleRef C, CycleInfo &CI, DominatorTree &DT) {
   if (CI.isReducible(C))
     return false;
   LLVM_DEBUG(dbgs() << "Processing cycle:\n" << CI.print(C) << "\n";);
@@ -312,7 +216,7 @@ static bool fixIrreducible(CycleRef C, CycleInfo &CI, DominatorTree &DT,
         BasicBlock *Succ = Term->getSuccessor(I);
         if (Succ != Header)
           continue;
-        NewSucc = SplitMultiBrEdge(P, Succ, I, NewSucc, &DTU, &CI, LI);
+        NewSucc = SplitMultiBrEdge(P, Succ, I, NewSucc, &DTU, &CI, nullptr);
         LLVM_DEBUG(dbgs() << "Added internal branch: "
                           << printBasicBlock(NewSucc) << " -> "
                           << printBasicBlock(Succ) << '\n');
@@ -366,7 +270,7 @@ static bool fixIrreducible(CycleRef C, CycleInfo &CI, DominatorTree &DT,
             (It != MultiBrTargets.end()) ? It->second : nullptr;
 
         BasicBlock *NewSucc =
-            SplitMultiBrEdge(P, Succ, I, ExistingTarget, &DTU, &CI, LI);
+            SplitMultiBrEdge(P, Succ, I, ExistingTarget, &DTU, &CI, nullptr);
         if (!ExistingTarget) {
           CHub.addBranch(NewSucc, Succ);
           MultiBrTargets[Succ] = NewSucc;
@@ -402,11 +306,6 @@ static bool fixIrreducible(CycleRef C, CycleInfo &CI, DominatorTree &DT,
   assert(DT.verify(DominatorTree::VerificationLevel::Fast));
 #endif
 
-  // If we are updating LoopInfo, do that now before modifying the cycle. This
-  // ensures that the first guard block is the header of a new natural loop.
-  if (LI)
-    updateLoopInfo(CI, *LI, C, GuardBlocks);
-
   for (auto *G : GuardBlocks) {
     LLVM_DEBUG(dbgs() << "added guard block to cycle: " << G->getName()
                       << "\n");
@@ -422,47 +321,39 @@ static bool fixIrreducible(CycleRef C, CycleInfo &CI, DominatorTree &DT,
   return true;
 }
 
-static bool FixIrreducibleImpl(Function &F, CycleInfo &CI, DominatorTree &DT,
-                               LoopInfo *LI) {
+static bool FixIrreducibleImpl(Function &F, CycleInfo &CI, DominatorTree &DT) {
   LLVM_DEBUG(dbgs() << "===== Fix irreducible control-flow in function: "
                     << F.getName() << "\n");
 
   bool Changed = false;
   for (auto C : CI.cycles())
-    Changed |= fixIrreducible(C, CI, DT, LI);
+    Changed |= fixIrreducible(C, CI, DT);
 
   if (!Changed)
     return false;
 
 #if defined(EXPENSIVE_CHECKS)
   CI.verify();
-  if (LI) {
-    LI->verify(DT);
-  }
 #endif // EXPENSIVE_CHECKS
 
   return true;
 }
 
 bool FixIrreducible::runOnFunction(Function &F) {
-  auto *LIWP = getAnalysisIfAvailable<LoopInfoWrapperPass>();
-  LoopInfo *LI = LIWP ? &LIWP->getLoopInfo() : nullptr;
   auto &CI = getAnalysis<CycleInfoWrapperPass>().getResult();
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  return FixIrreducibleImpl(F, CI, DT, LI);
+  return FixIrreducibleImpl(F, CI, DT);
 }
 
 PreservedAnalyses FixIrreduciblePass::run(Function &F,
                                           FunctionAnalysisManager &AM) {
-  auto *LI = AM.getCachedResult<LoopAnalysis>(F);
   auto &CI = AM.getResult<CycleAnalysis>(F);
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
 
-  if (!FixIrreducibleImpl(F, CI, DT, LI))
+  if (!FixIrreducibleImpl(F, CI, DT))
     return PreservedAnalyses::all();
 
   PreservedAnalyses PA;
-  PA.preserve<LoopAnalysis>();
   PA.preserve<CycleAnalysis>();
   PA.preserve<DominatorTreeAnalysis>();
   return PA;

@@ -58,19 +58,19 @@ b1:
 b2:
   call void @llvm.pseudoprobe(i64 -7702751003264189226, i64 2, i32 0, i64 -1)
   br i1 %cmp, label %b7, label %b3
-; CHECK: - b2: float = {{.*}}, int = {{.*}}, count = 586
+; CHECK: - b2: float = {{.*}}, int = {{.*}}, count = 2
 
 b3:
   call void @llvm.pseudoprobe(i64 -7702751003264189226, i64 3, i32 0, i64 -1)
   br i1 %cmp, label %b7, label %b4
-; CHECK: - b3: float = {{.*}}, int = {{.*}}, count = 586
+; CHECK: - b3: float = {{.*}}, int = {{.*}}, count = 1
 ; CHECK2: br i1 %cmp, label %b7, label %b4,
 ; CHECK2-SAME: !prof ![[END172_PROF:[0-9]+]]
 
 b4:
   call void @llvm.pseudoprobe(i64 -7702751003264189226, i64 4, i32 0, i64 -1)
   br label %b2
-; CHECK: - b4: float = {{.*}}, int = {{.*}}, count = 585
+; CHECK: - b4: float = {{.*}}, int = {{.*}}, count = 1
 
 b5:
   call void @llvm.pseudoprobe(i64 -7702751003264189226, i64 5, i32 0, i64 -1)
@@ -92,7 +92,7 @@ b7:
 b8:
   call void @llvm.pseudoprobe(i64 -7702751003264189226, i64 8, i32 0, i64 -1)
   br label %b3
-; CHECK: - b8: float = {{.*}}, int = {{.*}}, count = 1
+; CHECK: - b8: float = {{.*}}, int = {{.*}}, count = 0
 
 b9:
   call void @llvm.pseudoprobe(i64 -7702751003264189226, i64 9, i32 0, i64 -1)
@@ -184,4 +184,4 @@ attributes #1 = { nounwind }
 !134 = !{!"branch_weights", i32 85, i32 9449, i32 1, i32 8212}
 
 ; CHECK2: ![[END172_PROF]] = !{!"branch_weights", i32 1, i32 1003}
-; CHECK2: ![[FALSE4858_PROF]] = !{!"branch_weights", i32 2, i32 1}
+; CHECK2: ![[FALSE4858_PROF]] = !{!"branch_weights", i32 1004, i32 1}
