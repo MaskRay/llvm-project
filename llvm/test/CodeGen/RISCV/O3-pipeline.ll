@@ -110,6 +110,7 @@
 ; CHECK-NEXT:       Finalize ISel and expand pseudo-instructions
 ; CHECK-NEXT:       MachineDominator Tree Construction
 ; CHECK-NEXT:	    Machine Natural Loop Construction
+; CHECK-NEXT:       Machine Cycle Info Analysis
 ; CHECK-NEXT:       Machine Block Frequency Analysis
 ; CHECK-NEXT:       Early Machine Loop Invariant Code Motion
 ; CHECK-NEXT:       MachineDominator Tree Construction
@@ -133,6 +134,7 @@
 ; CHECK-NEXT:       Machine Block Frequency Analysis
 ; CHECK-NEXT:       Early Machine Loop Invariant Code Motion
 ; CHECK-NEXT:       MachineDominator Tree Construction
+; CHECK-NEXT:       Machine Cycle Info Analysis
 ; CHECK-NEXT:       Machine Block Frequency Analysis
 ; CHECK-NEXT:       Machine Common Subexpression Elimination
 ; CHECK-NEXT:       MachinePostDominator Tree Construction

@@ -1127,6 +1127,20 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeLoops() {
 
   LLVM_DEBUG(CI->print(dbgs()));
 
+  // Whether \p C describes a loop for BFI. An entry of a cycle an edge
+  // re-enters heads a loop the forest does not represent, because the cycle
+  // absorbed it; which entry that is depends on the order the search found
+  // them in. Represent none of them, so that equal entries stay equal, and
+  // leave the region to the packaging computeIrreducibleMass does.
+  auto hasLoop = [&](CycleRef C) {
+    if (!CI->isReducible(C))
+      return false;
+    for (CycleRef A = CI->getParentCycle(C); A; A = CI->getParentCycle(A))
+      if (!CI->isReducible(A) && CI->isEntry(A, CI->getHeader(C)))
+        return false;
+    return true;
+  };
+
   // Visit loops top down and assign them an index.
   std::deque<std::pair<CycleRef, LoopData *>> Q;
   for (CycleRef C : CI->toplevel_cycles())
@@ -1138,16 +1152,17 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeLoops() {
     LoopData *Parent = Q.front().second;
     Q.pop_front();
 
-    if (CI->isReducible(Cycle)) {
+    if (hasLoop(Cycle)) {
       BlockNode Header = getNode(CI->getHeader(Cycle));
       Loops.emplace_back(Parent, Header);
 
       Working[Header.Index].Loop = &Loops.back();
       LLVM_DEBUG(dbgs() << " - loop = " << getBlockName(Header) << "\n");
+      Parent = &Loops.back();
     }
 
     for (CycleRef C : CI->children(Cycle))
-      Q.emplace_back(C, Loops.empty() ? nullptr : &Loops.back());
+      Q.emplace_back(C, Parent);
   }
 
   // Visit nodes in reverse post-order and add them to their deepest containing
@@ -1162,7 +1177,7 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeLoops() {
     }
 
     CycleRef Cycle = CI->getCycle(RPOT[Index]);
-    while (Cycle && !CI->isReducible(Cycle))
+    while (Cycle && !hasLoop(Cycle))
       Cycle = CI->getParentCycle(Cycle);
     if (!Cycle)
       continue;
