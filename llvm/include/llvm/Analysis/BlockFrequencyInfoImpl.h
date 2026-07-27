@@ -1152,8 +1152,11 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeLoops() {
       LLVM_DEBUG(dbgs() << " - loop = " << getBlockName(Header) << "\n");
     }
 
+    // An irreducible cycle gets no LoopData of its own; leave its blocks to
+    // the enclosing loop, and to the packaging computeIrreducibleMass does.
+    LoopData *ChildParent = CI->isReducible(Cycle) ? &Loops.back() : Parent;
     for (CycleRef C : CI->children(Cycle))
-      Q.emplace_back(C, Loops.empty() ? nullptr : &Loops.back());
+      Q.emplace_back(C, ChildParent);
   }
 
   // Visit nodes in reverse post-order and add them to their deepest containing
