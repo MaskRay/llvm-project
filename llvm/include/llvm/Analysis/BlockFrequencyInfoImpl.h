@@ -595,17 +595,14 @@ struct IrreducibleGraph {
   using BlockNode = BFIBase::BlockNode;
   struct IrrNode {
     BlockNode Node;
-    unsigned NumIn = 0;
-    std::deque<const IrrNode *> Edges;
+    SmallVector<const IrrNode *, 4> Succs;
 
     IrrNode(const BlockNode &Node) : Node(Node) {}
 
-    using iterator = std::deque<const IrrNode *>::const_iterator;
+    using iterator = SmallVectorImpl<const IrrNode *>::const_iterator;
 
-    iterator pred_begin() const { return Edges.begin(); }
-    iterator succ_begin() const { return Edges.begin() + NumIn; }
-    iterator pred_end() const { return succ_begin(); }
-    iterator succ_end() const { return Edges.end(); }
+    iterator succ_begin() const { return Succs.begin(); }
+    iterator succ_end() const { return Succs.end(); }
   };
   BlockNode Start;
   const IrrNode *StartIrr = nullptr;

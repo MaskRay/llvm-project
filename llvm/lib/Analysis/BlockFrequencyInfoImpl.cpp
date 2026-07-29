@@ -663,9 +663,7 @@ void IrreducibleGraph::addEdge(IrrNode &Irr, const BlockNode &Succ,
   if (L == Lookup.end())
     return;
   IrrNode &SuccIrr = *L->second;
-  Irr.Edges.push_back(&SuccIrr);
-  SuccIrr.Edges.push_front(&Irr);
-  ++SuccIrr.NumIn;
+  Irr.Succs.push_back(&SuccIrr);
 }
 
 namespace llvm {
@@ -685,71 +683,50 @@ template <> struct GraphTraits<IrreducibleGraph> {
 /// Find extra irreducible headers.
 ///
 /// Find entry blocks and other blocks with backedges, which exist when \c G
-/// contains irreducible sub-SCCs.
+/// contains irreducible sub-SCCs.  Entry blocks -- nodes with a predecessor
+/// outside the SCC -- arrive precomputed in \c IsEntry; backedges within the
+/// SCC are found by sweeping members' successor edges.
 static void findIrreducibleHeaders(
-    const BlockFrequencyInfoImplBase &BFI,
-    const IrreducibleGraph &G,
+    const BlockFrequencyInfoImplBase &BFI, const IrreducibleGraph &G,
     const std::vector<const IrreducibleGraph::IrrNode *> &SCC,
+    ArrayRef<unsigned> SccId, const BitVector &IsEntry,
     LoopData::NodeList &Headers, LoopData::NodeList &Others) {
-  // Map from nodes in the SCC to whether it's an entry block.
-  SmallDenseMap<const IrreducibleGraph::IrrNode *, bool, 8> InSCC;
+  auto idx = [&](const IrreducibleGraph::IrrNode *N) {
+    return size_t(N - G.Nodes.data());
+  };
 
-  // InSCC also acts the set of nodes in the graph.  Seed it.
   for (const auto *I : SCC)
-    InSCC[I] = false;
-
-  for (auto I = InSCC.begin(), E = InSCC.end(); I != E; ++I) {
-    auto &Irr = *I->first;
-    for (const auto *P : make_range(Irr.pred_begin(), Irr.pred_end())) {
-      if (InSCC.count(P))
-        continue;
-
-      // This is an entry block.
-      I->second = true;
-      Headers.push_back(Irr.Node);
-      LLVM_DEBUG(dbgs() << "  => entry = " << BFI.getBlockName(Irr.Node)
+    if (IsEntry.test(idx(I))) {
+      Headers.push_back(I->Node);
+      LLVM_DEBUG(dbgs() << "  => entry = " << BFI.getBlockName(I->Node)
                         << "\n");
-      break;
     }
-  }
   assert(Headers.size() >= 2 &&
          "Expected irreducible CFG; -loop-info is likely invalid");
-  if (Headers.size() == InSCC.size()) {
-    // Every block is a header.
-    llvm::sort(Headers);
-    return;
+
+  // Look for extra headers from irreducible sub-SCCs: non-entries that
+  // receive a backedge from a non-entry in the same SCC.  Backedges from
+  // entry blocks can have inverted ordering; skip them.
+  BitVector Extra(G.Nodes.size());
+  for (const auto *U : SCC) {
+    if (IsEntry.test(idx(U)))
+      continue;
+    for (const auto *V : U->Succs)
+      if (SccId[idx(V)] == SccId[idx(U)] && !(U->Node < V->Node))
+        Extra.set(idx(V));
   }
-
-  // Look for extra headers from irreducible sub-SCCs.
-  for (const auto &I : InSCC) {
-    // Entry blocks are already headers.
-    if (I.second)
+  for (const auto *I : SCC) {
+    if (IsEntry.test(idx(I)))
       continue;
-
-    auto &Irr = *I.first;
-    for (const auto *P : make_range(Irr.pred_begin(), Irr.pred_end())) {
-      // Skip forward edges.
-      if (P->Node < Irr.Node)
-        continue;
-
-      // Skip predecessors from entry blocks.  These can have inverted
-      // ordering.
-      if (InSCC.lookup(P))
-        continue;
-
-      // Store the extra header.
-      Headers.push_back(Irr.Node);
-      LLVM_DEBUG(dbgs() << "  => extra = " << BFI.getBlockName(Irr.Node)
+    if (Extra.test(idx(I))) {
+      Headers.push_back(I->Node);
+      LLVM_DEBUG(dbgs() << "  => extra = " << BFI.getBlockName(I->Node)
                         << "\n");
-      break;
+    } else {
+      Others.push_back(I->Node);
+      LLVM_DEBUG(dbgs() << "  => other = " << BFI.getBlockName(I->Node)
+                        << "\n");
     }
-    if (Headers.back() == Irr.Node)
-      // Added this as a header.
-      continue;
-
-    // This is not a header.
-    Others.push_back(Irr.Node);
-    LLVM_DEBUG(dbgs() << "  => other = " << BFI.getBlockName(Irr.Node) << "\n");
   }
   llvm::sort(Headers);
   llvm::sort(Others);
@@ -758,13 +735,14 @@ static void findIrreducibleHeaders(
 static void createIrreducibleLoop(
     BlockFrequencyInfoImplBase &BFI, const IrreducibleGraph &G,
     LoopData *OuterLoop, std::list<LoopData>::iterator Insert,
-    const std::vector<const IrreducibleGraph::IrrNode *> &SCC) {
+    const std::vector<const IrreducibleGraph::IrrNode *> &SCC,
+    ArrayRef<unsigned> SccId, const BitVector &IsEntry) {
   // Translate the SCC into RPO.
   LLVM_DEBUG(dbgs() << " - found-scc\n");
 
   LoopData::NodeList Headers;
   LoopData::NodeList Others;
-  findIrreducibleHeaders(BFI, G, SCC, Headers, Others);
+  findIrreducibleHeaders(BFI, G, SCC, SccId, IsEntry, Headers, Others);
 
   auto Loop = BFI.Loops.emplace(Insert, OuterLoop, Headers.begin(),
                                 Headers.end(), Others.begin(), Others.end());
@@ -784,12 +762,32 @@ BlockFrequencyInfoImplBase::analyzeIrreducible(
   assert((OuterLoop == nullptr) == (Insert == Loops.begin()));
   auto Prev = OuterLoop ? std::prev(Insert) : Loops.end();
 
-  for (auto I = scc_begin(G); !I.isAtEnd(); ++I) {
-    if (I->size() < 2)
+  std::vector<std::vector<const IrreducibleGraph::IrrNode *>> SCCs;
+  for (auto I = scc_begin(G); !I.isAtEnd(); ++I)
+    SCCs.push_back(*I);
+
+  // Assign SCC ids, then mark entry blocks -- nodes with a predecessor
+  // outside their SCC -- with one sweep over successor edges.  Nodes the
+  // start node doesn't reach keep the sentinel id.
+  auto idx = [&](const IrreducibleGraph::IrrNode *N) {
+    return size_t(N - G.Nodes.data());
+  };
+  SmallVector<unsigned> SccId(G.Nodes.size(), ~0u);
+  BitVector IsEntry(G.Nodes.size());
+  for (unsigned I = 0; I != SCCs.size(); ++I)
+    for (const auto *N : SCCs[I])
+      SccId[idx(N)] = I;
+  for (const auto &N : G.Nodes)
+    for (const auto *S : N.Succs)
+      if (SccId[idx(&N)] != SccId[idx(S)])
+        IsEntry.set(idx(S));
+
+  for (const auto &SCC : SCCs) {
+    if (SCC.size() < 2)
       continue;
 
     // Translate the SCC into RPO.
-    createIrreducibleLoop(*this, G, OuterLoop, Insert, *I);
+    createIrreducibleLoop(*this, G, OuterLoop, Insert, SCC, SccId, IsEntry);
   }
 
   if (OuterLoop)
