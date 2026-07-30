@@ -1640,10 +1640,8 @@ inline uint32_t getWeightFromBranchProb(const BranchProbability Prob) {
 }
 
 template <class BT>
-bool
-BlockFrequencyInfoImpl<BT>::propagateMassToSuccessors(LoopData *OuterLoop,
-                                                      const BlockNode &Node,
-                                                      Distribution &Dist) {
+bool BlockFrequencyInfoImpl<BT>::propagateMassToSuccessors(
+    LoopData *OuterLoop, const BlockNode &Node, Distribution &Dist) {
   LLVM_DEBUG(dbgs() << " - node: " << getBlockName(Node) << "\n");
   // Calculate probability for successors.
   Dist.clear();
