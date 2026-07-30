@@ -411,6 +411,13 @@ public:
     /// auxiliary hash table is used.
     LLVM_ABI void normalize();
 
+    /// Reset for the next source block, retaining \a Weights' capacity.
+    void clear() {
+      Weights.clear();
+      Total = 0;
+      DidOverflow = false;
+    }
+
   private:
     LLVM_ABI void add(const BlockNode &Node, uint64_t Amount,
                       Weight::DistType Type);
@@ -882,7 +889,12 @@ template <class BT> class BlockFrequencyInfoImpl : BlockFrequencyInfoImplBase {
   /// currently assigned to \c Node between its successors.
   ///
   /// \return \c true unless there's an irreducible backedge.
-  bool propagateMassToSuccessors(LoopData *OuterLoop, const BlockNode &Node);
+  /// Distribute a block's mass to its successors.
+  ///
+  /// \p Dist is scratch space owned by the caller so that one allocation
+  /// serves every block it visits.
+  bool propagateMassToSuccessors(LoopData *OuterLoop, const BlockNode &Node,
+                                 Distribution &Dist);
 
   /// Compute mass in a particular loop.
   ///
@@ -1215,9 +1227,9 @@ bool BlockFrequencyInfoImpl<BT>::computeMassInLoop(LoopData &Loop) {
   // Compute mass in loop.
   LLVM_DEBUG(dbgs() << "compute-mass-in-loop: " << getLoopName(Loop) << "\n");
 
+  Distribution Dist;
   if (Loop.isIrreducible()) {
     LLVM_DEBUG(dbgs() << "isIrreducible = true\n");
-    Distribution Dist;
     unsigned NumHeadersWithWeight = 0;
     std::optional<uint64_t> MinHeaderWeight;
     DenseSet<uint32_t> HeadersWithoutWeight;
@@ -1264,17 +1276,17 @@ bool BlockFrequencyInfoImpl<BT>::computeMassInLoop(LoopData &Loop) {
     }
     distributeIrrLoopHeaderMass(Dist);
     for (const BlockNode &M : Loop.Nodes)
-      if (!propagateMassToSuccessors(&Loop, M))
+      if (!propagateMassToSuccessors(&Loop, M, Dist))
         llvm_unreachable("unhandled irreducible control flow");
     if (NumHeadersWithWeight == 0)
       // No headers have a metadata. Adjust header mass.
       adjustLoopHeaderMass(Loop);
   } else {
     Working[Loop.getHeader().Index].getMass() = BlockMass::getFull();
-    if (!propagateMassToSuccessors(&Loop, Loop.getHeader()))
+    if (!propagateMassToSuccessors(&Loop, Loop.getHeader(), Dist))
       llvm_unreachable("irreducible control flow to loop header!?");
     for (const BlockNode &M : Loop.members())
-      if (!propagateMassToSuccessors(&Loop, M))
+      if (!propagateMassToSuccessors(&Loop, M, Dist))
         // Irreducible backedge.
         return false;
   }
@@ -1292,12 +1304,13 @@ bool BlockFrequencyInfoImpl<BT>::tryToComputeMassInFunction() {
   assert(!Working[0].isLoopHeader() && "entry block is a loop header");
 
   Working[0].getMass() = BlockMass::getFull();
+  Distribution Dist;
   for (size_t i = 0, n = RPOT.size(); i != n; ++i) {
     // Check for nodes that have been packaged.
     if (Working[i].isPackaged())
       continue;
 
-    if (!propagateMassToSuccessors(nullptr, BlockNode(i)))
+    if (!propagateMassToSuccessors(nullptr, BlockNode(i), Dist))
       return false;
   }
   return true;
@@ -1629,10 +1642,11 @@ inline uint32_t getWeightFromBranchProb(const BranchProbability Prob) {
 template <class BT>
 bool
 BlockFrequencyInfoImpl<BT>::propagateMassToSuccessors(LoopData *OuterLoop,
-                                                      const BlockNode &Node) {
+                                                      const BlockNode &Node,
+                                                      Distribution &Dist) {
   LLVM_DEBUG(dbgs() << " - node: " << getBlockName(Node) << "\n");
   // Calculate probability for successors.
-  Distribution Dist;
+  Dist.clear();
   if (auto *Loop = Working[Node.Index].getPackagedLoop()) {
     assert(Loop != OuterLoop && "Cannot propagate mass in a packaged loop");
     if (!addLoopSuccessorsToDist(OuterLoop, *Loop, Dist))
