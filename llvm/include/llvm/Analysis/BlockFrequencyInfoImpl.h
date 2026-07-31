@@ -25,10 +25,8 @@
 #include "llvm/ADT/SparseBitVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/CodeGen/MachineSSAContext.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/SSAContext.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Support/BlockFrequency.h"
 #include "llvm/Support/BranchProbability.h"
@@ -62,9 +60,11 @@ extern LLVM_ABI llvm::cl::opt<unsigned> IterativeBFIMaxIterationsPerBlock;
 extern LLVM_ABI llvm::cl::opt<double> IterativeBFIPrecision;
 
 class BranchProbabilityInfo;
+class CycleInfo;
 class Function;
 class MachineBasicBlock;
 class MachineBranchProbabilityInfo;
+class MachineCycleInfo;
 class MachineFunction;
 
 namespace bfi_detail {
@@ -542,13 +542,13 @@ template <> struct TypeMap<BasicBlock> {
   using BlockT = BasicBlock;
   using FunctionT = Function;
   using BranchProbabilityInfoT = BranchProbabilityInfo;
-  using CycleInfoT = GenericCycleInfo<SSAContext>;
+  using CycleInfoT = CycleInfo;
 };
 template <> struct TypeMap<MachineBasicBlock> {
   using BlockT = MachineBasicBlock;
   using FunctionT = MachineFunction;
   using BranchProbabilityInfoT = MachineBranchProbabilityInfo;
-  using CycleInfoT = GenericCycleInfo<MachineSSAContext>;
+  using CycleInfoT = MachineCycleInfo;
 };
 
 /// Get the name of a MachineBasicBlock.
