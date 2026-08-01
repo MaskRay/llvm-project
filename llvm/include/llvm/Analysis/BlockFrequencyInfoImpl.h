@@ -220,57 +220,31 @@ public:
   struct LoopData {
     using ExitMap = SmallVector<std::pair<BlockNode, BlockMass>, 4>;
     using NodeList = SmallVector<BlockNode, 4>;
-    using HeaderMassList = SmallVector<BlockMass, 1>;
 
-    LoopData *Parent;            ///< The parent loop.
-    bool IsPackaged = false;     ///< Whether this has been packaged.
-    uint32_t NumHeaders = 1;     ///< Number of headers.
-    ExitMap Exits;               ///< Successor edges (and weights).
-    NodeList Nodes;              ///< Header and the members of the loop.
-    HeaderMassList BackedgeMass; ///< Mass returned to each loop header.
+    LoopData *Parent;           ///< The parent loop.
+    bool IsPackaged = false;    ///< Whether this has been packaged.
+    bool IsIrreducible = false; ///< Multi-entry SCC, solved rather than swept.
+    ExitMap Exits;              ///< Successor edges (and weights).
+    NodeList Nodes;             ///< Header and the members of the loop.
+    BlockMass BackedgeMass;     ///< Mass returned to the loop header.
     BlockMass Mass;
     Scaled64 Scale;
 
     LoopData(LoopData *Parent, const BlockNode &Header)
-      : Parent(Parent), Nodes(1, Header), BackedgeMass(1) {}
+        : Parent(Parent), Nodes(1, Header) {}
 
-    template <class It>
-    LoopData(LoopData *Parent, It FirstHeader, It LastHeader)
-        : Parent(Parent), Nodes(FirstHeader, LastHeader) {
-      NumHeaders = Nodes.size();
-      BackedgeMass.resize(NumHeaders);
-    }
+    /// An irreducible SCC.  Its entries are equivalent as far as the enclosing
+    /// region is concerned, so the lowest-RPO member stands for the package
+    /// and solveIrreducibleMass distributes mass among them all.
+    LoopData(LoopData *Parent, NodeList &&Members)
+        : Parent(Parent), IsIrreducible(true), Nodes(std::move(Members)) {}
 
-    template <class It1, class It2>
-    LoopData(LoopData *Parent, It1 FirstHeader, It1 LastHeader, It2 FirstOther,
-             It2 LastOther)
-        : Parent(Parent), Nodes(FirstHeader, LastHeader) {
-      NumHeaders = Nodes.size();
-      Nodes.insert(Nodes.end(), FirstOther, LastOther);
-      BackedgeMass.resize(NumHeaders);
-    }
-
-    bool isHeader(const BlockNode &Node) const {
-      if (isIrreducible())
-        return std::binary_search(Nodes.begin(), Nodes.begin() + NumHeaders,
-                                  Node);
-      return Node == Nodes[0];
-    }
+    bool isHeader(const BlockNode &Node) const { return Node == Nodes[0]; }
 
     BlockNode getHeader() const { return Nodes[0]; }
-    bool isIrreducible() const { return NumHeaders > 1; }
+    bool isIrreducible() const { return IsIrreducible; }
 
-    HeaderMassList::difference_type getHeaderIndex(const BlockNode &B) {
-      assert(isHeader(B) && "this is only valid on loop header blocks");
-      if (isIrreducible())
-        return std::lower_bound(Nodes.begin(), Nodes.begin() + NumHeaders, B) -
-               Nodes.begin();
-      return 0;
-    }
-
-    NodeList::const_iterator members_begin() const {
-      return Nodes.begin() + NumHeaders;
-    }
+    NodeList::const_iterator members_begin() const { return Nodes.begin() + 1; }
 
     NodeList::const_iterator members_end() const { return Nodes.end(); }
     iterator_range<NodeList::const_iterator> members() const {
@@ -484,18 +458,6 @@ public:
 
   /// Compute the loop scale for a loop.
   void computeLoopScale(LoopData &Loop);
-
-  /// Adjust the mass of all headers in an irreducible loop.
-  ///
-  /// Initially, irreducible loops are assumed to distribute their mass
-  /// equally among its headers. This can lead to wrong frequency estimates
-  /// since some headers may be executed more frequently than others.
-  ///
-  /// This adjusts header mass distribution so it matches the weights of
-  /// the backedges going into each of the loop headers.
-  void adjustLoopHeaderMass(LoopData &Loop);
-
-  void distributeIrrLoopHeaderMass(Distribution &Dist);
 
   /// Package up a loop.
   void packageLoop(LoopData &Loop);
@@ -893,6 +855,9 @@ template <class BT> class BlockFrequencyInfoImpl : BlockFrequencyInfoImplBase {
   /// \pre \a computeMassInLoop() has been called for each subloop of \c Loop.
   /// \return \c true unless there's an irreducible backedge.
   bool computeMassInLoop(LoopData &Loop);
+  void solveIrreducibleMass(LoopData &Loop);
+  void getSuccWeights(const BlockNode &Node,
+                      SmallVectorImpl<std::pair<BlockNode, uint64_t>> &Out);
 
   /// Try to compute mass in the top-level function.
   ///
@@ -1211,64 +1176,161 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::computeMassInLoops() {
 }
 
 template <class BT>
+void BlockFrequencyInfoImpl<BT>::getSuccWeights(
+    const BlockNode &Node,
+    SmallVectorImpl<std::pair<BlockNode, uint64_t>> &Out) {
+  Out.clear();
+  if (auto *L = Working[Node.Index].getPackagedLoop()) {
+    for (const auto &E : L->Exits)
+      Out.emplace_back(Working[E.first.Index].getResolvedNode(),
+                       E.second.getMass());
+    return;
+  }
+  const BlockT *BB = getBlock(Node);
+  for (auto It : enumerate(children<const BlockT *>(BB))) {
+    BlockNode Succ = getNode(It.value());
+    if (!Succ.isValid())
+      continue;
+    uint64_t W =
+        getWeightFromBranchProb(BPI->getEdgeProbability(BB, It.index()));
+    Out.emplace_back(Working[Succ.Index].getResolvedNode(),
+                     std::max<uint64_t>(1, W));
+  }
+}
+
+/// Distribute an irreducible SCC's mass among its members.
+///
+/// The members are strongly connected with no single entry, so there is no
+/// header to sweep from and no order in which one sweep is correct.  Iterate
+/// the internal chain to its dominant eigenvector instead -- the shape the
+/// mass settles into -- and read the exits and circulating mass off that.  A
+/// profile, when present, measures the entries directly and wins.
+template <class BT>
+void BlockFrequencyInfoImpl<BT>::solveIrreducibleMass(LoopData &Loop) {
+  const size_t N = Loop.Nodes.size();
+  SmallVector<SmallVector<std::pair<uint32_t, Scaled64>, 4>> P(N);
+  SmallVector<SmallVector<std::pair<BlockNode, Scaled64>, 4>> Ex(N);
+  SmallVector<std::pair<BlockNode, uint64_t>, 8> Succs;
+  for (size_t I = 0; I != N; ++I) {
+    getSuccWeights(Loop.Nodes[I], Succs);
+    uint64_t Total = 0;
+    for (const auto &S : Succs)
+      Total += S.second;
+    if (!Total)
+      continue;
+    Scaled64 Den(Total, 0);
+    for (const auto &S : Succs) {
+      Scaled64 Pr = Scaled64(S.second, 0) / Den;
+      // createIrreducibleLoop sorted Nodes, so a member's position in the
+      // matrix is where it lands in that list.
+      auto It = llvm::lower_bound(Loop.Nodes, S.first);
+      if (It != Loop.Nodes.end() && *It == S.first)
+        P[I].emplace_back(It - Loop.Nodes.begin(), Pr);
+      else
+        Ex[I].emplace_back(S.first, Pr);
+    }
+  }
+
+  SmallVector<Scaled64> F(N, Scaled64(1, 0) / Scaled64(N, 0));
+  std::optional<uint64_t> MinWeight;
+  for (size_t I = 0; I != N; ++I)
+    if (auto W = getBlock(Loop.Nodes[I])->getIrrLoopHeaderWeight())
+      if (!MinWeight || *W < *MinWeight)
+        MinWeight = *W;
+
+  SmallVector<Scaled64> G(N);
+  if (MinWeight) {
+    // irr_loop_header_weight is a measured block frequency, so pin the members
+    // that carry one and let the rest settle around them.
+    SmallVector<bool> Pinned(N, false);
+    Scaled64 Sum;
+    for (size_t I = 0; I != N; ++I)
+      if (auto W = getBlock(Loop.Nodes[I])->getIrrLoopHeaderWeight()) {
+        F[I] = Scaled64(*W, 0);
+        Pinned[I] = true;
+        Sum += F[I];
+      } else {
+        F[I] = Scaled64::getZero();
+      }
+    if (Sum.isZero()) {
+      MinWeight.reset();
+    } else {
+      // Scale to a distribution: Delta below is an absolute threshold, and raw
+      // header weights are far too large for it to ever be reached.
+      for (auto &X : F)
+        X = X / Sum;
+      for (unsigned It = 0; It != 200; ++It) {
+        for (auto &X : G)
+          X = Scaled64::getZero();
+        for (size_t I = 0; I != N; ++I)
+          for (const auto &T : P[I])
+            G[T.first] += F[I] * T.second;
+        Scaled64 Delta;
+        for (size_t I = 0; I != N; ++I) {
+          if (Pinned[I])
+            continue;
+          Delta += G[I] >= F[I] ? G[I] - F[I] : F[I] - G[I];
+          F[I] = G[I];
+        }
+        if (Delta < Scaled64(1, -32))
+          break;
+      }
+    }
+  }
+  for (unsigned It = 0; !MinWeight && It != 200; ++It) {
+    for (auto &X : G)
+      X = Scaled64::getZero();
+    for (size_t I = 0; I != N; ++I)
+      for (const auto &T : P[I])
+        G[T.first] += F[I] * T.second;
+    Scaled64 Sum;
+    for (const auto &X : G)
+      Sum += X;
+    if (Sum.isZero())
+      break; // nothing circulates; keep the uniform split
+    Scaled64 Delta;
+    for (size_t I = 0; I != N; ++I) {
+      Scaled64 V = G[I] / Sum;
+      Delta += V >= F[I] ? V - F[I] : F[I] - V;
+      F[I] = V;
+    }
+    if (Delta < Scaled64(1, -32))
+      break;
+  }
+
+  Scaled64 Norm;
+  for (const auto &X : F)
+    Norm += X;
+  if (!Norm.isZero())
+    for (auto &X : F)
+      X = X / Norm;
+
+  const Scaled64 FullMass(UINT64_MAX, 0);
+  for (size_t I = 0; I != N; ++I)
+    Working[Loop.Nodes[I].Index].getMass() =
+        BlockMass((F[I] * FullMass).template toInt<uint64_t>());
+
+  Loop.Exits.clear();
+  BlockMass TotalExit;
+  for (size_t I = 0; I != N; ++I)
+    for (const auto &E : Ex[I]) {
+      uint64_t M = (F[I] * E.second * FullMass).template toInt<uint64_t>();
+      if (!M)
+        continue;
+      Loop.Exits.emplace_back(E.first, BlockMass(M));
+      TotalExit += BlockMass(M);
+    }
+  Loop.BackedgeMass = BlockMass::getFull() - TotalExit;
+}
+
+template <class BT>
 bool BlockFrequencyInfoImpl<BT>::computeMassInLoop(LoopData &Loop) {
   // Compute mass in loop.
   LLVM_DEBUG(dbgs() << "compute-mass-in-loop: " << getLoopName(Loop) << "\n");
 
   if (Loop.isIrreducible()) {
     LLVM_DEBUG(dbgs() << "isIrreducible = true\n");
-    Distribution Dist;
-    unsigned NumHeadersWithWeight = 0;
-    std::optional<uint64_t> MinHeaderWeight;
-    DenseSet<uint32_t> HeadersWithoutWeight;
-    HeadersWithoutWeight.reserve(Loop.NumHeaders);
-    for (uint32_t H = 0; H < Loop.NumHeaders; ++H) {
-      auto &HeaderNode = Loop.Nodes[H];
-      const BlockT *Block = getBlock(HeaderNode);
-      IsIrrLoopHeader.set(Loop.Nodes[H].Index);
-      std::optional<uint64_t> HeaderWeight = Block->getIrrLoopHeaderWeight();
-      if (!HeaderWeight) {
-        LLVM_DEBUG(dbgs() << "Missing irr loop header metadata on "
-                          << getBlockName(HeaderNode) << "\n");
-        HeadersWithoutWeight.insert(H);
-        continue;
-      }
-      LLVM_DEBUG(dbgs() << getBlockName(HeaderNode)
-                        << " has irr loop header weight " << *HeaderWeight
-                        << "\n");
-      NumHeadersWithWeight++;
-      uint64_t HeaderWeightValue = *HeaderWeight;
-      if (!MinHeaderWeight || HeaderWeightValue < MinHeaderWeight)
-        MinHeaderWeight = HeaderWeightValue;
-      if (HeaderWeightValue) {
-        Dist.addLocal(HeaderNode, HeaderWeightValue);
-      }
-    }
-    // As a heuristic, if some headers don't have a weight, give them the
-    // minimum weight seen (not to disrupt the existing trends too much by
-    // using a weight that's in the general range of the other headers' weights,
-    // and the minimum seems to perform better than the average.)
-    // FIXME: better update in the passes that drop the header weight.
-    // If no headers have a weight, give them even weight (use weight 1).
-    if (!MinHeaderWeight)
-      MinHeaderWeight = 1;
-    for (uint32_t H : HeadersWithoutWeight) {
-      auto &HeaderNode = Loop.Nodes[H];
-      assert(!getBlock(HeaderNode)->getIrrLoopHeaderWeight() &&
-             "Shouldn't have a weight metadata");
-      uint64_t MinWeight = *MinHeaderWeight;
-      LLVM_DEBUG(dbgs() << "Giving weight " << MinWeight << " to "
-                        << getBlockName(HeaderNode) << "\n");
-      if (MinWeight)
-        Dist.addLocal(HeaderNode, MinWeight);
-    }
-    distributeIrrLoopHeaderMass(Dist);
-    for (const BlockNode &M : Loop.Nodes)
-      if (!propagateMassToSuccessors(&Loop, M))
-        llvm_unreachable("unhandled irreducible control flow");
-    if (NumHeadersWithWeight == 0)
-      // No headers have a metadata. Adjust header mass.
-      adjustLoopHeaderMass(Loop);
+    solveIrreducibleMass(Loop);
   } else {
     Working[Loop.getHeader().Index].getMass() = BlockMass::getFull();
     if (!propagateMassToSuccessors(&Loop, Loop.getHeader()))

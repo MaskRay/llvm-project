@@ -220,6 +220,6 @@ indirectgoto:                                     ; preds = %if.then18, %if.then
 
 ; CHECK-LABEL: Printing analysis {{.*}} for function '_Z11irreduciblePh2':
 ; CHECK: block-frequency-info: _Z11irreduciblePh2
-; CHECK: - sw.bb6: {{.*}} count = 100
+; CHECK: - sw.bb6: {{.*}} count = 300
 ; CHECK: - sw.bb15: {{.*}} count = 100, irr_loop_header_weight = 100
 ; CHECK: - indirectgoto: {{.*}} count = 400, irr_loop_header_weight = 400

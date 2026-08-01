@@ -75,7 +75,7 @@ b4:
 b5:
   call void @llvm.pseudoprobe(i64 -7702751003264189226, i64 5, i32 0, i64 -1)
   br i1 %cmp, label %b9, label %b6
-; CHECK: - b5: float = {{.*}}, int = {{.*}}, count = 2
+; CHECK: - b5: float = {{.*}}, int = {{.*}}, count = 1
 
 b6:
   call void @llvm.pseudoprobe(i64 -7702751003264189226, i64 6, i32 0, i64 -1)
