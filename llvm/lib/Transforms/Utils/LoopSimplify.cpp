@@ -149,22 +149,6 @@ BasicBlock *llvm::InsertPreheaderForLoop(Loop *L, DominatorTree *DT,
   return PreheaderBB;
 }
 
-/// Add the specified block, and all of its predecessors, to the specified set,
-/// if it's not already in there.  Stop predecessor traversal when we reach
-/// StopBlock.
-static void addBlockAndPredsToSet(BasicBlock *InputBB, BasicBlock *StopBlock,
-                                  SmallPtrSetImpl<BasicBlock *> &Blocks) {
-  SmallVector<BasicBlock *, 8> Worklist;
-  Worklist.push_back(InputBB);
-  do {
-    BasicBlock *BB = Worklist.pop_back_val();
-    if (Blocks.insert(BB).second && BB != StopBlock)
-      // If BB is not already processed and it is not a stop block then
-      // insert its predecessor in the work list
-      append_range(Worklist, predecessors(BB));
-  } while (!Worklist.empty());
-}
-
 /// The first part of loop-nestification is to find a PHI node that tells
 /// us how to partition the loops.
 static PHINode *findPHIToPartitionLoops(Loop *L, DominatorTree *DT,
@@ -273,58 +257,17 @@ static Loop *separateNestedLoop(Loop *L, BasicBlock *Preheader,
   // code layout too horribly.
   placeSplitBlockCarefully(NewBB, OuterLoopPreds, L);
 
-  // Create the new outer loop.
-  Loop *NewOuter = LI->AllocateLoop();
-
-  // Change the parent loop to use the outer loop as its child now.
-  if (Loop *Parent = L->getParentLoop())
-    Parent->replaceChildLoopWith(L, NewOuter);
-  else
-    LI->changeTopLevelLoop(L, NewOuter);
-
-  // L is now a subloop of our outer loop.
-  NewOuter->addChildLoop(L);
-
-  for (BasicBlock *BB : L->blocks())
-    NewOuter->addBlockEntry(BB);
-
-  // Now reset the header in L, which had been moved by
-  // SplitBlockPredecessors for the outer loop.
+  // SplitBlockPredecessors made NewBB the header of L. Give L back the header
+  // it had, so that the rebuild below refills L for the inner loop and gives
+  // the new outer loop an object of its own.
   L->moveToHeader(Header);
 
-  // Determine which blocks should stay in L and which should be moved out to
-  // the Outer loop now.
-  SmallPtrSet<BasicBlock *, 4> BlocksInL;
-  for (BasicBlock *P : predecessors(Header)) {
-    if (DT->dominates(Header, P))
-      addBlockAndPredsToSet(P, Header, BlocksInL);
-  }
-
-  // Scan all of the loop children of L, moving them to OuterLoop if they are
-  // not part of the inner loop.
-  const std::vector<Loop*> &SubLoops = L->getSubLoops();
-  for (size_t I = 0; I != SubLoops.size(); )
-    if (BlocksInL.count(SubLoops[I]->getHeader()))
-      ++I;   // Loop remains in L
-    else
-      NewOuter->addChildLoop(L->removeChildLoop(SubLoops.begin() + I));
-
-  SmallVector<BasicBlock *, 8> OuterLoopBlocks;
-  OuterLoopBlocks.push_back(NewBB);
-  // Now that we know which blocks are in L and which need to be moved to
-  // OuterLoop, move any blocks that need it.
-  for (unsigned i = 0; i != L->getBlocks().size(); ++i) {
-    BasicBlock *BB = L->getBlocks()[i];
-    if (!BlocksInL.count(BB)) {
-      // Move this block to the parent, updating the exit blocks sets
-      L->removeBlockFromLoop(BB);
-      if ((*LI)[BB] == L) {
-        LI->changeLoopFor(BB, NewOuter);
-        OuterLoopBlocks.push_back(BB);
-      }
-      --i;
-    }
-  }
+  // The CFG now describes the separated nest, so rederive the forest from it.
+  [[maybe_unused]] auto Removed = LI->recompute(*DT);
+  assert(Removed.empty() && "Separating a nested loop cannot remove one!");
+  Loop *NewOuter = LI->getLoopFor(NewBB);
+  assert(L->getParentLoop() == NewOuter &&
+         "L must nest in the new outer loop!");
 
   // Split edges to exit blocks from the inner loop, if they emerged in the
   // process of separating the outer one.
