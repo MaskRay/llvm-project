@@ -631,10 +631,6 @@ public:
   void transform(ArrayRef<Instruction *> DropNoWrapInsts,
                  ArrayRef<Instruction *> DropNoInfInsts);
   void reduction2Memory();
-  void restructureLoops(Loop *NewInner, Loop *NewOuter,
-                        BasicBlock *OrigInnerPreHeader,
-                        BasicBlock *OrigOuterPreHeader);
-  void removeChildLoop(Loop *OuterLoop, Loop *InnerLoop);
 
 private:
   void adjustLoopBranches();
@@ -2029,95 +2025,6 @@ bool LoopInterchangeProfitability::isProfitable(
   return true;
 }
 
-void LoopInterchangeTransform::removeChildLoop(Loop *OuterLoop,
-                                               Loop *InnerLoop) {
-  for (Loop *L : *OuterLoop)
-    if (L == InnerLoop) {
-      OuterLoop->removeChildLoop(L);
-      return;
-    }
-  llvm_unreachable("Couldn't find loop");
-}
-
-/// Update LoopInfo, after interchanging. NewInner and NewOuter refer to the
-/// new inner and outer loop after interchanging: NewInner is the original
-/// outer loop and NewOuter is the original inner loop.
-///
-/// Before interchanging, we have the following structure
-/// Outer preheader
-//  Outer header
-//    Inner preheader
-//    Inner header
-//      Inner body
-//      Inner latch
-//   outer bbs
-//   Outer latch
-//
-// After interchanging:
-// Inner preheader
-// Inner header
-//   Outer preheader
-//   Outer header
-//     Inner body
-//     outer bbs
-//     Outer latch
-//   Inner latch
-void LoopInterchangeTransform::restructureLoops(
-    Loop *NewInner, Loop *NewOuter, BasicBlock *OrigInnerPreHeader,
-    BasicBlock *OrigOuterPreHeader) {
-  Loop *OuterLoopParent = OuterLoop->getParentLoop();
-  // The original inner loop preheader moves from the new inner loop to
-  // the parent loop, if there is one.
-  NewInner->removeBlockFromLoop(OrigInnerPreHeader);
-  LI->changeLoopFor(OrigInnerPreHeader, OuterLoopParent);
-
-  // Switch the loop levels.
-  if (OuterLoopParent) {
-    // Remove the loop from its parent loop.
-    removeChildLoop(OuterLoopParent, NewInner);
-    removeChildLoop(NewInner, NewOuter);
-    OuterLoopParent->addChildLoop(NewOuter);
-  } else {
-    removeChildLoop(NewInner, NewOuter);
-    LI->changeTopLevelLoop(NewInner, NewOuter);
-  }
-  while (!NewOuter->isInnermost())
-    NewInner->addChildLoop(NewOuter->removeChildLoop(NewOuter->begin()));
-  NewOuter->addChildLoop(NewInner);
-
-  // BBs from the original inner loop.
-  SmallVector<BasicBlock *, 8> OrigInnerBBs(NewOuter->blocks());
-
-  // Add BBs from the original outer loop to the original inner loop (excluding
-  // BBs already in inner loop)
-  for (BasicBlock *BB : NewInner->blocks())
-    if (LI->getLoopFor(BB) == NewInner)
-      NewOuter->addBlockEntry(BB);
-
-  // Now remove inner loop header and latch from the new inner loop and move
-  // other BBs (the loop body) to the new inner loop.
-  BasicBlock *OuterHeader = NewOuter->getHeader();
-  BasicBlock *OuterLatch = NewOuter->getLoopLatch();
-  for (BasicBlock *BB : OrigInnerBBs) {
-    // Nothing will change for BBs in child loops.
-    if (LI->getLoopFor(BB) != NewOuter)
-      continue;
-    // Remove the new outer loop header and latch from the new inner loop.
-    if (BB == OuterHeader || BB == OuterLatch)
-      NewInner->removeBlockFromLoop(BB);
-    else
-      LI->changeLoopFor(BB, NewInner);
-  }
-
-  // The preheader of the original outer loop becomes part of the new
-  // outer loop.
-  NewOuter->addBlockEntry(OrigOuterPreHeader);
-  LI->changeLoopFor(OrigOuterPreHeader, NewOuter);
-
-  // Tell SE that we move the loops around.
-  SE->forgetLoop(NewOuter);
-}
-
 ///  User can write, or optimizers can generate the reduction for inner loop.
 ///  To make the interchange valid, apply Reduction2Mem by moving the
 ///  initializer and store instructions into the inner loop. So far we only
@@ -2502,6 +2409,27 @@ static void simplifyLCSSAPhis(Loop *OuterLoop, Loop *InnerLoop) {
   }
 }
 
+/// Rewire the branches so that the loops trade places.
+///
+/// Before interchanging, we have the following structure
+/// Outer preheader
+//  Outer header
+//    Inner preheader
+//    Inner header
+//      Inner body
+//      Inner latch
+//   outer bbs
+//   Outer latch
+//
+// After interchanging:
+// Inner preheader
+// Inner header
+//   Outer preheader
+//   Outer header
+//     Inner body
+//     outer bbs
+//     Outer latch
+//   Inner latch
 void LoopInterchangeTransform::adjustLoopBranches() {
   LLVM_DEBUG(dbgs() << "adjustLoopBranches called\n");
   std::vector<DominatorTree::UpdateType> DTUpdates;
@@ -2603,8 +2531,13 @@ void LoopInterchangeTransform::adjustLoopBranches() {
                   DTUpdates);
 
   DT->applyUpdates(DTUpdates);
-  restructureLoops(OuterLoop, InnerLoop, InnerLoopPreHeader,
-                   OuterLoopPreHeader);
+
+  // The blocks are in their new nesting now, so rederive the forest from the
+  // CFG. Interchanging keeps every loop, and each keeps the header it had, so
+  // no loop object changes identity.
+  [[maybe_unused]] auto Removed = LI->recompute(*DT);
+  assert(Removed.empty() && "Interchanging cannot remove a loop!");
+  SE->forgetLoop(InnerLoop);
 
   moveLCSSAPhis(InnerLoopLatchSuccessor, InnerLoopHeader, InnerLoopLatch,
                 OuterLoopHeader, OuterLoopLatch, InnerLoop->getExitBlock(),
