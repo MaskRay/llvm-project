@@ -651,12 +651,24 @@ private:
 
   /// AllocateLoop for analyze(): stash \p Header (see pendingHeader).
   /// getHeader() only works once the layout carve has replaced the stash with
-  /// the loop's block list.
-  LoopT *allocateLoop(BlockT *Header) {
+  /// the loop's block list. Under recompute(), \p ReuseByHeader supplies the
+  /// loop \p Header headed before, which is refilled instead of a fresh one.
+  LoopT *allocateLoop(BlockT *Header,
+                      const DenseMap<BlockT *, LoopT *> *ReuseByHeader) {
+    if (ReuseByHeader)
+      if (LoopT *L = ReuseByHeader->lookup(Header)) {
+        L->PendingHeader = Header;
+        return L;
+      }
     LoopT *L = AllocateLoop();
     L->PendingHeader = Header;
     return L;
   }
+
+  void analyzeImpl(
+      ParentT F,
+      function_ref<const DominatorTreeBase<BlockT, false> &()> GetDomTree,
+      const DenseMap<BlockT *, LoopT *> *ReuseByHeader);
 
   /// The header of a loop under construction, stashed until the layout carve
   /// builds the block list.
@@ -853,6 +865,20 @@ public:
   /// Analyze the function \p DomTree describes.
   void analyze(const DominatorTreeBase<BlockT, false> &DomTree);
   ///@}
+
+  /// Rebuild the loop forest from the CFG, reusing the existing loop object for
+  /// every block that still heads a loop. Analyses that key on loop pointers,
+  /// such as ScalarEvolution and the loop analysis manager, stay valid for the
+  /// loops that survive.
+  ///
+  /// Loops whose header no longer heads one are unlinked from the forest and
+  /// appended to \p Removed in a deterministic order. They are not destroyed:
+  /// the caller must run its deletion callbacks on them first, then destroy().
+  /// Such a loop keeps only its header, enough to identify and name it.
+  ///
+  /// Every loop's header must still belong to the function.
+  void recompute(const DominatorTreeBase<BlockT, false> &DomTree,
+                 SmallVectorImpl<LoopT *> &Removed);
 
   // Debugging
   void print(raw_ostream &OS) const;

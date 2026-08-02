@@ -477,6 +477,53 @@ void LoopInfoBase<BlockT, LoopT>::analyze(ParentT F) {
 template <class BlockT, class LoopT>
 void LoopInfoBase<BlockT, LoopT>::analyze(
     ParentT F, function_ref<const DomTreeBase<BlockT> &()> GetDomTree) {
+  analyzeImpl(F, GetDomTree, /*ReuseByHeader=*/nullptr);
+}
+
+/// Rebuild the forest in place, keeping the loop object of every surviving
+/// header so that pointer-keyed analyses need not be discarded.
+template <class BlockT, class LoopT>
+void LoopInfoBase<BlockT, LoopT>::recompute(const DomTreeBase<BlockT> &DomTree,
+                                            SmallVectorImpl<LoopT *> &Removed) {
+  // Record the loops with their headers before unlinking them, both to find
+  // them again by header and to report the survivors in a stable order.
+  SmallVector<std::pair<BlockT *, LoopT *>, 4> Old;
+  for (LoopT *L : getLoopsInPreorder())
+    Old.emplace_back(L->getHeader(), L);
+  DenseMap<BlockT *, LoopT *> ReuseByHeader(Old.begin(), Old.end());
+
+  // Empty out the loops the analysis is about to refill. Their block storage
+  // belongs to this LoopInfo and is reclaimed with it.
+  for (LoopT *L : make_second_range(Old)) {
+    L->SubLoops.clear();
+    L->ParentLoop = nullptr;
+    L->BlockData = nullptr;
+    L->BlockLen = 0;
+    L->BlockCapacity = 0;
+  }
+  BBMap.clear();
+  TopLevelLoops.clear();
+  BlockLayout.reset();
+
+  analyzeImpl(
+      DomTree.getRootNode()->getBlock()->getParent(),
+      [&]() -> const DomTreeBase<BlockT> & { return DomTree; }, &ReuseByHeader);
+
+  for (auto [Header, L] : Old)
+    if (lookupLoopFor(Header) != L) {
+      // Give the loop its header back, so that the caller can still identify
+      // and name it while running its deletion callbacks.
+      reallocBlocks(*L, 1);
+      L->BlockData[0] = Header;
+      L->BlockLen = 1;
+      Removed.push_back(L);
+    }
+}
+
+template <class BlockT, class LoopT>
+void LoopInfoBase<BlockT, LoopT>::analyzeImpl(
+    ParentT F, function_ref<const DomTreeBase<BlockT> &()> GetDomTree,
+    const DenseMap<BlockT *, LoopT *> *ReuseByHeader) {
   using BlockTraits = GraphTraits<BlockT *>;
   auto num = [](const BlockT *BB) {
     return GraphTraits<const BlockT *>::getNumber(BB);
@@ -701,7 +748,7 @@ void LoopInfoBase<BlockT, LoopT>::analyze(
     LoopT *Enclosing = H == NoBlock ? nullptr : BBMap[H];
     LoopT *L = Enclosing;
     if (Info[B].Pos == IsHeader) {
-      L = allocateLoop(BB);
+      L = allocateLoop(BB, ReuseByHeader);
       L->setParentLoop(Enclosing);
     }
     BBMap[B] = L;

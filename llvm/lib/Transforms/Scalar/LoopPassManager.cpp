@@ -235,8 +235,10 @@ PreservedAnalyses FunctionToLoopPassAdaptor::run(Function &F,
     LAMFP.markMSSAUsed();
   LoopAnalysisManager &LAM = LAMFP.getManager();
 
-  // A postorder worklist of loops to process.
-  SmallPriorityWorklist<Loop *, 4> Worklist;
+  // A postorder worklist of the loops to process, each identified by its
+  // header. Passes may destroy loops that are still queued, so an entry is
+  // resolved only when it is popped.
+  SmallPriorityWorklist<BasicBlock *, 4> Worklist;
 
   // Register the worklist and loop analysis manager so that loop passes can
   // update them when they mutate the loop nest structure.
@@ -245,10 +247,10 @@ PreservedAnalyses FunctionToLoopPassAdaptor::run(Function &F,
   // Add the loop nests in the reverse order of LoopInfo. See method
   // declaration.
   if (!LoopNestMode) {
-    appendLoopsToWorklist(LI, Worklist);
+    appendLoopHeadersToWorklist(LI, Worklist);
   } else {
     for (Loop *L : LI)
-      Worklist.insert(L);
+      Worklist.insert(L->getHeader());
   }
 
 #ifndef NDEBUG
@@ -268,7 +270,11 @@ PreservedAnalyses FunctionToLoopPassAdaptor::run(Function &F,
 #endif
 
   do {
-    Loop *L = Worklist.pop_back_val();
+    BasicBlock *Header = Worklist.pop_back_val();
+    // Nothing to visit if the loop this entry was queued for is gone.
+    Loop *L = LI.getLoopFor(Header);
+    if (!L || L->getHeader() != Header)
+      continue;
     assert(!(LoopNestMode && L->getParentLoop()) &&
            "L should be a top-level loop in loop-nest mode.");
 

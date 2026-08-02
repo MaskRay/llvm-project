@@ -2030,32 +2030,47 @@ int llvm::rewriteLoopExitValues(Loop *L, LoopInfo *LI, TargetLibraryInfo *TLI,
   return NumReplaced;
 }
 
+static void appendLoopEntry(SmallVectorImpl<Loop *> &PreOrder, Loop *L) {
+  PreOrder.push_back(L);
+}
+
+static void appendLoopEntry(SmallVectorImpl<BasicBlock *> &PreOrder, Loop *L) {
+  PreOrder.push_back(L->getHeader());
+}
+
 /// Utility that implements appending of loops onto a worklist.
 /// Loops are added in preorder (analogous for reverse postorder for trees),
 /// and the worklist is processed LIFO.
-template <typename RangeT>
-void llvm::appendReversedLoopsToWorklist(
-    RangeT &&Loops, SmallPriorityWorklist<Loop *, 4> &Worklist) {
+template <typename RangeT, typename T>
+static void appendReversedLoops(RangeT &&Loops,
+                                SmallPriorityWorklist<T, 4> &Worklist) {
   // We use an internal worklist to build up the preorder traversal without
   // recursion.
-  SmallVector<Loop *, 4> PreOrderLoops, PreOrderWorklist;
+  SmallVector<T, 4> PreOrder;
+  SmallVector<Loop *, 4> PreOrderWorklist;
 
   // We walk the initial sequence of loops in reverse because we generally want
   // to visit defs before uses and the worklist is LIFO.
   for (Loop *RootL : Loops) {
-    assert(PreOrderLoops.empty() && "Must start with an empty preorder walk.");
+    assert(PreOrder.empty() && "Must start with an empty preorder walk.");
     assert(PreOrderWorklist.empty() &&
            "Must start with an empty preorder walk worklist.");
     PreOrderWorklist.push_back(RootL);
     do {
       Loop *L = PreOrderWorklist.pop_back_val();
       PreOrderWorklist.append(L->begin(), L->end());
-      PreOrderLoops.push_back(L);
+      appendLoopEntry(PreOrder, L);
     } while (!PreOrderWorklist.empty());
 
-    Worklist.insert(std::move(PreOrderLoops));
-    PreOrderLoops.clear();
+    Worklist.insert(std::move(PreOrder));
+    PreOrder.clear();
   }
+}
+
+template <typename RangeT>
+void llvm::appendReversedLoopsToWorklist(
+    RangeT &&Loops, SmallPriorityWorklist<Loop *, 4> &Worklist) {
+  appendReversedLoops(Loops, Worklist);
 }
 
 template <typename RangeT>
@@ -2075,6 +2090,16 @@ llvm::appendLoopsToWorklist<Loop &>(Loop &L,
 void llvm::appendLoopsToWorklist(LoopInfo &LI,
                                  SmallPriorityWorklist<Loop *, 4> &Worklist) {
   appendReversedLoopsToWorklist(LI, Worklist);
+}
+
+void llvm::appendLoopHeadersToWorklist(
+    LoopInfo &LI, SmallPriorityWorklist<BasicBlock *, 4> &Worklist) {
+  appendReversedLoops(LI, Worklist);
+}
+
+void llvm::appendLoopHeadersToWorklist(
+    ArrayRef<Loop *> Loops, SmallPriorityWorklist<BasicBlock *, 4> &Worklist) {
+  appendReversedLoops(reverse(Loops), Worklist);
 }
 
 Loop *llvm::cloneLoop(Loop *L, Loop *PL, ValueToValueMapTy &VM,

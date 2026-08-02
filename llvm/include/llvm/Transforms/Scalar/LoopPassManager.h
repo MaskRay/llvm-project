@@ -226,20 +226,15 @@ public:
   bool skipCurrentLoop() const { return SkipCurrentLoop; }
 
   /// Loop passes should use this method to indicate they have deleted a loop
-  /// from the nest.
-  ///
-  /// Note that this loop must either be the current loop or a subloop of the
-  /// current loop. This routine must be called prior to removing the loop from
-  /// the loop nest.
+  /// from the nest. \p L must still be nameable, but need not still be linked
+  /// into the nest. A loop the walk has not reached yet may be reported too:
+  /// the worklist holds headers, so its entry resolves to nothing.
   ///
   /// If this is called for the current loop, in addition to clearing any
   /// state, this routine will mark that the current loop should be skipped by
   /// the rest of the pass management infrastructure.
   void markLoopAsDeleted(Loop &L, llvm::StringRef Name) {
     LAM.clear(L, Name);
-    assert((&L == CurrentL || CurrentL->contains(&L)) &&
-           "Cannot delete a loop outside of the "
-           "subloop tree currently being processed.");
     if (&L == CurrentL)
       SkipCurrentLoop = true;
   }
@@ -261,7 +256,7 @@ public:
            "Child loops should not be pushed in loop-nest mode.");
     // Insert ourselves back into the worklist first, as this loop should be
     // revisited after all the children have been processed.
-    Worklist.insert(CurrentL);
+    Worklist.insert(CurrentL->getHeader());
 
 #ifndef NDEBUG
     for (Loop *NewL : NewChildLoops)
@@ -270,7 +265,7 @@ public:
                                                   "the current loop!");
 #endif
 
-    appendLoopsToWorklist(NewChildLoops, Worklist);
+    appendLoopHeadersToWorklist(NewChildLoops, Worklist);
 
     // Also skip further processing of the current loop--it will be revisited
     // after all of its newly added children are accounted for.
@@ -291,9 +286,10 @@ public:
 #endif
 
     if (LoopNestMode)
-      Worklist.insert(NewSibLoops);
+      Worklist.insert(
+          map_range(NewSibLoops, [](Loop *L) { return L->getHeader(); }));
     else
-      appendLoopsToWorklist(NewSibLoops, Worklist);
+      appendLoopHeadersToWorklist(NewSibLoops, Worklist);
 
     // No need to skip the current loop or revisit it, as sibling loops
     // shouldn't impact anything.
@@ -309,7 +305,7 @@ public:
     SkipCurrentLoop = true;
 
     // And insert ourselves back into the worklist.
-    Worklist.insert(CurrentL);
+    Worklist.insert(CurrentL->getHeader());
   }
 
   bool isLoopNestChanged() const {
@@ -325,8 +321,9 @@ public:
 private:
   friend class llvm::FunctionToLoopPassAdaptor;
 
-  /// The \c FunctionToLoopPassAdaptor's worklist of loops to process.
-  SmallPriorityWorklist<Loop *, 4> &Worklist;
+  /// The \c FunctionToLoopPassAdaptor's worklist of loops to process, each
+  /// identified by its header.
+  SmallPriorityWorklist<BasicBlock *, 4> &Worklist;
 
   /// The analysis manager for use in the current loop nest.
   LoopAnalysisManager &LAM;
@@ -342,7 +339,7 @@ private:
   Loop *ParentL;
 #endif
 
-  LPMUpdater(SmallPriorityWorklist<Loop *, 4> &Worklist,
+  LPMUpdater(SmallPriorityWorklist<BasicBlock *, 4> &Worklist,
              LoopAnalysisManager &LAM, bool LoopNestMode = false,
              bool LoopNestChanged = false)
       : Worklist(Worklist), LAM(LAM), LoopNestMode(LoopNestMode),

@@ -648,6 +648,17 @@ appendLoopsToWorklist<Loop &>(Loop &L,
 LLVM_ABI void appendLoopsToWorklist(LoopInfo &,
                                     SmallPriorityWorklist<Loop *, 4> &);
 
+/// Variants of the above that queue the header of each loop instead of the loop
+/// itself. A header uniquely identifies a natural loop, so an entry can be
+/// resolved with LoopInfo::getLoopFor when it is popped; the queued loops need
+/// not outlive the worklist.
+LLVM_ABI void
+appendLoopHeadersToWorklist(LoopInfo &,
+                            SmallPriorityWorklist<BasicBlock *, 4> &);
+LLVM_ABI void
+appendLoopHeadersToWorklist(ArrayRef<Loop *>,
+                            SmallPriorityWorklist<BasicBlock *, 4> &);
+
 /// Recursively clone the specified loop and all of its children,
 /// mapping the blocks with the specified map.
 LLVM_ABI Loop *cloneLoop(Loop *L, Loop *PL, ValueToValueMapTy &VM, LoopInfo *LI,

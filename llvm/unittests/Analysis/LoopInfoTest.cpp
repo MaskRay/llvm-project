@@ -13,6 +13,7 @@
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/SourceMgr.h"
 #include "gtest/gtest.h"
@@ -1645,4 +1646,77 @@ TEST(LoopInfoTest, TokenLCSSA) {
     EXPECT_FALSE(
         InnerLoop->isRecursivelyLCSSAForm(DT, LI, /*IgnoreTokens*/ false));
   });
+}
+
+static BasicBlock *getBlockByName(Function *F, StringRef Name) {
+  for (auto &BB : *F)
+    if (BB.getName() == Name)
+      return &BB;
+  return nullptr;
+}
+
+TEST(LoopInfoTest, Recompute) {
+  const char *ModuleStr = "define void @test(i1 %c) {\n"
+                          "entry:\n"
+                          "  br label %outer\n"
+                          "outer:\n"
+                          "  br label %inner\n"
+                          "inner:\n"
+                          "  br i1 %c, label %inner, label %outer.latch\n"
+                          "outer.latch:\n"
+                          "  br i1 %c, label %outer, label %exit\n"
+                          "exit:\n"
+                          "  ret void\n"
+                          "}\n";
+
+  LLVMContext Context;
+  std::unique_ptr<Module> M = makeLLVMModule(Context, ModuleStr);
+  Function *F = M->getFunction("test");
+  DominatorTree DT(*F);
+  LoopInfo LI(DT);
+
+  BasicBlock *Outer = getBlockByName(F, "outer");
+  BasicBlock *Inner = getBlockByName(F, "inner");
+  Loop *OuterL = LI.getLoopFor(Outer);
+  Loop *InnerL = LI.getLoopFor(Inner);
+  ASSERT_NE(OuterL, nullptr);
+  ASSERT_NE(InnerL, nullptr);
+
+  // An unchanged CFG must reproduce the same forest in the same objects.
+  SmallVector<Loop *, 4> Removed;
+  LI.recompute(DT, Removed);
+  EXPECT_TRUE(Removed.empty());
+  EXPECT_EQ(LI.getLoopFor(Outer), OuterL);
+  EXPECT_EQ(LI.getLoopFor(Inner), InnerL);
+  EXPECT_EQ(InnerL->getParentLoop(), OuterL);
+  EXPECT_EQ(OuterL->getSubLoops().size(), 1u);
+  EXPECT_EQ(OuterL->getNumBlocks(), 3u);
+  LI.verify();
+
+  // Drop the inner backedge. The outer loop keeps its identity and absorbs the
+  // block; only the inner loop is reported as removed.
+  cast<CondBrInst>(Inner->getTerminator())
+      ->setSuccessor(0, getBlockByName(F, "outer.latch"));
+  DT.recalculate(*F);
+  Removed.clear();
+  LI.recompute(DT, Removed);
+  EXPECT_EQ(LI.getLoopFor(Outer), OuterL);
+  EXPECT_EQ(LI.getLoopFor(Inner), OuterL);
+  EXPECT_TRUE(OuterL->getSubLoops().empty());
+  ASSERT_EQ(Removed.size(), 1u);
+  EXPECT_EQ(Removed[0], InnerL);
+  LI.verify();
+  LI.destroy(InnerL);
+
+  // Dropping the last backedge leaves no loops at all.
+  cast<CondBrInst>(getBlockByName(F, "outer.latch")->getTerminator())
+      ->setSuccessor(0, getBlockByName(F, "exit"));
+  DT.recalculate(*F);
+  Removed.clear();
+  LI.recompute(DT, Removed);
+  EXPECT_TRUE(LI.empty());
+  ASSERT_EQ(Removed.size(), 1u);
+  EXPECT_EQ(Removed[0], OuterL);
+  LI.verify();
+  LI.destroy(OuterL);
 }
