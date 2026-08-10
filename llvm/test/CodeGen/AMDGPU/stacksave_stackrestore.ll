@@ -267,15 +267,16 @@ define void @func_stacksave_nonentry_block(i1 %cond) #0 {
 ; WAVE32-O0-NEXT:    s_xor_saveexec_b32 s4, -1
 ; WAVE32-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s32 offset:4 ; 4-byte Folded Spill
 ; WAVE32-O0-NEXT:    s_mov_b32 exec_lo, s4
+; WAVE32-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; WAVE32-O0-NEXT:    v_and_b32_e64 v0, 1, v0
-; WAVE32-O0-NEXT:    v_cmp_eq_u32_e64 s5, v0, 1
-; WAVE32-O0-NEXT:    s_mov_b32 s4, exec_lo
+; WAVE32-O0-NEXT:    v_cmp_eq_u32_e64 s4, v0, 1
+; WAVE32-O0-NEXT:    s_mov_b32 s5, exec_lo
 ; WAVE32-O0-NEXT:    ; implicit-def: $vgpr1 : SGPR spill to VGPR lane
-; WAVE32-O0-NEXT:    v_writelane_b32 v1, s4, 0
+; WAVE32-O0-NEXT:    v_writelane_b32 v1, s5, 0
 ; WAVE32-O0-NEXT:    s_or_saveexec_b32 s7, -1
 ; WAVE32-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s32 ; 4-byte Folded Spill
 ; WAVE32-O0-NEXT:    s_mov_b32 exec_lo, s7
-; WAVE32-O0-NEXT:    s_and_b32 s4, s4, s5
+; WAVE32-O0-NEXT:    s_and_b32 s4, s5, s4
 ; WAVE32-O0-NEXT:    s_mov_b32 exec_lo, s4
 ; WAVE32-O0-NEXT:    s_cbranch_execz .LBB4_2
 ; WAVE32-O0-NEXT:  ; %bb.1: ; %bb1
@@ -303,16 +304,20 @@ define void @func_stacksave_nonentry_block(i1 %cond) #0 {
 ; WAVE64-O0-NEXT:    s_xor_saveexec_b64 s[4:5], -1
 ; WAVE64-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s32 offset:4 ; 4-byte Folded Spill
 ; WAVE64-O0-NEXT:    s_mov_b64 exec, s[4:5]
+; WAVE64-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; WAVE64-O0-NEXT:    v_and_b32_e64 v0, 1, v0
-; WAVE64-O0-NEXT:    v_cmp_eq_u32_e64 s[6:7], v0, 1
-; WAVE64-O0-NEXT:    s_mov_b64 s[4:5], exec
+; WAVE64-O0-NEXT:    v_cmp_eq_u32_e64 s[4:5], v0, 1
+; WAVE64-O0-NEXT:    s_mov_b64 s[6:7], exec
 ; WAVE64-O0-NEXT:    ; implicit-def: $vgpr1 : SGPR spill to VGPR lane
-; WAVE64-O0-NEXT:    v_writelane_b32 v1, s4, 0
-; WAVE64-O0-NEXT:    v_writelane_b32 v1, s5, 1
+; WAVE64-O0-NEXT:    v_writelane_b32 v1, s6, 0
 ; WAVE64-O0-NEXT:    s_or_saveexec_b64 s[10:11], -1
 ; WAVE64-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s32 ; 4-byte Folded Spill
 ; WAVE64-O0-NEXT:    s_mov_b64 exec, s[10:11]
-; WAVE64-O0-NEXT:    s_and_b64 s[4:5], s[4:5], s[6:7]
+; WAVE64-O0-NEXT:    v_writelane_b32 v1, s7, 1
+; WAVE64-O0-NEXT:    s_or_saveexec_b64 s[10:11], -1
+; WAVE64-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s32 ; 4-byte Folded Spill
+; WAVE64-O0-NEXT:    s_mov_b64 exec, s[10:11]
+; WAVE64-O0-NEXT:    s_and_b64 s[4:5], s[6:7], s[4:5]
 ; WAVE64-O0-NEXT:    s_mov_b64 exec, s[4:5]
 ; WAVE64-O0-NEXT:    s_cbranch_execz .LBB4_2
 ; WAVE64-O0-NEXT:  ; %bb.1: ; %bb1
@@ -341,12 +346,13 @@ define void @func_stacksave_nonentry_block(i1 %cond) #0 {
 ; WAVE32-WWM-PREALLOC-NEXT:    s_xor_saveexec_b32 s4, -1
 ; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v1, off, s[0:3], s32 ; 4-byte Folded Spill
 ; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 exec_lo, s4
+; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; WAVE32-WWM-PREALLOC-NEXT:    v_and_b32_e64 v0, 1, v0
-; WAVE32-WWM-PREALLOC-NEXT:    v_cmp_eq_u32_e64 s5, v0, 1
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s4, exec_lo
+; WAVE32-WWM-PREALLOC-NEXT:    v_cmp_eq_u32_e64 s4, v0, 1
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s5, exec_lo
 ; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $vgpr1 : SGPR spill to VGPR lane
-; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v1, s4, 0
-; WAVE32-WWM-PREALLOC-NEXT:    s_and_b32 s4, s4, s5
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v1, s5, 0
+; WAVE32-WWM-PREALLOC-NEXT:    s_and_b32 s4, s5, s4
 ; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 exec_lo, s4
 ; WAVE32-WWM-PREALLOC-NEXT:    s_cbranch_execz .LBB4_2
 ; WAVE32-WWM-PREALLOC-NEXT:  ; %bb.1: ; %bb1
@@ -701,6 +707,7 @@ define void @func_stacksave_stackrestore_voffset(i32 %offset) #0 {
 ;
 ; WAVE32-O0-LABEL: func_stacksave_stackrestore_voffset:
 ; WAVE32-O0:       ; %bb.0:
+; WAVE32-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; WAVE32-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; WAVE32-O0-NEXT:    s_mov_b32 s4, s32
 ; WAVE32-O0-NEXT:    s_lshr_b32 s4, s4, 5
@@ -712,6 +719,7 @@ define void @func_stacksave_stackrestore_voffset(i32 %offset) #0 {
 ;
 ; WAVE64-O0-LABEL: func_stacksave_stackrestore_voffset:
 ; WAVE64-O0:       ; %bb.0:
+; WAVE64-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; WAVE64-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; WAVE64-O0-NEXT:    s_mov_b32 s4, s32
 ; WAVE64-O0-NEXT:    s_lshr_b32 s4, s4, 6
@@ -723,6 +731,7 @@ define void @func_stacksave_stackrestore_voffset(i32 %offset) #0 {
 ;
 ; WAVE32-WWM-PREALLOC-LABEL: func_stacksave_stackrestore_voffset:
 ; WAVE32-WWM-PREALLOC:       ; %bb.0:
+; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; WAVE32-WWM-PREALLOC-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s4, s32
 ; WAVE32-WWM-PREALLOC-NEXT:    s_lshr_b32 s4, s4, 5
@@ -754,6 +763,7 @@ define void @func_stacksave_vgpr(ptr addrspace(5) %stack) #0 {
 ;
 ; WAVE32-O0-LABEL: func_stacksave_vgpr:
 ; WAVE32-O0:       ; %bb.0:
+; WAVE32-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; WAVE32-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; WAVE32-O0-NEXT:    v_readfirstlane_b32 s4, v0
 ; WAVE32-O0-NEXT:    s_lshl_b32 s4, s4, 5
@@ -762,6 +772,7 @@ define void @func_stacksave_vgpr(ptr addrspace(5) %stack) #0 {
 ;
 ; WAVE64-O0-LABEL: func_stacksave_vgpr:
 ; WAVE64-O0:       ; %bb.0:
+; WAVE64-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; WAVE64-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; WAVE64-O0-NEXT:    v_readfirstlane_b32 s4, v0
 ; WAVE64-O0-NEXT:    s_lshl_b32 s4, s4, 6
@@ -770,6 +781,7 @@ define void @func_stacksave_vgpr(ptr addrspace(5) %stack) #0 {
 ;
 ; WAVE32-WWM-PREALLOC-LABEL: func_stacksave_vgpr:
 ; WAVE32-WWM-PREALLOC:       ; %bb.0:
+; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; WAVE32-WWM-PREALLOC-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; WAVE32-WWM-PREALLOC-NEXT:    v_readfirstlane_b32 s4, v0
 ; WAVE32-WWM-PREALLOC-NEXT:    s_lshl_b32 s4, s4, 5
@@ -795,22 +807,49 @@ define amdgpu_gfx void @func_stacksave_sgpr(ptr addrspace(5) inreg %stack) #0 {
 ; WAVE32-O0-LABEL: func_stacksave_sgpr:
 ; WAVE32-O0:       ; %bb.0:
 ; WAVE32-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
+; WAVE32-O0-NEXT:    s_xor_saveexec_b32 s34, -1
+; WAVE32-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 ; 4-byte Folded Spill
+; WAVE32-O0-NEXT:    s_mov_b32 exec_lo, s34
+; WAVE32-O0-NEXT:    v_writelane_b32 v0, s4, 0
 ; WAVE32-O0-NEXT:    s_lshl_b32 s34, s4, 5
 ; WAVE32-O0-NEXT:    s_mov_b32 s32, s34
+; WAVE32-O0-NEXT:    v_readlane_b32 s4, v0, 0
+; WAVE32-O0-NEXT:    s_xor_saveexec_b32 s34, -1
+; WAVE32-O0-NEXT:    buffer_load_dword v0, off, s[0:3], s32 ; 4-byte Folded Reload
+; WAVE32-O0-NEXT:    s_mov_b32 exec_lo, s34
+; WAVE32-O0-NEXT:    s_waitcnt vmcnt(0)
 ; WAVE32-O0-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; WAVE64-O0-LABEL: func_stacksave_sgpr:
 ; WAVE64-O0:       ; %bb.0:
 ; WAVE64-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
+; WAVE64-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
+; WAVE64-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 ; 4-byte Folded Spill
+; WAVE64-O0-NEXT:    s_mov_b64 exec, s[34:35]
+; WAVE64-O0-NEXT:    v_writelane_b32 v0, s4, 0
 ; WAVE64-O0-NEXT:    s_lshl_b32 s34, s4, 6
 ; WAVE64-O0-NEXT:    s_mov_b32 s32, s34
+; WAVE64-O0-NEXT:    v_readlane_b32 s4, v0, 0
+; WAVE64-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
+; WAVE64-O0-NEXT:    buffer_load_dword v0, off, s[0:3], s32 ; 4-byte Folded Reload
+; WAVE64-O0-NEXT:    s_mov_b64 exec, s[34:35]
+; WAVE64-O0-NEXT:    s_waitcnt vmcnt(0)
 ; WAVE64-O0-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; WAVE32-WWM-PREALLOC-LABEL: func_stacksave_sgpr:
 ; WAVE32-WWM-PREALLOC:       ; %bb.0:
 ; WAVE32-WWM-PREALLOC-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
+; WAVE32-WWM-PREALLOC-NEXT:    s_xor_saveexec_b32 s34, -1
+; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v0, off, s[0:3], s32 ; 4-byte Folded Spill
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 exec_lo, s34
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v0, s4, 0
 ; WAVE32-WWM-PREALLOC-NEXT:    s_lshl_b32 s34, s4, 5
 ; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s32, s34
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s4, v0, 0
+; WAVE32-WWM-PREALLOC-NEXT:    s_xor_saveexec_b32 s34, -1
+; WAVE32-WWM-PREALLOC-NEXT:    buffer_load_dword v0, off, s[0:3], s32 ; 4-byte Folded Reload
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 exec_lo, s34
+; WAVE32-WWM-PREALLOC-NEXT:    s_waitcnt vmcnt(0)
 ; WAVE32-WWM-PREALLOC-NEXT:    s_setpc_b64 s[30:31]
   call void @llvm.stackrestore.p5(ptr addrspace(5) %stack)
   ret void
@@ -958,114 +997,136 @@ define amdgpu_kernel void @kernel_stacksave_stackrestore_call_with_stack_objects
 ; WAVE32-O0-LABEL: kernel_stacksave_stackrestore_call_with_stack_objects:
 ; WAVE32-O0:       ; %bb.0:
 ; WAVE32-O0-NEXT:    s_mov_b32 s32, 0x1200
-; WAVE32-O0-NEXT:    s_getpc_b64 s[20:21]
-; WAVE32-O0-NEXT:    s_mov_b32 s20, s0
-; WAVE32-O0-NEXT:    s_load_dwordx4 s[20:23], s[20:21], 0x0
+; WAVE32-O0-NEXT:    s_getpc_b64 s[24:25]
+; WAVE32-O0-NEXT:    s_mov_b32 s24, s0
+; WAVE32-O0-NEXT:    s_load_dwordx4 s[24:27], s[24:25], 0x0
 ; WAVE32-O0-NEXT:    s_waitcnt lgkmcnt(0)
-; WAVE32-O0-NEXT:    s_bitset0_b32 s23, 21
-; WAVE32-O0-NEXT:    s_add_u32 s20, s20, s11
-; WAVE32-O0-NEXT:    s_addc_u32 s21, s21, 0
-; WAVE32-O0-NEXT:    s_mov_b32 s14, s10
-; WAVE32-O0-NEXT:    s_mov_b32 s13, s9
-; WAVE32-O0-NEXT:    s_mov_b32 s12, s8
-; WAVE32-O0-NEXT:    s_mov_b64 s[10:11], s[6:7]
-; WAVE32-O0-NEXT:    s_mov_b64 s[8:9], s[4:5]
-; WAVE32-O0-NEXT:    s_mov_b64 s[6:7], s[2:3]
-; WAVE32-O0-NEXT:    s_mov_b64 s[4:5], s[0:1]
-; WAVE32-O0-NEXT:    s_mov_b32 s0, s32
-; WAVE32-O0-NEXT:    ; implicit-def: $vgpr32 : SGPR spill to VGPR lane
-; WAVE32-O0-NEXT:    v_writelane_b32 v32, s0, 0
-; WAVE32-O0-NEXT:    s_lshr_b32 s0, s0, 5
-; WAVE32-O0-NEXT:    v_writelane_b32 v32, s0, 1
+; WAVE32-O0-NEXT:    s_bitset0_b32 s27, 21
+; WAVE32-O0-NEXT:    s_add_u32 s24, s24, s11
+; WAVE32-O0-NEXT:    s_addc_u32 s25, s25, 0
+; WAVE32-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; WAVE32-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; WAVE32-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; WAVE32-O0-NEXT:    s_mov_b32 s11, s32
+; WAVE32-O0-NEXT:    s_lshr_b32 s12, s11, 5
 ; WAVE32-O0-NEXT:    v_mov_b32_e32 v3, 42
-; WAVE32-O0-NEXT:    buffer_store_dword v3, off, s[20:23], 0
+; WAVE32-O0-NEXT:    buffer_store_dword v3, off, s[24:27], 0
 ; WAVE32-O0-NEXT:    s_waitcnt_vscnt null, 0x0
-; WAVE32-O0-NEXT:    s_mov_b64 s[0:1], s[20:21]
-; WAVE32-O0-NEXT:    s_mov_b64 s[2:3], s[22:23]
-; WAVE32-O0-NEXT:    s_mov_b32 s15, s32
+; WAVE32-O0-NEXT:    s_mov_b64 s[16:17], s[24:25]
+; WAVE32-O0-NEXT:    s_mov_b64 s[18:19], s[26:27]
+; WAVE32-O0-NEXT:    s_mov_b32 s13, s32
 ; WAVE32-O0-NEXT:    v_mov_b32_e32 v3, 17
-; WAVE32-O0-NEXT:    buffer_store_dword v3, off, s[20:23], s15 offset:4
+; WAVE32-O0-NEXT:    buffer_store_dword v3, off, s[24:27], s13 offset:4
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr14
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v3, s14
+; WAVE32-O0-NEXT:    buffer_store_dword v3, off, s[24:27], s13
+; WAVE32-O0-NEXT:    s_mov_b32 s13, stack_passed_argument@abs32@hi
+; WAVE32-O0-NEXT:    s_mov_b32 s14, stack_passed_argument@abs32@lo
+; WAVE32-O0-NEXT:    ; kill: def $sgpr14 killed $sgpr14 def $sgpr14_sgpr15
+; WAVE32-O0-NEXT:    s_mov_b32 s15, s13
+; WAVE32-O0-NEXT:    s_mov_b32 s13, 20
+; WAVE32-O0-NEXT:    v_lshlrev_b32_e64 v2, s13, v2
+; WAVE32-O0-NEXT:    s_mov_b32 s13, 10
+; WAVE32-O0-NEXT:    v_lshlrev_b32_e64 v1, s13, v1
+; WAVE32-O0-NEXT:    v_or3_b32 v31, v0, v1, v2
+; WAVE32-O0-NEXT:    ; implicit-def: $vgpr32 : SGPR spill to VGPR lane
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s4, 0
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s5, 1
+; WAVE32-O0-NEXT:    s_mov_b64 s[4:5], s[0:1]
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s6, 2
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s7, 3
+; WAVE32-O0-NEXT:    s_mov_b64 s[6:7], s[2:3]
+; WAVE32-O0-NEXT:    v_readlane_b32 s0, v32, 0
+; WAVE32-O0-NEXT:    v_readlane_b32 s1, v32, 1
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s8, 4
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s9, 5
+; WAVE32-O0-NEXT:    s_mov_b64 s[8:9], s[0:1]
+; WAVE32-O0-NEXT:    v_readlane_b32 s0, v32, 2
+; WAVE32-O0-NEXT:    v_readlane_b32 s1, v32, 3
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s10, 6
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s11, 7
+; WAVE32-O0-NEXT:    s_mov_b64 s[10:11], s[0:1]
+; WAVE32-O0-NEXT:    v_readlane_b32 s0, v32, 4
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s12, 8
+; WAVE32-O0-NEXT:    s_mov_b32 s12, s0
+; WAVE32-O0-NEXT:    v_readlane_b32 s13, v32, 5
+; WAVE32-O0-NEXT:    v_readlane_b32 s0, v32, 6
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s14, 9
+; WAVE32-O0-NEXT:    v_writelane_b32 v32, s15, 10
+; WAVE32-O0-NEXT:    s_mov_b32 s14, s0
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr15
+; WAVE32-O0-NEXT:    s_mov_b64 s[0:1], s[16:17]
+; WAVE32-O0-NEXT:    s_mov_b64 s[2:3], s[18:19]
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v0, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v1, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v2, s16
 ; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
 ; WAVE32-O0-NEXT:    v_mov_b32_e32 v3, s16
-; WAVE32-O0-NEXT:    buffer_store_dword v3, off, s[20:23], s15
-; WAVE32-O0-NEXT:    s_mov_b32 s15, stack_passed_argument@abs32@hi
-; WAVE32-O0-NEXT:    s_mov_b32 s16, stack_passed_argument@abs32@lo
-; WAVE32-O0-NEXT:    ; kill: def $sgpr16 killed $sgpr16 def $sgpr16_sgpr17
-; WAVE32-O0-NEXT:    s_mov_b32 s17, s15
-; WAVE32-O0-NEXT:    s_mov_b32 s15, 20
-; WAVE32-O0-NEXT:    v_lshlrev_b32_e64 v2, s15, v2
-; WAVE32-O0-NEXT:    s_mov_b32 s15, 10
-; WAVE32-O0-NEXT:    v_lshlrev_b32_e64 v1, s15, v1
-; WAVE32-O0-NEXT:    v_or3_b32 v31, v0, v1, v2
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr15
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v0, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v1, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v2, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v3, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v4, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v5, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v6, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v7, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v8, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v9, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v10, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v11, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v12, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v13, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v14, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v15, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v16, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v17, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v18, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v19, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v20, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v21, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v22, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v23, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v24, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v25, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v26, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v27, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v28, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v29, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v30, s18
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v4, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v5, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v6, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v7, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v8, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v9, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v10, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v11, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v12, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v13, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v14, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v15, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v16, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v17, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v18, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v19, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v20, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v21, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v22, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v23, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v24, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v25, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v26, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v27, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v28, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v29, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v30, s16
+; WAVE32-O0-NEXT:    v_readlane_b32 s16, v32, 9
+; WAVE32-O0-NEXT:    v_readlane_b32 s17, v32, 10
 ; WAVE32-O0-NEXT:    s_swappc_b64 s[30:31], s[16:17]
-; WAVE32-O0-NEXT:    v_readlane_b32 s1, v32, 1
-; WAVE32-O0-NEXT:    v_readlane_b32 s0, v32, 0
+; WAVE32-O0-NEXT:    v_readlane_b32 s0, v32, 8
 ; WAVE32-O0-NEXT:    ;;#ASMSTART
-; WAVE32-O0-NEXT:    ; use s1
+; WAVE32-O0-NEXT:    ; use s0
 ; WAVE32-O0-NEXT:    ;;#ASMEND
+; WAVE32-O0-NEXT:    v_readlane_b32 s0, v32, 7
 ; WAVE32-O0-NEXT:    s_mov_b32 s32, s0
 ; WAVE32-O0-NEXT:    s_endpgm
 ;
@@ -1078,221 +1139,265 @@ define amdgpu_kernel void @kernel_stacksave_stackrestore_call_with_stack_objects
 ; WAVE64-O0-NEXT:    s_waitcnt lgkmcnt(0)
 ; WAVE64-O0-NEXT:    s_add_u32 s24, s24, s11
 ; WAVE64-O0-NEXT:    s_addc_u32 s25, s25, 0
-; WAVE64-O0-NEXT:    s_mov_b32 s14, s10
-; WAVE64-O0-NEXT:    s_mov_b32 s13, s9
-; WAVE64-O0-NEXT:    s_mov_b32 s12, s8
-; WAVE64-O0-NEXT:    s_mov_b64 s[10:11], s[6:7]
-; WAVE64-O0-NEXT:    s_mov_b64 s[8:9], s[4:5]
-; WAVE64-O0-NEXT:    s_mov_b64 s[6:7], s[2:3]
-; WAVE64-O0-NEXT:    s_mov_b64 s[4:5], s[0:1]
-; WAVE64-O0-NEXT:    s_mov_b32 s0, s32
-; WAVE64-O0-NEXT:    ; implicit-def: $vgpr32 : SGPR spill to VGPR lane
-; WAVE64-O0-NEXT:    v_writelane_b32 v32, s0, 0
-; WAVE64-O0-NEXT:    s_lshr_b32 s0, s0, 6
-; WAVE64-O0-NEXT:    v_writelane_b32 v32, s0, 1
+; WAVE64-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; WAVE64-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; WAVE64-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; WAVE64-O0-NEXT:    s_mov_b32 s11, s32
+; WAVE64-O0-NEXT:    s_lshr_b32 s12, s11, 6
 ; WAVE64-O0-NEXT:    v_mov_b32_e32 v3, 42
 ; WAVE64-O0-NEXT:    buffer_store_dword v3, off, s[24:27], 0
 ; WAVE64-O0-NEXT:    s_waitcnt_vscnt null, 0x0
-; WAVE64-O0-NEXT:    s_mov_b64 s[0:1], s[24:25]
-; WAVE64-O0-NEXT:    s_mov_b64 s[2:3], s[26:27]
-; WAVE64-O0-NEXT:    s_mov_b32 s15, s32
+; WAVE64-O0-NEXT:    s_mov_b64 s[16:17], s[24:25]
+; WAVE64-O0-NEXT:    s_mov_b64 s[18:19], s[26:27]
+; WAVE64-O0-NEXT:    s_mov_b32 s13, s32
 ; WAVE64-O0-NEXT:    v_mov_b32_e32 v3, 17
-; WAVE64-O0-NEXT:    buffer_store_dword v3, off, s[24:27], s15 offset:4
+; WAVE64-O0-NEXT:    buffer_store_dword v3, off, s[24:27], s13 offset:4
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr14
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v3, s14
+; WAVE64-O0-NEXT:    buffer_store_dword v3, off, s[24:27], s13
+; WAVE64-O0-NEXT:    s_mov_b32 s13, stack_passed_argument@abs32@hi
+; WAVE64-O0-NEXT:    s_mov_b32 s14, stack_passed_argument@abs32@lo
+; WAVE64-O0-NEXT:    ; kill: def $sgpr14 killed $sgpr14 def $sgpr14_sgpr15
+; WAVE64-O0-NEXT:    s_mov_b32 s15, s13
+; WAVE64-O0-NEXT:    s_mov_b32 s13, 20
+; WAVE64-O0-NEXT:    v_lshlrev_b32_e64 v2, s13, v2
+; WAVE64-O0-NEXT:    s_mov_b32 s13, 10
+; WAVE64-O0-NEXT:    v_lshlrev_b32_e64 v1, s13, v1
+; WAVE64-O0-NEXT:    v_or3_b32 v31, v0, v1, v2
+; WAVE64-O0-NEXT:    ; implicit-def: $vgpr32 : SGPR spill to VGPR lane
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s4, 0
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s5, 1
+; WAVE64-O0-NEXT:    s_mov_b64 s[4:5], s[0:1]
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s6, 2
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s7, 3
+; WAVE64-O0-NEXT:    s_mov_b64 s[6:7], s[2:3]
+; WAVE64-O0-NEXT:    v_readlane_b32 s0, v32, 0
+; WAVE64-O0-NEXT:    v_readlane_b32 s1, v32, 1
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s8, 4
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s9, 5
+; WAVE64-O0-NEXT:    s_mov_b64 s[8:9], s[0:1]
+; WAVE64-O0-NEXT:    v_readlane_b32 s0, v32, 2
+; WAVE64-O0-NEXT:    v_readlane_b32 s1, v32, 3
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s10, 6
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s11, 7
+; WAVE64-O0-NEXT:    s_mov_b64 s[10:11], s[0:1]
+; WAVE64-O0-NEXT:    v_readlane_b32 s0, v32, 4
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s12, 8
+; WAVE64-O0-NEXT:    s_mov_b32 s12, s0
+; WAVE64-O0-NEXT:    v_readlane_b32 s13, v32, 5
+; WAVE64-O0-NEXT:    v_readlane_b32 s0, v32, 6
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s14, 9
+; WAVE64-O0-NEXT:    v_writelane_b32 v32, s15, 10
+; WAVE64-O0-NEXT:    s_mov_b32 s14, s0
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr15
+; WAVE64-O0-NEXT:    s_mov_b64 s[0:1], s[16:17]
+; WAVE64-O0-NEXT:    s_mov_b64 s[2:3], s[18:19]
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v0, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v1, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v2, s16
 ; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
 ; WAVE64-O0-NEXT:    v_mov_b32_e32 v3, s16
-; WAVE64-O0-NEXT:    buffer_store_dword v3, off, s[24:27], s15
-; WAVE64-O0-NEXT:    s_mov_b32 s15, stack_passed_argument@abs32@hi
-; WAVE64-O0-NEXT:    s_mov_b32 s16, stack_passed_argument@abs32@lo
-; WAVE64-O0-NEXT:    ; kill: def $sgpr16 killed $sgpr16 def $sgpr16_sgpr17
-; WAVE64-O0-NEXT:    s_mov_b32 s17, s15
-; WAVE64-O0-NEXT:    s_mov_b32 s15, 20
-; WAVE64-O0-NEXT:    v_lshlrev_b32_e64 v2, s15, v2
-; WAVE64-O0-NEXT:    s_mov_b32 s15, 10
-; WAVE64-O0-NEXT:    v_lshlrev_b32_e64 v1, s15, v1
-; WAVE64-O0-NEXT:    v_or3_b32 v31, v0, v1, v2
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr15
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v0, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v1, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v2, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v3, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v4, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v5, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v6, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v7, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v8, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v9, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v10, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v11, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v12, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v13, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v14, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v15, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v16, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v17, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v18, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v19, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v20, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v21, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v22, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v23, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v24, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v25, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v26, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v27, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v28, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v29, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v30, s18
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v4, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v5, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v6, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v7, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v8, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v9, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v10, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v11, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v12, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v13, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v14, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v15, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v16, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v17, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v18, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v19, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v20, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v21, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v22, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v23, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v24, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v25, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v26, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v27, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v28, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v29, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v30, s16
+; WAVE64-O0-NEXT:    v_readlane_b32 s16, v32, 9
+; WAVE64-O0-NEXT:    v_readlane_b32 s17, v32, 10
 ; WAVE64-O0-NEXT:    s_swappc_b64 s[30:31], s[16:17]
-; WAVE64-O0-NEXT:    v_readlane_b32 s1, v32, 1
-; WAVE64-O0-NEXT:    v_readlane_b32 s0, v32, 0
+; WAVE64-O0-NEXT:    v_readlane_b32 s0, v32, 8
 ; WAVE64-O0-NEXT:    ;;#ASMSTART
-; WAVE64-O0-NEXT:    ; use s1
+; WAVE64-O0-NEXT:    ; use s0
 ; WAVE64-O0-NEXT:    ;;#ASMEND
+; WAVE64-O0-NEXT:    v_readlane_b32 s0, v32, 7
 ; WAVE64-O0-NEXT:    s_mov_b32 s32, s0
 ; WAVE64-O0-NEXT:    s_endpgm
 ;
 ; WAVE32-WWM-PREALLOC-LABEL: kernel_stacksave_stackrestore_call_with_stack_objects:
 ; WAVE32-WWM-PREALLOC:       ; %bb.0:
 ; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s32, 0x1200
-; WAVE32-WWM-PREALLOC-NEXT:    s_getpc_b64 s[20:21]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s20, s0
-; WAVE32-WWM-PREALLOC-NEXT:    s_load_dwordx4 s[20:23], s[20:21], 0x0
+; WAVE32-WWM-PREALLOC-NEXT:    s_getpc_b64 s[24:25]
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s24, s0
+; WAVE32-WWM-PREALLOC-NEXT:    s_load_dwordx4 s[24:27], s[24:25], 0x0
 ; WAVE32-WWM-PREALLOC-NEXT:    s_waitcnt lgkmcnt(0)
-; WAVE32-WWM-PREALLOC-NEXT:    s_bitset0_b32 s23, 21
-; WAVE32-WWM-PREALLOC-NEXT:    s_add_u32 s20, s20, s11
-; WAVE32-WWM-PREALLOC-NEXT:    s_addc_u32 s21, s21, 0
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s14, s10
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s13, s9
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s12, s8
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[10:11], s[6:7]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[8:9], s[4:5]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[6:7], s[2:3]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[4:5], s[0:1]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s0, s32
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $vgpr32 : SGPR spill to VGPR lane
-; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s0, 0
-; WAVE32-WWM-PREALLOC-NEXT:    s_lshr_b32 s0, s0, 5
-; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s0, 1
+; WAVE32-WWM-PREALLOC-NEXT:    s_bitset0_b32 s27, 21
+; WAVE32-WWM-PREALLOC-NEXT:    s_add_u32 s24, s24, s11
+; WAVE32-WWM-PREALLOC-NEXT:    s_addc_u32 s25, s25, 0
+; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s11, s32
+; WAVE32-WWM-PREALLOC-NEXT:    s_lshr_b32 s12, s11, 5
 ; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v3, 42
-; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v3, off, s[20:23], 0
+; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v3, off, s[24:27], 0
 ; WAVE32-WWM-PREALLOC-NEXT:    s_waitcnt_vscnt null, 0x0
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[0:1], s[20:21]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[2:3], s[22:23]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s15, s32
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[16:17], s[24:25]
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[18:19], s[26:27]
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s13, s32
 ; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v3, 17
-; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v3, off, s[20:23], s15 offset:4
+; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v3, off, s[24:27], s13 offset:4
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr14
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v3, s14
+; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v3, off, s[24:27], s13
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s13, stack_passed_argument@abs32@hi
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s14, stack_passed_argument@abs32@lo
+; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $sgpr14 killed $sgpr14 def $sgpr14_sgpr15
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s15, s13
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s13, 20
+; WAVE32-WWM-PREALLOC-NEXT:    v_lshlrev_b32_e64 v2, s13, v2
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s13, 10
+; WAVE32-WWM-PREALLOC-NEXT:    v_lshlrev_b32_e64 v1, s13, v1
+; WAVE32-WWM-PREALLOC-NEXT:    v_or3_b32 v31, v0, v1, v2
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $vgpr32 : SGPR spill to VGPR lane
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s4, 0
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s5, 1
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[4:5], s[0:1]
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s6, 2
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s7, 3
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[6:7], s[2:3]
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s0, v32, 0
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s1, v32, 1
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s8, 4
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s9, 5
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[8:9], s[0:1]
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s0, v32, 2
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s1, v32, 3
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s10, 6
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s11, 7
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[10:11], s[0:1]
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s0, v32, 4
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s12, 8
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s12, s0
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s13, v32, 5
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s0, v32, 6
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s14, 9
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s15, 10
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s14, s0
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr15
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[0:1], s[16:17]
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[2:3], s[18:19]
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v0, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v1, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v2, s16
 ; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
 ; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v3, s16
-; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v3, off, s[20:23], s15
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s15, stack_passed_argument@abs32@hi
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s16, stack_passed_argument@abs32@lo
-; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $sgpr16 killed $sgpr16 def $sgpr16_sgpr17
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s17, s15
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s15, 20
-; WAVE32-WWM-PREALLOC-NEXT:    v_lshlrev_b32_e64 v2, s15, v2
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s15, 10
-; WAVE32-WWM-PREALLOC-NEXT:    v_lshlrev_b32_e64 v1, s15, v1
-; WAVE32-WWM-PREALLOC-NEXT:    v_or3_b32 v31, v0, v1, v2
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr15
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v0, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v1, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v2, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v3, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v4, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v5, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v6, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v7, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v8, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v9, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v10, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v11, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v12, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v13, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v14, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v15, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v16, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v17, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v18, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v19, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v20, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v21, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v22, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v23, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v24, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v25, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v26, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v27, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v28, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v29, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v30, s18
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v4, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v5, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v6, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v7, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v8, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v9, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v10, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v11, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v12, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v13, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v14, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v15, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v16, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v17, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v18, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v19, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v20, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v21, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v22, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v23, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v24, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v25, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v26, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v27, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v28, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v29, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v30, s16
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s16, v32, 9
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s17, v32, 10
 ; WAVE32-WWM-PREALLOC-NEXT:    s_swappc_b64 s[30:31], s[16:17]
-; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s1, v32, 1
-; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s0, v32, 0
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s0, v32, 8
 ; WAVE32-WWM-PREALLOC-NEXT:    ;;#ASMSTART
-; WAVE32-WWM-PREALLOC-NEXT:    ; use s1
+; WAVE32-WWM-PREALLOC-NEXT:    ; use s0
 ; WAVE32-WWM-PREALLOC-NEXT:    ;;#ASMEND
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s0, v32, 7
 ; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s32, s0
 ; WAVE32-WWM-PREALLOC-NEXT:    s_endpgm
   %alloca = alloca [32 x i32], addrspace(5)
@@ -1378,7 +1483,7 @@ define void @func_stacksave_stackrestore_call_with_stack_objects() #0 {
 ; WAVE32-O0-LABEL: func_stacksave_stackrestore_call_with_stack_objects:
 ; WAVE32-O0:       ; %bb.0:
 ; WAVE32-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; WAVE32-O0-NEXT:    s_mov_b32 s24, s33
+; WAVE32-O0-NEXT:    s_mov_b32 s25, s33
 ; WAVE32-O0-NEXT:    s_mov_b32 s33, s32
 ; WAVE32-O0-NEXT:    s_xor_saveexec_b32 s16, -1
 ; WAVE32-O0-NEXT:    buffer_store_dword v32, off, s[0:3], s33 offset:128 ; 4-byte Folded Spill
@@ -1387,97 +1492,99 @@ define void @func_stacksave_stackrestore_call_with_stack_objects() #0 {
 ; WAVE32-O0-NEXT:    s_add_i32 s32, s32, 0x1200
 ; WAVE32-O0-NEXT:    v_writelane_b32 v32, s30, 0
 ; WAVE32-O0-NEXT:    v_writelane_b32 v32, s31, 1
-; WAVE32-O0-NEXT:    s_mov_b32 s16, s32
-; WAVE32-O0-NEXT:    ; implicit-def: $vgpr33 : SGPR spill to VGPR lane
-; WAVE32-O0-NEXT:    v_writelane_b32 v33, s16, 0
-; WAVE32-O0-NEXT:    s_lshr_b32 s16, s16, 5
-; WAVE32-O0-NEXT:    v_writelane_b32 v33, s16, 1
+; WAVE32-O0-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
+; WAVE32-O0-NEXT:    s_mov_b32 s30, s32
+; WAVE32-O0-NEXT:    s_lshr_b32 s31, s30, 5
 ; WAVE32-O0-NEXT:    v_mov_b32_e32 v0, 42
 ; WAVE32-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s33
 ; WAVE32-O0-NEXT:    s_waitcnt_vscnt null, 0x0
-; WAVE32-O0-NEXT:    s_mov_b64 s[22:23], s[2:3]
-; WAVE32-O0-NEXT:    s_mov_b64 s[20:21], s[0:1]
-; WAVE32-O0-NEXT:    s_mov_b32 s16, s32
+; WAVE32-O0-NEXT:    s_mov_b64 s[18:19], s[2:3]
+; WAVE32-O0-NEXT:    s_mov_b64 s[16:17], s[0:1]
+; WAVE32-O0-NEXT:    s_mov_b32 s20, s32
 ; WAVE32-O0-NEXT:    v_mov_b32_e32 v0, 17
-; WAVE32-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s16 offset:4
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr17
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v0, s17
-; WAVE32-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s16
-; WAVE32-O0-NEXT:    s_mov_b32 s18, stack_passed_argument@abs32@hi
-; WAVE32-O0-NEXT:    s_mov_b32 s16, stack_passed_argument@abs32@lo
-; WAVE32-O0-NEXT:    ; kill: def $sgpr16 killed $sgpr16 def $sgpr16_sgpr17
-; WAVE32-O0-NEXT:    s_mov_b32 s17, s18
-; WAVE32-O0-NEXT:    s_mov_b64 s[0:1], s[20:21]
-; WAVE32-O0-NEXT:    s_mov_b64 s[2:3], s[22:23]
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v0, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v1, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v2, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v3, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v4, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v5, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v6, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v7, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v8, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v9, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v10, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v11, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v12, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v13, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v14, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v15, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v16, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v17, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v18, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v19, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v20, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v21, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v22, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v23, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v24, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v25, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v26, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v27, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v28, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v29, s18
-; WAVE32-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-O0-NEXT:    v_mov_b32_e32 v30, s18
-; WAVE32-O0-NEXT:    s_swappc_b64 s[30:31], s[16:17]
-; WAVE32-O0-NEXT:    v_readlane_b32 s5, v33, 1
-; WAVE32-O0-NEXT:    v_readlane_b32 s4, v33, 0
+; WAVE32-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s20 offset:4
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr21
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v0, s21
+; WAVE32-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s20
+; WAVE32-O0-NEXT:    s_mov_b32 s20, stack_passed_argument@abs32@hi
+; WAVE32-O0-NEXT:    s_mov_b32 s21, stack_passed_argument@abs32@lo
+; WAVE32-O0-NEXT:    s_mov_b32 s22, s21
+; WAVE32-O0-NEXT:    s_mov_b32 s23, s20
+; WAVE32-O0-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
+; WAVE32-O0-NEXT:    s_mov_b64 s[0:1], s[16:17]
+; WAVE32-O0-NEXT:    s_mov_b64 s[2:3], s[18:19]
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v0, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v1, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v2, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v3, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v4, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v5, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v6, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v7, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v8, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v9, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v10, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v11, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v12, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v13, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v14, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v15, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v16, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v17, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v18, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v19, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v20, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v21, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v22, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v23, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v24, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v25, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v26, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v27, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v28, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v29, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-O0-NEXT:    v_mov_b32_e32 v30, s16
+; WAVE32-O0-NEXT:    ; implicit-def: $vgpr33 : SGPR spill to VGPR lane
+; WAVE32-O0-NEXT:    v_writelane_b32 v33, s30, 0
+; WAVE32-O0-NEXT:    v_writelane_b32 v33, s31, 1
+; WAVE32-O0-NEXT:    s_swappc_b64 s[30:31], s[22:23]
+; WAVE32-O0-NEXT:    v_readlane_b32 s30, v33, 1
 ; WAVE32-O0-NEXT:    ;;#ASMSTART
-; WAVE32-O0-NEXT:    ; use s5
+; WAVE32-O0-NEXT:    ; use s30
 ; WAVE32-O0-NEXT:    ;;#ASMEND
-; WAVE32-O0-NEXT:    s_mov_b32 s32, s4
+; WAVE32-O0-NEXT:    v_readlane_b32 s30, v33, 0
+; WAVE32-O0-NEXT:    s_mov_b32 s32, s30
 ; WAVE32-O0-NEXT:    v_readlane_b32 s30, v32, 0
 ; WAVE32-O0-NEXT:    v_readlane_b32 s31, v32, 1
 ; WAVE32-O0-NEXT:    s_mov_b32 s32, s33
@@ -1485,14 +1592,14 @@ define void @func_stacksave_stackrestore_call_with_stack_objects() #0 {
 ; WAVE32-O0-NEXT:    buffer_load_dword v32, off, s[0:3], s33 offset:128 ; 4-byte Folded Reload
 ; WAVE32-O0-NEXT:    buffer_load_dword v33, off, s[0:3], s33 offset:132 ; 4-byte Folded Reload
 ; WAVE32-O0-NEXT:    s_mov_b32 exec_lo, s4
-; WAVE32-O0-NEXT:    s_mov_b32 s33, s24
+; WAVE32-O0-NEXT:    s_mov_b32 s33, s25
 ; WAVE32-O0-NEXT:    s_waitcnt vmcnt(0)
 ; WAVE32-O0-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; WAVE64-O0-LABEL: func_stacksave_stackrestore_call_with_stack_objects:
 ; WAVE64-O0:       ; %bb.0:
 ; WAVE64-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; WAVE64-O0-NEXT:    s_mov_b32 s19, s33
+; WAVE64-O0-NEXT:    s_mov_b32 s26, s33
 ; WAVE64-O0-NEXT:    s_mov_b32 s33, s32
 ; WAVE64-O0-NEXT:    s_xor_saveexec_b64 s[16:17], -1
 ; WAVE64-O0-NEXT:    buffer_store_dword v32, off, s[0:3], s33 offset:128 ; 4-byte Folded Spill
@@ -1501,97 +1608,99 @@ define void @func_stacksave_stackrestore_call_with_stack_objects() #0 {
 ; WAVE64-O0-NEXT:    s_add_i32 s32, s32, 0x2400
 ; WAVE64-O0-NEXT:    v_writelane_b32 v32, s30, 0
 ; WAVE64-O0-NEXT:    v_writelane_b32 v32, s31, 1
-; WAVE64-O0-NEXT:    s_mov_b32 s16, s32
-; WAVE64-O0-NEXT:    ; implicit-def: $vgpr33 : SGPR spill to VGPR lane
-; WAVE64-O0-NEXT:    v_writelane_b32 v33, s16, 0
-; WAVE64-O0-NEXT:    s_lshr_b32 s16, s16, 6
-; WAVE64-O0-NEXT:    v_writelane_b32 v33, s16, 1
+; WAVE64-O0-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
+; WAVE64-O0-NEXT:    s_mov_b32 s30, s32
+; WAVE64-O0-NEXT:    s_lshr_b32 s31, s30, 6
 ; WAVE64-O0-NEXT:    v_mov_b32_e32 v0, 42
 ; WAVE64-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s33
 ; WAVE64-O0-NEXT:    s_waitcnt_vscnt null, 0x0
-; WAVE64-O0-NEXT:    s_mov_b64 s[22:23], s[2:3]
-; WAVE64-O0-NEXT:    s_mov_b64 s[20:21], s[0:1]
-; WAVE64-O0-NEXT:    s_mov_b32 s16, s32
+; WAVE64-O0-NEXT:    s_mov_b64 s[18:19], s[2:3]
+; WAVE64-O0-NEXT:    s_mov_b64 s[16:17], s[0:1]
+; WAVE64-O0-NEXT:    s_mov_b32 s20, s32
 ; WAVE64-O0-NEXT:    v_mov_b32_e32 v0, 17
-; WAVE64-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s16 offset:4
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr17
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v0, s17
-; WAVE64-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s16
-; WAVE64-O0-NEXT:    s_mov_b32 s18, stack_passed_argument@abs32@hi
-; WAVE64-O0-NEXT:    s_mov_b32 s16, stack_passed_argument@abs32@lo
-; WAVE64-O0-NEXT:    ; kill: def $sgpr16 killed $sgpr16 def $sgpr16_sgpr17
-; WAVE64-O0-NEXT:    s_mov_b32 s17, s18
-; WAVE64-O0-NEXT:    s_mov_b64 s[0:1], s[20:21]
-; WAVE64-O0-NEXT:    s_mov_b64 s[2:3], s[22:23]
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v0, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v1, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v2, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v3, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v4, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v5, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v6, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v7, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v8, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v9, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v10, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v11, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v12, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v13, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v14, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v15, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v16, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v17, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v18, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v19, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v20, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v21, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v22, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v23, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v24, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v25, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v26, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v27, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v28, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v29, s18
-; WAVE64-O0-NEXT:    ; implicit-def: $sgpr18
-; WAVE64-O0-NEXT:    v_mov_b32_e32 v30, s18
-; WAVE64-O0-NEXT:    s_swappc_b64 s[30:31], s[16:17]
-; WAVE64-O0-NEXT:    v_readlane_b32 s5, v33, 1
-; WAVE64-O0-NEXT:    v_readlane_b32 s4, v33, 0
+; WAVE64-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s20 offset:4
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr21
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v0, s21
+; WAVE64-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s20
+; WAVE64-O0-NEXT:    s_mov_b32 s20, stack_passed_argument@abs32@hi
+; WAVE64-O0-NEXT:    s_mov_b32 s21, stack_passed_argument@abs32@lo
+; WAVE64-O0-NEXT:    s_mov_b32 s22, s21
+; WAVE64-O0-NEXT:    s_mov_b32 s23, s20
+; WAVE64-O0-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
+; WAVE64-O0-NEXT:    s_mov_b64 s[0:1], s[16:17]
+; WAVE64-O0-NEXT:    s_mov_b64 s[2:3], s[18:19]
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v0, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v1, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v2, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v3, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v4, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v5, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v6, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v7, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v8, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v9, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v10, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v11, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v12, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v13, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v14, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v15, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v16, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v17, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v18, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v19, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v20, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v21, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v22, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v23, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v24, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v25, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v26, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v27, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v28, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v29, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $sgpr16
+; WAVE64-O0-NEXT:    v_mov_b32_e32 v30, s16
+; WAVE64-O0-NEXT:    ; implicit-def: $vgpr33 : SGPR spill to VGPR lane
+; WAVE64-O0-NEXT:    v_writelane_b32 v33, s30, 0
+; WAVE64-O0-NEXT:    v_writelane_b32 v33, s31, 1
+; WAVE64-O0-NEXT:    s_swappc_b64 s[30:31], s[22:23]
+; WAVE64-O0-NEXT:    v_readlane_b32 s30, v33, 1
 ; WAVE64-O0-NEXT:    ;;#ASMSTART
-; WAVE64-O0-NEXT:    ; use s5
+; WAVE64-O0-NEXT:    ; use s30
 ; WAVE64-O0-NEXT:    ;;#ASMEND
-; WAVE64-O0-NEXT:    s_mov_b32 s32, s4
+; WAVE64-O0-NEXT:    v_readlane_b32 s30, v33, 0
+; WAVE64-O0-NEXT:    s_mov_b32 s32, s30
 ; WAVE64-O0-NEXT:    v_readlane_b32 s30, v32, 0
 ; WAVE64-O0-NEXT:    v_readlane_b32 s31, v32, 1
 ; WAVE64-O0-NEXT:    s_mov_b32 s32, s33
@@ -1599,14 +1708,14 @@ define void @func_stacksave_stackrestore_call_with_stack_objects() #0 {
 ; WAVE64-O0-NEXT:    buffer_load_dword v32, off, s[0:3], s33 offset:128 ; 4-byte Folded Reload
 ; WAVE64-O0-NEXT:    buffer_load_dword v33, off, s[0:3], s33 offset:132 ; 4-byte Folded Reload
 ; WAVE64-O0-NEXT:    s_mov_b64 exec, s[4:5]
-; WAVE64-O0-NEXT:    s_mov_b32 s33, s19
+; WAVE64-O0-NEXT:    s_mov_b32 s33, s26
 ; WAVE64-O0-NEXT:    s_waitcnt vmcnt(0)
 ; WAVE64-O0-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; WAVE32-WWM-PREALLOC-LABEL: func_stacksave_stackrestore_call_with_stack_objects:
 ; WAVE32-WWM-PREALLOC:       ; %bb.0:
 ; WAVE32-WWM-PREALLOC-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s24, s33
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s25, s33
 ; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s33, s32
 ; WAVE32-WWM-PREALLOC-NEXT:    s_xor_saveexec_b32 s16, -1
 ; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v32, off, s[0:3], s33 offset:128 ; 4-byte Folded Spill
@@ -1615,97 +1724,99 @@ define void @func_stacksave_stackrestore_call_with_stack_objects() #0 {
 ; WAVE32-WWM-PREALLOC-NEXT:    s_add_i32 s32, s32, 0x1200
 ; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v33, s30, 0
 ; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v33, s31, 1
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s16, s32
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $vgpr32 : SGPR spill to VGPR lane
-; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s16, 0
-; WAVE32-WWM-PREALLOC-NEXT:    s_lshr_b32 s16, s16, 5
-; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s16, 1
+; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s30, s32
+; WAVE32-WWM-PREALLOC-NEXT:    s_lshr_b32 s31, s30, 5
 ; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v0, 42
 ; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v0, off, s[0:3], s33
 ; WAVE32-WWM-PREALLOC-NEXT:    s_waitcnt_vscnt null, 0x0
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[22:23], s[2:3]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[20:21], s[0:1]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s16, s32
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[18:19], s[2:3]
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[16:17], s[0:1]
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s20, s32
 ; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v0, 17
-; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v0, off, s[0:3], s16 offset:4
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr17
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v0, s17
-; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v0, off, s[0:3], s16
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s18, stack_passed_argument@abs32@hi
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s16, stack_passed_argument@abs32@lo
-; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $sgpr16 killed $sgpr16 def $sgpr16_sgpr17
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s17, s18
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[0:1], s[20:21]
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[2:3], s[22:23]
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v0, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v1, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v2, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v3, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v4, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v5, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v6, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v7, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v8, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v9, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v10, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v11, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v12, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v13, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v14, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v15, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v16, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v17, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v18, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v19, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v20, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v21, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v22, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v23, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v24, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v25, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v26, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v27, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v28, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v29, s18
-; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr18
-; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v30, s18
-; WAVE32-WWM-PREALLOC-NEXT:    s_swappc_b64 s[30:31], s[16:17]
-; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s5, v32, 1
-; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s4, v32, 0
+; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v0, off, s[0:3], s20 offset:4
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr21
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v0, s21
+; WAVE32-WWM-PREALLOC-NEXT:    buffer_store_dword v0, off, s[0:3], s20
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s20, stack_passed_argument@abs32@hi
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s21, stack_passed_argument@abs32@lo
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s22, s21
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s23, s20
+; WAVE32-WWM-PREALLOC-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[0:1], s[16:17]
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b64 s[2:3], s[18:19]
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v0, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v1, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v2, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v3, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v4, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v5, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v6, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v7, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v8, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v9, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v10, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v11, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v12, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v13, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v14, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v15, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v16, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v17, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v18, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v19, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v20, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v21, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v22, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v23, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v24, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v25, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v26, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v27, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v28, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v29, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $sgpr16
+; WAVE32-WWM-PREALLOC-NEXT:    v_mov_b32_e32 v30, s16
+; WAVE32-WWM-PREALLOC-NEXT:    ; implicit-def: $vgpr32 : SGPR spill to VGPR lane
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s30, 0
+; WAVE32-WWM-PREALLOC-NEXT:    v_writelane_b32 v32, s31, 1
+; WAVE32-WWM-PREALLOC-NEXT:    s_swappc_b64 s[30:31], s[22:23]
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s30, v32, 1
 ; WAVE32-WWM-PREALLOC-NEXT:    ;;#ASMSTART
-; WAVE32-WWM-PREALLOC-NEXT:    ; use s5
+; WAVE32-WWM-PREALLOC-NEXT:    ; use s30
 ; WAVE32-WWM-PREALLOC-NEXT:    ;;#ASMEND
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s32, s4
+; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s30, v32, 0
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s32, s30
 ; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s30, v33, 0
 ; WAVE32-WWM-PREALLOC-NEXT:    v_readlane_b32 s31, v33, 1
 ; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s32, s33
@@ -1713,7 +1824,7 @@ define void @func_stacksave_stackrestore_call_with_stack_objects() #0 {
 ; WAVE32-WWM-PREALLOC-NEXT:    buffer_load_dword v32, off, s[0:3], s33 offset:128 ; 4-byte Folded Reload
 ; WAVE32-WWM-PREALLOC-NEXT:    buffer_load_dword v33, off, s[0:3], s33 offset:132 ; 4-byte Folded Reload
 ; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 exec_lo, s4
-; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s33, s24
+; WAVE32-WWM-PREALLOC-NEXT:    s_mov_b32 s33, s25
 ; WAVE32-WWM-PREALLOC-NEXT:    s_waitcnt vmcnt(0)
 ; WAVE32-WWM-PREALLOC-NEXT:    s_setpc_b64 s[30:31]
   %alloca = alloca [32 x i32], addrspace(5)

@@ -38,6 +38,52 @@ define signext i32 @sdiv_i32(i32 signext %a, i32 signext %b, i32 signext %c) {
 ; MIPS32-NEXT:    jr $ra
 ; MIPS32-NEXT:    mflo $2
 ;
+; MIPS3-LABEL: sdiv_i32:
+; MIPS3:       # %bb.0: # %entry
+; MIPS3-NEXT:    div $zero, $4, $5
+; MIPS3-NEXT:    teq $5, $zero, 7
+; MIPS3-NEXT:    mflo $1
+; MIPS3-NEXT:    nop
+; MIPS3-NEXT:    nop
+; MIPS3-NEXT:    div $zero, $1, $6
+; MIPS3-NEXT:    teq $6, $zero, 7
+; MIPS3-NEXT:    mflo $2
+; MIPS3-NEXT:    jr $ra
+; MIPS3-NEXT:    nop
+;
+; MIPS64-LABEL: sdiv_i32:
+; MIPS64:       # %bb.0: # %entry
+; MIPS64-NEXT:    div $zero, $4, $5
+; MIPS64-NEXT:    teq $5, $zero, 7
+; MIPS64-NEXT:    mflo $1
+; MIPS64-NEXT:    div $zero, $1, $6
+; MIPS64-NEXT:    teq $6, $zero, 7
+; MIPS64-NEXT:    jr $ra
+; MIPS64-NEXT:    mflo $2
+;
+; MIPS2-O0-LABEL: sdiv_i32:
+; MIPS2-O0:       # %bb.0: # %entry
+; MIPS2-O0-NEXT:    div $zero, $4, $5
+; MIPS2-O0-NEXT:    teq $5, $zero, 7
+; MIPS2-O0-NEXT:    mflo $1
+; MIPS2-O0-NEXT:    nop
+; MIPS2-O0-NEXT:    nop
+; MIPS2-O0-NEXT:    div $zero, $1, $6
+; MIPS2-O0-NEXT:    teq $6, $zero, 7
+; MIPS2-O0-NEXT:    mflo $2
+; MIPS2-O0-NEXT:    jr $ra
+; MIPS2-O0-NEXT:    nop
+;
+; MIPS32-O0-LABEL: sdiv_i32:
+; MIPS32-O0:       # %bb.0: # %entry
+; MIPS32-O0-NEXT:    div $zero, $4, $5
+; MIPS32-O0-NEXT:    teq $5, $zero, 7
+; MIPS32-O0-NEXT:    mflo $1
+; MIPS32-O0-NEXT:    div $zero, $1, $6
+; MIPS32-O0-NEXT:    teq $6, $zero, 7
+; MIPS32-O0-NEXT:    mflo $2
+; MIPS32-O0-NEXT:    jr $ra
+; MIPS32-O0-NEXT:    nop
 entry:
   %sdiv = sdiv i32 %a, %b
   %sdiv1 = sdiv i32 %sdiv, %c
@@ -45,6 +91,56 @@ entry:
 }
 
 define signext i64 @sdiv_i64(i64 signext %a, i64 signext %b, i64 signext %c) {
+; MIPS2-LABEL: sdiv_i64:
+; MIPS2:       # %bb.0: # %entry
+; MIPS2-NEXT:    lui $2, %hi(_gp_disp)
+; MIPS2-NEXT:    addiu $2, $2, %lo(_gp_disp)
+; MIPS2-NEXT:    addiu $sp, $sp, -24
+; MIPS2-NEXT:    .cfi_def_cfa_offset 24
+; MIPS2-NEXT:    sw $ra, 20($sp) # 4-byte Folded Spill
+; MIPS2-NEXT:    sw $16, 16($sp) # 4-byte Folded Spill
+; MIPS2-NEXT:    .cfi_offset 31, -4
+; MIPS2-NEXT:    .cfi_offset 16, -8
+; MIPS2-NEXT:    addu $16, $2, $25
+; MIPS2-NEXT:    lw $25, %call16(__divdi3)($16)
+; MIPS2-NEXT:    jalr $25
+; MIPS2-NEXT:    move $gp, $16
+; MIPS2-NEXT:    move $4, $2
+; MIPS2-NEXT:    lw $6, 40($sp)
+; MIPS2-NEXT:    lw $7, 44($sp)
+; MIPS2-NEXT:    lw $25, %call16(__divdi3)($16)
+; MIPS2-NEXT:    jalr $25
+; MIPS2-NEXT:    move $5, $3
+; MIPS2-NEXT:    lw $16, 16($sp) # 4-byte Folded Reload
+; MIPS2-NEXT:    lw $ra, 20($sp) # 4-byte Folded Reload
+; MIPS2-NEXT:    jr $ra
+; MIPS2-NEXT:    addiu $sp, $sp, 24
+;
+; MIPS32-LABEL: sdiv_i64:
+; MIPS32:       # %bb.0: # %entry
+; MIPS32-NEXT:    lui $2, %hi(_gp_disp)
+; MIPS32-NEXT:    addiu $2, $2, %lo(_gp_disp)
+; MIPS32-NEXT:    addiu $sp, $sp, -24
+; MIPS32-NEXT:    .cfi_def_cfa_offset 24
+; MIPS32-NEXT:    sw $ra, 20($sp) # 4-byte Folded Spill
+; MIPS32-NEXT:    sw $16, 16($sp) # 4-byte Folded Spill
+; MIPS32-NEXT:    .cfi_offset 31, -4
+; MIPS32-NEXT:    .cfi_offset 16, -8
+; MIPS32-NEXT:    addu $16, $2, $25
+; MIPS32-NEXT:    lw $25, %call16(__divdi3)($16)
+; MIPS32-NEXT:    jalr $25
+; MIPS32-NEXT:    move $gp, $16
+; MIPS32-NEXT:    move $4, $2
+; MIPS32-NEXT:    lw $6, 40($sp)
+; MIPS32-NEXT:    lw $7, 44($sp)
+; MIPS32-NEXT:    lw $25, %call16(__divdi3)($16)
+; MIPS32-NEXT:    jalr $25
+; MIPS32-NEXT:    move $5, $3
+; MIPS32-NEXT:    lw $16, 16($sp) # 4-byte Folded Reload
+; MIPS32-NEXT:    lw $ra, 20($sp) # 4-byte Folded Reload
+; MIPS32-NEXT:    jr $ra
+; MIPS32-NEXT:    addiu $sp, $sp, 24
+;
 ; MIPS3-LABEL: sdiv_i64:
 ; MIPS3:       # %bb.0: # %entry
 ; MIPS3-NEXT:    ddiv $zero, $4, $5
@@ -68,6 +164,81 @@ define signext i64 @sdiv_i64(i64 signext %a, i64 signext %b, i64 signext %c) {
 ; MIPS64-NEXT:    jr $ra
 ; MIPS64-NEXT:    mflo $2
 ;
+; MIPS2-O0-LABEL: sdiv_i64:
+; MIPS2-O0:       # %bb.0: # %entry
+; MIPS2-O0-NEXT:    lui $2, %hi(_gp_disp)
+; MIPS2-O0-NEXT:    addiu $2, $2, %lo(_gp_disp)
+; MIPS2-O0-NEXT:    addiu $sp, $sp, -32
+; MIPS2-O0-NEXT:    .cfi_def_cfa_offset 32
+; MIPS2-O0-NEXT:    sw $ra, 28($sp) # 4-byte Folded Spill
+; MIPS2-O0-NEXT:    sw $18, 24($sp) # 4-byte Folded Spill
+; MIPS2-O0-NEXT:    sw $17, 20($sp) # 4-byte Folded Spill
+; MIPS2-O0-NEXT:    sw $16, 16($sp) # 4-byte Folded Spill
+; MIPS2-O0-NEXT:    .cfi_offset 31, -4
+; MIPS2-O0-NEXT:    .cfi_offset 18, -8
+; MIPS2-O0-NEXT:    .cfi_offset 17, -12
+; MIPS2-O0-NEXT:    .cfi_offset 16, -16
+; MIPS2-O0-NEXT:    addu $16, $2, $25
+; MIPS2-O0-NEXT:    lw $17, 52($sp)
+; MIPS2-O0-NEXT:    lw $18, 48($sp)
+; MIPS2-O0-NEXT:    # kill: def $at killed $a3
+; MIPS2-O0-NEXT:    # kill: def $at killed $a2
+; MIPS2-O0-NEXT:    # kill: def $at killed $a1
+; MIPS2-O0-NEXT:    # kill: def $at killed $a0
+; MIPS2-O0-NEXT:    lw $25, %call16(__divdi3)($16)
+; MIPS2-O0-NEXT:    move $gp, $16
+; MIPS2-O0-NEXT:    jalr $25
+; MIPS2-O0-NEXT:    nop
+; MIPS2-O0-NEXT:    lw $25, %call16(__divdi3)($16)
+; MIPS2-O0-NEXT:    move $4, $2
+; MIPS2-O0-NEXT:    move $5, $3
+; MIPS2-O0-NEXT:    move $6, $18
+; MIPS2-O0-NEXT:    move $7, $17
+; MIPS2-O0-NEXT:    jalr $25
+; MIPS2-O0-NEXT:    nop
+; MIPS2-O0-NEXT:    lw $16, 16($sp) # 4-byte Folded Reload
+; MIPS2-O0-NEXT:    lw $17, 20($sp) # 4-byte Folded Reload
+; MIPS2-O0-NEXT:    lw $18, 24($sp) # 4-byte Folded Reload
+; MIPS2-O0-NEXT:    lw $ra, 28($sp) # 4-byte Folded Reload
+; MIPS2-O0-NEXT:    addiu $sp, $sp, 32
+; MIPS2-O0-NEXT:    jr $ra
+; MIPS2-O0-NEXT:    nop
+;
+; MIPS32-O0-LABEL: sdiv_i64:
+; MIPS32-O0:       # %bb.0: # %entry
+; MIPS32-O0-NEXT:    lui $2, %hi(_gp_disp)
+; MIPS32-O0-NEXT:    addiu $2, $2, %lo(_gp_disp)
+; MIPS32-O0-NEXT:    addiu $sp, $sp, -32
+; MIPS32-O0-NEXT:    .cfi_def_cfa_offset 32
+; MIPS32-O0-NEXT:    sw $ra, 28($sp) # 4-byte Folded Spill
+; MIPS32-O0-NEXT:    sw $18, 24($sp) # 4-byte Folded Spill
+; MIPS32-O0-NEXT:    sw $17, 20($sp) # 4-byte Folded Spill
+; MIPS32-O0-NEXT:    sw $16, 16($sp) # 4-byte Folded Spill
+; MIPS32-O0-NEXT:    .cfi_offset 31, -4
+; MIPS32-O0-NEXT:    .cfi_offset 18, -8
+; MIPS32-O0-NEXT:    .cfi_offset 17, -12
+; MIPS32-O0-NEXT:    .cfi_offset 16, -16
+; MIPS32-O0-NEXT:    addu $16, $2, $25
+; MIPS32-O0-NEXT:    lw $17, 52($sp)
+; MIPS32-O0-NEXT:    lw $18, 48($sp)
+; MIPS32-O0-NEXT:    lw $25, %call16(__divdi3)($16)
+; MIPS32-O0-NEXT:    move $gp, $16
+; MIPS32-O0-NEXT:    jalr $25
+; MIPS32-O0-NEXT:    nop
+; MIPS32-O0-NEXT:    lw $25, %call16(__divdi3)($16)
+; MIPS32-O0-NEXT:    move $4, $2
+; MIPS32-O0-NEXT:    move $5, $3
+; MIPS32-O0-NEXT:    move $6, $18
+; MIPS32-O0-NEXT:    move $7, $17
+; MIPS32-O0-NEXT:    jalr $25
+; MIPS32-O0-NEXT:    nop
+; MIPS32-O0-NEXT:    lw $16, 16($sp) # 4-byte Folded Reload
+; MIPS32-O0-NEXT:    lw $17, 20($sp) # 4-byte Folded Reload
+; MIPS32-O0-NEXT:    lw $18, 24($sp) # 4-byte Folded Reload
+; MIPS32-O0-NEXT:    lw $ra, 28($sp) # 4-byte Folded Reload
+; MIPS32-O0-NEXT:    addiu $sp, $sp, 32
+; MIPS32-O0-NEXT:    jr $ra
+; MIPS32-O0-NEXT:    nop
 entry:
   %sdiv = sdiv i64 %a, %b
   %sdiv1 = sdiv i64 %sdiv, %c
@@ -75,6 +246,74 @@ entry:
 }
 
 define signext i32 @sdiv_lw_sdiv_i32(i32 signext %a, i32 signext %b, i32 signext %c) {
+; MIPS2-LABEL: sdiv_lw_sdiv_i32:
+; MIPS2:       # %bb.0: # %entry
+; MIPS2-NEXT:    addiu $sp, $sp, -16
+; MIPS2-NEXT:    .cfi_def_cfa_offset 16
+; MIPS2-NEXT:    div $zero, $4, $5
+; MIPS2-NEXT:    teq $5, $zero, 7
+; MIPS2-NEXT:    mflo $1
+; MIPS2-NEXT:    nop
+; MIPS2-NEXT:    nop
+; MIPS2-NEXT:    div $zero, $1, $6
+; MIPS2-NEXT:    teq $6, $zero, 7
+; MIPS2-NEXT:    mflo $2
+; MIPS2-NEXT:    sw $5, 8($sp)
+; MIPS2-NEXT:    sw $4, 12($sp)
+; MIPS2-NEXT:    sw $6, 4($sp)
+; MIPS2-NEXT:    jr $ra
+; MIPS2-NEXT:    addiu $sp, $sp, 16
+;
+; MIPS32-LABEL: sdiv_lw_sdiv_i32:
+; MIPS32:       # %bb.0: # %entry
+; MIPS32-NEXT:    addiu $sp, $sp, -16
+; MIPS32-NEXT:    .cfi_def_cfa_offset 16
+; MIPS32-NEXT:    div $zero, $4, $5
+; MIPS32-NEXT:    teq $5, $zero, 7
+; MIPS32-NEXT:    mflo $1
+; MIPS32-NEXT:    div $zero, $1, $6
+; MIPS32-NEXT:    teq $6, $zero, 7
+; MIPS32-NEXT:    mflo $2
+; MIPS32-NEXT:    sw $5, 8($sp)
+; MIPS32-NEXT:    sw $4, 12($sp)
+; MIPS32-NEXT:    sw $6, 4($sp)
+; MIPS32-NEXT:    jr $ra
+; MIPS32-NEXT:    addiu $sp, $sp, 16
+;
+; MIPS3-LABEL: sdiv_lw_sdiv_i32:
+; MIPS3:       # %bb.0: # %entry
+; MIPS3-NEXT:    daddiu $sp, $sp, -16
+; MIPS3-NEXT:    .cfi_def_cfa_offset 16
+; MIPS3-NEXT:    div $zero, $4, $5
+; MIPS3-NEXT:    teq $5, $zero, 7
+; MIPS3-NEXT:    mflo $1
+; MIPS3-NEXT:    nop
+; MIPS3-NEXT:    nop
+; MIPS3-NEXT:    div $zero, $1, $6
+; MIPS3-NEXT:    teq $6, $zero, 7
+; MIPS3-NEXT:    mflo $2
+; MIPS3-NEXT:    sw $5, 8($sp)
+; MIPS3-NEXT:    sw $4, 12($sp)
+; MIPS3-NEXT:    sw $6, 4($sp)
+; MIPS3-NEXT:    jr $ra
+; MIPS3-NEXT:    daddiu $sp, $sp, 16
+;
+; MIPS64-LABEL: sdiv_lw_sdiv_i32:
+; MIPS64:       # %bb.0: # %entry
+; MIPS64-NEXT:    daddiu $sp, $sp, -16
+; MIPS64-NEXT:    .cfi_def_cfa_offset 16
+; MIPS64-NEXT:    div $zero, $4, $5
+; MIPS64-NEXT:    teq $5, $zero, 7
+; MIPS64-NEXT:    mflo $1
+; MIPS64-NEXT:    div $zero, $1, $6
+; MIPS64-NEXT:    teq $6, $zero, 7
+; MIPS64-NEXT:    mflo $2
+; MIPS64-NEXT:    sw $5, 8($sp)
+; MIPS64-NEXT:    sw $4, 12($sp)
+; MIPS64-NEXT:    sw $6, 4($sp)
+; MIPS64-NEXT:    jr $ra
+; MIPS64-NEXT:    daddiu $sp, $sp, 16
+;
 ; MIPS2-O0-LABEL: sdiv_lw_sdiv_i32:
 ; MIPS2-O0:       # %bb.0: # %entry
 ; MIPS2-O0-NEXT:    addiu $sp, $sp, -16
@@ -82,15 +321,15 @@ define signext i32 @sdiv_lw_sdiv_i32(i32 signext %a, i32 signext %b, i32 signext
 ; MIPS2-O0-NEXT:    sw $4, 12($sp)
 ; MIPS2-O0-NEXT:    sw $5, 8($sp)
 ; MIPS2-O0-NEXT:    sw $6, 4($sp)
-; MIPS2-O0-NEXT:    lw $2, 12($sp)
-; MIPS2-O0-NEXT:    lw $1, 8($sp)
-; MIPS2-O0-NEXT:    div $zero, $2, $1
-; MIPS2-O0-NEXT:    teq	$1, $zero, 7
-; MIPS2-O0-NEXT:    mflo $2
-; MIPS2-O0-NEXT:    lw $1, 4($sp)
+; MIPS2-O0-NEXT:    lw $1, 12($sp)
+; MIPS2-O0-NEXT:    lw $2, 8($sp)
+; MIPS2-O0-NEXT:    div $zero, $1, $2
+; MIPS2-O0-NEXT:    teq $2, $zero, 7
+; MIPS2-O0-NEXT:    mflo $1
+; MIPS2-O0-NEXT:    lw $2, 4($sp)
 ; MIPS2-O0-NEXT:    nop
-; MIPS2-O0-NEXT:    div $zero, $2, $1
-; MIPS2-O0-NEXT:    teq	$1, $zero, 7
+; MIPS2-O0-NEXT:    div $zero, $1, $2
+; MIPS2-O0-NEXT:    teq $2, $zero, 7
 ; MIPS2-O0-NEXT:    mflo $2
 ; MIPS2-O0-NEXT:    addiu $sp, $sp, 16
 ; MIPS2-O0-NEXT:    jr $ra
@@ -103,19 +342,18 @@ define signext i32 @sdiv_lw_sdiv_i32(i32 signext %a, i32 signext %b, i32 signext
 ; MIPS32-O0-NEXT:    sw $4, 12($sp)
 ; MIPS32-O0-NEXT:    sw $5, 8($sp)
 ; MIPS32-O0-NEXT:    sw $6, 4($sp)
-; MIPS32-O0-NEXT:    lw $2, 12($sp)
-; MIPS32-O0-NEXT:    lw $1, 8($sp)
-; MIPS32-O0-NEXT:    div $zero, $2, $1
-; MIPS32-O0-NEXT:    teq $1, $zero, 7
-; MIPS32-O0-NEXT:    mflo $2
-; MIPS32-O0-NEXT:    lw $1, 4($sp)
-; MIPS32-O0-NEXT:    div $zero, $2, $1
-; MIPS32-O0-NEXT:    teq $1, $zero, 7
+; MIPS32-O0-NEXT:    lw $1, 12($sp)
+; MIPS32-O0-NEXT:    lw $2, 8($sp)
+; MIPS32-O0-NEXT:    div $zero, $1, $2
+; MIPS32-O0-NEXT:    teq $2, $zero, 7
+; MIPS32-O0-NEXT:    mflo $1
+; MIPS32-O0-NEXT:    lw $2, 4($sp)
+; MIPS32-O0-NEXT:    div $zero, $1, $2
+; MIPS32-O0-NEXT:    teq $2, $zero, 7
 ; MIPS32-O0-NEXT:    mflo $2
 ; MIPS32-O0-NEXT:    addiu $sp, $sp, 16
 ; MIPS32-O0-NEXT:    jr $ra
 ; MIPS32-O0-NEXT:    nop
-;
 entry:
   %a.addr = alloca i32, align 4
   %b.addr = alloca i32, align 4

@@ -28,32 +28,31 @@ define amdgpu_ps void @global_load_lds_dword_saddr(ptr addrspace(1) inreg nocapt
 ;
 ; GFX90A-LABEL: global_load_lds_dword_saddr:
 ; GFX90A:       ; %bb.0: ; %main_body
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v0
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_mov_b32 s2, s0
-; GFX90A-NEXT:    ; kill: def $sgpr2 killed $sgpr2 def $sgpr2_sgpr3
 ; GFX90A-NEXT:    s_mov_b32 s3, s1
 ; GFX90A-NEXT:    s_getpc_b64 s[0:1]
 ; GFX90A-NEXT:    s_add_u32 s0, s0, G@gotpcrel32@lo+4
 ; GFX90A-NEXT:    s_addc_u32 s1, s1, G@gotpcrel32@hi+12
 ; GFX90A-NEXT:    s_load_dwordx2 s[0:1], s[0:1], 0x0
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX90A-NEXT:    s_load_dwordx2 s[8:9], s[0:1], 0x0
-; GFX90A-NEXT:    v_mov_b32_e32 v0, 0
+; GFX90A-NEXT:    s_load_dwordx2 s[4:5], s[0:1], 0x0
+; GFX90A-NEXT:    v_mov_b32_e32 v1, 0
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX90A-NEXT:    s_mov_b32 s4, s9
-; GFX90A-NEXT:    s_mov_b32 s6, 10
-; GFX90A-NEXT:    s_mul_i32 s4, s4, s6
-; GFX90A-NEXT:    s_mov_b32 s5, s8
-; GFX90A-NEXT:    s_mul_i32 s5, s5, s6
-; GFX90A-NEXT:    v_mov_b32_e32 v2, s5
-; GFX90A-NEXT:    v_mov_b32_e32 v4, s4
-; GFX90A-NEXT:    ; kill: def $vgpr2 killed $vgpr2 def $vgpr2_vgpr3 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v3, v4
-; GFX90A-NEXT:    v_readfirstlane_b32 s4, v1
+; GFX90A-NEXT:    s_mov_b32 s6, s5
+; GFX90A-NEXT:    s_mov_b32 s7, 10
+; GFX90A-NEXT:    s_mul_i32 s6, s6, s7
+; GFX90A-NEXT:    ; kill: def $sgpr4 killed $sgpr4 killed $sgpr4_sgpr5
+; GFX90A-NEXT:    s_mul_i32 s4, s4, s7
+; GFX90A-NEXT:    v_mov_b32_e32 v2, s4
+; GFX90A-NEXT:    v_mov_b32_e32 v3, s6
+; GFX90A-NEXT:    v_mov_b32_e32 v4, v2
+; GFX90A-NEXT:    v_mov_b32_e32 v5, v3
+; GFX90A-NEXT:    v_readfirstlane_b32 s4, v0
 ; GFX90A-NEXT:    s_mov_b32 m0, s4
 ; GFX90A-NEXT:    s_nop 0
-; GFX90A-NEXT:    global_load_dword v0, s[2:3] offset:32 slc lds
-; GFX90A-NEXT:    global_store_dwordx2 v0, v[2:3], s[0:1]
+; GFX90A-NEXT:    global_load_dword v1, s[2:3] offset:32 slc lds
+; GFX90A-NEXT:    global_store_dwordx2 v1, v[4:5], s[0:1]
 ; GFX90A-NEXT:    s_endpgm
 main_body:
   %LGV = load <2 x i32>, ptr addrspace(1) @G, align 8

@@ -17,132 +17,132 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) n
 ; AVX512-NEXT:    movb $1, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw %dx, %ax
 ; AVX512-NEXT:    movw %ax, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
-; AVX512-NEXT:    movw %si, %ax
-; AVX512-NEXT:    movw %ax, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
+; AVX512-NEXT:    movw %si, %cx
+; AVX512-NEXT:    movw %cx, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
 ; AVX512-NEXT:    cmpl $0, %edi
 ; AVX512-NEXT:    je .LBB0_2
 ; AVX512-NEXT:  # %bb.1: # %if.then
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %ax # 2-byte Reload
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %cx # 2-byte Reload
-; AVX512-NEXT:    movl $buf, %esi
-; AVX512-NEXT:    movl $32, %edi
+; AVX512-NEXT:    movl $buf, %eax
+; AVX512-NEXT:    movl $32, %ecx
 ; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    # implicit-def: $al
-; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $sil
+; AVX512-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    tileloadd (%rsi,%rdi), %tmm0
-; AVX512-NEXT:    movl $64, %edi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %si # 2-byte Reload
+; AVX512-NEXT:    tileloadd (%rax,%rcx), %tmm0
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
 ; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    tilestored %tmm0, (%rsi,%rdi)
-; AVX512-NEXT:    movl $buf, %esi
-; AVX512-NEXT:    movl $32, %edi
+; AVX512-NEXT:    tilestored %tmm0, (%rcx,%rax)
+; AVX512-NEXT:    movl $buf, %eax
+; AVX512-NEXT:    movl $32, %ecx
 ; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    # implicit-def: $al
-; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $sil
+; AVX512-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %di, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    # implicit-def: $dl
 ; AVX512-NEXT:    movb %dl, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %di, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    tileloadd (%rsi,%rdi), %tmm0
-; AVX512-NEXT:    movl $64, %edi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %di # 2-byte Reload
+; AVX512-NEXT:    tileloadd (%rax,%rcx), %tmm0
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
 ; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    tilestored %tmm0, (%rsi,%rdi)
-; AVX512-NEXT:    movl $buf, %edx
-; AVX512-NEXT:    movl $32, %esi
-; AVX512-NEXT:    tileloadd (%rdx,%rsi), %tmm0
-; AVX512-NEXT:    movl $64, %esi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX512-NEXT:    tilestored %tmm0, (%rdx,%rsi)
+; AVX512-NEXT:    tilestored %tmm0, (%rcx,%rax)
+; AVX512-NEXT:    movl $buf, %eax
+; AVX512-NEXT:    movl $32, %ecx
+; AVX512-NEXT:    tileloadd (%rax,%rcx), %tmm0
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX512-NEXT:    tilestored %tmm0, (%rcx,%rax)
 ; AVX512-NEXT:    jmp .LBB0_3
 ; AVX512-NEXT:  .LBB0_2: # %if.else
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %ax # 2-byte Reload
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %cx # 2-byte Reload
-; AVX512-NEXT:    movl $buf2, %esi
-; AVX512-NEXT:    movl $32, %edi
+; AVX512-NEXT:    movl $buf2, %eax
+; AVX512-NEXT:    movl $32, %ecx
 ; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    # implicit-def: $al
-; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $sil
+; AVX512-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    tileloadd (%rsi,%rdi), %tmm0
-; AVX512-NEXT:    movl $64, %edi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %si # 2-byte Reload
+; AVX512-NEXT:    tileloadd (%rax,%rcx), %tmm0
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
 ; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    tilestored %tmm0, (%rsi,%rdi)
-; AVX512-NEXT:    movl $buf2, %esi
-; AVX512-NEXT:    movl $32, %edi
+; AVX512-NEXT:    tilestored %tmm0, (%rcx,%rax)
+; AVX512-NEXT:    movl $buf2, %eax
+; AVX512-NEXT:    movl $32, %ecx
 ; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    # implicit-def: $al
-; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $sil
+; AVX512-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %di, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    # implicit-def: $dl
 ; AVX512-NEXT:    movb %dl, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %di, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    tileloadd (%rsi,%rdi), %tmm0
-; AVX512-NEXT:    movl $64, %edi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %di # 2-byte Reload
+; AVX512-NEXT:    tileloadd (%rax,%rcx), %tmm0
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
 ; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    tilestored %tmm0, (%rsi,%rdi)
-; AVX512-NEXT:    movl $buf2, %edx
-; AVX512-NEXT:    movl $32, %esi
-; AVX512-NEXT:    tileloadd (%rdx,%rsi), %tmm0
-; AVX512-NEXT:    movl $64, %esi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX512-NEXT:    tilestored %tmm0, (%rdx,%rsi)
+; AVX512-NEXT:    tilestored %tmm0, (%rcx,%rax)
+; AVX512-NEXT:    movl $buf2, %eax
+; AVX512-NEXT:    movl $32, %ecx
+; AVX512-NEXT:    tileloadd (%rax,%rcx), %tmm0
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX512-NEXT:    tilestored %tmm0, (%rcx,%rax)
 ; AVX512-NEXT:  .LBB0_3: # %if.end
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %ax # 2-byte Reload
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %cx # 2-byte Reload
-; AVX512-NEXT:    movl $64, %edi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX512-NEXT:    movw $8, %si
-; AVX512-NEXT:    # implicit-def: $al
-; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    tileloadd (%rdx,%rdi), %tmm0
-; AVX512-NEXT:    movabsq $64, %rdx
-; AVX512-NEXT:    tilestored %tmm0, 1024(%rsp,%rdx) # 1024-byte Folded Spill
-; AVX512-NEXT:    movl $64, %r8d
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdi
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
 ; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    # implicit-def: $al
-; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    # implicit-def: $al
-; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    # implicit-def: $al
-; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    # implicit-def: $al
-; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    # implicit-def: $dl
-; AVX512-NEXT:    movb %dl, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $sil
+; AVX512-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    tileloadd (%rdi,%r8), %tmm2
-; AVX512-NEXT:    movl $64, %edi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX512-NEXT:    tileloadd (%rdx,%rdi), %tmm0
-; AVX512-NEXT:    movw $8, %dx
-; AVX512-NEXT:    movabsq $64, %rdi
-; AVX512-NEXT:    tileloadd 1024(%rsp,%rdi), %tmm1 # 1024-byte Folded Reload
-; AVX512-NEXT:    tdpbssd %tmm2, %tmm1, %tmm0
-; AVX512-NEXT:    movl $64, %esi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX512-NEXT:    tilestored %tmm0, (%rdx,%rsi)
-; AVX512-NEXT:    movl $64, %esi
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX512-NEXT:    tileloadd (%rdx,%rsi), %tmm0
-; AVX512-NEXT:    movl $buf, %edx
-; AVX512-NEXT:    movl $32, %esi
-; AVX512-NEXT:    tilestored %tmm0, (%rdx,%rsi)
+; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %si # 2-byte Reload
+; AVX512-NEXT:    tileloadd (%rcx,%rax), %tmm0
+; AVX512-NEXT:    movabsq $64, %rax
+; AVX512-NEXT:    tilestored %tmm0, 1024(%rsp,%rax) # 1024-byte Folded Spill
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX512-NEXT:    movw $8, %di
+; AVX512-NEXT:    # implicit-def: $sil
+; AVX512-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %r8w, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $sil
+; AVX512-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %r8w, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $sil
+; AVX512-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $sil
+; AVX512-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %r8w, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $dil
+; AVX512-NEXT:    movb %dil, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %r8w, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %r8w # 2-byte Reload
+; AVX512-NEXT:    tileloadd (%rcx,%rax), %tmm0
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX512-NEXT:    tileloadd (%rcx,%rax), %tmm1
+; AVX512-NEXT:    movw $8, %ax
+; AVX512-NEXT:    movabsq $64, %rcx
+; AVX512-NEXT:    tileloadd 1024(%rsp,%rcx), %tmm2 # 1024-byte Folded Reload
+; AVX512-NEXT:    tdpbssd %tmm0, %tmm2, %tmm1
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX512-NEXT:    tilestored %tmm1, (%rcx,%rax)
+; AVX512-NEXT:    movl $64, %eax
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX512-NEXT:    tileloadd (%rcx,%rax), %tmm0
+; AVX512-NEXT:    movl $buf, %eax
+; AVX512-NEXT:    movl $32, %ecx
+; AVX512-NEXT:    tilestored %tmm0, (%rax,%rcx)
 ; AVX512-NEXT:    movq %rbp, %rsp
 ; AVX512-NEXT:    popq %rbp
 ; AVX512-NEXT:    tilerelease

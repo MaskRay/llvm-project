@@ -9,31 +9,39 @@ define void @test() nounwind {
 ; GISEL-NEXT:    sub sp, sp, #16
 ; GISEL-NEXT:    mov x8, xzr
 ; GISEL-NEXT:    mov x9, x8
-; GISEL-NEXT:    str x9, [sp] // 8-byte Spill
-; GISEL-NEXT:    str x8, [sp, #8] // 8-byte Spill
+; GISEL-NEXT:    str x9, [sp, #8] // 8-byte Spill
+; GISEL-NEXT:    str x8, [sp] // 8-byte Spill
 ; GISEL-NEXT:    b .LBB0_1
 ; GISEL-NEXT:  .LBB0_1: // %loop
 ; GISEL-NEXT:    // =>This Inner Loop Header: Depth=1
-; GISEL-NEXT:    ldr x8, [sp, #8] // 8-byte Reload
-; GISEL-NEXT:    ldr x9, [sp] // 8-byte Reload
-; GISEL-NEXT:    str x9, [sp] // 8-byte Spill
-; GISEL-NEXT:    str x8, [sp, #8] // 8-byte Spill
+; GISEL-NEXT:    ldr x8, [sp] // 8-byte Reload
+; GISEL-NEXT:    mov x9, x8
+; GISEL-NEXT:    ldr x10, [sp, #8] // 8-byte Reload
+; GISEL-NEXT:    mov x11, x10
+; GISEL-NEXT:    mov x10, x11
+; GISEL-NEXT:    str x10, [sp, #8] // 8-byte Spill
+; GISEL-NEXT:    mov x8, x9
+; GISEL-NEXT:    str x8, [sp] // 8-byte Spill
 ; GISEL-NEXT:    b .LBB0_1
 ;
 ; SDAG-LABEL: test:
 ; SDAG:       // %bb.0: // %entry
 ; SDAG-NEXT:    sub sp, sp, #16
-; SDAG-NEXT:    mov x1, xzr
-; SDAG-NEXT:    mov x0, x1
-; SDAG-NEXT:    str x1, [sp] // 8-byte Spill
+; SDAG-NEXT:    mov x0, xzr
+; SDAG-NEXT:    mov x1, x0
 ; SDAG-NEXT:    str x0, [sp, #8] // 8-byte Spill
+; SDAG-NEXT:    str x1, [sp] // 8-byte Spill
 ; SDAG-NEXT:    b .LBB0_1
 ; SDAG-NEXT:  .LBB0_1: // %loop
 ; SDAG-NEXT:    // =>This Inner Loop Header: Depth=1
-; SDAG-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
-; SDAG-NEXT:    ldr x1, [sp] // 8-byte Reload
-; SDAG-NEXT:    str x1, [sp] // 8-byte Spill
-; SDAG-NEXT:    str x0, [sp, #8] // 8-byte Spill
+; SDAG-NEXT:    ldr x0, [sp] // 8-byte Reload
+; SDAG-NEXT:    mov x1, x0
+; SDAG-NEXT:    ldr x2, [sp, #8] // 8-byte Reload
+; SDAG-NEXT:    mov x3, x2
+; SDAG-NEXT:    mov x2, x3
+; SDAG-NEXT:    str x2, [sp, #8] // 8-byte Spill
+; SDAG-NEXT:    mov x0, x1
+; SDAG-NEXT:    str x0, [sp] // 8-byte Spill
 ; SDAG-NEXT:    b .LBB0_1
 entry:
   br label %loop

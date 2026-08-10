@@ -29,9 +29,9 @@ define void @foo() {
 ; X64-O0-NEXT:    # kill: def $rcx killed $ecx
 ; X64-O0-NEXT:    # kill: def $cl killed $rcx
 ; X64-O0-NEXT:    sarq %cl, %rax
-; X64-O0-NEXT:    movb %al, %cl
-; X64-O0-NEXT:    # implicit-def: $rax
-; X64-O0-NEXT:    movb %cl, (%rax)
+; X64-O0-NEXT:    # kill: def $al killed $al killed $rax
+; X64-O0-NEXT:    # implicit-def: $rcx
+; X64-O0-NEXT:    movb %al, (%rcx)
 ; X64-O0-NEXT:    retq
 ;
 ; X86-O0-LABEL: foo:
@@ -46,25 +46,26 @@ define void @foo() {
 ; X86-O0-NEXT:    movzwl var_22, %eax
 ; X86-O0-NEXT:    movl %eax, {{[0-9]+}}(%esp)
 ; X86-O0-NEXT:    movl $0, {{[0-9]+}}(%esp)
-; X86-O0-NEXT:    movzwl var_22, %edx
+; X86-O0-NEXT:    movzwl var_22, %eax
 ; X86-O0-NEXT:    movb var_27, %cl
 ; X86-O0-NEXT:    addb $30, %cl
+; X86-O0-NEXT:    xorl %edx, %edx
 ; X86-O0-NEXT:    movb %cl, {{[-0-9]+}}(%e{{[sb]}}p) # 1-byte Spill
-; X86-O0-NEXT:    xorl %eax, %eax
-; X86-O0-NEXT:    shrdl %cl, %eax, %edx
-; X86-O0-NEXT:    movb {{[-0-9]+}}(%e{{[sb]}}p), %cl # 1-byte Reload
-; X86-O0-NEXT:    movl %edx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
-; X86-O0-NEXT:    testb $32, %cl
 ; X86-O0-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; X86-O0-NEXT:    shrdl %cl, %edx, %eax
+; X86-O0-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; X86-O0-NEXT:    movb {{[-0-9]+}}(%e{{[sb]}}p), %cl # 1-byte Reload
+; X86-O0-NEXT:    testb $32, %cl
+; X86-O0-NEXT:    movl %edx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; X86-O0-NEXT:    jne .LBB0_2
 ; X86-O0-NEXT:  # %bb.1: # %bb
 ; X86-O0-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
 ; X86-O0-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; X86-O0-NEXT:  .LBB0_2: # %bb
 ; X86-O0-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; X86-O0-NEXT:    movb %al, %cl
-; X86-O0-NEXT:    # implicit-def: $eax
-; X86-O0-NEXT:    movb %cl, (%eax)
+; X86-O0-NEXT:    # kill: def $al killed $al killed $eax
+; X86-O0-NEXT:    # implicit-def: $ecx
+; X86-O0-NEXT:    movb %al, (%ecx)
 ; X86-O0-NEXT:    movl %ebp, %esp
 ; X86-O0-NEXT:    popl %ebp
 ; X86-O0-NEXT:    .cfi_def_cfa %esp, 4

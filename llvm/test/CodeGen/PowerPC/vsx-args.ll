@@ -8,33 +8,54 @@ target triple = "powerpc64-unknown-linux-gnu"
 declare <2 x double> @sv(<2 x double>, <2 x i64>, <4 x float>) #0
 
 define <2 x double> @main(<4 x float> %a, <2 x double> %b, <2 x i64> %c) #1 {
+; CHECK-LABEL: main:
+; CHECK:       # %bb.0: # %entry
+; CHECK-NEXT:    mflr 0
+; CHECK-NEXT:    stdu 1, -112(1)
+; CHECK-NEXT:    vmr 5, 2
+; CHECK-NEXT:    std 0, 128(1)
+; CHECK-NEXT:    vmr 2, 3
+; CHECK-NEXT:    vmr 3, 4
+; CHECK-NEXT:    vmr 4, 5
+; CHECK-NEXT:    bl sv
+; CHECK-NEXT:    nop
+; CHECK-NEXT:    addis 3, 2, .LCPI0_0@toc@ha
+; CHECK-NEXT:    addi 3, 3, .LCPI0_0@toc@l
+; CHECK-NEXT:    lxvd2x 0, 0, 3
+; CHECK-NEXT:    xvadddp 34, 34, 0
+; CHECK-NEXT:    addi 1, 1, 112
+; CHECK-NEXT:    ld 0, 16(1)
+; CHECK-NEXT:    mtlr 0
+; CHECK-NEXT:    blr
+;
+; CHECK-FISL-LABEL: main:
+; CHECK-FISL:       # %bb.0: # %entry
+; CHECK-FISL-NEXT:    mflr 0
+; CHECK-FISL-NEXT:    stdu 1, -144(1)
+; CHECK-FISL-NEXT:    std 0, 160(1)
+; CHECK-FISL-NEXT:    li 3, 128
+; CHECK-FISL-NEXT:    stxvd2x 34, 1, 3 # 16-byte Folded Spill
+; CHECK-FISL-NEXT:    vmr 2, 3
+; CHECK-FISL-NEXT:    vmr 3, 4
+; CHECK-FISL-NEXT:    lxvd2x 36, 1, 3 # 16-byte Folded Reload
+; CHECK-FISL-NEXT:    bl sv
+; CHECK-FISL-NEXT:    nop
+; CHECK-FISL-NEXT:    # kill: def $vsl0 killed $v2
+; CHECK-FISL-NEXT:    addis 3, 2, .LCPI0_0@toc@ha
+; CHECK-FISL-NEXT:    addi 3, 3, .LCPI0_0@toc@l
+; CHECK-FISL-NEXT:    lxvd2x 0, 0, 3
+; CHECK-FISL-NEXT:    xvadddp 34, 34, 0
+; CHECK-FISL-NEXT:    addi 1, 1, 144
+; CHECK-FISL-NEXT:    ld 0, 16(1)
+; CHECK-FISL-NEXT:    mtlr 0
+; CHECK-FISL-NEXT:    blr
 entry:
   %ca = tail call <2 x double> @sv(<2 x double> %b, <2 x i64> %c,  <4 x float> %a)
   %v = fadd <2 x double> %ca, <double 1.0, double 1.0>
   ret <2 x double> %v
 
-; CHECK-LABEL: @main
-; CHECK-DAG: vmr [[V:[0-9]+]], 2
-; CHECK-DAG: vmr 2, 3
-; CHECK-DAG: vmr 3, 4
-; CHECK-DAG: vmr 4, [[V]]
-; CHECK: bl sv
-; CHECK: lxvd2x [[VC:[0-9]+]],
-; CHECK: xvadddp 34, 34, [[VC]]
-; CHECK: blr
 
-; CHECK-FISL-LABEL: @main
-; CHECK-FISL: stxvd2x 36, 1, 3
-; CHECK-FISL: vmr 4, 3
-; CHECK-FISL: lxvd2x 35, 1, 3
-; CHECK-FISL: 3, 144
-; CHECK-FISL: stxvd2x 36, 1, 3
-; CHECK-FISL: vmr 4, 2
-; CHECK-FISL: bl sv
 
-; CHECK-FISL: lxvd2x [[VC:[0-9]+]],
-; CHECK-FISL: xvadddp 34, 34, [[VC]]
-; CHECK-FISL: blr
 }
 
 attributes #0 = { noinline nounwind readnone }

@@ -48,13 +48,12 @@ define void @storeInt(i32 noundef %x) {
 ; SMALL32-O0-NEXT:    mflr r0
 ; SMALL32-O0-NEXT:    stwu r1, -32(r1)
 ; SMALL32-O0-NEXT:    stw r0, 40(r1)
+; SMALL32-O0-NEXT:    lwz r4, L..C0(r2) # target-flags(ppc-tprel) @TLInt
 ; SMALL32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
-; SMALL32-O0-NEXT:    lwz r5, L..C0(r2) # target-flags(ppc-tprel) @TLInt
 ; SMALL32-O0-NEXT:    bla .__get_tpointer[PR]
-; SMALL32-O0-NEXT:    mr r4, r3
-; SMALL32-O0-NEXT:    lwz r3, 28(r1) # 4-byte Folded Reload
-; SMALL32-O0-NEXT:    add r4, r4, r5
-; SMALL32-O0-NEXT:    stw r3, 0(r4)
+; SMALL32-O0-NEXT:    add r3, r3, r4
+; SMALL32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
+; SMALL32-O0-NEXT:    stw r4, 0(r3)
 ; SMALL32-O0-NEXT:    addi r1, r1, 32
 ; SMALL32-O0-NEXT:    lwz r0, 8(r1)
 ; SMALL32-O0-NEXT:    mtlr r0
@@ -65,14 +64,13 @@ define void @storeInt(i32 noundef %x) {
 ; LARGE32-O0-NEXT:    mflr r0
 ; LARGE32-O0-NEXT:    stwu r1, -32(r1)
 ; LARGE32-O0-NEXT:    stw r0, 40(r1)
+; LARGE32-O0-NEXT:    addis r4, L..C0@u(r2)
+; LARGE32-O0-NEXT:    lwz r4, L..C0@l(r4)
 ; LARGE32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
-; LARGE32-O0-NEXT:    addis r3, L..C0@u(r2)
-; LARGE32-O0-NEXT:    lwz r5, L..C0@l(r3)
 ; LARGE32-O0-NEXT:    bla .__get_tpointer[PR]
-; LARGE32-O0-NEXT:    mr r4, r3
-; LARGE32-O0-NEXT:    lwz r3, 28(r1) # 4-byte Folded Reload
-; LARGE32-O0-NEXT:    add r4, r4, r5
-; LARGE32-O0-NEXT:    stw r3, 0(r4)
+; LARGE32-O0-NEXT:    add r3, r3, r4
+; LARGE32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
+; LARGE32-O0-NEXT:    stw r4, 0(r3)
 ; LARGE32-O0-NEXT:    addi r1, r1, 32
 ; LARGE32-O0-NEXT:    lwz r0, 8(r1)
 ; LARGE32-O0-NEXT:    mtlr r0
@@ -118,15 +116,15 @@ define void @storeLongLong(i64 noundef %x) {
 ; SMALL32-O0-NEXT:    mflr r0
 ; SMALL32-O0-NEXT:    stwu r1, -32(r1)
 ; SMALL32-O0-NEXT:    stw r0, 40(r1)
-; SMALL32-O0-NEXT:    mr r5, r4
+; SMALL32-O0-NEXT:    # kill: def $r5 killed $r4
+; SMALL32-O0-NEXT:    # kill: def $r5 killed $r3
+; SMALL32-O0-NEXT:    lwz r5, L..C1(r2) # target-flags(ppc-tprel) @TLLongLong
 ; SMALL32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
-; SMALL32-O0-NEXT:    lwz r6, L..C1(r2) # target-flags(ppc-tprel) @TLLongLong
 ; SMALL32-O0-NEXT:    bla .__get_tpointer[PR]
-; SMALL32-O0-NEXT:    mr r4, r3
-; SMALL32-O0-NEXT:    lwz r3, 28(r1) # 4-byte Folded Reload
-; SMALL32-O0-NEXT:    add r4, r4, r6
-; SMALL32-O0-NEXT:    stw r5, 4(r4)
-; SMALL32-O0-NEXT:    stw r3, 0(r4)
+; SMALL32-O0-NEXT:    add r3, r3, r5
+; SMALL32-O0-NEXT:    stw r4, 4(r3)
+; SMALL32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
+; SMALL32-O0-NEXT:    stw r4, 0(r3)
 ; SMALL32-O0-NEXT:    addi r1, r1, 32
 ; SMALL32-O0-NEXT:    lwz r0, 8(r1)
 ; SMALL32-O0-NEXT:    mtlr r0
@@ -137,16 +135,16 @@ define void @storeLongLong(i64 noundef %x) {
 ; LARGE32-O0-NEXT:    mflr r0
 ; LARGE32-O0-NEXT:    stwu r1, -32(r1)
 ; LARGE32-O0-NEXT:    stw r0, 40(r1)
-; LARGE32-O0-NEXT:    mr r5, r4
+; LARGE32-O0-NEXT:    # kill: def $r5 killed $r4
+; LARGE32-O0-NEXT:    # kill: def $r5 killed $r3
+; LARGE32-O0-NEXT:    addis r5, L..C1@u(r2)
+; LARGE32-O0-NEXT:    lwz r5, L..C1@l(r5)
 ; LARGE32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
-; LARGE32-O0-NEXT:    addis r3, L..C1@u(r2)
-; LARGE32-O0-NEXT:    lwz r6, L..C1@l(r3)
 ; LARGE32-O0-NEXT:    bla .__get_tpointer[PR]
-; LARGE32-O0-NEXT:    mr r4, r3
-; LARGE32-O0-NEXT:    lwz r3, 28(r1) # 4-byte Folded Reload
-; LARGE32-O0-NEXT:    add r4, r4, r6
-; LARGE32-O0-NEXT:    stw r5, 4(r4)
-; LARGE32-O0-NEXT:    stw r3, 0(r4)
+; LARGE32-O0-NEXT:    add r3, r3, r5
+; LARGE32-O0-NEXT:    stw r4, 4(r3)
+; LARGE32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
+; LARGE32-O0-NEXT:    stw r4, 0(r3)
 ; LARGE32-O0-NEXT:    addi r1, r1, 32
 ; LARGE32-O0-NEXT:    lwz r0, 8(r1)
 ; LARGE32-O0-NEXT:    mtlr r0
@@ -190,8 +188,10 @@ define void @storeDouble(double noundef %x) {
 ; SMALL32-O0-NEXT:    mflr r0
 ; SMALL32-O0-NEXT:    stwu r1, -32(r1)
 ; SMALL32-O0-NEXT:    stw r0, 40(r1)
-; SMALL32-O0-NEXT:    lwz r4, L..C2(r2) # target-flags(ppc-tprel) @TLDouble
+; SMALL32-O0-NEXT:    lwz r3, L..C2(r2) # target-flags(ppc-tprel) @TLDouble
+; SMALL32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
 ; SMALL32-O0-NEXT:    bla .__get_tpointer[PR]
+; SMALL32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
 ; SMALL32-O0-NEXT:    add r3, r3, r4
 ; SMALL32-O0-NEXT:    stfd f1, 0(r3)
 ; SMALL32-O0-NEXT:    addi r1, r1, 32
@@ -205,8 +205,10 @@ define void @storeDouble(double noundef %x) {
 ; LARGE32-O0-NEXT:    stwu r1, -32(r1)
 ; LARGE32-O0-NEXT:    stw r0, 40(r1)
 ; LARGE32-O0-NEXT:    addis r3, L..C2@u(r2)
-; LARGE32-O0-NEXT:    lwz r4, L..C2@l(r3)
+; LARGE32-O0-NEXT:    lwz r3, L..C2@l(r3)
+; LARGE32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
 ; LARGE32-O0-NEXT:    bla .__get_tpointer[PR]
+; LARGE32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
 ; LARGE32-O0-NEXT:    add r3, r3, r4
 ; LARGE32-O0-NEXT:    stfd f1, 0(r3)
 ; LARGE32-O0-NEXT:    addi r1, r1, 32
@@ -252,8 +254,10 @@ define void @storeFloat(float noundef %x) {
 ; SMALL32-O0-NEXT:    mflr r0
 ; SMALL32-O0-NEXT:    stwu r1, -32(r1)
 ; SMALL32-O0-NEXT:    stw r0, 40(r1)
-; SMALL32-O0-NEXT:    lwz r4, L..C3(r2) # target-flags(ppc-tprel) @TLFloat
+; SMALL32-O0-NEXT:    lwz r3, L..C3(r2) # target-flags(ppc-tprel) @TLFloat
+; SMALL32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
 ; SMALL32-O0-NEXT:    bla .__get_tpointer[PR]
+; SMALL32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
 ; SMALL32-O0-NEXT:    add r3, r3, r4
 ; SMALL32-O0-NEXT:    stfs f1, 0(r3)
 ; SMALL32-O0-NEXT:    addi r1, r1, 32
@@ -267,8 +271,10 @@ define void @storeFloat(float noundef %x) {
 ; LARGE32-O0-NEXT:    stwu r1, -32(r1)
 ; LARGE32-O0-NEXT:    stw r0, 40(r1)
 ; LARGE32-O0-NEXT:    addis r3, L..C3@u(r2)
-; LARGE32-O0-NEXT:    lwz r4, L..C3@l(r3)
+; LARGE32-O0-NEXT:    lwz r3, L..C3@l(r3)
+; LARGE32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
 ; LARGE32-O0-NEXT:    bla .__get_tpointer[PR]
+; LARGE32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
 ; LARGE32-O0-NEXT:    add r3, r3, r4
 ; LARGE32-O0-NEXT:    stfs f1, 0(r3)
 ; LARGE32-O0-NEXT:    addi r1, r1, 32
@@ -314,8 +320,10 @@ define i32 @loadInt() {
 ; SMALL32-O0-NEXT:    mflr r0
 ; SMALL32-O0-NEXT:    stwu r1, -32(r1)
 ; SMALL32-O0-NEXT:    stw r0, 40(r1)
-; SMALL32-O0-NEXT:    lwz r4, L..C0(r2) # target-flags(ppc-tprel) @TLInt
+; SMALL32-O0-NEXT:    lwz r3, L..C0(r2) # target-flags(ppc-tprel) @TLInt
+; SMALL32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
 ; SMALL32-O0-NEXT:    bla .__get_tpointer[PR]
+; SMALL32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
 ; SMALL32-O0-NEXT:    add r3, r3, r4
 ; SMALL32-O0-NEXT:    lwz r3, 0(r3)
 ; SMALL32-O0-NEXT:    addi r1, r1, 32
@@ -329,8 +337,10 @@ define i32 @loadInt() {
 ; LARGE32-O0-NEXT:    stwu r1, -32(r1)
 ; LARGE32-O0-NEXT:    stw r0, 40(r1)
 ; LARGE32-O0-NEXT:    addis r3, L..C0@u(r2)
-; LARGE32-O0-NEXT:    lwz r4, L..C0@l(r3)
+; LARGE32-O0-NEXT:    lwz r3, L..C0@l(r3)
+; LARGE32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
 ; LARGE32-O0-NEXT:    bla .__get_tpointer[PR]
+; LARGE32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
 ; LARGE32-O0-NEXT:    add r3, r3, r4
 ; LARGE32-O0-NEXT:    lwz r3, 0(r3)
 ; LARGE32-O0-NEXT:    addi r1, r1, 32
@@ -380,8 +390,10 @@ define i32 @loadLongLong() {
 ; SMALL32-O0-NEXT:    mflr r0
 ; SMALL32-O0-NEXT:    stwu r1, -32(r1)
 ; SMALL32-O0-NEXT:    stw r0, 40(r1)
-; SMALL32-O0-NEXT:    lwz r4, L..C1(r2) # target-flags(ppc-tprel) @TLLongLong
+; SMALL32-O0-NEXT:    lwz r3, L..C1(r2) # target-flags(ppc-tprel) @TLLongLong
+; SMALL32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
 ; SMALL32-O0-NEXT:    bla .__get_tpointer[PR]
+; SMALL32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
 ; SMALL32-O0-NEXT:    add r3, r3, r4
 ; SMALL32-O0-NEXT:    lwz r3, 4(r3)
 ; SMALL32-O0-NEXT:    addi r1, r1, 32
@@ -395,8 +407,10 @@ define i32 @loadLongLong() {
 ; LARGE32-O0-NEXT:    stwu r1, -32(r1)
 ; LARGE32-O0-NEXT:    stw r0, 40(r1)
 ; LARGE32-O0-NEXT:    addis r3, L..C1@u(r2)
-; LARGE32-O0-NEXT:    lwz r4, L..C1@l(r3)
+; LARGE32-O0-NEXT:    lwz r3, L..C1@l(r3)
+; LARGE32-O0-NEXT:    stw r3, 28(r1) # 4-byte Folded Spill
 ; LARGE32-O0-NEXT:    bla .__get_tpointer[PR]
+; LARGE32-O0-NEXT:    lwz r4, 28(r1) # 4-byte Folded Reload
 ; LARGE32-O0-NEXT:    add r3, r3, r4
 ; LARGE32-O0-NEXT:    lwz r3, 4(r3)
 ; LARGE32-O0-NEXT:    addi r1, r1, 32
@@ -457,8 +471,10 @@ define i32 @loadDouble() {
 ; SMALL32-O0-NEXT:    mflr r0
 ; SMALL32-O0-NEXT:    stwu r1, -32(r1)
 ; SMALL32-O0-NEXT:    stw r0, 40(r1)
-; SMALL32-O0-NEXT:    lwz r4, L..C2(r2) # target-flags(ppc-tprel) @TLDouble
+; SMALL32-O0-NEXT:    lwz r3, L..C2(r2) # target-flags(ppc-tprel) @TLDouble
+; SMALL32-O0-NEXT:    stw r3, 24(r1) # 4-byte Folded Spill
 ; SMALL32-O0-NEXT:    bla .__get_tpointer[PR]
+; SMALL32-O0-NEXT:    lwz r4, 24(r1) # 4-byte Folded Reload
 ; SMALL32-O0-NEXT:    add r3, r3, r4
 ; SMALL32-O0-NEXT:    lfd f0, 0(r3)
 ; SMALL32-O0-NEXT:    xscvdpsxws f0, f0
@@ -476,8 +492,10 @@ define i32 @loadDouble() {
 ; LARGE32-O0-NEXT:    stwu r1, -32(r1)
 ; LARGE32-O0-NEXT:    stw r0, 40(r1)
 ; LARGE32-O0-NEXT:    addis r3, L..C2@u(r2)
-; LARGE32-O0-NEXT:    lwz r4, L..C2@l(r3)
+; LARGE32-O0-NEXT:    lwz r3, L..C2@l(r3)
+; LARGE32-O0-NEXT:    stw r3, 24(r1) # 4-byte Folded Spill
 ; LARGE32-O0-NEXT:    bla .__get_tpointer[PR]
+; LARGE32-O0-NEXT:    lwz r4, 24(r1) # 4-byte Folded Reload
 ; LARGE32-O0-NEXT:    add r3, r3, r4
 ; LARGE32-O0-NEXT:    lfd f0, 0(r3)
 ; LARGE32-O0-NEXT:    xscvdpsxws f0, f0
@@ -546,8 +564,10 @@ define i32 @loadFloat() {
 ; SMALL32-O0-NEXT:    mflr r0
 ; SMALL32-O0-NEXT:    stwu r1, -32(r1)
 ; SMALL32-O0-NEXT:    stw r0, 40(r1)
-; SMALL32-O0-NEXT:    lwz r4, L..C3(r2) # target-flags(ppc-tprel) @TLFloat
+; SMALL32-O0-NEXT:    lwz r3, L..C3(r2) # target-flags(ppc-tprel) @TLFloat
+; SMALL32-O0-NEXT:    stw r3, 24(r1) # 4-byte Folded Spill
 ; SMALL32-O0-NEXT:    bla .__get_tpointer[PR]
+; SMALL32-O0-NEXT:    lwz r4, 24(r1) # 4-byte Folded Reload
 ; SMALL32-O0-NEXT:    add r3, r3, r4
 ; SMALL32-O0-NEXT:    lfs f0, 0(r3)
 ; SMALL32-O0-NEXT:    xscvdpsxws f0, f0
@@ -565,8 +585,10 @@ define i32 @loadFloat() {
 ; LARGE32-O0-NEXT:    stwu r1, -32(r1)
 ; LARGE32-O0-NEXT:    stw r0, 40(r1)
 ; LARGE32-O0-NEXT:    addis r3, L..C3@u(r2)
-; LARGE32-O0-NEXT:    lwz r4, L..C3@l(r3)
+; LARGE32-O0-NEXT:    lwz r3, L..C3@l(r3)
+; LARGE32-O0-NEXT:    stw r3, 24(r1) # 4-byte Folded Spill
 ; LARGE32-O0-NEXT:    bla .__get_tpointer[PR]
+; LARGE32-O0-NEXT:    lwz r4, 24(r1) # 4-byte Folded Reload
 ; LARGE32-O0-NEXT:    add r3, r3, r4
 ; LARGE32-O0-NEXT:    lfs f0, 0(r3)
 ; LARGE32-O0-NEXT:    xscvdpsxws f0, f0

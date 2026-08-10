@@ -6,29 +6,26 @@ target triple = "powerpc64le-unknown-linux-gnu"
 define void @bn_mul_comba8(ptr nocapture %r, ptr nocapture readonly %a, ptr nocapture readonly %b) {
 ; CHECK-LABEL: bn_mul_comba8:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    std 4, -8(1) # 8-byte Folded Spill
-; CHECK-NEXT:    mr 4, 3
-; CHECK-NEXT:    ld 3, -8(1) # 8-byte Folded Reload
-; CHECK-NEXT:    ld 6, 0(3)
-; CHECK-NEXT:    ld 11, 0(5)
-; CHECK-NEXT:    mulhdu 8, 11, 6
-; CHECK-NEXT:    ld 3, 8(3)
-; CHECK-NEXT:    mulld 7, 3, 6
-; CHECK-NEXT:    addc 9, 7, 8
-; CHECK-NEXT:    ld 10, 8(5)
-; CHECK-NEXT:    mulhdu 5, 10, 11
-; CHECK-NEXT:    mulld 10, 10, 11
-; CHECK-NEXT:    addc 9, 9, 10
-; CHECK-NEXT:    addze 5, 5
-; CHECK-NEXT:    addc 7, 7, 8
-; CHECK-NEXT:    mulhdu 3, 3, 6
-; CHECK-NEXT:    adde 3, 5, 3
-; CHECK-NEXT:    cmpld 3, 5
+; CHECK-NEXT:    ld 6, 0(4)
+; CHECK-NEXT:    ld 7, 0(5)
+; CHECK-NEXT:    mulhdu 8, 7, 6
+; CHECK-NEXT:    ld 4, 8(4)
+; CHECK-NEXT:    mulld 9, 4, 6
+; CHECK-NEXT:    addc 10, 9, 8
+; CHECK-NEXT:    ld 5, 8(5)
+; CHECK-NEXT:    mulhdu 11, 5, 7
+; CHECK-NEXT:    mulld 5, 5, 7
+; CHECK-NEXT:    addc 5, 10, 5
+; CHECK-NEXT:    addze 5, 11
+; CHECK-NEXT:    addc 7, 9, 8
+; CHECK-NEXT:    mulhdu 4, 4, 6
+; CHECK-NEXT:    adde 4, 5, 4
+; CHECK-NEXT:    cmpld 4, 5
 ; CHECK-NEXT:    crmove 20, 0
-; CHECK-NEXT:    li 5, 0
-; CHECK-NEXT:    li 3, 1
-; CHECK-NEXT:    isel 3, 3, 5, 20
-; CHECK-NEXT:    std 3, 0(4)
+; CHECK-NEXT:    li 4, 0
+; CHECK-NEXT:    li 5, 1
+; CHECK-NEXT:    isel 4, 5, 4, 20
+; CHECK-NEXT:    std 4, 0(3)
 ; CHECK-NEXT:    blr
   %1 = load i64, ptr %a, align 8
   %conv = zext i64 %1 to i128

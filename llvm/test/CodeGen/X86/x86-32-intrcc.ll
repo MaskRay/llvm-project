@@ -80,9 +80,9 @@ define x86_intrcc void @test_isr_ecode(ptr byval(%struct.interrupt_frame) %frame
 ; CHECK0-NEXT:    pushl %eax
 ; CHECK0-NEXT:    andl $-16, %esp
 ; CHECK0-NEXT:    cld
-; CHECK0-NEXT:    movl 4(%ebp), %ecx
-; CHECK0-NEXT:    leal 8(%ebp), %eax
-; CHECK0-NEXT:    movl 8(%eax), %eax
+; CHECK0-NEXT:    movl 4(%ebp), %eax
+; CHECK0-NEXT:    leal 8(%ebp), %ecx
+; CHECK0-NEXT:    movl 8(%ecx), %ecx
 ; CHECK0-NEXT:    #APP
 ; CHECK0-NEXT:    #NO_APP
 ; CHECK0-NEXT:    leal -8(%ebp), %esp
@@ -207,11 +207,11 @@ define dso_local x86_intrcc void @test_fp_1(ptr byval(%struct.interrupt_frame) %
 ; CHECK0-NEXT:    pushl %ecx
 ; CHECK0-NEXT:    pushl %eax
 ; CHECK0-NEXT:    andl $-16, %esp
-; CHECK0-NEXT:    leal 4(%ebp), %ecx
-; CHECK0-NEXT:    movl %ecx, %eax
-; CHECK0-NEXT:    addl $16, %eax
-; CHECK0-NEXT:    movl %ecx, sink_address
+; CHECK0-NEXT:    leal 4(%ebp), %eax
+; CHECK0-NEXT:    movl %eax, %ecx
+; CHECK0-NEXT:    addl $16, %ecx
 ; CHECK0-NEXT:    movl %eax, sink_address
+; CHECK0-NEXT:    movl %ecx, sink_address
 ; CHECK0-NEXT:    leal -8(%ebp), %esp
 ; CHECK0-NEXT:    popl %eax
 ; CHECK0-NEXT:    popl %ecx
@@ -257,11 +257,11 @@ define dso_local x86_intrcc void @test_fp_2(ptr byval(%struct.interrupt_frame) %
 ; CHECK0-NEXT:    pushl %eax
 ; CHECK0-NEXT:    andl $-16, %esp
 ; CHECK0-NEXT:    movl 4(%ebp), %eax
-; CHECK0-NEXT:    leal 8(%ebp), %edx
-; CHECK0-NEXT:    movl %edx, %ecx
-; CHECK0-NEXT:    addl $16, %ecx
-; CHECK0-NEXT:    movl %edx, sink_address
+; CHECK0-NEXT:    leal 8(%ebp), %ecx
+; CHECK0-NEXT:    movl %ecx, %edx
+; CHECK0-NEXT:    addl $16, %edx
 ; CHECK0-NEXT:    movl %ecx, sink_address
+; CHECK0-NEXT:    movl %edx, sink_address
 ; CHECK0-NEXT:    movl %eax, sink_i32
 ; CHECK0-NEXT:    leal -12(%ebp), %esp
 ; CHECK0-NEXT:    popl %eax

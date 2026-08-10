@@ -15,44 +15,50 @@ define protected amdgpu_kernel void @kern(ptr %addr) !llvm.amdgcn.lds.kernel.id 
 ; CHECK-NEXT:    s_setreg_b32 hwreg(HW_REG_FLAT_SCR_HI), s13
 ; CHECK-NEXT:    s_add_u32 s0, s0, s17
 ; CHECK-NEXT:    s_addc_u32 s1, s1, 0
-; CHECK-NEXT:    ; implicit-def: $vgpr40 : SGPR spill to VGPR lane
-; CHECK-NEXT:    v_writelane_b32 v40, s16, 0
-; CHECK-NEXT:    s_mov_b32 s13, s15
-; CHECK-NEXT:    s_mov_b32 s12, s14
-; CHECK-NEXT:    v_readlane_b32 s14, v40, 0
-; CHECK-NEXT:    s_mov_b64 s[16:17], s[8:9]
-; CHECK-NEXT:    s_load_dwordx2 s[8:9], s[16:17], 0x0
+; CHECK-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; CHECK-NEXT:    s_load_dwordx2 s[12:13], s[8:9], 0x0
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
-; CHECK-NEXT:    s_load_dwordx2 s[8:9], s[16:17], 0x0
-; CHECK-NEXT:    v_mov_b32_e32 v5, 42
+; CHECK-NEXT:    s_load_dwordx2 s[12:13], s[8:9], 0x0
+; CHECK-NEXT:    v_mov_b32_e32 v3, 42
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
-; CHECK-NEXT:    v_mov_b32_e32 v3, s8
-; CHECK-NEXT:    v_mov_b32_e32 v4, s9
-; CHECK-NEXT:    flat_store_dword v[3:4], v5
-; CHECK-NEXT:    s_mov_b64 s[18:19], 8
-; CHECK-NEXT:    s_mov_b32 s8, s16
-; CHECK-NEXT:    s_mov_b32 s9, s17
-; CHECK-NEXT:    s_mov_b32 s16, s18
-; CHECK-NEXT:    s_mov_b32 s15, s19
-; CHECK-NEXT:    s_add_u32 s8, s8, s16
-; CHECK-NEXT:    s_addc_u32 s15, s9, s15
-; CHECK-NEXT:    ; kill: def $sgpr8 killed $sgpr8 def $sgpr8_sgpr9
-; CHECK-NEXT:    s_mov_b32 s9, s15
-; CHECK-NEXT:    s_getpc_b64 s[16:17]
-; CHECK-NEXT:    s_add_u32 s16, s16, unknown_call@gotpcrel32@lo+4
-; CHECK-NEXT:    s_addc_u32 s17, s17, unknown_call@gotpcrel32@hi+12
-; CHECK-NEXT:    s_load_dwordx2 s[16:17], s[16:17], 0x0
+; CHECK-NEXT:    v_mov_b32_e32 v4, s12
+; CHECK-NEXT:    v_mov_b32_e32 v5, s13
+; CHECK-NEXT:    flat_store_dword v[4:5], v3
+; CHECK-NEXT:    s_mov_b64 s[12:13], 8
+; CHECK-NEXT:    s_mov_b32 s17, s8
+; CHECK-NEXT:    s_mov_b32 s8, s9
+; CHECK-NEXT:    s_mov_b32 s9, s12
+; CHECK-NEXT:    s_mov_b32 s12, s13
+; CHECK-NEXT:    s_add_u32 s9, s17, s9
+; CHECK-NEXT:    s_addc_u32 s8, s8, s12
+; CHECK-NEXT:    s_mov_b32 s12, s9
+; CHECK-NEXT:    s_mov_b32 s13, s8
+; CHECK-NEXT:    s_getpc_b64 s[8:9]
+; CHECK-NEXT:    s_add_u32 s8, s8, unknown_call@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s9, s9, unknown_call@gotpcrel32@hi+12
+; CHECK-NEXT:    s_load_dwordx2 s[8:9], s[8:9], 0x0
 ; CHECK-NEXT:    s_mov_b64 s[22:23], s[2:3]
 ; CHECK-NEXT:    s_mov_b64 s[20:21], s[0:1]
-; CHECK-NEXT:    s_mov_b32 s15, 20
-; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s15, v2
-; CHECK-NEXT:    s_mov_b32 s15, 10
-; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s15, v1
+; CHECK-NEXT:    s_mov_b32 s17, 20
+; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s17, v2
+; CHECK-NEXT:    s_mov_b32 s17, 10
+; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s17, v1
 ; CHECK-NEXT:    v_or3_b32 v31, v0, v1, v2
+; CHECK-NEXT:    ; implicit-def: $vgpr40 : SGPR spill to VGPR lane
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    v_writelane_b32 v40, s8, 0
+; CHECK-NEXT:    v_writelane_b32 v40, s9, 1
+; CHECK-NEXT:    s_mov_b64 s[8:9], s[12:13]
+; CHECK-NEXT:    s_mov_b32 s12, s14
+; CHECK-NEXT:    s_mov_b32 s13, s15
+; CHECK-NEXT:    s_mov_b32 s14, s16
 ; CHECK-NEXT:    s_mov_b32 s15, 42
 ; CHECK-NEXT:    s_mov_b64 s[0:1], s[20:21]
 ; CHECK-NEXT:    s_mov_b64 s[2:3], s[22:23]
-; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    v_readlane_b32 s16, v40, 0
+; CHECK-NEXT:    v_readlane_b32 s17, v40, 1
 ; CHECK-NEXT:    s_swappc_b64 s[30:31], s[16:17]
 ; CHECK-NEXT:    s_endpgm
   store i32 42, ptr %addr

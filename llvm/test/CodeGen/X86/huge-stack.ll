@@ -29,30 +29,53 @@ declare ptr @baz(ptr, ptr, ptr, ptr)
 define ptr @scavenge_spill() unnamed_addr #0 {
 ; CHECK-LABEL: scavenge_spill:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    movabsq $25769803816, %rax # imm = 0x600000028
+; CHECK-NEXT:    pushq %r15
+; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    pushq %r14
+; CHECK-NEXT:    .cfi_def_cfa_offset 24
+; CHECK-NEXT:    pushq %r12
+; CHECK-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-NEXT:    pushq %rbx
+; CHECK-NEXT:    .cfi_def_cfa_offset 40
+; CHECK-NEXT:    movabsq $25769803784, %rax # imm = 0x600000008
 ; CHECK-NEXT:    subq %rax, %rsp
 ; CHECK-NEXT:    .cfi_def_cfa_offset 25769803824
-; CHECK-NEXT:    movabsq $21474836521, %rax # imm = 0x500000029
+; CHECK-NEXT:    .cfi_offset %rbx, -40
+; CHECK-NEXT:    .cfi_offset %r12, -32
+; CHECK-NEXT:    .cfi_offset %r14, -24
+; CHECK-NEXT:    .cfi_offset %r15, -16
+; CHECK-NEXT:    movabsq $21474836489, %rax # imm = 0x500000009
 ; CHECK-NEXT:    leaq (%rsp,%rax), %rdi
-; CHECK-NEXT:    movabsq $17179869226, %rax # imm = 0x40000002A
-; CHECK-NEXT:    leaq (%rsp,%rax), %rsi
-; CHECK-NEXT:    movq %rsi, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; CHECK-NEXT:    movabsq $12884901931, %rax # imm = 0x30000002B
-; CHECK-NEXT:    leaq (%rsp,%rax), %rdx
-; CHECK-NEXT:    movq %rdx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; CHECK-NEXT:    movabsq $8589934636, %rax # imm = 0x20000002C
-; CHECK-NEXT:    leaq (%rsp,%rax), %rcx
-; CHECK-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; CHECK-NEXT:    movabsq $17179869194, %rax # imm = 0x40000000A
+; CHECK-NEXT:    leaq (%rsp,%rax), %rbx
+; CHECK-NEXT:    movabsq $12884901899, %rax # imm = 0x30000000B
+; CHECK-NEXT:    leaq (%rsp,%rax), %r14
+; CHECK-NEXT:    movabsq $8589934604, %rax # imm = 0x20000000C
+; CHECK-NEXT:    leaq (%rsp,%rax), %r15
+; CHECK-NEXT:    movq %rbx, %rsi
+; CHECK-NEXT:    movq %r14, %rdx
+; CHECK-NEXT:    movq %r15, %rcx
 ; CHECK-NEXT:    callq baz@PLT
-; CHECK-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rsi # 8-byte Reload
-; CHECK-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rdx # 8-byte Reload
-; CHECK-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rcx # 8-byte Reload
-; CHECK-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; CHECK-NEXT:    leaq 46(%rsp), %rdi
+; CHECK-NEXT:    movq %rax, %r12
+; CHECK-NEXT:    leaq 14(%rsp), %rdi
+; CHECK-NEXT:    movq %rbx, %rsi
+; CHECK-NEXT:    movq %r14, %rdx
+; CHECK-NEXT:    movq %r15, %rcx
 ; CHECK-NEXT:    callq baz@PLT
-; CHECK-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rax # 8-byte Reload
-; CHECK-NEXT:    movabsq $25769803816, %rcx # imm = 0x600000028
-; CHECK-NEXT:    addq %rcx, %rsp
+; CHECK-NEXT:    movq %r12, %rax
+; CHECK-NEXT:    pushq %rax
+; CHECK-NEXT:    movabsq $25769803792, %rax # imm = 0x600000010
+; CHECK-NEXT:    addq %rsp, %rax
+; CHECK-NEXT:    xchgq %rax, (%rsp)
+; CHECK-NEXT:    movq (%rsp), %rsp
+; CHECK-NEXT:    .cfi_def_cfa_offset 40
+; CHECK-NEXT:    popq %rbx
+; CHECK-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-NEXT:    popq %r12
+; CHECK-NEXT:    .cfi_def_cfa_offset 24
+; CHECK-NEXT:    popq %r14
+; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    popq %r15
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
   %large1 = alloca %large, align 1

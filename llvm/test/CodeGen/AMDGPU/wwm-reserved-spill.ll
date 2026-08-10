@@ -10,59 +10,67 @@ define amdgpu_gfx void @strict_wwm_no_cfg(ptr addrspace(8) inreg %tmp14) #1 {
 ; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s32 offset:4 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    buffer_store_dword v2, off, s[0:3], s32 offset:8 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v6, off, s[0:3], s32 offset:12 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    s_mov_b32 s40, s6
-; GFX9-O0-NEXT:    s_mov_b32 s34, s4
-; GFX9-O0-NEXT:    ; kill: def $sgpr40 killed $sgpr40 def $sgpr40_sgpr41
-; GFX9-O0-NEXT:    s_mov_b32 s41, s7
-; GFX9-O0-NEXT:    s_mov_b32 s42, s41
-; GFX9-O0-NEXT:    s_mov_b32 s43, s40
-; GFX9-O0-NEXT:    ; kill: def $sgpr34 killed $sgpr34 def $sgpr34_sgpr35
-; GFX9-O0-NEXT:    s_mov_b32 s35, s5
-; GFX9-O0-NEXT:    s_mov_b32 s44, s35
-; GFX9-O0-NEXT:    s_mov_b32 s36, s34
-; GFX9-O0-NEXT:    ; kill: def $sgpr36 killed $sgpr36 def $sgpr36_sgpr37_sgpr38_sgpr39
-; GFX9-O0-NEXT:    s_mov_b32 s37, s44
-; GFX9-O0-NEXT:    s_mov_b32 s38, s43
-; GFX9-O0-NEXT:    s_mov_b32 s39, s42
+; GFX9-O0-NEXT:    v_writelane_b32 v6, s4, 0
+; GFX9-O0-NEXT:    v_writelane_b32 v6, s5, 1
+; GFX9-O0-NEXT:    v_writelane_b32 v6, s6, 2
+; GFX9-O0-NEXT:    v_writelane_b32 v6, s7, 3
+; GFX9-O0-NEXT:    s_mov_b32 s34, s6
+; GFX9-O0-NEXT:    s_mov_b32 s35, s7
+; GFX9-O0-NEXT:    s_mov_b32 s36, s35
+; GFX9-O0-NEXT:    s_mov_b32 s37, s34
+; GFX9-O0-NEXT:    s_mov_b32 s38, s4
+; GFX9-O0-NEXT:    s_mov_b32 s39, s5
+; GFX9-O0-NEXT:    s_mov_b32 s40, s39
+; GFX9-O0-NEXT:    s_mov_b32 s41, s38
+; GFX9-O0-NEXT:    s_mov_b32 s44, s41
+; GFX9-O0-NEXT:    s_mov_b32 s45, s40
+; GFX9-O0-NEXT:    s_mov_b32 s46, s37
+; GFX9-O0-NEXT:    s_mov_b32 s47, s36
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 0
-; GFX9-O0-NEXT:    buffer_load_dwordx2 v[5:6], off, s[36:39], s34
+; GFX9-O0-NEXT:    buffer_load_dwordx2 v[3:4], off, s[44:47], s34
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v5
-; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v6
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v3
+; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v4
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr36_sgpr37
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s34
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v0, v0, v4, s[40:41]
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v0, v0, v5, s[36:37]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr36_sgpr37
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s34
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v3, s[40:41]
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v3, s[36:37]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s34
 ; GFX9-O0-NEXT:    s_nop 1
 ; GFX9-O0-NEXT:    v_mov_b32_dpp v2, v0 row_bcast:31 row_mask:0xc bank_mask:0xf
 ; GFX9-O0-NEXT:    v_add_u32_e64 v0, v0, v2
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v0
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s34
 ; GFX9-O0-NEXT:    s_nop 1
 ; GFX9-O0-NEXT:    v_mov_b32_dpp v0, v1 row_bcast:31 row_mask:0xc bank_mask:0xf
 ; GFX9-O0-NEXT:    v_add_u32_e64 v0, v1, v0
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v0
-; GFX9-O0-NEXT:    v_cmp_eq_u32_e64 s[40:41], v3, v4
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v3, 0, -1, s[40:41]
+; GFX9-O0-NEXT:    v_cmp_eq_u32_e64 s[36:37], v3, v4
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v3, 0, -1, s[36:37]
 ; GFX9-O0-NEXT:    s_mov_b32 s35, 1
 ; GFX9-O0-NEXT:    v_lshlrev_b32_e64 v3, s35, v3
 ; GFX9-O0-NEXT:    s_mov_b32 s35, 2
 ; GFX9-O0-NEXT:    v_and_b32_e64 v3, v3, s35
-; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[36:39], s34 offset:4
+; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[44:47], s34 offset:4
+; GFX9-O0-NEXT:    v_readlane_b32 s7, v6, 3
+; GFX9-O0-NEXT:    v_readlane_b32 s6, v6, 2
+; GFX9-O0-NEXT:    v_readlane_b32 s5, v6, 1
+; GFX9-O0-NEXT:    v_readlane_b32 s4, v6, 0
 ; GFX9-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    buffer_load_dword v0, off, s[0:3], s32 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v1, off, s[0:3], s32 offset:4 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v2, off, s[0:3], s32 offset:8 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v6, off, s[0:3], s32 offset:12 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
@@ -136,60 +144,80 @@ define amdgpu_gfx void @strict_wwm_cfg(ptr addrspace(8) inreg %tmp14, i32 %arg) 
 ; GFX9-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s32 offset:20 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    buffer_store_dword v2, off, s[0:3], s32 offset:24 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v5, off, s[0:3], s32 offset:28 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v6, off, s[0:3], s32 offset:28 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v7, off, s[0:3], s32 offset:32 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    s_mov_b32 s40, s6
-; GFX9-O0-NEXT:    s_mov_b32 s34, s4
-; GFX9-O0-NEXT:    ; kill: def $sgpr40 killed $sgpr40 def $sgpr40_sgpr41
-; GFX9-O0-NEXT:    s_mov_b32 s41, s7
-; GFX9-O0-NEXT:    s_mov_b32 s42, s41
-; GFX9-O0-NEXT:    s_mov_b32 s43, s40
-; GFX9-O0-NEXT:    ; kill: def $sgpr34 killed $sgpr34 def $sgpr34_sgpr35
-; GFX9-O0-NEXT:    s_mov_b32 s35, s5
-; GFX9-O0-NEXT:    s_mov_b32 s44, s35
-; GFX9-O0-NEXT:    s_mov_b32 s36, s34
-; GFX9-O0-NEXT:    ; kill: def $sgpr36 killed $sgpr36 def $sgpr36_sgpr37_sgpr38_sgpr39
-; GFX9-O0-NEXT:    s_mov_b32 s37, s44
-; GFX9-O0-NEXT:    s_mov_b32 s38, s43
-; GFX9-O0-NEXT:    s_mov_b32 s39, s42
-; GFX9-O0-NEXT:    ; implicit-def: $vgpr5 : SGPR spill to VGPR lane
-; GFX9-O0-NEXT:    v_writelane_b32 v5, s40, 0
-; GFX9-O0-NEXT:    v_writelane_b32 v5, s41, 1
-; GFX9-O0-NEXT:    v_writelane_b32 v5, s34, 2
-; GFX9-O0-NEXT:    v_writelane_b32 v5, s35, 3
-; GFX9-O0-NEXT:    s_mov_b32 s34, 0
-; GFX9-O0-NEXT:    s_nop 2
-; GFX9-O0-NEXT:    buffer_load_dwordx2 v[3:4], off, s[36:39], s34
+; GFX9-O0-NEXT:    v_writelane_b32 v6, s4, 0
+; GFX9-O0-NEXT:    v_writelane_b32 v6, s5, 1
+; GFX9-O0-NEXT:    v_writelane_b32 v6, s6, 2
+; GFX9-O0-NEXT:    v_writelane_b32 v6, s7, 3
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; GFX9-O0-NEXT:    s_mov_b32 s34, s6
+; GFX9-O0-NEXT:    s_mov_b32 s35, s7
+; GFX9-O0-NEXT:    s_mov_b32 s36, s35
+; GFX9-O0-NEXT:    s_mov_b32 s37, s34
+; GFX9-O0-NEXT:    s_mov_b32 s38, s4
+; GFX9-O0-NEXT:    s_mov_b32 s39, s5
+; GFX9-O0-NEXT:    s_mov_b32 s40, s39
+; GFX9-O0-NEXT:    s_mov_b32 s41, s38
+; GFX9-O0-NEXT:    s_mov_b32 s44, s41
+; GFX9-O0-NEXT:    s_mov_b32 s45, s40
+; GFX9-O0-NEXT:    s_mov_b32 s46, s37
+; GFX9-O0-NEXT:    s_mov_b32 s47, s36
+; GFX9-O0-NEXT:    ; implicit-def: $vgpr7 : SGPR spill to VGPR lane
+; GFX9-O0-NEXT:    v_writelane_b32 v7, s34, 0
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[48:49], -1
+; GFX9-O0-NEXT:    buffer_store_dword v7, off, s[0:3], s32 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[48:49]
+; GFX9-O0-NEXT:    v_writelane_b32 v7, s35, 1
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[48:49], -1
+; GFX9-O0-NEXT:    buffer_store_dword v7, off, s[0:3], s32 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[48:49]
+; GFX9-O0-NEXT:    v_writelane_b32 v7, s38, 2
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[48:49], -1
+; GFX9-O0-NEXT:    buffer_store_dword v7, off, s[0:3], s32 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[48:49]
+; GFX9-O0-NEXT:    v_writelane_b32 v7, s39, 3
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[48:49], -1
+; GFX9-O0-NEXT:    buffer_store_dword v7, off, s[0:3], s32 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[48:49]
+; GFX9-O0-NEXT:    s_mov_b32 s36, 0
+; GFX9-O0-NEXT:    buffer_load_dwordx2 v[3:4], off, s[44:47], s36
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s32 offset:12 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s32 offset:4 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_nop 0
-; GFX9-O0-NEXT:    buffer_store_dword v4, off, s[0:3], s32 offset:16 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr36_sgpr37
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s34
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v3, s[36:37]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s34
+; GFX9-O0-NEXT:    buffer_store_dword v4, off, s[0:3], s32 offset:8 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v3
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s36
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v5, s[40:41]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s36
 ; GFX9-O0-NEXT:    s_nop 1
 ; GFX9-O0-NEXT:    v_mov_b32_dpp v2, v1 row_bcast:31 row_mask:0xc bank_mask:0xf
 ; GFX9-O0-NEXT:    v_add_u32_e64 v1, v1, v2
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v1
-; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s32 offset:8 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    v_cmp_eq_u32_e64 s[36:37], v0, s34
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s34
-; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 offset:4 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    s_mov_b64 s[34:35], exec
-; GFX9-O0-NEXT:    v_writelane_b32 v5, s34, 4
-; GFX9-O0-NEXT:    v_writelane_b32 v5, s35, 5
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[46:47], -1
-; GFX9-O0-NEXT:    buffer_store_dword v5, off, s[0:3], s32 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[46:47]
-; GFX9-O0-NEXT:    s_and_b64 s[34:35], s[34:35], s[36:37]
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v1
+; GFX9-O0-NEXT:    buffer_store_dword v5, off, s[0:3], s32 offset:12 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    v_cmp_eq_u32_e64 s[40:41], v0, s36
+; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s36
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 offset:16 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    s_mov_b64 s[36:37], exec
+; GFX9-O0-NEXT:    v_writelane_b32 v7, s36, 4
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[48:49], -1
+; GFX9-O0-NEXT:    buffer_store_dword v7, off, s[0:3], s32 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[48:49]
+; GFX9-O0-NEXT:    v_writelane_b32 v7, s37, 5
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[48:49], -1
+; GFX9-O0-NEXT:    buffer_store_dword v7, off, s[0:3], s32 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[48:49]
+; GFX9-O0-NEXT:    s_and_b64 s[40:41], s[36:37], s[40:41]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
 ; GFX9-O0-NEXT:    s_cbranch_execz .LBB1_2
 ; GFX9-O0-NEXT:  ; %bb.1: ; %if
-; GFX9-O0-NEXT:    buffer_load_dword v3, off, s[0:3], s32 offset:12 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v4, off, s[0:3], s32 offset:16 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v3, off, s[0:3], s32 offset:4 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v4, off, s[0:3], s32 offset:8 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v4
 ; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
@@ -203,42 +231,46 @@ define amdgpu_gfx void @strict_wwm_cfg(ptr addrspace(8) inreg %tmp14, i32 %arg) 
 ; GFX9-O0-NEXT:    v_add_u32_e64 v1, v2, v1
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v1
-; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 offset:4 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 offset:16 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:  .LBB1_2: ; %merge
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[46:47], -1
-; GFX9-O0-NEXT:    buffer_load_dword v5, off, s[0:3], s32 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[46:47]
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[48:49], -1
+; GFX9-O0-NEXT:    buffer_load_dword v7, off, s[0:3], s32 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[48:49]
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    v_readlane_b32 s36, v5, 4
-; GFX9-O0-NEXT:    v_readlane_b32 s37, v5, 5
-; GFX9-O0-NEXT:    s_or_b64 exec, exec, s[36:37]
-; GFX9-O0-NEXT:    v_readlane_b32 s38, v5, 0
-; GFX9-O0-NEXT:    v_readlane_b32 s39, v5, 1
-; GFX9-O0-NEXT:    v_readlane_b32 s34, v5, 2
-; GFX9-O0-NEXT:    v_readlane_b32 s35, v5, 3
-; GFX9-O0-NEXT:    buffer_load_dword v0, off, s[0:3], s32 offset:8 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v3, off, s[0:3], s32 offset:4 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    v_readlane_b32 s34, v7, 4
+; GFX9-O0-NEXT:    v_readlane_b32 s35, v7, 5
+; GFX9-O0-NEXT:    s_or_b64 exec, exec, s[34:35]
+; GFX9-O0-NEXT:    buffer_load_dword v0, off, s[0:3], s32 offset:16 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v3, off, s[0:3], s32 offset:12 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    v_cmp_eq_u32_e64 s[36:37], v0, v3
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v0, 0, -1, s[36:37]
-; GFX9-O0-NEXT:    s_mov_b32 s36, 1
-; GFX9-O0-NEXT:    v_lshlrev_b32_e64 v0, s36, v0
-; GFX9-O0-NEXT:    s_mov_b32 s36, 2
-; GFX9-O0-NEXT:    v_and_b32_e64 v0, v0, s36
-; GFX9-O0-NEXT:    s_mov_b32 s40, s35
-; GFX9-O0-NEXT:    s_mov_b32 s36, s34
-; GFX9-O0-NEXT:    s_mov_b32 s34, s39
-; GFX9-O0-NEXT:    s_mov_b32 s35, s38
-; GFX9-O0-NEXT:    ; kill: def $sgpr36 killed $sgpr36 def $sgpr36_sgpr37_sgpr38_sgpr39
-; GFX9-O0-NEXT:    s_mov_b32 s37, s40
-; GFX9-O0-NEXT:    s_mov_b32 s38, s35
-; GFX9-O0-NEXT:    s_mov_b32 s39, s34
+; GFX9-O0-NEXT:    v_cmp_eq_u32_e64 s[34:35], v3, v0
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v0, 0, -1, s[34:35]
+; GFX9-O0-NEXT:    s_mov_b32 s34, 1
+; GFX9-O0-NEXT:    v_lshlrev_b32_e64 v0, s34, v0
+; GFX9-O0-NEXT:    s_mov_b32 s34, 2
+; GFX9-O0-NEXT:    v_and_b32_e64 v0, v0, s34
+; GFX9-O0-NEXT:    v_readlane_b32 s34, v7, 2
+; GFX9-O0-NEXT:    v_readlane_b32 s35, v7, 3
+; GFX9-O0-NEXT:    s_mov_b32 s36, s35
+; GFX9-O0-NEXT:    v_readlane_b32 s38, v7, 0
+; GFX9-O0-NEXT:    v_readlane_b32 s39, v7, 1
+; GFX9-O0-NEXT:    s_mov_b32 s35, s39
+; GFX9-O0-NEXT:    s_mov_b32 s37, s38
+; GFX9-O0-NEXT:    s_mov_b32 s40, s34
+; GFX9-O0-NEXT:    s_mov_b32 s41, s36
+; GFX9-O0-NEXT:    s_mov_b32 s42, s37
+; GFX9-O0-NEXT:    s_mov_b32 s43, s35
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 0
-; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[36:39], s34 offset:4
+; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[40:43], s34 offset:4
+; GFX9-O0-NEXT:    v_readlane_b32 s7, v6, 3
+; GFX9-O0-NEXT:    v_readlane_b32 s6, v6, 2
+; GFX9-O0-NEXT:    v_readlane_b32 s5, v6, 1
+; GFX9-O0-NEXT:    v_readlane_b32 s4, v6, 0
 ; GFX9-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    buffer_load_dword v1, off, s[0:3], s32 offset:20 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v2, off, s[0:3], s32 offset:24 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v5, off, s[0:3], s32 offset:28 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v6, off, s[0:3], s32 offset:28 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v7, off, s[0:3], s32 offset:32 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
@@ -320,10 +352,12 @@ merge:
 define hidden amdgpu_gfx i32 @strict_wwm_called(i32 %a) noinline {
 ; GFX9-O0-LABEL: strict_wwm_called:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; GFX9-O0-NEXT:    v_add_u32_e64 v1, v0, v0
 ; GFX9-O0-NEXT:    v_mul_lo_u32 v0, v1, v0
 ; GFX9-O0-NEXT:    v_sub_u32_e64 v0, v0, v1
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX9-O3-LABEL: strict_wwm_called:
@@ -343,7 +377,7 @@ define amdgpu_gfx void @strict_wwm_call(ptr addrspace(8) inreg %tmp14, i32 inreg
 ; GFX9-O0-LABEL: strict_wwm_call:
 ; GFX9-O0:       ; %bb.0:
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX9-O0-NEXT:    s_mov_b32 s48, s33
+; GFX9-O0-NEXT:    s_mov_b32 s42, s33
 ; GFX9-O0-NEXT:    s_mov_b32 s33, s32
 ; GFX9-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s33 ; 4-byte Folded Spill
@@ -351,51 +385,65 @@ define amdgpu_gfx void @strict_wwm_call(ptr addrspace(8) inreg %tmp14, i32 inreg
 ; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s33 offset:8 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
 ; GFX9-O0-NEXT:    s_add_i32 s32, s32, 0x400
-; GFX9-O0-NEXT:    v_writelane_b32 v3, s30, 0
-; GFX9-O0-NEXT:    v_writelane_b32 v3, s31, 1
-; GFX9-O0-NEXT:    s_mov_b32 s40, s6
-; GFX9-O0-NEXT:    s_mov_b32 s34, s4
-; GFX9-O0-NEXT:    ; kill: def $sgpr40 killed $sgpr40 def $sgpr40_sgpr41
-; GFX9-O0-NEXT:    s_mov_b32 s41, s7
-; GFX9-O0-NEXT:    s_mov_b32 s42, s41
-; GFX9-O0-NEXT:    s_mov_b32 s43, s40
-; GFX9-O0-NEXT:    ; kill: def $sgpr34 killed $sgpr34 def $sgpr34_sgpr35
-; GFX9-O0-NEXT:    s_mov_b32 s35, s5
-; GFX9-O0-NEXT:    s_mov_b32 s44, s35
-; GFX9-O0-NEXT:    s_mov_b32 s36, s34
-; GFX9-O0-NEXT:    ; kill: def $sgpr36 killed $sgpr36 def $sgpr36_sgpr37_sgpr38_sgpr39
-; GFX9-O0-NEXT:    s_mov_b32 s37, s44
-; GFX9-O0-NEXT:    s_mov_b32 s38, s43
-; GFX9-O0-NEXT:    s_mov_b32 s39, s42
-; GFX9-O0-NEXT:    s_mov_b32 s34, 0
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s4, 0
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s5, 1
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s6, 2
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s7, 3
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s8, 4
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s9, 5
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s10, 6
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s11, 7
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s30, 8
+; GFX9-O0-NEXT:    v_writelane_b32 v3, s31, 9
+; GFX9-O0-NEXT:    s_mov_b32 s34, s6
+; GFX9-O0-NEXT:    s_mov_b32 s35, s7
+; GFX9-O0-NEXT:    s_mov_b32 s36, s35
+; GFX9-O0-NEXT:    s_mov_b32 s37, s34
+; GFX9-O0-NEXT:    s_mov_b32 s38, s4
+; GFX9-O0-NEXT:    s_mov_b32 s39, s5
+; GFX9-O0-NEXT:    s_mov_b32 s40, s39
+; GFX9-O0-NEXT:    s_mov_b32 s41, s38
+; GFX9-O0-NEXT:    s_mov_b32 s4, s41
+; GFX9-O0-NEXT:    s_mov_b32 s5, s40
+; GFX9-O0-NEXT:    s_mov_b32 s6, s37
+; GFX9-O0-NEXT:    s_mov_b32 s7, s36
+; GFX9-O0-NEXT:    s_mov_b32 s9, 0
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr34_sgpr35
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s8
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s34
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v1, v0, s[40:41]
-; GFX9-O0-NEXT:    s_getpc_b64 s[42:43]
-; GFX9-O0-NEXT:    s_add_u32 s42, s42, strict_wwm_called@rel32@lo+4
-; GFX9-O0-NEXT:    s_addc_u32 s43, s43, strict_wwm_called@rel32@hi+12
-; GFX9-O0-NEXT:    s_mov_b64 s[46:47], s[2:3]
-; GFX9-O0-NEXT:    s_mov_b64 s[44:45], s[0:1]
-; GFX9-O0-NEXT:    s_mov_b64 s[0:1], s[44:45]
-; GFX9-O0-NEXT:    s_mov_b64 s[2:3], s[46:47]
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[10:11], -1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s9
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v1, v0, s[10:11]
+; GFX9-O0-NEXT:    s_getpc_b64 s[34:35]
+; GFX9-O0-NEXT:    s_add_u32 s34, s34, strict_wwm_called@rel32@lo+4
+; GFX9-O0-NEXT:    s_addc_u32 s35, s35, strict_wwm_called@rel32@hi+12
+; GFX9-O0-NEXT:    s_mov_b64 s[38:39], s[2:3]
+; GFX9-O0-NEXT:    s_mov_b64 s[36:37], s[0:1]
+; GFX9-O0-NEXT:    s_mov_b64 s[0:1], s[36:37]
+; GFX9-O0-NEXT:    s_mov_b64 s[2:3], s[38:39]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v2
-; GFX9-O0-NEXT:    s_swappc_b64 s[30:31], s[42:43]
+; GFX9-O0-NEXT:    s_swappc_b64 s[30:31], s[34:35]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v0
 ; GFX9-O0-NEXT:    v_add_u32_e64 v1, v1, v2
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[10:11]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v1
-; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[36:39], s34 offset:4
-; GFX9-O0-NEXT:    v_readlane_b32 s30, v3, 0
-; GFX9-O0-NEXT:    v_readlane_b32 s31, v3, 1
+; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[4:7], s9 offset:4
+; GFX9-O0-NEXT:    v_readlane_b32 s30, v3, 8
+; GFX9-O0-NEXT:    v_readlane_b32 s31, v3, 9
+; GFX9-O0-NEXT:    v_readlane_b32 s11, v3, 7
+; GFX9-O0-NEXT:    v_readlane_b32 s10, v3, 6
+; GFX9-O0-NEXT:    v_readlane_b32 s9, v3, 5
+; GFX9-O0-NEXT:    v_readlane_b32 s8, v3, 4
+; GFX9-O0-NEXT:    v_readlane_b32 s7, v3, 3
+; GFX9-O0-NEXT:    v_readlane_b32 s6, v3, 2
+; GFX9-O0-NEXT:    v_readlane_b32 s5, v3, 1
+; GFX9-O0-NEXT:    v_readlane_b32 s4, v3, 0
 ; GFX9-O0-NEXT:    s_mov_b32 s32, s33
 ; GFX9-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    buffer_load_dword v1, off, s[0:3], s33 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v2, off, s[0:3], s33 offset:4 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v3, off, s[0:3], s33 offset:8 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    s_mov_b32 s33, s48
+; GFX9-O0-NEXT:    s_mov_b32 s33, s42
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -447,60 +495,63 @@ define amdgpu_gfx void @strict_wwm_call(ptr addrspace(8) inreg %tmp14, i32 inreg
 define amdgpu_gfx i64 @strict_wwm_called_i64(i64 %a) noinline {
 ; GFX9-O0-LABEL: strict_wwm_called_i64:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v0
-; GFX9-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 def $vgpr2_vgpr3 killed $exec
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v2
-; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v2
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v3
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v3
-; GFX9-O0-NEXT:    v_add_co_u32_e64 v4, s[34:35], v4, v5
-; GFX9-O0-NEXT:    v_addc_co_u32_e64 v0, s[34:35], v0, v1, s[34:35]
-; GFX9-O0-NEXT:    ; kill: def $vgpr4 killed $vgpr4 def $vgpr4_vgpr5 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v0
+; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v2
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v2
+; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v3
+; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v3
+; GFX9-O0-NEXT:    v_add_co_u32_e64 v0, s[34:35], v0, v1
+; GFX9-O0-NEXT:    v_addc_co_u32_e64 v1, s[34:35], v4, v5, s[34:35]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v0
+; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 32
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v2
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v3
 ; GFX9-O0-NEXT:    v_lshrrev_b64 v[0:1], s34, v[0:1]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v0
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v4
-; GFX9-O0-NEXT:    v_mul_lo_u32 v1, v0, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v2
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $vgpr0_vgpr1 killed $exec
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v4
+; GFX9-O0-NEXT:    v_mul_lo_u32 v0, v1, v0
+; GFX9-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $vgpr2_vgpr3 killed $exec
 ; GFX9-O0-NEXT:    v_lshrrev_b64 v[6:7], s34, v[4:5]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v6
-; GFX9-O0-NEXT:    v_mul_lo_u32 v2, v2, v3
-; GFX9-O0-NEXT:    v_mad_u64_u32 v[6:7], s[36:37], v0, v3, 0
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v7
-; GFX9-O0-NEXT:    v_add3_u32 v0, v0, v1, v2
+; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v6
+; GFX9-O0-NEXT:    v_mul_lo_u32 v3, v3, v2
+; GFX9-O0-NEXT:    v_mad_u64_u32 v[1:2], s[36:37], v1, v2, 0
+; GFX9-O0-NEXT:    v_mov_b32_e32 v6, v2
+; GFX9-O0-NEXT:    v_add3_u32 v0, v6, v0, v3
 ; GFX9-O0-NEXT:    ; implicit-def: $sgpr35
 ; GFX9-O0-NEXT:    ; implicit-def: $sgpr36
-; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s35
-; GFX9-O0-NEXT:    v_lshlrev_b64 v[1:2], s34, v[0:1]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v2
-; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 killed $vgpr6_vgpr7 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, 0
-; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 def $vgpr6_vgpr7 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v0
+; GFX9-O0-NEXT:    v_mov_b32_e32 v6, v0
+; GFX9-O0-NEXT:    v_mov_b32_e32 v7, s35
+; GFX9-O0-NEXT:    v_lshlrev_b64 v[6:7], s34, v[6:7]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v7
-; GFX9-O0-NEXT:    v_or_b32_e64 v0, v0, v3
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v1
+; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $vgpr1_vgpr2 killed $exec
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, 0
+; GFX9-O0-NEXT:    v_mov_b32_e32 v8, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v9, v2
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v9
+; GFX9-O0-NEXT:    v_or_b32_e64 v0, v1, v0
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v6
-; GFX9-O0-NEXT:    v_or_b32_e64 v6, v1, v2
-; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 def $vgpr6_vgpr7 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v0
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v6
-; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v4
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v7
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v5
-; GFX9-O0-NEXT:    v_sub_co_u32_e64 v1, s[36:37], v1, v3
-; GFX9-O0-NEXT:    v_subb_co_u32_e64 v0, s[36:37], v0, v2, s[36:37]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v8
+; GFX9-O0-NEXT:    v_or_b32_e64 v1, v2, v1
 ; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 def $vgpr1_vgpr2 killed $exec
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v0
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v1
-; GFX9-O0-NEXT:    v_lshrrev_b64 v[1:2], s34, v[1:2]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v4
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v2
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v5
+; GFX9-O0-NEXT:    v_sub_co_u32_e64 v0, s[36:37], v0, v3
+; GFX9-O0-NEXT:    v_subb_co_u32_e64 v1, s[36:37], v1, v2, s[36:37]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v0
+; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v2
+; GFX9-O0-NEXT:    v_lshrrev_b64 v[1:2], s34, v[2:3]
 ; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $vgpr1_vgpr2 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX9-O3-LABEL: strict_wwm_called_i64:
@@ -525,14 +576,14 @@ define amdgpu_gfx void @strict_wwm_call_i64(ptr addrspace(8) inreg %tmp14, i64 i
 ; GFX9-O0-LABEL: strict_wwm_call_i64:
 ; GFX9-O0:       ; %bb.0:
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX9-O0-NEXT:    s_mov_b32 s46, s33
+; GFX9-O0-NEXT:    s_mov_b32 s42, s33
 ; GFX9-O0-NEXT:    s_mov_b32 s33, s32
 ; GFX9-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    buffer_store_dword v2, off, s[0:3], s33 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s33 offset:4 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v8, off, s[0:3], s33 offset:8 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v10, off, s[0:3], s33 offset:8 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_nop 0
-; GFX9-O0-NEXT:    buffer_store_dword v9, off, s[0:3], s33 offset:12 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v11, off, s[0:3], s33 offset:12 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s33 offset:16 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_nop 0
 ; GFX9-O0-NEXT:    buffer_store_dword v4, off, s[0:3], s33 offset:20 ; 4-byte Folded Spill
@@ -541,57 +592,52 @@ define amdgpu_gfx void @strict_wwm_call_i64(ptr addrspace(8) inreg %tmp14, i64 i
 ; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s33 offset:28 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    buffer_store_dword v4, off, s[0:3], s33 offset:32 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    buffer_store_dword v5, off, s[0:3], s33 offset:36 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v10, off, s[0:3], s33 offset:40 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v11, off, s[0:3], s33 offset:44 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v12, off, s[0:3], s33 offset:40 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    s_add_i32 s32, s32, 0x1000
-; GFX9-O0-NEXT:    v_writelane_b32 v10, s30, 0
-; GFX9-O0-NEXT:    v_writelane_b32 v10, s31, 1
-; GFX9-O0-NEXT:    s_mov_b32 s34, s8
-; GFX9-O0-NEXT:    s_mov_b32 s38, s6
-; GFX9-O0-NEXT:    s_mov_b32 s36, s4
-; GFX9-O0-NEXT:    ; kill: def $sgpr38 killed $sgpr38 def $sgpr38_sgpr39
-; GFX9-O0-NEXT:    s_mov_b32 s39, s7
+; GFX9-O0-NEXT:    s_add_i32 s32, s32, 0xc00
+; GFX9-O0-NEXT:    v_writelane_b32 v12, s4, 0
+; GFX9-O0-NEXT:    v_writelane_b32 v12, s5, 1
+; GFX9-O0-NEXT:    v_writelane_b32 v12, s6, 2
+; GFX9-O0-NEXT:    v_writelane_b32 v12, s7, 3
+; GFX9-O0-NEXT:    v_writelane_b32 v12, s8, 4
+; GFX9-O0-NEXT:    v_writelane_b32 v12, s9, 5
+; GFX9-O0-NEXT:    v_writelane_b32 v12, s30, 6
+; GFX9-O0-NEXT:    v_writelane_b32 v12, s31, 7
+; GFX9-O0-NEXT:    s_mov_b32 s34, s6
+; GFX9-O0-NEXT:    s_mov_b32 s35, s7
+; GFX9-O0-NEXT:    s_mov_b32 s36, s35
+; GFX9-O0-NEXT:    s_mov_b32 s37, s34
+; GFX9-O0-NEXT:    s_mov_b32 s38, s4
+; GFX9-O0-NEXT:    s_mov_b32 s39, s5
+; GFX9-O0-NEXT:    s_mov_b32 s40, s39
+; GFX9-O0-NEXT:    s_mov_b32 s41, s38
+; GFX9-O0-NEXT:    s_mov_b32 s4, s41
+; GFX9-O0-NEXT:    s_mov_b32 s5, s40
+; GFX9-O0-NEXT:    s_mov_b32 s6, s37
+; GFX9-O0-NEXT:    s_mov_b32 s7, s36
+; GFX9-O0-NEXT:    s_mov_b32 s36, s8
+; GFX9-O0-NEXT:    s_mov_b32 s37, s9
+; GFX9-O0-NEXT:    s_mov_b32 s34, s37
+; GFX9-O0-NEXT:    s_mov_b64 s[38:39], 0
 ; GFX9-O0-NEXT:    s_mov_b32 s35, s39
-; GFX9-O0-NEXT:    s_mov_b32 s44, s38
-; GFX9-O0-NEXT:    ; kill: def $sgpr36 killed $sgpr36 def $sgpr36_sgpr37
-; GFX9-O0-NEXT:    s_mov_b32 s37, s5
-; GFX9-O0-NEXT:    s_mov_b32 s45, s37
-; GFX9-O0-NEXT:    s_mov_b32 s40, s36
-; GFX9-O0-NEXT:    ; kill: def $sgpr40 killed $sgpr40 def $sgpr40_sgpr41_sgpr42_sgpr43
-; GFX9-O0-NEXT:    s_mov_b32 s41, s45
-; GFX9-O0-NEXT:    s_mov_b32 s42, s44
-; GFX9-O0-NEXT:    s_mov_b32 s43, s35
-; GFX9-O0-NEXT:    ; implicit-def: $vgpr11 : SGPR spill to VGPR lane
-; GFX9-O0-NEXT:    v_writelane_b32 v11, s40, 0
-; GFX9-O0-NEXT:    v_writelane_b32 v11, s41, 1
-; GFX9-O0-NEXT:    v_writelane_b32 v11, s42, 2
-; GFX9-O0-NEXT:    v_writelane_b32 v11, s43, 3
-; GFX9-O0-NEXT:    ; kill: def $sgpr34 killed $sgpr34 def $sgpr34_sgpr35
-; GFX9-O0-NEXT:    s_mov_b32 s35, s9
-; GFX9-O0-NEXT:    s_mov_b32 s38, s35
-; GFX9-O0-NEXT:    s_mov_b64 s[36:37], 0
-; GFX9-O0-NEXT:    s_mov_b32 s40, s37
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr42_sgpr43
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s38
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[38:39], -1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s40
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v2, v0, s[38:39]
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[38:39]
-; GFX9-O0-NEXT:    ; kill: def $sgpr34 killed $sgpr34 killed $sgpr34_sgpr35
-; GFX9-O0-NEXT:    ; kill: def $sgpr36 killed $sgpr36 killed $sgpr36_sgpr37
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s34
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    v_writelane_b32 v11, s34, 4
-; GFX9-O0-NEXT:    v_writelane_b32 v11, s35, 5
-; GFX9-O0-NEXT:    v_mov_b32_e32 v3, s36
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v3, v3, v0, s[34:35]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v8, v3
-; GFX9-O0-NEXT:    v_mov_b32_e32 v9, v2
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v8
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s35
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v2, v0, s[40:41]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
+; GFX9-O0-NEXT:    s_mov_b32 s34, s36
+; GFX9-O0-NEXT:    s_mov_b32 s35, s38
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr36_sgpr37
+; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s34
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[8:9], -1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v3, s35
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v3, v3, v0, s[8:9]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v3
+; GFX9-O0-NEXT:    v_mov_b32_e32 v11, v2
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v10
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 32
-; GFX9-O0-NEXT:    v_lshrrev_b64 v[3:4], s34, v[8:9]
+; GFX9-O0-NEXT:    v_lshrrev_b64 v[3:4], s34, v[10:11]
 ; GFX9-O0-NEXT:    s_getpc_b64 s[34:35]
 ; GFX9-O0-NEXT:    s_add_u32 s34, s34, strict_wwm_called_i64@gotpcrel32@lo+4
 ; GFX9-O0-NEXT:    s_addc_u32 s35, s35, strict_wwm_called_i64@gotpcrel32@hi+12
@@ -604,41 +650,41 @@ define amdgpu_gfx void @strict_wwm_call_i64(ptr addrspace(8) inreg %tmp14, i64 i
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v3
 ; GFX9-O0-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-O0-NEXT:    s_swappc_b64 s[30:31], s[34:35]
-; GFX9-O0-NEXT:    v_readlane_b32 s34, v11, 4
-; GFX9-O0-NEXT:    v_readlane_b32 s35, v11, 5
-; GFX9-O0-NEXT:    v_readlane_b32 s36, v11, 0
-; GFX9-O0-NEXT:    v_readlane_b32 s37, v11, 1
-; GFX9-O0-NEXT:    v_readlane_b32 s38, v11, 2
-; GFX9-O0-NEXT:    v_readlane_b32 s39, v11, 3
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v0
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v8
-; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v9
-; GFX9-O0-NEXT:    v_add_co_u32_e64 v2, s[40:41], v2, v4
-; GFX9-O0-NEXT:    v_addc_co_u32_e64 v3, s[40:41], v3, v5, s[40:41]
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v10
+; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v11
+; GFX9-O0-NEXT:    v_add_co_u32_e64 v2, s[34:35], v2, v4
+; GFX9-O0-NEXT:    v_addc_co_u32_e64 v3, s[34:35], v3, v5, s[34:35]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[8:9]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v2
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v3
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 0
-; GFX9-O0-NEXT:    buffer_store_dwordx2 v[0:1], off, s[36:39], s34 offset:4
-; GFX9-O0-NEXT:    v_readlane_b32 s30, v10, 0
-; GFX9-O0-NEXT:    v_readlane_b32 s31, v10, 1
+; GFX9-O0-NEXT:    s_nop 0
+; GFX9-O0-NEXT:    buffer_store_dwordx2 v[0:1], off, s[4:7], s34 offset:4
+; GFX9-O0-NEXT:    v_readlane_b32 s30, v12, 6
+; GFX9-O0-NEXT:    v_readlane_b32 s31, v12, 7
+; GFX9-O0-NEXT:    v_readlane_b32 s9, v12, 5
+; GFX9-O0-NEXT:    v_readlane_b32 s8, v12, 4
+; GFX9-O0-NEXT:    v_readlane_b32 s7, v12, 3
+; GFX9-O0-NEXT:    v_readlane_b32 s6, v12, 2
+; GFX9-O0-NEXT:    v_readlane_b32 s5, v12, 1
+; GFX9-O0-NEXT:    v_readlane_b32 s4, v12, 0
 ; GFX9-O0-NEXT:    s_mov_b32 s32, s33
 ; GFX9-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    buffer_load_dword v2, off, s[0:3], s33 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v3, off, s[0:3], s33 offset:4 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v8, off, s[0:3], s33 offset:8 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v9, off, s[0:3], s33 offset:12 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v10, off, s[0:3], s33 offset:8 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v11, off, s[0:3], s33 offset:12 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v3, off, s[0:3], s33 offset:16 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v4, off, s[0:3], s33 offset:20 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v2, off, s[0:3], s33 offset:24 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v3, off, s[0:3], s33 offset:28 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v4, off, s[0:3], s33 offset:32 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v5, off, s[0:3], s33 offset:36 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v10, off, s[0:3], s33 offset:40 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v11, off, s[0:3], s33 offset:44 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v12, off, s[0:3], s33 offset:40 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    s_mov_b32 s33, s46
+; GFX9-O0-NEXT:    s_mov_b32 s33, s42
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -717,102 +763,111 @@ define amdgpu_gfx void @strict_wwm_amdgpu_cs_main(ptr addrspace(8) inreg %desc, 
 ; GFX9-O0-NEXT:    buffer_store_dword v2, off, s[0:3], s32 offset:8 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_nop 0
 ; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s32 offset:12 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v15, off, s[0:3], s32 offset:16 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    s_mov_b32 s40, s6
-; GFX9-O0-NEXT:    s_mov_b32 s34, s4
-; GFX9-O0-NEXT:    ; kill: def $sgpr40 killed $sgpr40 def $sgpr40_sgpr41
-; GFX9-O0-NEXT:    s_mov_b32 s41, s7
-; GFX9-O0-NEXT:    s_mov_b32 s42, s41
-; GFX9-O0-NEXT:    s_mov_b32 s43, s40
-; GFX9-O0-NEXT:    ; kill: def $sgpr34 killed $sgpr34 def $sgpr34_sgpr35
-; GFX9-O0-NEXT:    s_mov_b32 s35, s5
-; GFX9-O0-NEXT:    s_mov_b32 s44, s35
-; GFX9-O0-NEXT:    s_mov_b32 s36, s34
-; GFX9-O0-NEXT:    ; kill: def $sgpr36 killed $sgpr36 def $sgpr36_sgpr37_sgpr38_sgpr39
-; GFX9-O0-NEXT:    s_mov_b32 s37, s44
-; GFX9-O0-NEXT:    s_mov_b32 s38, s43
-; GFX9-O0-NEXT:    s_mov_b32 s39, s42
+; GFX9-O0-NEXT:    v_writelane_b32 v15, s4, 0
+; GFX9-O0-NEXT:    v_writelane_b32 v15, s5, 1
+; GFX9-O0-NEXT:    v_writelane_b32 v15, s6, 2
+; GFX9-O0-NEXT:    v_writelane_b32 v15, s7, 3
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; GFX9-O0-NEXT:    s_mov_b32 s34, s6
+; GFX9-O0-NEXT:    s_mov_b32 s35, s7
+; GFX9-O0-NEXT:    s_mov_b32 s36, s35
+; GFX9-O0-NEXT:    s_mov_b32 s37, s34
+; GFX9-O0-NEXT:    s_mov_b32 s38, s4
+; GFX9-O0-NEXT:    s_mov_b32 s39, s5
+; GFX9-O0-NEXT:    s_mov_b32 s40, s39
+; GFX9-O0-NEXT:    s_mov_b32 s41, s38
+; GFX9-O0-NEXT:    s_mov_b32 s44, s41
+; GFX9-O0-NEXT:    s_mov_b32 s45, s40
+; GFX9-O0-NEXT:    s_mov_b32 s46, s37
+; GFX9-O0-NEXT:    s_mov_b32 s47, s36
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 5
 ; GFX9-O0-NEXT:    v_lshlrev_b32_e64 v0, s34, v0
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 0
-; GFX9-O0-NEXT:    buffer_load_dwordx4 v[11:14], v0, s[36:39], s34 offen
-; GFX9-O0-NEXT:    buffer_load_dwordx2 v[4:5], v0, s[36:39], s34 offen offset:16
+; GFX9-O0-NEXT:    buffer_load_dwordx4 v[4:7], v0, s[44:47], s34 offen
+; GFX9-O0-NEXT:    buffer_load_dwordx2 v[8:9], v0, s[44:47], s34 offen offset:16
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(1)
-; GFX9-O0-NEXT:    v_mov_b32_e32 v8, v12
-; GFX9-O0-NEXT:    v_mov_b32_e32 v6, v11
-; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 def $vgpr6_vgpr7 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v8
-; GFX9-O0-NEXT:    v_mov_b32_e32 v8, v7
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v5
+; GFX9-O0-NEXT:    v_mov_b32_e32 v11, v4
+; GFX9-O0-NEXT:    ; kill: def $vgpr11 killed $vgpr11 def $vgpr11_vgpr12 killed $exec
+; GFX9-O0-NEXT:    v_mov_b32_e32 v12, v10
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v12
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
 ; GFX9-O0-NEXT:    s_mov_b32 s35, 0x7fffffff
-; GFX9-O0-NEXT:    s_mov_b32 s44, -1
-; GFX9-O0-NEXT:    ; kill: def $sgpr44 killed $sgpr44 def $sgpr44_sgpr45
-; GFX9-O0-NEXT:    s_mov_b32 s45, s35
-; GFX9-O0-NEXT:    s_mov_b32 s42, s45
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr46_sgpr47
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s42
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v8, s[40:41]
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
-; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 killed $vgpr6_vgpr7 killed $exec
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
-; GFX9-O0-NEXT:    s_mov_b32 s35, s44
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr44_sgpr45
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s35
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v2, v6, s[40:41]
+; GFX9-O0-NEXT:    s_mov_b32 s38, -1
+; GFX9-O0-NEXT:    ; kill: def $sgpr38 killed $sgpr38 def $sgpr38_sgpr39
+; GFX9-O0-NEXT:    s_mov_b32 s39, s35
+; GFX9-O0-NEXT:    s_mov_b32 s35, s39
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s35
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v10, s[36:37]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v11
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
+; GFX9-O0-NEXT:    ; kill: def $sgpr38 killed $sgpr38 killed $sgpr38_sgpr39
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s38
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v2, v10, s[36:37]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v1
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v9, v2
-; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v3
-; GFX9-O0-NEXT:    v_mov_b32_e32 v8, v14
-; GFX9-O0-NEXT:    v_mov_b32_e32 v6, v13
-; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 def $vgpr6_vgpr7 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v8
-; GFX9-O0-NEXT:    v_mov_b32_e32 v8, v7
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr44_sgpr45
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s42
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v8, s[40:41]
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
-; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 killed $vgpr6_vgpr7 killed $exec
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr44_sgpr45
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s35
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v2, v6, s[40:41]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v1
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v2
-; GFX9-O0-NEXT:    v_mov_b32_e32 v8, v3
-; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v2
+; GFX9-O0-NEXT:    v_mov_b32_e32 v11, v3
+; GFX9-O0-NEXT:    v_mov_b32_e32 v12, v7
+; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v6
+; GFX9-O0-NEXT:    ; kill: def $vgpr4 killed $vgpr4 def $vgpr4_vgpr5 killed $exec
+; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v12
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v6, v5
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr44_sgpr45
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s42
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v6, s[40:41]
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s35
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v6, s[36:37]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
 ; GFX9-O0-NEXT:    ; kill: def $vgpr4 killed $vgpr4 killed $vgpr4_vgpr5 killed $exec
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[40:41], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr42_sgpr43
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s35
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v2, v4, s[40:41]
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s38
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v2, v4, s[36:37]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v1
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[40:41]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v2
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v3
-; GFX9-O0-NEXT:    v_mov_b32_e32 v12, v10
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v6, v9
-; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v8
-; GFX9-O0-NEXT:    v_mov_b32_e32 v11, v7
-; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 def $vgpr6_vgpr7_vgpr8_vgpr9 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v12
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s35
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v1, v1, v6, s[36:37]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v6, v8
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[36:37], -1
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s38
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v2, v2, v6, s[36:37]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v1
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[36:37]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v6, v2
+; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v3
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v8, v11
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v9, v10
-; GFX9-O0-NEXT:    buffer_store_dwordx4 v[6:9], v0, s[36:39], s34 offen
-; GFX9-O0-NEXT:    buffer_store_dwordx2 v[4:5], v0, s[36:39], s34 offen offset:16
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v5
+; GFX9-O0-NEXT:    ; kill: def $vgpr4 killed $vgpr4 killed $vgpr4_vgpr5 killed $exec
+; GFX9-O0-NEXT:    v_mov_b32_e32 v11, v9
+; GFX9-O0-NEXT:    v_mov_b32_e32 v12, v8
+; GFX9-O0-NEXT:    v_mov_b32_e32 v13, v4
+; GFX9-O0-NEXT:    v_mov_b32_e32 v14, v10
+; GFX9-O0-NEXT:    buffer_store_dwordx4 v[11:14], v0, s[44:47], s34 offen
+; GFX9-O0-NEXT:    buffer_store_dwordx2 v[6:7], v0, s[44:47], s34 offen offset:16
+; GFX9-O0-NEXT:    v_readlane_b32 s7, v15, 3
+; GFX9-O0-NEXT:    v_readlane_b32 s6, v15, 2
+; GFX9-O0-NEXT:    v_readlane_b32 s5, v15, 1
+; GFX9-O0-NEXT:    v_readlane_b32 s4, v15, 0
 ; GFX9-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    buffer_load_dword v1, off, s[0:3], s32 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v2, off, s[0:3], s32 offset:4 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v2, off, s[0:3], s32 offset:8 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v3, off, s[0:3], s32 offset:12 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v15, off, s[0:3], s32 offset:16 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
@@ -899,36 +954,70 @@ define amdgpu_gfx <32 x i32> @strict_wwm_callee_saves(<32 x i32> inreg %keep, pt
 ; GFX9-O0-NEXT:    buffer_store_dword v33, off, s[0:3], s32 offset:100 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_nop 0
 ; GFX9-O0-NEXT:    buffer_store_dword v34, off, s[0:3], s32 offset:104 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v39, off, s[0:3], s32 offset:108 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    buffer_store_dword v10, off, s[0:3], s32 offset:40 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v9, off, s[0:3], s32 offset:32 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v8, off, s[0:3], s32 offset:48 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v7, off, s[0:3], s32 offset:36 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v6, off, s[0:3], s32 offset:56 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s4, 0
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s5, 1
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s6, 2
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s7, 3
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s8, 4
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s9, 5
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s10, 6
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s11, 7
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s12, 8
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s13, 9
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s14, 10
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s15, 11
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s16, 12
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s17, 13
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s18, 14
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s19, 15
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s20, 16
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s21, 17
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s22, 18
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s23, 19
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s24, 20
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s25, 21
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s26, 22
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s27, 23
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s28, 24
+; GFX9-O0-NEXT:    v_writelane_b32 v39, s29, 25
+; GFX9-O0-NEXT:    ; kill: def $vgpr10 killed $vgpr10 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr9 killed $vgpr9 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr8 killed $vgpr8 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr7 killed $vgpr7 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr5 killed $vgpr5 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr4 killed $vgpr4 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr3 killed $vgpr3 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; GFX9-O0-NEXT:    buffer_load_dword v31, off, s[0:3], s32 offset:20
+; GFX9-O0-NEXT:    buffer_load_dword v30, off, s[0:3], s32 offset:16
+; GFX9-O0-NEXT:    buffer_load_dword v29, off, s[0:3], s32 offset:12
+; GFX9-O0-NEXT:    buffer_load_dword v28, off, s[0:3], s32 offset:8
+; GFX9-O0-NEXT:    buffer_load_dword v27, off, s[0:3], s32 offset:4
+; GFX9-O0-NEXT:    buffer_load_dword v26, off, s[0:3], s32
+; GFX9-O0-NEXT:    s_nop 0
+; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 offset:24 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s32 offset:28 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v2, off, s[0:3], s32 offset:32 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s32 offset:36 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v4, off, s[0:3], s32 offset:40 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    buffer_store_dword v5, off, s[0:3], s32 offset:44 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v4, off, s[0:3], s32 offset:64 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v3, off, s[0:3], s32 offset:52 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v2, off, s[0:3], s32 offset:24 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v1, off, s[0:3], s32 offset:60 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 offset:28 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_load_dword v0, off, s[0:3], s32 offset:20
-; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 offset:88 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_load_dword v0, off, s[0:3], s32 offset:16
-; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    buffer_store_dword v0, off, s[0:3], s32 offset:84 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_load_dword v35, off, s[0:3], s32 offset:12
-; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    buffer_store_dword v35, off, s[0:3], s32 offset:80 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_load_dword v36, off, s[0:3], s32 offset:8
-; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    buffer_store_dword v36, off, s[0:3], s32 offset:76 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_load_dword v37, off, s[0:3], s32 offset:4
-; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    buffer_store_dword v37, off, s[0:3], s32 offset:72 ; 4-byte Folded Spill
-; GFX9-O0-NEXT:    buffer_load_dword v38, off, s[0:3], s32
-; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    buffer_store_dword v38, off, s[0:3], s32 offset:68 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v6, off, s[0:3], s32 offset:48 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v7, off, s[0:3], s32 offset:52 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v8, off, s[0:3], s32 offset:56 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v9, off, s[0:3], s32 offset:60 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v10, off, s[0:3], s32 offset:64 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(11)
+; GFX9-O0-NEXT:    buffer_store_dword v26, off, s[0:3], s32 offset:68 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v27, off, s[0:3], s32 offset:72 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v28, off, s[0:3], s32 offset:76 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v29, off, s[0:3], s32 offset:80 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v30, off, s[0:3], s32 offset:84 ; 4-byte Folded Spill
+; GFX9-O0-NEXT:    buffer_store_dword v31, off, s[0:3], s32 offset:88 ; 4-byte Folded Spill
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s4
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s6
@@ -955,144 +1044,152 @@ define amdgpu_gfx <32 x i32> @strict_wwm_callee_saves(<32 x i32> inreg %keep, pt
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v23, s27
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v24, s28
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v25, s29
-; GFX9-O0-NEXT:    v_mov_b32_e32 v26, v38
-; GFX9-O0-NEXT:    v_mov_b32_e32 v27, v37
-; GFX9-O0-NEXT:    v_mov_b32_e32 v28, v36
-; GFX9-O0-NEXT:    buffer_load_dword v31, off, s[0:3], s32 offset:88 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v30, off, s[0:3], s32 offset:84 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v29, off, s[0:3], s32 offset:80 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v28, off, s[0:3], s32 offset:76 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v27, off, s[0:3], s32 offset:72 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v26, off, s[0:3], s32 offset:68 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v11, off, s[0:3], s32 offset:64 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v10, off, s[0:3], s32 offset:60 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v9, off, s[0:3], s32 offset:56 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v8, off, s[0:3], s32 offset:52 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v7, off, s[0:3], s32 offset:48 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v6, off, s[0:3], s32 offset:44 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v5, off, s[0:3], s32 offset:40 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v4, off, s[0:3], s32 offset:36 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v2, off, s[0:3], s32 offset:32 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v1, off, s[0:3], s32 offset:28 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    buffer_load_dword v0, off, s[0:3], s32 offset:24 ; 4-byte Folded Reload
-; GFX9-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 def $vgpr2_vgpr3 killed $exec
-; GFX9-O0-NEXT:    s_waitcnt vmcnt(4)
-; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v5
-; GFX9-O0-NEXT:    ; kill: def $vgpr4 killed $vgpr4 def $vgpr4_vgpr5 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v7
-; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 def $vgpr6_vgpr7 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v9
-; GFX9-O0-NEXT:    ; kill: def $vgpr8 killed $vgpr8 def $vgpr8_vgpr9 killed $exec
-; GFX9-O0-NEXT:    v_mov_b32_e32 v9, v11
-; GFX9-O0-NEXT:    ; kill: def $vgpr10 killed $vgpr10 def $vgpr10_vgpr11 killed $exec
+; GFX9-O0-NEXT:    buffer_load_dword v35, off, s[0:3], s32 offset:68 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
-; GFX9-O0-NEXT:    v_mov_b32_e32 v11, v0
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v11
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    s_mov_b64 s[38:39], 0
-; GFX9-O0-NEXT:    s_mov_b32 s37, s39
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
-; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s37
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v0, s[34:35]
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v10
-; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    s_mov_b32 s36, s38
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
-; GFX9-O0-NEXT:    v_mov_b32_e32 v33, s36
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v33, v33, v0, s[34:35]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v34, v32
-; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v33
-; GFX9-O0-NEXT:    v_mov_b32_e32 v11, v34
+; GFX9-O0-NEXT:    v_mov_b32_e32 v26, v35
+; GFX9-O0-NEXT:    buffer_load_dword v36, off, s[0:3], s32 offset:72 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    v_mov_b32_e32 v27, v36
+; GFX9-O0-NEXT:    buffer_load_dword v37, off, s[0:3], s32 offset:76 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    v_mov_b32_e32 v28, v37
+; GFX9-O0-NEXT:    buffer_load_dword v38, off, s[0:3], s32 offset:80 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v9, off, s[0:3], s32 offset:60 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v9
+; GFX9-O0-NEXT:    buffer_load_dword v10, off, s[0:3], s32 offset:64 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v10
+; GFX9-O0-NEXT:    buffer_load_dword v7, off, s[0:3], s32 offset:52 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v7
+; GFX9-O0-NEXT:    buffer_load_dword v8, off, s[0:3], s32 offset:56 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v8
+; GFX9-O0-NEXT:    buffer_load_dword v5, off, s[0:3], s32 offset:44 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v5
+; GFX9-O0-NEXT:    buffer_load_dword v6, off, s[0:3], s32 offset:48 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v6
+; GFX9-O0-NEXT:    buffer_load_dword v6, off, s[0:3], s32 offset:36 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 def $vgpr6_vgpr7 killed $exec
+; GFX9-O0-NEXT:    buffer_load_dword v8, off, s[0:3], s32 offset:40 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v8
+; GFX9-O0-NEXT:    buffer_load_dword v8, off, s[0:3], s32 offset:28 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    ; kill: def $vgpr8 killed $vgpr8 def $vgpr8_vgpr9 killed $exec
+; GFX9-O0-NEXT:    buffer_load_dword v10, off, s[0:3], s32 offset:32 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    v_mov_b32_e32 v9, v10
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v9
 ; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
-; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s37
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v0, s[34:35]
+; GFX9-O0-NEXT:    s_mov_b64 s[36:37], 0
+; GFX9-O0-NEXT:    s_mov_b32 s38, s37
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s38
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v10, s[34:35]
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v8
+; GFX9-O0-NEXT:    ; kill: def $vgpr8 killed $vgpr8 killed $vgpr8_vgpr9 killed $exec
 ; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
+; GFX9-O0-NEXT:    ; kill: def $sgpr36 killed $sgpr36 killed $sgpr36_sgpr37
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v33, s36
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v33, v33, v0, s[34:35]
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v33, v33, v8, s[34:35]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v34, v32
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v8, v33
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v9, v34
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v7
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v7
 ; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
-; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s37
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v0, s[34:35]
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s38
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v10, s[34:35]
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v6
+; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 killed $vgpr6_vgpr7 killed $exec
 ; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v33, s36
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v33, v33, v0, s[34:35]
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v33, v33, v6, s[34:35]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v34, v32
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v6, v33
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v34
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v5
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v5
 ; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
-; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s37
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v0, s[34:35]
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s38
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v10, s[34:35]
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v4
+; GFX9-O0-NEXT:    ; kill: def $vgpr4 killed $vgpr4 killed $vgpr4_vgpr5 killed $exec
 ; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v33, s36
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v33, v33, v0, s[34:35]
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v33, v33, v4, s[34:35]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v34, v32
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v4, v33
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v34
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v3
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v3
 ; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
-; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
-; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s37
-; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v0, s[34:35]
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s38
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v10, s[34:35]
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v2
+; GFX9-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $vgpr2_vgpr3 killed $exec
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v33, s36
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v33, v33, v2, s[34:35]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v34, v32
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
+; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v33
+; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v34
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v1
+; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
+; GFX9-O0-NEXT:    ; implicit-def: $sgpr40_sgpr41
+; GFX9-O0-NEXT:    v_mov_b32_e32 v32, s38
+; GFX9-O0-NEXT:    v_cndmask_b32_e64 v32, v32, v10, s[34:35]
+; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $vgpr0_vgpr1 killed $exec
 ; GFX9-O0-NEXT:    s_or_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    ; implicit-def: $sgpr38_sgpr39
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v33, s36
 ; GFX9-O0-NEXT:    v_cndmask_b32_e64 v33, v33, v0, s[34:35]
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v34, v32
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
-; GFX9-O0-NEXT:    v_mov_b32_e32 v2, v33
-; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v34
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v11
-; GFX9-O0-NEXT:    buffer_store_dword v0, v1, s[0:3], 0 offen offset:4
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v10
-; GFX9-O0-NEXT:    buffer_store_dword v0, v1, s[0:3], 0 offen
+; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v33
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, v34
+; GFX9-O0-NEXT:    v_mov_b32_e32 v10, v9
+; GFX9-O0-NEXT:    buffer_load_dword v11, off, s[0:3], s32 offset:24 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
+; GFX9-O0-NEXT:    buffer_store_dword v10, v11, s[0:3], 0 offen offset:4
+; GFX9-O0-NEXT:    ; kill: def $vgpr8 killed $vgpr8 killed $vgpr8_vgpr9 killed $exec
+; GFX9-O0-NEXT:    buffer_store_dword v8, v11, s[0:3], 0 offen
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 8
-; GFX9-O0-NEXT:    v_add_u32_e64 v10, v1, s34
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v9
-; GFX9-O0-NEXT:    buffer_store_dword v0, v10, s[0:3], 0 offen offset:4
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v8
-; GFX9-O0-NEXT:    buffer_store_dword v0, v1, s[0:3], 0 offen offset:8
+; GFX9-O0-NEXT:    v_add_u32_e64 v8, v11, s34
+; GFX9-O0-NEXT:    v_mov_b32_e32 v9, v7
+; GFX9-O0-NEXT:    buffer_store_dword v9, v8, s[0:3], 0 offen offset:4
+; GFX9-O0-NEXT:    ; kill: def $vgpr6 killed $vgpr6 killed $vgpr6_vgpr7 killed $exec
+; GFX9-O0-NEXT:    buffer_store_dword v6, v11, s[0:3], 0 offen offset:8
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 16
-; GFX9-O0-NEXT:    v_add_u32_e64 v8, v1, s34
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v7
-; GFX9-O0-NEXT:    buffer_store_dword v0, v8, s[0:3], 0 offen offset:4
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v6
-; GFX9-O0-NEXT:    buffer_store_dword v0, v1, s[0:3], 0 offen offset:16
+; GFX9-O0-NEXT:    v_add_u32_e64 v6, v11, s34
+; GFX9-O0-NEXT:    v_mov_b32_e32 v7, v5
+; GFX9-O0-NEXT:    buffer_store_dword v7, v6, s[0:3], 0 offen offset:4
+; GFX9-O0-NEXT:    ; kill: def $vgpr4 killed $vgpr4 killed $vgpr4_vgpr5 killed $exec
+; GFX9-O0-NEXT:    buffer_store_dword v4, v11, s[0:3], 0 offen offset:16
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 24
-; GFX9-O0-NEXT:    v_add_u32_e64 v6, v1, s34
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v5
-; GFX9-O0-NEXT:    buffer_store_dword v0, v6, s[0:3], 0 offen offset:4
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v4
-; GFX9-O0-NEXT:    buffer_store_dword v0, v1, s[0:3], 0 offen offset:24
+; GFX9-O0-NEXT:    v_add_u32_e64 v4, v11, s34
+; GFX9-O0-NEXT:    v_mov_b32_e32 v5, v3
+; GFX9-O0-NEXT:    buffer_store_dword v5, v4, s[0:3], 0 offen offset:4
+; GFX9-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $vgpr2_vgpr3 killed $exec
+; GFX9-O0-NEXT:    buffer_store_dword v2, v11, s[0:3], 0 offen offset:24
 ; GFX9-O0-NEXT:    s_mov_b32 s34, 32
-; GFX9-O0-NEXT:    v_add_u32_e64 v4, v1, s34
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v3
-; GFX9-O0-NEXT:    buffer_store_dword v0, v4, s[0:3], 0 offen offset:4
-; GFX9-O0-NEXT:    v_mov_b32_e32 v0, v2
-; GFX9-O0-NEXT:    buffer_store_dword v0, v1, s[0:3], 0 offen offset:32
+; GFX9-O0-NEXT:    v_add_u32_e64 v2, v11, s34
+; GFX9-O0-NEXT:    v_mov_b32_e32 v3, v1
+; GFX9-O0-NEXT:    buffer_store_dword v3, v2, s[0:3], 0 offen offset:4
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $vgpr0_vgpr1 killed $exec
+; GFX9-O0-NEXT:    buffer_store_dword v0, v11, s[0:3], 0 offen offset:32
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v0, s4
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v2, s6
@@ -1119,11 +1216,44 @@ define amdgpu_gfx <32 x i32> @strict_wwm_callee_saves(<32 x i32> inreg %keep, pt
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v23, s27
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v24, s28
 ; GFX9-O0-NEXT:    v_mov_b32_e32 v25, s29
+; GFX9-O0-NEXT:    v_mov_b32_e32 v26, v35
+; GFX9-O0-NEXT:    v_mov_b32_e32 v27, v36
+; GFX9-O0-NEXT:    v_mov_b32_e32 v28, v37
+; GFX9-O0-NEXT:    v_mov_b32_e32 v29, v38
+; GFX9-O0-NEXT:    buffer_load_dword v30, off, s[0:3], s32 offset:84 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v31, off, s[0:3], s32 offset:88 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    v_readlane_b32 s29, v39, 25
+; GFX9-O0-NEXT:    v_readlane_b32 s28, v39, 24
+; GFX9-O0-NEXT:    v_readlane_b32 s27, v39, 23
+; GFX9-O0-NEXT:    v_readlane_b32 s26, v39, 22
+; GFX9-O0-NEXT:    v_readlane_b32 s25, v39, 21
+; GFX9-O0-NEXT:    v_readlane_b32 s24, v39, 20
+; GFX9-O0-NEXT:    v_readlane_b32 s23, v39, 19
+; GFX9-O0-NEXT:    v_readlane_b32 s22, v39, 18
+; GFX9-O0-NEXT:    v_readlane_b32 s21, v39, 17
+; GFX9-O0-NEXT:    v_readlane_b32 s20, v39, 16
+; GFX9-O0-NEXT:    v_readlane_b32 s19, v39, 15
+; GFX9-O0-NEXT:    v_readlane_b32 s18, v39, 14
+; GFX9-O0-NEXT:    v_readlane_b32 s17, v39, 13
+; GFX9-O0-NEXT:    v_readlane_b32 s16, v39, 12
+; GFX9-O0-NEXT:    v_readlane_b32 s15, v39, 11
+; GFX9-O0-NEXT:    v_readlane_b32 s14, v39, 10
+; GFX9-O0-NEXT:    v_readlane_b32 s13, v39, 9
+; GFX9-O0-NEXT:    v_readlane_b32 s12, v39, 8
+; GFX9-O0-NEXT:    v_readlane_b32 s11, v39, 7
+; GFX9-O0-NEXT:    v_readlane_b32 s10, v39, 6
+; GFX9-O0-NEXT:    v_readlane_b32 s9, v39, 5
+; GFX9-O0-NEXT:    v_readlane_b32 s8, v39, 4
+; GFX9-O0-NEXT:    v_readlane_b32 s7, v39, 3
+; GFX9-O0-NEXT:    v_readlane_b32 s6, v39, 2
+; GFX9-O0-NEXT:    v_readlane_b32 s5, v39, 1
+; GFX9-O0-NEXT:    v_readlane_b32 s4, v39, 0
 ; GFX9-O0-NEXT:    s_xor_saveexec_b64 s[34:35], -1
 ; GFX9-O0-NEXT:    buffer_load_dword v32, off, s[0:3], s32 offset:92 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v33, off, s[0:3], s32 offset:96 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v33, off, s[0:3], s32 offset:100 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    buffer_load_dword v34, off, s[0:3], s32 offset:104 ; 4-byte Folded Reload
+; GFX9-O0-NEXT:    buffer_load_dword v39, off, s[0:3], s32 offset:108 ; 4-byte Folded Reload
 ; GFX9-O0-NEXT:    s_mov_b64 exec, s[34:35]
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]

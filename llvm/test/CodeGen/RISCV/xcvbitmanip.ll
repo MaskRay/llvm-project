@@ -136,14 +136,14 @@ define i32 @test.ctlz.zero.defined(i32 %a) {
 ; CHECK-O0-NEXT:    cv.fl1 a1, a0
 ; CHECK-O0-NEXT:    xori a1, a1, 31
 ; CHECK-O0-NEXT:    li a2, 32
-; CHECK-O0-NEXT:    sw a2, 8(sp) # 4-byte Folded Spill
-; CHECK-O0-NEXT:    sw a1, 12(sp) # 4-byte Folded Spill
+; CHECK-O0-NEXT:    sw a2, 12(sp) # 4-byte Folded Spill
+; CHECK-O0-NEXT:    sw a1, 8(sp) # 4-byte Folded Spill
 ; CHECK-O0-NEXT:    bnez a0, .LBB13_2
 ; CHECK-O0-NEXT:  # %bb.1:
-; CHECK-O0-NEXT:    lw a0, 8(sp) # 4-byte Folded Reload
-; CHECK-O0-NEXT:    sw a0, 12(sp) # 4-byte Folded Spill
-; CHECK-O0-NEXT:  .LBB13_2:
 ; CHECK-O0-NEXT:    lw a0, 12(sp) # 4-byte Folded Reload
+; CHECK-O0-NEXT:    sw a0, 8(sp) # 4-byte Folded Spill
+; CHECK-O0-NEXT:  .LBB13_2:
+; CHECK-O0-NEXT:    lw a0, 8(sp) # 4-byte Folded Reload
 ; CHECK-O0-NEXT:    addi sp, sp, 16
 ; CHECK-O0-NEXT:    .cfi_def_cfa_offset 0
 ; CHECK-O0-NEXT:    ret
@@ -193,9 +193,8 @@ define i32 @test.llvm.fshl.imm(i32 %a) {
 define i32 @test.llvm.fshl.reg(i32 %a, i32 %b) {
 ; CHECK-O0-LABEL: test.llvm.fshl.reg:
 ; CHECK-O0:       # %bb.0:
-; CHECK-O0-NEXT:    mv a2, a1
-; CHECK-O0-NEXT:    li a1, 0
-; CHECK-O0-NEXT:    sub a1, a1, a2
+; CHECK-O0-NEXT:    li a2, 0
+; CHECK-O0-NEXT:    sub a1, a2, a1
 ; CHECK-O0-NEXT:    cv.ror a0, a0, a1
 ; CHECK-O0-NEXT:    ret
 ;

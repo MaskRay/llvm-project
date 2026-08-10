@@ -108,29 +108,29 @@ define i32 @main() nounwind {
 ; CHECK:       ## %bb.0: ## %entry
 ; CHECK-NEXT:    pushl %ebp
 ; CHECK-NEXT:    movl %esp, %ebp
+; CHECK-NEXT:    pushl %ebx
 ; CHECK-NEXT:    pushl %edi
 ; CHECK-NEXT:    pushl %esi
-; CHECK-NEXT:    subl $32, %esp
+; CHECK-NEXT:    subl $28, %esp
 ; CHECK-NEXT:    calll _baz
-; CHECK-NEXT:    movl %eax, %edi
-; CHECK-NEXT:    calll _bar
 ; CHECK-NEXT:    movl %eax, %esi
+; CHECK-NEXT:    calll _bar
+; CHECK-NEXT:    movl %eax, %edi
 ; CHECK-NEXT:    calll _foo
-; CHECK-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) ## 4-byte Spill
+; CHECK-NEXT:    movl %eax, %ebx
 ; CHECK-NEXT:    calll _quux
-; CHECK-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %edx ## 4-byte Reload
-; CHECK-NEXT:    movl %eax, %ecx
-; CHECK-NEXT:    movl %esp, %eax
-; CHECK-NEXT:    movl %edi, 16(%eax)
-; CHECK-NEXT:    movl %esi, 12(%eax)
-; CHECK-NEXT:    movl %edx, 8(%eax)
-; CHECK-NEXT:    movl %ecx, 4(%eax)
-; CHECK-NEXT:    movl $_.str, (%eax)
+; CHECK-NEXT:    movl %esp, %ecx
+; CHECK-NEXT:    movl %esi, 16(%ecx)
+; CHECK-NEXT:    movl %edi, 12(%ecx)
+; CHECK-NEXT:    movl %ebx, 8(%ecx)
+; CHECK-NEXT:    movl %eax, 4(%ecx)
+; CHECK-NEXT:    movl $_.str, (%ecx)
 ; CHECK-NEXT:    calll _printf
 ; CHECK-NEXT:    ## implicit-def: $eax
-; CHECK-NEXT:    addl $32, %esp
+; CHECK-NEXT:    addl $28, %esp
 ; CHECK-NEXT:    popl %esi
 ; CHECK-NEXT:    popl %edi
+; CHECK-NEXT:    popl %ebx
 ; CHECK-NEXT:    popl %ebp
 ; CHECK-NEXT:    retl
 entry:

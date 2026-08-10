@@ -21,19 +21,19 @@ define void @test1(i64 %A, i64 %B) {
 ; CHECK-GIO0-NEXT:    str x30, [sp, #16] // 8-byte Spill
 ; CHECK-GIO0-NEXT:    .cfi_def_cfa_offset 32
 ; CHECK-GIO0-NEXT:    .cfi_offset w30, -16
-; CHECK-GIO0-NEXT:    str x0, [sp] // 8-byte Spill
-; CHECK-GIO0-NEXT:    str x1, [sp, #8] // 8-byte Spill
-; CHECK-GIO0-NEXT:    mov w8, w1
-; CHECK-GIO0-NEXT:    tbz w8, #3, .LBB0_3
+; CHECK-GIO0-NEXT:    str x0, [sp, #8] // 8-byte Spill
+; CHECK-GIO0-NEXT:    str x1, [sp] // 8-byte Spill
+; CHECK-GIO0-NEXT:    mov w2, w1
+; CHECK-GIO0-NEXT:    tbz w2, #3, .LBB0_3
 ; CHECK-GIO0-NEXT:    b .LBB0_1
 ; CHECK-GIO0-NEXT:  .LBB0_1: // %entry
-; CHECK-GIO0-NEXT:    ldr x0, [sp] // 8-byte Reload
-; CHECK-GIO0-NEXT:    mov w8, w0
-; CHECK-GIO0-NEXT:    tbz w8, #2, .LBB0_3
+; CHECK-GIO0-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
+; CHECK-GIO0-NEXT:    mov w1, w0
+; CHECK-GIO0-NEXT:    tbz w1, #2, .LBB0_3
 ; CHECK-GIO0-NEXT:    b .LBB0_2
 ; CHECK-GIO0-NEXT:  .LBB0_2: // %if.then2
-; CHECK-GIO0-NEXT:    ldr x1, [sp, #8] // 8-byte Reload
-; CHECK-GIO0-NEXT:    ldr x0, [sp] // 8-byte Reload
+; CHECK-GIO0-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
+; CHECK-GIO0-NEXT:    ldr x1, [sp] // 8-byte Reload
 ; CHECK-GIO0-NEXT:    bl foo
 ; CHECK-GIO0-NEXT:    b .LBB0_3
 ; CHECK-GIO0-NEXT:  .LBB0_3: // %if.end3
@@ -74,19 +74,19 @@ define void @test2(i64 %A, ptr readonly %B) #0 {
 ; CHECK-GIO0-NEXT:    str x30, [sp, #16] // 8-byte Spill
 ; CHECK-GIO0-NEXT:    .cfi_def_cfa_offset 32
 ; CHECK-GIO0-NEXT:    .cfi_offset w30, -16
-; CHECK-GIO0-NEXT:    str x0, [sp] // 8-byte Spill
-; CHECK-GIO0-NEXT:    str x1, [sp, #8] // 8-byte Spill
+; CHECK-GIO0-NEXT:    str x0, [sp, #8] // 8-byte Spill
+; CHECK-GIO0-NEXT:    str x1, [sp] // 8-byte Spill
 ; CHECK-GIO0-NEXT:    cbz x1, .LBB1_3
 ; CHECK-GIO0-NEXT:    b .LBB1_1
 ; CHECK-GIO0-NEXT:  .LBB1_1: // %entry
-; CHECK-GIO0-NEXT:    ldr x0, [sp] // 8-byte Reload
-; CHECK-GIO0-NEXT:    mov w8, w0
-; CHECK-GIO0-NEXT:    tbz w8, #3, .LBB1_3
+; CHECK-GIO0-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
+; CHECK-GIO0-NEXT:    mov w1, w0
+; CHECK-GIO0-NEXT:    tbz w1, #3, .LBB1_3
 ; CHECK-GIO0-NEXT:    b .LBB1_2
 ; CHECK-GIO0-NEXT:  .LBB1_2: // %if.then2
-; CHECK-GIO0-NEXT:    ldr x0, [sp] // 8-byte Reload
-; CHECK-GIO0-NEXT:    ldr x8, [sp, #8] // 8-byte Reload
-; CHECK-GIO0-NEXT:    ldr x1, [x8]
+; CHECK-GIO0-NEXT:    ldr x1, [sp] // 8-byte Reload
+; CHECK-GIO0-NEXT:    ldr x1, [x1]
+; CHECK-GIO0-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
 ; CHECK-GIO0-NEXT:    bl foo
 ; CHECK-GIO0-NEXT:    b .LBB1_3
 ; CHECK-GIO0-NEXT:  .LBB1_3: // %if.end3
@@ -127,19 +127,19 @@ define void @test3(i64 %A, i64 %B) {
 ; CHECK-GIO0-NEXT:    str x30, [sp, #16] // 8-byte Spill
 ; CHECK-GIO0-NEXT:    .cfi_def_cfa_offset 32
 ; CHECK-GIO0-NEXT:    .cfi_offset w30, -16
-; CHECK-GIO0-NEXT:    str x0, [sp] // 8-byte Spill
-; CHECK-GIO0-NEXT:    str x1, [sp, #8] // 8-byte Spill
-; CHECK-GIO0-NEXT:    mov w8, w1
-; CHECK-GIO0-NEXT:    tbz w8, #3, .LBB2_2
+; CHECK-GIO0-NEXT:    str x0, [sp, #8] // 8-byte Spill
+; CHECK-GIO0-NEXT:    str x1, [sp] // 8-byte Spill
+; CHECK-GIO0-NEXT:    mov w2, w1
+; CHECK-GIO0-NEXT:    tbz w2, #3, .LBB2_2
 ; CHECK-GIO0-NEXT:    b .LBB2_1
 ; CHECK-GIO0-NEXT:  .LBB2_1: // %entry
-; CHECK-GIO0-NEXT:    ldr x0, [sp] // 8-byte Reload
-; CHECK-GIO0-NEXT:    mov w8, w0
-; CHECK-GIO0-NEXT:    tbz w8, #28, .LBB2_2
+; CHECK-GIO0-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
+; CHECK-GIO0-NEXT:    mov w1, w0
+; CHECK-GIO0-NEXT:    tbz w1, #28, .LBB2_2
 ; CHECK-GIO0-NEXT:    b .LBB2_3
 ; CHECK-GIO0-NEXT:  .LBB2_2: // %if.then2
-; CHECK-GIO0-NEXT:    ldr x1, [sp, #8] // 8-byte Reload
-; CHECK-GIO0-NEXT:    ldr x0, [sp] // 8-byte Reload
+; CHECK-GIO0-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
+; CHECK-GIO0-NEXT:    ldr x1, [sp] // 8-byte Reload
 ; CHECK-GIO0-NEXT:    bl foo
 ; CHECK-GIO0-NEXT:    b .LBB2_3
 ; CHECK-GIO0-NEXT:  .LBB2_3: // %if.end3
@@ -180,18 +180,18 @@ define void @test4(i64 %A, i64 %B) {
 ; CHECK-GIO0-NEXT:    str x30, [sp, #16] // 8-byte Spill
 ; CHECK-GIO0-NEXT:    .cfi_def_cfa_offset 32
 ; CHECK-GIO0-NEXT:    .cfi_offset w30, -16
-; CHECK-GIO0-NEXT:    str x0, [sp] // 8-byte Spill
-; CHECK-GIO0-NEXT:    str x1, [sp, #8] // 8-byte Spill
-; CHECK-GIO0-NEXT:    mov w8, w1
-; CHECK-GIO0-NEXT:    tbz w8, #3, .LBB3_2
+; CHECK-GIO0-NEXT:    str x0, [sp, #8] // 8-byte Spill
+; CHECK-GIO0-NEXT:    str x1, [sp] // 8-byte Spill
+; CHECK-GIO0-NEXT:    mov w2, w1
+; CHECK-GIO0-NEXT:    tbz w2, #3, .LBB3_2
 ; CHECK-GIO0-NEXT:    b .LBB3_1
 ; CHECK-GIO0-NEXT:  .LBB3_1: // %entry
-; CHECK-GIO0-NEXT:    ldr x8, [sp] // 8-byte Reload
-; CHECK-GIO0-NEXT:    tbz x8, #35, .LBB3_2
+; CHECK-GIO0-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
+; CHECK-GIO0-NEXT:    tbz x0, #35, .LBB3_2
 ; CHECK-GIO0-NEXT:    b .LBB3_3
 ; CHECK-GIO0-NEXT:  .LBB3_2: // %if.then2
-; CHECK-GIO0-NEXT:    ldr x1, [sp, #8] // 8-byte Reload
-; CHECK-GIO0-NEXT:    ldr x0, [sp] // 8-byte Reload
+; CHECK-GIO0-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
+; CHECK-GIO0-NEXT:    ldr x1, [sp] // 8-byte Reload
 ; CHECK-GIO0-NEXT:    bl foo
 ; CHECK-GIO0-NEXT:    b .LBB3_3
 ; CHECK-GIO0-NEXT:  .LBB3_3: // %if.end3
@@ -223,17 +223,17 @@ define i32 @tbzfromextract(<8 x i8> %b) {
 ;
 ; CHECK-GIO0-LABEL: tbzfromextract:
 ; CHECK-GIO0:       // %bb.0:
+; CHECK-GIO0-NEXT:    // implicit-def: $q1
 ; CHECK-GIO0-NEXT:    fmov d1, d0
-; CHECK-GIO0-NEXT:    // implicit-def: $q0
-; CHECK-GIO0-NEXT:    fmov d0, d1
-; CHECK-GIO0-NEXT:    umov w8, v0.b[0]
+; CHECK-GIO0-NEXT:    umov w8, v1.b[0]
 ; CHECK-GIO0-NEXT:    tbz w8, #31, .LBB4_1
 ; CHECK-GIO0-NEXT:    b .LBB4_2
 ; CHECK-GIO0-NEXT:  .LBB4_1: // %land.rhs
 ; CHECK-GIO0-NEXT:    mov w0, #1 // =0x1
 ; CHECK-GIO0-NEXT:    ret
 ; CHECK-GIO0-NEXT:  .LBB4_2: // %land.end
-; CHECK-GIO0-NEXT:    mov w0, wzr
+; CHECK-GIO0-NEXT:    mov w8, wzr
+; CHECK-GIO0-NEXT:    mov w0, w8
 ; CHECK-GIO0-NEXT:    ret
   %e = extractelement <8 x i8> %b, i32 0
   %z = zext i8 %e to i32

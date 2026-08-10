@@ -61,11 +61,11 @@ define <vscale x 32 x i1> @reverse_nxv32i1(<vscale x 32 x i1> %a) #0 {
 ; CHECK-FASTISEL:       // %bb.0:
 ; CHECK-FASTISEL-NEXT:    str x29, [sp, #-16]! // 8-byte Folded Spill
 ; CHECK-FASTISEL-NEXT:    addvl sp, sp, #-1
-; CHECK-FASTISEL-NEXT:    str p1, [sp, #7, mul vl] // 2-byte Spill
-; CHECK-FASTISEL-NEXT:    mov p1.b, p0.b
-; CHECK-FASTISEL-NEXT:    ldr p0, [sp, #7, mul vl] // 2-byte Reload
-; CHECK-FASTISEL-NEXT:    rev p0.b, p0.b
 ; CHECK-FASTISEL-NEXT:    rev p1.b, p1.b
+; CHECK-FASTISEL-NEXT:    rev p0.b, p0.b
+; CHECK-FASTISEL-NEXT:    str p0, [sp, #7, mul vl] // 2-byte Spill
+; CHECK-FASTISEL-NEXT:    mov p0.b, p1.b
+; CHECK-FASTISEL-NEXT:    ldr p1, [sp, #7, mul vl] // 2-byte Reload
 ; CHECK-FASTISEL-NEXT:    addvl sp, sp, #1
 ; CHECK-FASTISEL-NEXT:    ldr x29, [sp], #16 // 8-byte Folded Reload
 ; CHECK-FASTISEL-NEXT:    ret
@@ -230,11 +230,11 @@ define <vscale x 8 x i32> @reverse_nxv8i32(<vscale x 8 x i32> %a) #0 {
 ; CHECK-FASTISEL:       // %bb.0:
 ; CHECK-FASTISEL-NEXT:    str x29, [sp, #-16]! // 8-byte Folded Spill
 ; CHECK-FASTISEL-NEXT:    addvl sp, sp, #-1
-; CHECK-FASTISEL-NEXT:    str z1, [sp] // 16-byte Folded Spill
-; CHECK-FASTISEL-NEXT:    mov z1.d, z0.d
-; CHECK-FASTISEL-NEXT:    ldr z0, [sp] // 16-byte Folded Reload
-; CHECK-FASTISEL-NEXT:    rev z0.s, z0.s
 ; CHECK-FASTISEL-NEXT:    rev z1.s, z1.s
+; CHECK-FASTISEL-NEXT:    rev z0.s, z0.s
+; CHECK-FASTISEL-NEXT:    str z0, [sp] // 16-byte Folded Spill
+; CHECK-FASTISEL-NEXT:    mov z0.d, z1.d
+; CHECK-FASTISEL-NEXT:    ldr z1, [sp] // 16-byte Folded Reload
 ; CHECK-FASTISEL-NEXT:    addvl sp, sp, #1
 ; CHECK-FASTISEL-NEXT:    ldr x29, [sp], #16 // 8-byte Folded Reload
 ; CHECK-FASTISEL-NEXT:    ret
@@ -259,16 +259,16 @@ define <vscale x 16 x float> @reverse_nxv16f32(<vscale x 16 x float> %a) #0 {
 ; CHECK-FASTISEL:       // %bb.0:
 ; CHECK-FASTISEL-NEXT:    str x29, [sp, #-16]! // 8-byte Folded Spill
 ; CHECK-FASTISEL-NEXT:    addvl sp, sp, #-2
-; CHECK-FASTISEL-NEXT:    str z3, [sp, #1, mul vl] // 16-byte Folded Spill
-; CHECK-FASTISEL-NEXT:    str z2, [sp] // 16-byte Folded Spill
-; CHECK-FASTISEL-NEXT:    mov z2.d, z1.d
-; CHECK-FASTISEL-NEXT:    ldr z1, [sp] // 16-byte Folded Reload
-; CHECK-FASTISEL-NEXT:    mov z3.d, z0.d
-; CHECK-FASTISEL-NEXT:    ldr z0, [sp, #1, mul vl] // 16-byte Folded Reload
-; CHECK-FASTISEL-NEXT:    rev z0.s, z0.s
-; CHECK-FASTISEL-NEXT:    rev z1.s, z1.s
-; CHECK-FASTISEL-NEXT:    rev z2.s, z2.s
 ; CHECK-FASTISEL-NEXT:    rev z3.s, z3.s
+; CHECK-FASTISEL-NEXT:    rev z2.s, z2.s
+; CHECK-FASTISEL-NEXT:    rev z1.s, z1.s
+; CHECK-FASTISEL-NEXT:    rev z0.s, z0.s
+; CHECK-FASTISEL-NEXT:    str z0, [sp, #1, mul vl] // 16-byte Folded Spill
+; CHECK-FASTISEL-NEXT:    mov z0.d, z3.d
+; CHECK-FASTISEL-NEXT:    str z1, [sp] // 16-byte Folded Spill
+; CHECK-FASTISEL-NEXT:    mov z1.d, z2.d
+; CHECK-FASTISEL-NEXT:    ldr z2, [sp] // 16-byte Folded Reload
+; CHECK-FASTISEL-NEXT:    ldr z3, [sp, #1, mul vl] // 16-byte Folded Reload
 ; CHECK-FASTISEL-NEXT:    addvl sp, sp, #2
 ; CHECK-FASTISEL-NEXT:    ldr x29, [sp], #16 // 8-byte Folded Reload
 ; CHECK-FASTISEL-NEXT:    ret

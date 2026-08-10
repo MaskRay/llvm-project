@@ -43,8 +43,8 @@ define <1 x i1> @shuffle_extract_12(<8 x i1> %a, <8 x i1> %b) {
 ;
 ; CHECK-GIO0-LABEL: shuffle_extract_12:
 ; CHECK-GIO0:       // %bb.0:
-; CHECK-GIO0-NEXT:    ushll v0.8h, v1.8b, #0
-; CHECK-GIO0-NEXT:    umov w8, v0.h[4]
+; CHECK-GIO0-NEXT:    ushll v1.8h, v1.8b, #0
+; CHECK-GIO0-NEXT:    umov w8, v1.h[4]
 ; CHECK-GIO0-NEXT:    and w0, w8, #0x1
 ; CHECK-GIO0-NEXT:    ret
   %extractvec60 = shufflevector <8 x i1> %a, <8 x i1> %b, <1 x i32> <i32 12>

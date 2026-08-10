@@ -13,66 +13,69 @@ define amdgpu_kernel void @test_kernel(i32 %val) #0 {
 ; CHECK-NEXT:    s_addc_u32 flat_scratch_hi, s13, 0
 ; CHECK-NEXT:    s_add_u32 s0, s0, s17
 ; CHECK-NEXT:    s_addc_u32 s1, s1, 0
-; CHECK-NEXT:    ; implicit-def: $vgpr40 : SGPR spill to VGPR lane
-; CHECK-NEXT:    v_writelane_b32 v40, s16, 0
-; CHECK-NEXT:    s_mov_b32 s13, s15
-; CHECK-NEXT:    s_mov_b32 s12, s14
-; CHECK-NEXT:    v_readlane_b32 s14, v40, 0
-; CHECK-NEXT:    s_mov_b64 s[16:17], s[8:9]
-; CHECK-NEXT:    s_load_dword s8, s[16:17], 0x0
+; CHECK-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; CHECK-NEXT:    s_load_dword s12, s[8:9], 0x0
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
-; CHECK-NEXT:    s_load_dword s8, s[16:17], 0x0
-; CHECK-NEXT:    s_mov_b32 s9, 0
+; CHECK-NEXT:    s_load_dword s12, s[8:9], 0x0
+; CHECK-NEXT:    s_mov_b32 s13, 0
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
-; CHECK-NEXT:    s_cmp_lg_u32 s8, s9
-; CHECK-NEXT:    s_cselect_b64 s[8:9], -1, 0
-; CHECK-NEXT:    v_writelane_b32 v40, s8, 1
-; CHECK-NEXT:    v_writelane_b32 v40, s9, 2
+; CHECK-NEXT:    s_cmp_lg_u32 s12, s13
+; CHECK-NEXT:    s_cselect_b64 s[12:13], -1, 0
 ; CHECK-NEXT:    ;;#ASMSTART
 ; CHECK-NEXT:    ; def vgpr10
 ; CHECK-NEXT:    ;;#ASMEND
-; CHECK-NEXT:    s_add_i32 s8, s33, 0x100000
-; CHECK-NEXT:    s_nop 2
-; CHECK-NEXT:    buffer_store_dword v10, off, s[0:3], s8 ; 4-byte Folded Spill
+; CHECK-NEXT:    s_add_i32 s17, s33, 0x100000
+; CHECK-NEXT:    buffer_store_dword v10, off, s[0:3], s17 ; 4-byte Folded Spill
 ; CHECK-NEXT:    s_mov_b64 s[18:19], 8
-; CHECK-NEXT:    s_mov_b32 s8, s16
-; CHECK-NEXT:    s_mov_b32 s9, s17
-; CHECK-NEXT:    s_mov_b32 s16, s18
-; CHECK-NEXT:    s_mov_b32 s15, s19
-; CHECK-NEXT:    s_add_u32 s8, s8, s16
-; CHECK-NEXT:    s_addc_u32 s15, s9, s15
-; CHECK-NEXT:    ; kill: def $sgpr8 killed $sgpr8 def $sgpr8_sgpr9
-; CHECK-NEXT:    s_mov_b32 s9, s15
-; CHECK-NEXT:    s_mov_b32 s15, 0x2000
-; CHECK-NEXT:    s_mov_b32 s18, s15
-; CHECK-NEXT:    s_getpc_b64 s[16:17]
-; CHECK-NEXT:    s_add_u32 s16, s16, device_func@gotpcrel32@lo+4
-; CHECK-NEXT:    s_addc_u32 s17, s17, device_func@gotpcrel32@hi+12
-; CHECK-NEXT:    s_load_dwordx2 s[16:17], s[16:17], 0x0
-; CHECK-NEXT:    s_mov_b64 s[22:23], s[2:3]
-; CHECK-NEXT:    s_mov_b64 s[20:21], s[0:1]
-; CHECK-NEXT:    s_mov_b32 s15, 20
-; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s15, v2
-; CHECK-NEXT:    s_mov_b32 s15, 10
-; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s15, v1
+; CHECK-NEXT:    s_mov_b32 s17, s8
+; CHECK-NEXT:    s_mov_b32 s8, s9
+; CHECK-NEXT:    s_mov_b32 s9, s18
+; CHECK-NEXT:    s_mov_b32 s18, s19
+; CHECK-NEXT:    s_add_u32 s9, s17, s9
+; CHECK-NEXT:    s_addc_u32 s8, s8, s18
+; CHECK-NEXT:    s_mov_b32 s18, s9
+; CHECK-NEXT:    s_mov_b32 s19, s8
+; CHECK-NEXT:    s_mov_b32 s8, 0x2000
+; CHECK-NEXT:    s_mov_b32 s8, s8
+; CHECK-NEXT:    s_getpc_b64 s[20:21]
+; CHECK-NEXT:    s_add_u32 s20, s20, device_func@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s21, s21, device_func@gotpcrel32@hi+12
+; CHECK-NEXT:    s_load_dwordx2 s[20:21], s[20:21], 0x0
+; CHECK-NEXT:    s_mov_b64 s[26:27], s[2:3]
+; CHECK-NEXT:    s_mov_b64 s[24:25], s[0:1]
+; CHECK-NEXT:    s_mov_b32 s9, 20
+; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s9, v2
+; CHECK-NEXT:    s_mov_b32 s9, 10
+; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s9, v1
 ; CHECK-NEXT:    v_or3_b32 v31, v0, v1, v2
+; CHECK-NEXT:    ; implicit-def: $vgpr40 : SGPR spill to VGPR lane
+; CHECK-NEXT:    v_writelane_b32 v40, s8, 0
+; CHECK-NEXT:    s_mov_b64 s[8:9], s[18:19]
+; CHECK-NEXT:    v_writelane_b32 v40, s12, 1
+; CHECK-NEXT:    v_writelane_b32 v40, s13, 2
+; CHECK-NEXT:    s_mov_b32 s12, s14
+; CHECK-NEXT:    s_mov_b32 s13, s15
+; CHECK-NEXT:    s_mov_b32 s14, s16
 ; CHECK-NEXT:    ; implicit-def: $sgpr15
-; CHECK-NEXT:    s_mov_b64 s[0:1], s[20:21]
-; CHECK-NEXT:    s_mov_b64 s[2:3], s[22:23]
-; CHECK-NEXT:    v_mov_b32_e32 v0, s18
+; CHECK-NEXT:    s_mov_b64 s[0:1], s[24:25]
+; CHECK-NEXT:    s_mov_b64 s[2:3], s[26:27]
+; CHECK-NEXT:    v_readlane_b32 s16, v40, 0
+; CHECK-NEXT:    v_mov_b32_e32 v0, s16
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
-; CHECK-NEXT:    s_swappc_b64 s[30:31], s[16:17]
-; CHECK-NEXT:    v_readlane_b32 s4, v40, 1
-; CHECK-NEXT:    v_readlane_b32 s5, v40, 2
-; CHECK-NEXT:    s_mov_b64 s[6:7], -1
-; CHECK-NEXT:    s_xor_b64 s[4:5], s[4:5], s[6:7]
+; CHECK-NEXT:    s_swappc_b64 s[30:31], s[20:21]
+; CHECK-NEXT:    s_mov_b64 s[4:5], -1
+; CHECK-NEXT:    v_readlane_b32 s6, v40, 1
+; CHECK-NEXT:    v_readlane_b32 s7, v40, 2
+; CHECK-NEXT:    s_xor_b64 s[4:5], s[6:7], s[4:5]
 ; CHECK-NEXT:    s_and_b64 vcc, exec, s[4:5]
 ; CHECK-NEXT:    s_cbranch_vccnz .LBB0_2
 ; CHECK-NEXT:  ; %bb.1: ; %store
-; CHECK-NEXT:    s_add_i32 s4, s33, 0x100000
-; CHECK-NEXT:    buffer_load_dword v1, off, s[0:3], s4 ; 4-byte Folded Reload
 ; CHECK-NEXT:    ; implicit-def: $sgpr4
 ; CHECK-NEXT:    v_mov_b32_e32 v0, s4
+; CHECK-NEXT:    s_add_i32 s4, s33, 0x100000
+; CHECK-NEXT:    buffer_load_dword v1, off, s[0:3], s4 ; 4-byte Folded Reload
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    ds_write_b32 v0, v1
 ; CHECK-NEXT:    s_endpgm

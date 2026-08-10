@@ -10,17 +10,18 @@ define internal fastcc void @main() {
 ; CHECK:       @ %bb.0: @ %Entry
 ; CHECK-NEXT:    push {r11, lr}
 ; CHECK-NEXT:    mov r11, sp
+; CHECK-NEXT:    vpush {d8}
 ; CHECK-NEXT:    sub sp, sp, #8
 ; CHECK-NEXT:    mov r0, #31744
-; CHECK-NEXT:    strh r0, [r11, #-2]
-; CHECK-NEXT:    ldrh r0, [r11, #-2]
-; CHECK-NEXT:    vmov s0, r0
-; CHECK-NEXT:    vstr s0, [sp] @ 4-byte Spill
+; CHECK-NEXT:    strh r0, [sp, #6]
+; CHECK-NEXT:    ldrh r0, [sp, #6]
+; CHECK-NEXT:    vmov s16, r0
 ; CHECK-NEXT:    bl getConstant
 ; CHECK-NEXT:    vmov.f32 s1, s0
-; CHECK-NEXT:    vldr s0, [sp] @ 4-byte Reload
+; CHECK-NEXT:    vmov.f32 s0, s16
 ; CHECK-NEXT:    bl isEqual
-; CHECK-NEXT:    mov sp, r11
+; CHECK-NEXT:    sub sp, r11, #8
+; CHECK-NEXT:    vpop {d8}
 ; CHECK-NEXT:    pop {r11, pc}
 Entry:
     ; First arg directly from constant

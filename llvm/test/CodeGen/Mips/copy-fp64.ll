@@ -8,18 +8,22 @@ declare double @bar(double)
 define  double @foo(double %self) {
   ; CHECK-LABEL: name: foo
   ; CHECK: bb.0.start:
-  ; CHECK:   successors: %bb.1(0x80000000)
-  ; CHECK:   liveins: $d12_64, $t9, $v0
-  ; CHECK:   renamable $at = ADDu killed $v0, killed $t9
-  ; CHECK:   renamable $d6_64 = COPY killed $d12_64
-  ; CHECK:   ADJCALLSTACKDOWN 16, 0, implicit-def $sp, implicit $sp
-  ; CHECK:   renamable $t9 = LW killed renamable $at, target-flags(mips-got) @bar
-  ; CHECK:   dead $ra = JALR killed $t9, csr_o32_fp64, target-flags(mips-jalr) <mcsymbol bar>, implicit-def dead $ra, implicit killed $d6_64, implicit-def $d0_64
-  ; CHECK:   ADJCALLSTACKUP 16, 0, implicit-def $sp, implicit $sp
-  ; CHECK:   SDC164 killed $d0_64, %stack.0, 0 :: (store (s64) into %stack.0)
-  ; CHECK: bb.1.bb1:
-  ; CHECK:   $d0_64 = LDC164 %stack.0, 0 :: (load (s64) from %stack.0)
-  ; CHECK:   RetRA implicit killed $d0_64
+  ; CHECK-NEXT:   successors: %bb.1(0x80000000)
+  ; CHECK-NEXT:   liveins: $d12_64, $t9, $v0
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   renamable $at = ADDu killed $v0, killed $t9
+  ; CHECK-NEXT:   renamable $d12_64 = COPY killed $d12_64
+  ; CHECK-NEXT:   ADJCALLSTACKDOWN 16, 0, implicit-def $sp, implicit $sp
+  ; CHECK-NEXT:   $d6_64 = COPY killed renamable $d12_64
+  ; CHECK-NEXT:   renamable $t9 = LW killed renamable $at, target-flags(mips-got) @bar
+  ; CHECK-NEXT:   $t9 = COPY killed renamable $t9
+  ; CHECK-NEXT:   dead $ra = JALR killed $t9, csr_o32_fp64, target-flags(mips-jalr) <mcsymbol bar>, implicit-def dead $ra, implicit killed $d6_64, implicit-def $d0_64
+  ; CHECK-NEXT:   ADJCALLSTACKUP 16, 0, implicit-def $sp, implicit $sp
+  ; CHECK-NEXT:   SDC164 $d0_64, %stack.0, 0 :: (store (s64) into %stack.0)
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.1.bb1:
+  ; CHECK-NEXT:   $d0_64 = LDC164 %stack.0, 0 :: (load (s64) from %stack.0)
+  ; CHECK-NEXT:   RetRA implicit killed $d0_64
 start:
   %0 = call double @bar(double %self)
   br label %bb1

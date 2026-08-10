@@ -7,36 +7,38 @@ define void @test(ptr %0) {
 ; CHECK-LABEL: test:
 ; CHECK:       ; %bb.0: ; %entry
 ; CHECK-NEXT:    sub sp, sp, #144
+; CHECK-NEXT:    stp x20, x19, [sp, #112] ; 16-byte Folded Spill
 ; CHECK-NEXT:    stp x29, x30, [sp, #128] ; 16-byte Folded Spill
 ; CHECK-NEXT:    .cfi_def_cfa_offset 144
 ; CHECK-NEXT:    .cfi_offset w30, -8
 ; CHECK-NEXT:    .cfi_offset w29, -16
-; CHECK-NEXT:    ldar w8, [x0]
-; CHECK-NEXT:    str w8, [sp, #116] ; 4-byte Spill
+; CHECK-NEXT:    .cfi_offset w19, -24
+; CHECK-NEXT:    .cfi_offset w20, -32
+; CHECK-NEXT:    ldar w19, [x0]
 ; CHECK-NEXT:    mov x8, #0 ; =0x0
-; CHECK-NEXT:    str x8, [sp, #120] ; 8-byte Spill
+; CHECK-NEXT:    str x8, [sp, #104] ; 8-byte Spill
 ; CHECK-NEXT:    blr x8
-; CHECK-NEXT:    ldr w11, [sp, #116] ; 4-byte Reload
-; CHECK-NEXT:    ldr x8, [sp, #120] ; 8-byte Reload
-; CHECK-NEXT:    mov x9, sp
-; CHECK-NEXT:    str xzr, [x9]
-; CHECK-NEXT:    str xzr, [x9, #8]
-; CHECK-NEXT:    str xzr, [x9, #16]
-; CHECK-NEXT:    str xzr, [x9, #24]
-; CHECK-NEXT:    str xzr, [x9, #32]
-; CHECK-NEXT:    str xzr, [x9, #40]
-; CHECK-NEXT:    ; implicit-def: $x10
-; CHECK-NEXT:    mov x10, x11
-; CHECK-NEXT:    str x10, [x9, #48]
-; CHECK-NEXT:    str xzr, [x9, #56]
-; CHECK-NEXT:    str xzr, [x9, #64]
-; CHECK-NEXT:    str xzr, [x9, #72]
-; CHECK-NEXT:    str xzr, [x9, #80]
-; CHECK-NEXT:    str xzr, [x9, #88]
-; CHECK-NEXT:    str xzr, [x9, #96]
-; CHECK-NEXT:    mov x0, x8
+; CHECK-NEXT:    mov x8, sp
+; CHECK-NEXT:    str xzr, [x8]
+; CHECK-NEXT:    str xzr, [x8, #8]
+; CHECK-NEXT:    str xzr, [x8, #16]
+; CHECK-NEXT:    str xzr, [x8, #24]
+; CHECK-NEXT:    str xzr, [x8, #32]
+; CHECK-NEXT:    str xzr, [x8, #40]
+; CHECK-NEXT:    ; implicit-def: $x0
+; CHECK-NEXT:    mov x0, x19
+; CHECK-NEXT:    str x0, [x8, #48]
+; CHECK-NEXT:    str xzr, [x8, #56]
+; CHECK-NEXT:    str xzr, [x8, #64]
+; CHECK-NEXT:    str xzr, [x8, #72]
+; CHECK-NEXT:    str xzr, [x8, #80]
+; CHECK-NEXT:    str xzr, [x8, #88]
+; CHECK-NEXT:    str xzr, [x8, #96]
+; CHECK-NEXT:    ldr x0, [sp, #104] ; 8-byte Reload
+; CHECK-NEXT:    ldr x8, [sp, #104] ; 8-byte Reload
 ; CHECK-NEXT:    blr x8
 ; CHECK-NEXT:    ldp x29, x30, [sp, #128] ; 16-byte Folded Reload
+; CHECK-NEXT:    ldp x20, x19, [sp, #112] ; 16-byte Folded Reload
 ; CHECK-NEXT:    add sp, sp, #144
 ; CHECK-NEXT:    ret
 entry:

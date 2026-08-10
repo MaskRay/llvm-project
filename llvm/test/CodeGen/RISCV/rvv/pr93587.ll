@@ -14,8 +14,8 @@ define i16 @f() {
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    li a0, 0
 ; CHECK-NEXT:    sd a0, 8(sp) # 8-byte Folded Spill
-; CHECK-NEXT:    li a0, 1
-; CHECK-NEXT:    bnez a0, .LBB0_1
+; CHECK-NEXT:    li a1, 1
+; CHECK-NEXT:    bnez a1, .LBB0_1
 ; CHECK-NEXT:    j .LBB0_2
 ; CHECK-NEXT:  .LBB0_2: # %BB2
 ; CHECK-NEXT:    ld a0, 8(sp) # 8-byte Folded Reload

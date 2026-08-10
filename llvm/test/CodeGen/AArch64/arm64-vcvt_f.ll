@@ -150,19 +150,19 @@ define <2 x bfloat> @test_vcvt_bf16_f64(<2 x double> %v) nounwind readnone ssp {
 ;
 ; CHECK-FI-LABEL: test_vcvt_bf16_f64:
 ; CHECK-FI:       // %bb.0:
-; CHECK-FI-NEXT:    fcvtxn v1.2s, v0.2d
-; CHECK-FI-NEXT:    // implicit-def: $q0
-; CHECK-FI-NEXT:    fmov d0, d1
-; CHECK-FI-NEXT:    ushr.4s v1, v0, #16
+; CHECK-FI-NEXT:    fcvtxn v0.2s, v0.2d
+; CHECK-FI-NEXT:    // implicit-def: $q1
+; CHECK-FI-NEXT:    fmov d1, d0
+; CHECK-FI-NEXT:    ushr.4s v0, v1, #16
 ; CHECK-FI-NEXT:    movi.4s v2, #1
-; CHECK-FI-NEXT:    and.16b v1, v1, v2
-; CHECK-FI-NEXT:    add.4s v1, v1, v0
+; CHECK-FI-NEXT:    and.16b v0, v0, v2
+; CHECK-FI-NEXT:    add.4s v0, v0, v1
 ; CHECK-FI-NEXT:    movi.4s v2, #127, msl #8
-; CHECK-FI-NEXT:    add.4s v1, v1, v2
-; CHECK-FI-NEXT:    mov.16b v2, v0
+; CHECK-FI-NEXT:    add.4s v0, v0, v2
+; CHECK-FI-NEXT:    mov.16b v2, v1
 ; CHECK-FI-NEXT:    orr.4s v2, #64, lsl #16
-; CHECK-FI-NEXT:    fcmeq.4s v0, v0, v0
-; CHECK-FI-NEXT:    bsl.16b v0, v1, v2
+; CHECK-FI-NEXT:    fcmeq.4s v1, v1, v1
+; CHECK-FI-NEXT:    bif.16b v0, v2, v1
 ; CHECK-FI-NEXT:    shrn.4h v0, v0, #16
 ; CHECK-FI-NEXT:    ret
 ;
@@ -195,10 +195,9 @@ define half @test_vcvt_f16_f32(<1 x float> %x) {
 ;
 ; CHECK-FI-LABEL: test_vcvt_f16_f32:
 ; CHECK-FI:       // %bb.0:
+; CHECK-FI-NEXT:    // implicit-def: $q1
 ; CHECK-FI-NEXT:    fmov d1, d0
-; CHECK-FI-NEXT:    // implicit-def: $q0
-; CHECK-FI-NEXT:    fmov d0, d1
-; CHECK-FI-NEXT:    // kill: def $s0 killed $s0 killed $q0
+; CHECK-FI-NEXT:    fmov s0, s1
 ; CHECK-FI-NEXT:    fcvt h0, s0
 ; CHECK-FI-NEXT:    ret
 ;
@@ -220,9 +219,9 @@ define <4 x float> @test_vcvt_high_f32_f64(<2 x float> %x, <2 x double> %v) noun
 ;
 ; CHECK-FI-LABEL: test_vcvt_high_f32_f64:
 ; CHECK-FI:       // %bb.0:
+; CHECK-FI-NEXT:    // implicit-def: $q2
 ; CHECK-FI-NEXT:    fmov d2, d0
-; CHECK-FI-NEXT:    // implicit-def: $q0
-; CHECK-FI-NEXT:    fmov d0, d2
+; CHECK-FI-NEXT:    mov.16b v0, v2
 ; CHECK-FI-NEXT:    fcvtn2 v0.4s, v1.2d
 ; CHECK-FI-NEXT:    ret
 ;
@@ -254,9 +253,9 @@ define <4 x float> @test_vcvtx_high_f32_f64(<2 x float> %x, <2 x double> %v) nou
 ;
 ; CHECK-FI-LABEL: test_vcvtx_high_f32_f64:
 ; CHECK-FI:       // %bb.0:
+; CHECK-FI-NEXT:    // implicit-def: $q2
 ; CHECK-FI-NEXT:    fmov d2, d0
-; CHECK-FI-NEXT:    // implicit-def: $q0
-; CHECK-FI-NEXT:    fmov d0, d2
+; CHECK-FI-NEXT:    mov.16b v0, v2
 ; CHECK-FI-NEXT:    fcvtxn2 v0.4s, v1.2d
 ; CHECK-FI-NEXT:    ret
 ;

@@ -914,7 +914,7 @@ define i128 @load_atomic_i128_unaligned_seq_cst_const(ptr readonly %ptr) {
 define i8 @load_atomic_i8_from_gep() {
 ; GISEL-LABEL: load_atomic_i8_from_gep:
 ; GISEL:    bl init
-; GISEL:    ldapurb w0, [x8, #1]
+; GISEL:    ldapurb w0, [x19, #1]
 ;
 ; SDAG-AVOIDLDAPUR-LABEL: load_atomic_i8_from_gep:
 ; SDAG-AVOIDLDAPUR:    bl init
@@ -934,7 +934,7 @@ define i8 @load_atomic_i8_from_gep() {
 define i16 @load_atomic_i16_from_gep() {
 ; GISEL-LABEL: load_atomic_i16_from_gep:
 ; GISEL:    bl init
-; GISEL:    ldapurh w0, [x8, #2]
+; GISEL:    ldapurh w0, [x19, #2]
 ;
 ; SDAG-AVOIDLDAPUR-LABEL: load_atomic_i16_from_gep:
 ; SDAG-AVOIDLDAPUR:    bl init
@@ -954,7 +954,7 @@ define i16 @load_atomic_i16_from_gep() {
 define i32 @load_atomic_i32_from_gep() {
 ; GISEL-LABEL: load_atomic_i32_from_gep:
 ; GISEL:    bl init
-; GISEL:    ldapur w0, [x8, #4]
+; GISEL:    ldapur w0, [x19, #4]
 ;
 ; SDAG-AVOIDLDAPUR-LABEL: load_atomic_i32_from_gep:
 ; SDAG-AVOIDLDAPUR:    bl init
@@ -974,7 +974,7 @@ define i32 @load_atomic_i32_from_gep() {
 define i64 @load_atomic_i64_from_gep() {
 ; GISEL-LABEL: load_atomic_i64_from_gep:
 ; GISEL:    bl init
-; GISEL:    ldapur x0, [x8, #8]
+; GISEL:    ldapur x0, [x19, #8]
 ;
 ; SDAG-AVOIDLDAPUR-LABEL: load_atomic_i64_from_gep:
 ; SDAG-AVOIDLDAPUR:    bl init
@@ -994,7 +994,7 @@ define i64 @load_atomic_i64_from_gep() {
 define i128 @load_atomic_i128_from_gep() {
 ; GISEL-LABEL: load_atomic_i128_from_gep:
 ; GISEL:    bl init
-; GISEL:    ldp x0, x1, [x8, #16]
+; GISEL:    ldp x0, x1, [x19, #16]
 ; GISEL:    dmb ishld
 ;
 ; SDAG-LABEL: load_atomic_i128_from_gep:

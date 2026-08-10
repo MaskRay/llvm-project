@@ -53,14 +53,14 @@ define <vscale x 4 x i32> @invoke_callee_may_throw_sve(<vscale x 4 x i32> %v) uw
 ; CHECK-NEXT:    addvl sp, sp, #-2
 ; CHECK-NEXT:    .cfi_escape 0x0f, 0x0a, 0x8f, 0x10, 0x92, 0x2e, 0x00, 0x11, 0xa0, 0x01, 0x1e, 0x22 // sp + 16 + 160 * VG
 ; CHECK-NEXT:    .cfi_remember_state
-; CHECK-NEXT:    str z0, [sp] // 16-byte Folded Spill
+; CHECK-NEXT:    str z0, [sp, #1, mul vl] // 16-byte Folded Spill
 ; CHECK-NEXT:  .Ltmp0: // EH_LABEL
 ; CHECK-NEXT:    bl may_throw_sve
 ; CHECK-NEXT:  .Ltmp1: // EH_LABEL
-; CHECK-NEXT:    str z0, [sp, #1, mul vl] // 16-byte Folded Spill
+; CHECK-NEXT:    str z0, [sp] // 16-byte Folded Spill
 ; CHECK-NEXT:    b .LBB0_1
 ; CHECK-NEXT:  .LBB0_1: // %.Lcontinue
-; CHECK-NEXT:    ldr z0, [sp, #1, mul vl] // 16-byte Folded Reload
+; CHECK-NEXT:    ldr z0, [sp] // 16-byte Folded Reload
 ; CHECK-NEXT:    addvl sp, sp, #2
 ; CHECK-NEXT:    .cfi_escape 0x0f, 0x0a, 0x8f, 0x10, 0x92, 0x2e, 0x00, 0x11, 0x90, 0x01, 0x1e, 0x22 // sp + 16 + 144 * VG
 ; CHECK-NEXT:    ldr z23, [sp, #2, mul vl] // 16-byte Folded Reload
@@ -109,7 +109,9 @@ define <vscale x 4 x i32> @invoke_callee_may_throw_sve(<vscale x 4 x i32> %v) uw
 ; CHECK-NEXT:  .LBB0_2: // %.Lunwind
 ; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp2: // EH_LABEL
-; CHECK-NEXT:    ldr z0, [sp] // 16-byte Folded Reload
+; CHECK-NEXT:    // kill: def $x1 killed $x1
+; CHECK-NEXT:    // kill: def $x0 killed $x0
+; CHECK-NEXT:    ldr z0, [sp, #1, mul vl] // 16-byte Folded Reload
 ; CHECK-NEXT:    addvl sp, sp, #2
 ; CHECK-NEXT:    .cfi_escape 0x0f, 0x0a, 0x8f, 0x10, 0x92, 0x2e, 0x00, 0x11, 0x90, 0x01, 0x1e, 0x22 // sp + 16 + 144 * VG
 ; CHECK-NEXT:    ldr z23, [sp, #2, mul vl] // 16-byte Folded Reload
@@ -205,14 +207,14 @@ define <vscale x 4 x i32> @invoke_callee_may_throw_sve(<vscale x 4 x i32> %v) uw
 ; GISEL-NEXT:    addvl sp, sp, #-2
 ; GISEL-NEXT:    .cfi_escape 0x0f, 0x0a, 0x8f, 0x10, 0x92, 0x2e, 0x00, 0x11, 0xa0, 0x01, 0x1e, 0x22 // sp + 16 + 160 * VG
 ; GISEL-NEXT:    .cfi_remember_state
-; GISEL-NEXT:    str z0, [sp] // 16-byte Folded Spill
+; GISEL-NEXT:    str z0, [sp, #1, mul vl] // 16-byte Folded Spill
 ; GISEL-NEXT:  .Ltmp0: // EH_LABEL
 ; GISEL-NEXT:    bl may_throw_sve
 ; GISEL-NEXT:  .Ltmp1: // EH_LABEL
-; GISEL-NEXT:    str z0, [sp, #1, mul vl] // 16-byte Folded Spill
+; GISEL-NEXT:    str z0, [sp] // 16-byte Folded Spill
 ; GISEL-NEXT:    b .LBB0_1
 ; GISEL-NEXT:  .LBB0_1: // %.Lcontinue
-; GISEL-NEXT:    ldr z0, [sp, #1, mul vl] // 16-byte Folded Reload
+; GISEL-NEXT:    ldr z0, [sp] // 16-byte Folded Reload
 ; GISEL-NEXT:    addvl sp, sp, #2
 ; GISEL-NEXT:    .cfi_escape 0x0f, 0x0a, 0x8f, 0x10, 0x92, 0x2e, 0x00, 0x11, 0x90, 0x01, 0x1e, 0x22 // sp + 16 + 144 * VG
 ; GISEL-NEXT:    ldr z23, [sp, #2, mul vl] // 16-byte Folded Reload
@@ -261,7 +263,9 @@ define <vscale x 4 x i32> @invoke_callee_may_throw_sve(<vscale x 4 x i32> %v) uw
 ; GISEL-NEXT:  .LBB0_2: // %.Lunwind
 ; GISEL-NEXT:    .cfi_restore_state
 ; GISEL-NEXT:  .Ltmp2: // EH_LABEL
-; GISEL-NEXT:    ldr z0, [sp] // 16-byte Folded Reload
+; GISEL-NEXT:    // kill: def $x1 killed $x1
+; GISEL-NEXT:    // kill: def $x0 killed $x0
+; GISEL-NEXT:    ldr z0, [sp, #1, mul vl] // 16-byte Folded Reload
 ; GISEL-NEXT:    addvl sp, sp, #2
 ; GISEL-NEXT:    .cfi_escape 0x0f, 0x0a, 0x8f, 0x10, 0x92, 0x2e, 0x00, 0x11, 0x90, 0x01, 0x1e, 0x22 // sp + 16 + 144 * VG
 ; GISEL-NEXT:    ldr z23, [sp, #2, mul vl] // 16-byte Folded Reload
@@ -354,14 +358,14 @@ define aarch64_vector_pcs <4 x i32> @invoke_callee_may_throw_neon(<4 x i32> %v) 
 ; CHECK-NEXT:    .cfi_offset b22, -256
 ; CHECK-NEXT:    .cfi_offset b23, -272
 ; CHECK-NEXT:    .cfi_remember_state
-; CHECK-NEXT:    str q0, [sp] // 16-byte Spill
+; CHECK-NEXT:    str q0, [sp, #16] // 16-byte Spill
 ; CHECK-NEXT:  .Ltmp3: // EH_LABEL
 ; CHECK-NEXT:    bl may_throw_neon
 ; CHECK-NEXT:  .Ltmp4: // EH_LABEL
-; CHECK-NEXT:    str q0, [sp, #16] // 16-byte Spill
+; CHECK-NEXT:    str q0, [sp] // 16-byte Spill
 ; CHECK-NEXT:    b .LBB1_1
 ; CHECK-NEXT:  .LBB1_1: // %.Lcontinue
-; CHECK-NEXT:    ldr q0, [sp, #16] // 16-byte Reload
+; CHECK-NEXT:    ldr q0, [sp] // 16-byte Reload
 ; CHECK-NEXT:    ldp x29, x30, [sp, #288] // 16-byte Folded Reload
 ; CHECK-NEXT:    ldp q9, q8, [sp, #256] // 32-byte Folded Reload
 ; CHECK-NEXT:    ldp q11, q10, [sp, #224] // 32-byte Folded Reload
@@ -395,7 +399,9 @@ define aarch64_vector_pcs <4 x i32> @invoke_callee_may_throw_neon(<4 x i32> %v) 
 ; CHECK-NEXT:  .LBB1_2: // %.Lunwind
 ; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp5: // EH_LABEL
-; CHECK-NEXT:    ldr q0, [sp] // 16-byte Reload
+; CHECK-NEXT:    // kill: def $x1 killed $x1
+; CHECK-NEXT:    // kill: def $x0 killed $x0
+; CHECK-NEXT:    ldr q0, [sp, #16] // 16-byte Reload
 ; CHECK-NEXT:    ldp x29, x30, [sp, #288] // 16-byte Folded Reload
 ; CHECK-NEXT:    ldp q9, q8, [sp, #256] // 32-byte Folded Reload
 ; CHECK-NEXT:    ldp q11, q10, [sp, #224] // 32-byte Folded Reload
@@ -461,14 +467,14 @@ define aarch64_vector_pcs <4 x i32> @invoke_callee_may_throw_neon(<4 x i32> %v) 
 ; GISEL-NEXT:    .cfi_offset b22, -256
 ; GISEL-NEXT:    .cfi_offset b23, -272
 ; GISEL-NEXT:    .cfi_remember_state
-; GISEL-NEXT:    str q0, [sp] // 16-byte Spill
+; GISEL-NEXT:    str q0, [sp, #16] // 16-byte Spill
 ; GISEL-NEXT:  .Ltmp3: // EH_LABEL
 ; GISEL-NEXT:    bl may_throw_neon
-; GISEL-NEXT:    str q0, [sp, #16] // 16-byte Spill
+; GISEL-NEXT:    str q0, [sp] // 16-byte Spill
 ; GISEL-NEXT:  .Ltmp4: // EH_LABEL
 ; GISEL-NEXT:    b .LBB1_1
 ; GISEL-NEXT:  .LBB1_1: // %.Lcontinue
-; GISEL-NEXT:    ldr q0, [sp, #16] // 16-byte Reload
+; GISEL-NEXT:    ldr q0, [sp] // 16-byte Reload
 ; GISEL-NEXT:    ldp x29, x30, [sp, #288] // 16-byte Folded Reload
 ; GISEL-NEXT:    ldp q9, q8, [sp, #256] // 32-byte Folded Reload
 ; GISEL-NEXT:    ldp q11, q10, [sp, #224] // 32-byte Folded Reload
@@ -502,7 +508,7 @@ define aarch64_vector_pcs <4 x i32> @invoke_callee_may_throw_neon(<4 x i32> %v) 
 ; GISEL-NEXT:  .LBB1_2: // %.Lunwind
 ; GISEL-NEXT:    .cfi_restore_state
 ; GISEL-NEXT:  .Ltmp5: // EH_LABEL
-; GISEL-NEXT:    ldr q0, [sp] // 16-byte Reload
+; GISEL-NEXT:    ldr q0, [sp, #16] // 16-byte Reload
 ; GISEL-NEXT:    ldp x29, x30, [sp, #288] // 16-byte Folded Reload
 ; GISEL-NEXT:    ldp q9, q8, [sp, #256] // 32-byte Folded Reload
 ; GISEL-NEXT:    ldp q11, q10, [sp, #224] // 32-byte Folded Reload

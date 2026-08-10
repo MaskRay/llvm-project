@@ -4,23 +4,24 @@
 define void @repro(ptr %a0, i1 %a1) nounwind {
 ; CHECK-LABEL: repro:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    subq $24, %rsp
-; CHECK-NEXT:    movb %sil, %al
-; CHECK-NEXT:    movb %al, {{[-0-9]+}}(%r{{[sb]}}p) # 1-byte Spill
+; CHECK-NEXT:    pushq %rbx
+; CHECK-NEXT:    subq $16, %rsp
+; CHECK-NEXT:    movb %sil, %bl
 ; CHECK-NEXT:    movq (%rdi), %rax
 ; CHECK-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; CHECK-NEXT:    callq *%rax
-; CHECK-NEXT:    movb {{[-0-9]+}}(%r{{[sb]}}p), %al # 1-byte Reload
-; CHECK-NEXT:    testb $1, %al
+; CHECK-NEXT:    testb $1, %bl
 ; CHECK-NEXT:    jne .LBB0_1
 ; CHECK-NEXT:    jmp .LBB0_2
 ; CHECK-NEXT:  .LBB0_1: # %bb1
 ; CHECK-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rax # 8-byte Reload
 ; CHECK-NEXT:    callq *%rax
-; CHECK-NEXT:    addq $24, %rsp
+; CHECK-NEXT:    addq $16, %rsp
+; CHECK-NEXT:    popq %rbx
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB0_2: # %bb2
-; CHECK-NEXT:    addq $24, %rsp
+; CHECK-NEXT:    addq $16, %rsp
+; CHECK-NEXT:    popq %rbx
 ; CHECK-NEXT:    retq
   %tmp0 = load ptr, ptr %a0
   call void %tmp0()

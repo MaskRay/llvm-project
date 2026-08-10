@@ -53,7 +53,8 @@ define void @test2(i32 %x) #0 {
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    cmpl $0, %edi
 ; CHECK-NEXT:    setne %al
-; CHECK-NEXT:    movzbl %al, %edi
+; CHECK-NEXT:    movzbl %al, %eax
+; CHECK-NEXT:    movl %eax, %edi
 ; CHECK-NEXT:    andl $1, %edi
 ; CHECK-NEXT:    negl %edi
 ; CHECK-NEXT:    callq callee2@PLT
@@ -65,7 +66,8 @@ define void @test2(i32 %x) #0 {
 ; SETZUCC-NEXT:    pushq %rax
 ; SETZUCC-NEXT:    cmpl $0, %edi
 ; SETZUCC-NEXT:    setzune %al
-; SETZUCC-NEXT:    movzbl %al, %edi
+; SETZUCC-NEXT:    movzbl %al, %eax
+; SETZUCC-NEXT:    movl %eax, %edi
 ; SETZUCC-NEXT:    andl $1, %edi
 ; SETZUCC-NEXT:    negl %edi
 ; SETZUCC-NEXT:    callq callee2@PLT
@@ -77,7 +79,8 @@ define void @test2(i32 %x) #0 {
 ; NO-SETZUCC-NEXT:    pushq %rax
 ; NO-SETZUCC-NEXT:    cmpl $0, %edi
 ; NO-SETZUCC-NEXT:    setne %al
-; NO-SETZUCC-NEXT:    movzbl %al, %edi
+; NO-SETZUCC-NEXT:    movzbl %al, %eax
+; NO-SETZUCC-NEXT:    movl %eax, %edi
 ; NO-SETZUCC-NEXT:    andl $1, %edi
 ; NO-SETZUCC-NEXT:    negl %edi
 ; NO-SETZUCC-NEXT:    callq callee2@PLT

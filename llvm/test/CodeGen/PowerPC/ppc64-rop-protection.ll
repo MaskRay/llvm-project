@@ -121,66 +121,66 @@ define dso_local zeroext i32 @caller(i32 zeroext %in, i32 zeroext %add_after) #0
 ; LE-P10-O0-LABEL: caller:
 ; LE-P10-O0:       # %bb.0: # %entry
 ; LE-P10-O0-NEXT:    mflr r0
+; LE-P10-O0-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
 ; LE-P10-O0-NEXT:    std r0, 16(r1)
-; LE-P10-O0-NEXT:    hashst r0, -8(r1)
-; LE-P10-O0-NEXT:    stdu r1, -48(r1)
-; LE-P10-O0-NEXT:    # kill: def $r4 killed $r4 killed $x4
-; LE-P10-O0-NEXT:    stw r4, 36(r1) # 4-byte Folded Spill
-; LE-P10-O0-NEXT:    mr r4, r3
-; LE-P10-O0-NEXT:    # implicit-def: $x3
-; LE-P10-O0-NEXT:    mr r3, r4
-; LE-P10-O0-NEXT:    clrldi r3, r3, 32
-; LE-P10-O0-NEXT:    bl callee@notoc
-; LE-P10-O0-NEXT:    lwz r4, 36(r1) # 4-byte Folded Reload
+; LE-P10-O0-NEXT:    hashst r0, -24(r1)
+; LE-P10-O0-NEXT:    stdu r1, -64(r1)
+; LE-P10-O0-NEXT:    mr r30, r4
 ; LE-P10-O0-NEXT:    # kill: def $r3 killed $r3 killed $x3
-; LE-P10-O0-NEXT:    add r3, r3, r4
+; LE-P10-O0-NEXT:    # implicit-def: $x4
+; LE-P10-O0-NEXT:    mr r4, r3
+; LE-P10-O0-NEXT:    clrldi r3, r4, 32
+; LE-P10-O0-NEXT:    bl callee@notoc
+; LE-P10-O0-NEXT:    # kill: def $r3 killed $r3 killed $x3
+; LE-P10-O0-NEXT:    add r3, r3, r30
 ; LE-P10-O0-NEXT:    clrldi r3, r3, 32
-; LE-P10-O0-NEXT:    addi r1, r1, 48
+; LE-P10-O0-NEXT:    addi r1, r1, 64
 ; LE-P10-O0-NEXT:    ld r0, 16(r1)
-; LE-P10-O0-NEXT:    hashchk r0, -8(r1)
+; LE-P10-O0-NEXT:    hashchk r0, -24(r1)
 ; LE-P10-O0-NEXT:    mtlr r0
+; LE-P10-O0-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
 ; LE-P10-O0-NEXT:    blr
 ;
 ; LE-P9-O0-LABEL: caller:
 ; LE-P9-O0:       # %bb.0: # %entry
 ; LE-P9-O0-NEXT:    mflr r0
+; LE-P9-O0-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
 ; LE-P9-O0-NEXT:    std r0, 16(r1)
-; LE-P9-O0-NEXT:    hashst r0, -8(r1)
-; LE-P9-O0-NEXT:    stdu r1, -112(r1)
-; LE-P9-O0-NEXT:    # kill: def $r4 killed $r4 killed $x4
-; LE-P9-O0-NEXT:    stw r4, 100(r1) # 4-byte Folded Spill
+; LE-P9-O0-NEXT:    hashst r0, -24(r1)
+; LE-P9-O0-NEXT:    stdu r1, -128(r1)
+; LE-P9-O0-NEXT:    mr r30, r4
 ; LE-P9-O0-NEXT:    # kill: def $r3 killed $r3 killed $x3
 ; LE-P9-O0-NEXT:    clrldi r3, r3, 32
 ; LE-P9-O0-NEXT:    bl callee
 ; LE-P9-O0-NEXT:    nop
-; LE-P9-O0-NEXT:    lwz r4, 100(r1) # 4-byte Folded Reload
-; LE-P9-O0-NEXT:    add r3, r3, r4
+; LE-P9-O0-NEXT:    add r3, r3, r30
 ; LE-P9-O0-NEXT:    clrldi r3, r3, 32
-; LE-P9-O0-NEXT:    addi r1, r1, 112
+; LE-P9-O0-NEXT:    addi r1, r1, 128
 ; LE-P9-O0-NEXT:    ld r0, 16(r1)
-; LE-P9-O0-NEXT:    hashchk r0, -8(r1)
+; LE-P9-O0-NEXT:    hashchk r0, -24(r1)
 ; LE-P9-O0-NEXT:    mtlr r0
+; LE-P9-O0-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
 ; LE-P9-O0-NEXT:    blr
 ;
 ; LE-P8-O0-LABEL: caller:
 ; LE-P8-O0:       # %bb.0: # %entry
 ; LE-P8-O0-NEXT:    mflr r0
+; LE-P8-O0-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
 ; LE-P8-O0-NEXT:    std r0, 16(r1)
-; LE-P8-O0-NEXT:    hashst r0, -8(r1)
-; LE-P8-O0-NEXT:    stdu r1, -112(r1)
-; LE-P8-O0-NEXT:    # kill: def $r4 killed $r4 killed $x4
-; LE-P8-O0-NEXT:    stw r4, 100(r1) # 4-byte Folded Spill
+; LE-P8-O0-NEXT:    hashst r0, -24(r1)
+; LE-P8-O0-NEXT:    stdu r1, -128(r1)
+; LE-P8-O0-NEXT:    mr r30, r4
 ; LE-P8-O0-NEXT:    # kill: def $r3 killed $r3 killed $x3
 ; LE-P8-O0-NEXT:    clrldi r3, r3, 32
 ; LE-P8-O0-NEXT:    bl callee
 ; LE-P8-O0-NEXT:    nop
-; LE-P8-O0-NEXT:    lwz r4, 100(r1) # 4-byte Folded Reload
-; LE-P8-O0-NEXT:    add r3, r3, r4
+; LE-P8-O0-NEXT:    add r3, r3, r30
 ; LE-P8-O0-NEXT:    clrldi r3, r3, 32
-; LE-P8-O0-NEXT:    addi r1, r1, 112
+; LE-P8-O0-NEXT:    addi r1, r1, 128
 ; LE-P8-O0-NEXT:    ld r0, 16(r1)
-; LE-P8-O0-NEXT:    hashchk r0, -8(r1)
+; LE-P8-O0-NEXT:    hashchk r0, -24(r1)
 ; LE-P8-O0-NEXT:    mtlr r0
+; LE-P8-O0-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
 ; LE-P8-O0-NEXT:    blr
 ;
 ; BE-P10-LABEL: caller:
@@ -868,19 +868,19 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; LE-P10-O0-NEXT:    stxv v29, 208(r1) # 16-byte Folded Spill
 ; LE-P10-O0-NEXT:    stxv v30, 224(r1) # 16-byte Folded Spill
 ; LE-P10-O0-NEXT:    stxv v31, 240(r1) # 16-byte Folded Spill
-; LE-P10-O0-NEXT:    std r3, 40(r1) # 8-byte Folded Spill
-; LE-P10-O0-NEXT:    lwz r3, 12(r3)
+; LE-P10-O0-NEXT:    mr r30, r3
+; LE-P10-O0-NEXT:    lwz r3, 12(r30)
 ; LE-P10-O0-NEXT:    stw r3, 52(r1)
+; LE-P10-O0-NEXT:    std r30, 40(r1) # 8-byte Folded Spill
 ; LE-P10-O0-NEXT:    #APP
 ; LE-P10-O0-NEXT:    nop
 ; LE-P10-O0-NEXT:    #NO_APP
 ; LE-P10-O0-NEXT:    addi r3, r1, 52
 ; LE-P10-O0-NEXT:    bl callee2@notoc
-; LE-P10-O0-NEXT:    mr r4, r3
-; LE-P10-O0-NEXT:    ld r3, 40(r1) # 8-byte Folded Reload
-; LE-P10-O0-NEXT:    # kill: def $r4 killed $r4 killed $x4
-; LE-P10-O0-NEXT:    lwz r3, 16(r3)
-; LE-P10-O0-NEXT:    add r3, r3, r4
+; LE-P10-O0-NEXT:    # kill: def $r3 killed $r3 killed $x3
+; LE-P10-O0-NEXT:    ld r30, 40(r1) # 8-byte Folded Reload
+; LE-P10-O0-NEXT:    lwz r4, 16(r30)
+; LE-P10-O0-NEXT:    add r3, r4, r3
 ; LE-P10-O0-NEXT:    clrldi r3, r3, 32
 ; LE-P10-O0-NEXT:    lxv v31, 240(r1) # 16-byte Folded Reload
 ; LE-P10-O0-NEXT:    lxv v30, 224(r1) # 16-byte Folded Reload
@@ -994,19 +994,19 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; LE-P9-O0-NEXT:    stxv v29, 272(r1) # 16-byte Folded Spill
 ; LE-P9-O0-NEXT:    stxv v30, 288(r1) # 16-byte Folded Spill
 ; LE-P9-O0-NEXT:    stxv v31, 304(r1) # 16-byte Folded Spill
-; LE-P9-O0-NEXT:    std r3, 104(r1) # 8-byte Folded Spill
-; LE-P9-O0-NEXT:    lwz r3, 12(r3)
+; LE-P9-O0-NEXT:    mr r30, r3
+; LE-P9-O0-NEXT:    lwz r3, 12(r30)
 ; LE-P9-O0-NEXT:    stw r3, 116(r1)
+; LE-P9-O0-NEXT:    std r30, 104(r1) # 8-byte Folded Spill
 ; LE-P9-O0-NEXT:    #APP
 ; LE-P9-O0-NEXT:    nop
 ; LE-P9-O0-NEXT:    #NO_APP
 ; LE-P9-O0-NEXT:    addi r3, r1, 116
 ; LE-P9-O0-NEXT:    bl callee2
 ; LE-P9-O0-NEXT:    nop
-; LE-P9-O0-NEXT:    mr r4, r3
-; LE-P9-O0-NEXT:    ld r3, 104(r1) # 8-byte Folded Reload
-; LE-P9-O0-NEXT:    lwz r3, 16(r3)
-; LE-P9-O0-NEXT:    add r3, r3, r4
+; LE-P9-O0-NEXT:    ld r30, 104(r1) # 8-byte Folded Reload
+; LE-P9-O0-NEXT:    lwz r4, 16(r30)
+; LE-P9-O0-NEXT:    add r3, r4, r3
 ; LE-P9-O0-NEXT:    clrldi r3, r3, 32
 ; LE-P9-O0-NEXT:    lxv v31, 304(r1) # 16-byte Folded Reload
 ; LE-P9-O0-NEXT:    lxv v30, 288(r1) # 16-byte Folded Reload
@@ -1132,19 +1132,19 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; LE-P8-O0-NEXT:    stxvd2x v30, r1, r4 # 16-byte Folded Spill
 ; LE-P8-O0-NEXT:    li r4, 304
 ; LE-P8-O0-NEXT:    stxvd2x v31, r1, r4 # 16-byte Folded Spill
-; LE-P8-O0-NEXT:    std r3, 104(r1) # 8-byte Folded Spill
-; LE-P8-O0-NEXT:    lwz r3, 12(r3)
+; LE-P8-O0-NEXT:    mr r30, r3
+; LE-P8-O0-NEXT:    lwz r3, 12(r30)
 ; LE-P8-O0-NEXT:    stw r3, 116(r1)
+; LE-P8-O0-NEXT:    std r30, 104(r1) # 8-byte Folded Spill
 ; LE-P8-O0-NEXT:    #APP
 ; LE-P8-O0-NEXT:    nop
 ; LE-P8-O0-NEXT:    #NO_APP
 ; LE-P8-O0-NEXT:    addi r3, r1, 116
 ; LE-P8-O0-NEXT:    bl callee2
 ; LE-P8-O0-NEXT:    nop
-; LE-P8-O0-NEXT:    mr r4, r3
-; LE-P8-O0-NEXT:    ld r3, 104(r1) # 8-byte Folded Reload
-; LE-P8-O0-NEXT:    lwz r3, 16(r3)
-; LE-P8-O0-NEXT:    add r3, r3, r4
+; LE-P8-O0-NEXT:    ld r30, 104(r1) # 8-byte Folded Reload
+; LE-P8-O0-NEXT:    lwz r4, 16(r30)
+; LE-P8-O0-NEXT:    add r3, r4, r3
 ; LE-P8-O0-NEXT:    clrldi r3, r3, 32
 ; LE-P8-O0-NEXT:    li r4, 304
 ; LE-P8-O0-NEXT:    lxvd2x v31, r1, r4 # 16-byte Folded Reload
@@ -2910,97 +2910,97 @@ define dso_local zeroext i32 @shrinkwrap(ptr readonly %in) #0 {
 ; LE-P10-O0-LABEL: shrinkwrap:
 ; LE-P10-O0:       # %bb.0: # %entry
 ; LE-P10-O0-NEXT:    mflr r0
+; LE-P10-O0-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
 ; LE-P10-O0-NEXT:    std r0, 16(r1)
-; LE-P10-O0-NEXT:    hashst r0, -8(r1)
-; LE-P10-O0-NEXT:    stdu r1, -64(r1)
-; LE-P10-O0-NEXT:    mr. r4, r3
-; LE-P10-O0-NEXT:    std r4, 40(r1) # 8-byte Folded Spill
+; LE-P10-O0-NEXT:    hashst r0, -24(r1)
+; LE-P10-O0-NEXT:    stdu r1, -80(r1)
+; LE-P10-O0-NEXT:    mr. r30, r3
+; LE-P10-O0-NEXT:    std r30, 40(r1) # 8-byte Folded Spill
 ; LE-P10-O0-NEXT:    li r3, 0
-; LE-P10-O0-NEXT:    stw r3, 48(r1) # 4-byte Folded Spill
+; LE-P10-O0-NEXT:    stw r3, 36(r1) # 4-byte Folded Spill
 ; LE-P10-O0-NEXT:    beq cr0, .LBB2_2
 ; LE-P10-O0-NEXT:  # %bb.1: # %if.end
-; LE-P10-O0-NEXT:    ld r3, 40(r1) # 8-byte Folded Reload
-; LE-P10-O0-NEXT:    lwz r3, 12(r3)
+; LE-P10-O0-NEXT:    ld r30, 40(r1) # 8-byte Folded Reload
+; LE-P10-O0-NEXT:    lwz r3, 12(r30)
 ; LE-P10-O0-NEXT:    stw r3, 52(r1)
 ; LE-P10-O0-NEXT:    addi r3, r1, 52
 ; LE-P10-O0-NEXT:    bl callee2@notoc
-; LE-P10-O0-NEXT:    mr r4, r3
-; LE-P10-O0-NEXT:    ld r3, 40(r1) # 8-byte Folded Reload
-; LE-P10-O0-NEXT:    # kill: def $r4 killed $r4 killed $x4
-; LE-P10-O0-NEXT:    lwz r3, 16(r3)
-; LE-P10-O0-NEXT:    add r3, r3, r4
-; LE-P10-O0-NEXT:    stw r3, 48(r1) # 4-byte Folded Spill
+; LE-P10-O0-NEXT:    # kill: def $r3 killed $r3 killed $x3
+; LE-P10-O0-NEXT:    lwz r4, 16(r30)
+; LE-P10-O0-NEXT:    add r3, r4, r3
+; LE-P10-O0-NEXT:    stw r3, 36(r1) # 4-byte Folded Spill
 ; LE-P10-O0-NEXT:  .LBB2_2: # %return
-; LE-P10-O0-NEXT:    lwz r3, 48(r1) # 4-byte Folded Reload
+; LE-P10-O0-NEXT:    lwz r3, 36(r1) # 4-byte Folded Reload
 ; LE-P10-O0-NEXT:    clrldi r3, r3, 32
-; LE-P10-O0-NEXT:    addi r1, r1, 64
+; LE-P10-O0-NEXT:    addi r1, r1, 80
 ; LE-P10-O0-NEXT:    ld r0, 16(r1)
-; LE-P10-O0-NEXT:    hashchk r0, -8(r1)
+; LE-P10-O0-NEXT:    hashchk r0, -24(r1)
 ; LE-P10-O0-NEXT:    mtlr r0
+; LE-P10-O0-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
 ; LE-P10-O0-NEXT:    blr
 ;
 ; LE-P9-O0-LABEL: shrinkwrap:
 ; LE-P9-O0:       # %bb.0: # %entry
 ; LE-P9-O0-NEXT:    mflr r0
+; LE-P9-O0-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
 ; LE-P9-O0-NEXT:    std r0, 16(r1)
-; LE-P9-O0-NEXT:    hashst r0, -8(r1)
-; LE-P9-O0-NEXT:    stdu r1, -128(r1)
-; LE-P9-O0-NEXT:    mr. r4, r3
-; LE-P9-O0-NEXT:    std r4, 104(r1) # 8-byte Folded Spill
+; LE-P9-O0-NEXT:    hashst r0, -24(r1)
+; LE-P9-O0-NEXT:    stdu r1, -144(r1)
+; LE-P9-O0-NEXT:    mr. r30, r3
+; LE-P9-O0-NEXT:    std r30, 104(r1) # 8-byte Folded Spill
 ; LE-P9-O0-NEXT:    li r3, 0
-; LE-P9-O0-NEXT:    stw r3, 112(r1) # 4-byte Folded Spill
+; LE-P9-O0-NEXT:    stw r3, 100(r1) # 4-byte Folded Spill
 ; LE-P9-O0-NEXT:    beq cr0, .LBB2_2
 ; LE-P9-O0-NEXT:  # %bb.1: # %if.end
-; LE-P9-O0-NEXT:    ld r3, 104(r1) # 8-byte Folded Reload
-; LE-P9-O0-NEXT:    lwz r3, 12(r3)
+; LE-P9-O0-NEXT:    ld r30, 104(r1) # 8-byte Folded Reload
+; LE-P9-O0-NEXT:    lwz r3, 12(r30)
 ; LE-P9-O0-NEXT:    stw r3, 116(r1)
 ; LE-P9-O0-NEXT:    addi r3, r1, 116
 ; LE-P9-O0-NEXT:    bl callee2
 ; LE-P9-O0-NEXT:    nop
-; LE-P9-O0-NEXT:    mr r4, r3
-; LE-P9-O0-NEXT:    ld r3, 104(r1) # 8-byte Folded Reload
-; LE-P9-O0-NEXT:    lwz r3, 16(r3)
-; LE-P9-O0-NEXT:    add r3, r3, r4
-; LE-P9-O0-NEXT:    stw r3, 112(r1) # 4-byte Folded Spill
+; LE-P9-O0-NEXT:    lwz r4, 16(r30)
+; LE-P9-O0-NEXT:    add r3, r4, r3
+; LE-P9-O0-NEXT:    stw r3, 100(r1) # 4-byte Folded Spill
 ; LE-P9-O0-NEXT:  .LBB2_2: # %return
-; LE-P9-O0-NEXT:    lwz r3, 112(r1) # 4-byte Folded Reload
+; LE-P9-O0-NEXT:    lwz r3, 100(r1) # 4-byte Folded Reload
 ; LE-P9-O0-NEXT:    clrldi r3, r3, 32
-; LE-P9-O0-NEXT:    addi r1, r1, 128
+; LE-P9-O0-NEXT:    addi r1, r1, 144
 ; LE-P9-O0-NEXT:    ld r0, 16(r1)
-; LE-P9-O0-NEXT:    hashchk r0, -8(r1)
+; LE-P9-O0-NEXT:    hashchk r0, -24(r1)
 ; LE-P9-O0-NEXT:    mtlr r0
+; LE-P9-O0-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
 ; LE-P9-O0-NEXT:    blr
 ;
 ; LE-P8-O0-LABEL: shrinkwrap:
 ; LE-P8-O0:       # %bb.0: # %entry
 ; LE-P8-O0-NEXT:    mflr r0
+; LE-P8-O0-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
 ; LE-P8-O0-NEXT:    std r0, 16(r1)
-; LE-P8-O0-NEXT:    hashst r0, -8(r1)
-; LE-P8-O0-NEXT:    stdu r1, -128(r1)
-; LE-P8-O0-NEXT:    mr. r4, r3
-; LE-P8-O0-NEXT:    std r4, 104(r1) # 8-byte Folded Spill
+; LE-P8-O0-NEXT:    hashst r0, -24(r1)
+; LE-P8-O0-NEXT:    stdu r1, -144(r1)
+; LE-P8-O0-NEXT:    mr. r30, r3
+; LE-P8-O0-NEXT:    std r30, 104(r1) # 8-byte Folded Spill
 ; LE-P8-O0-NEXT:    li r3, 0
-; LE-P8-O0-NEXT:    stw r3, 112(r1) # 4-byte Folded Spill
+; LE-P8-O0-NEXT:    stw r3, 100(r1) # 4-byte Folded Spill
 ; LE-P8-O0-NEXT:    beq cr0, .LBB2_2
 ; LE-P8-O0-NEXT:  # %bb.1: # %if.end
-; LE-P8-O0-NEXT:    ld r3, 104(r1) # 8-byte Folded Reload
-; LE-P8-O0-NEXT:    lwz r3, 12(r3)
+; LE-P8-O0-NEXT:    ld r30, 104(r1) # 8-byte Folded Reload
+; LE-P8-O0-NEXT:    lwz r3, 12(r30)
 ; LE-P8-O0-NEXT:    stw r3, 116(r1)
 ; LE-P8-O0-NEXT:    addi r3, r1, 116
 ; LE-P8-O0-NEXT:    bl callee2
 ; LE-P8-O0-NEXT:    nop
-; LE-P8-O0-NEXT:    mr r4, r3
-; LE-P8-O0-NEXT:    ld r3, 104(r1) # 8-byte Folded Reload
-; LE-P8-O0-NEXT:    lwz r3, 16(r3)
-; LE-P8-O0-NEXT:    add r3, r3, r4
-; LE-P8-O0-NEXT:    stw r3, 112(r1) # 4-byte Folded Spill
+; LE-P8-O0-NEXT:    lwz r4, 16(r30)
+; LE-P8-O0-NEXT:    add r3, r4, r3
+; LE-P8-O0-NEXT:    stw r3, 100(r1) # 4-byte Folded Spill
 ; LE-P8-O0-NEXT:  .LBB2_2: # %return
-; LE-P8-O0-NEXT:    lwz r3, 112(r1) # 4-byte Folded Reload
+; LE-P8-O0-NEXT:    lwz r3, 100(r1) # 4-byte Folded Reload
 ; LE-P8-O0-NEXT:    clrldi r3, r3, 32
-; LE-P8-O0-NEXT:    addi r1, r1, 128
+; LE-P8-O0-NEXT:    addi r1, r1, 144
 ; LE-P8-O0-NEXT:    ld r0, 16(r1)
-; LE-P8-O0-NEXT:    hashchk r0, -8(r1)
+; LE-P8-O0-NEXT:    hashchk r0, -24(r1)
 ; LE-P8-O0-NEXT:    mtlr r0
+; LE-P8-O0-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
 ; LE-P8-O0-NEXT:    blr
 ;
 ; BE-P10-LABEL: shrinkwrap:
@@ -3514,41 +3514,41 @@ define dso_local zeroext i32 @aligned(ptr nocapture readonly %in) #0 {
 ; LE-P10-O0-NEXT:    mflr r0
 ; LE-P10-O0-NEXT:    std r30, -16(r1)
 ; LE-P10-O0-NEXT:    std r0, 16(r1)
-; LE-P10-O0-NEXT:    hashst r0, -24(r1)
+; LE-P10-O0-NEXT:    hashst r0, -32(r1)
 ; LE-P10-O0-NEXT:    mr r30, r1
 ; LE-P10-O0-NEXT:    clrldi r0, r1, 49
 ; LE-P10-O0-NEXT:    lis r12, -1
 ; LE-P10-O0-NEXT:    subc r0, r12, r0
 ; LE-P10-O0-NEXT:    stdux r1, r1, r0
-; LE-P10-O0-NEXT:    std r3, 32752(r1) # 8-byte Folded Spill
-; LE-P10-O0-NEXT:    lwz r4, 4(r3)
-; LE-P10-O0-NEXT:    lis r5, 0
-; LE-P10-O0-NEXT:    ori r5, r5, 65508
-; LE-P10-O0-NEXT:    stwx r4, r1, r5
-; LE-P10-O0-NEXT:    lwz r4, 12(r3)
-; LE-P10-O0-NEXT:    lis r5, 0
-; LE-P10-O0-NEXT:    ori r5, r5, 32768
-; LE-P10-O0-NEXT:    stwx r4, r1, r5
-; LE-P10-O0-NEXT:    lwz r3, 20(r3)
+; LE-P10-O0-NEXT:    std r29, -24(r30) # 8-byte Folded Spill
+; LE-P10-O0-NEXT:    mr r29, r3
+; LE-P10-O0-NEXT:    lwz r3, 4(r29)
+; LE-P10-O0-NEXT:    lis r4, 0
+; LE-P10-O0-NEXT:    ori r4, r4, 65500
+; LE-P10-O0-NEXT:    stwx r3, r1, r4
+; LE-P10-O0-NEXT:    lwz r3, 12(r29)
+; LE-P10-O0-NEXT:    lis r4, 0
+; LE-P10-O0-NEXT:    ori r4, r4, 32768
+; LE-P10-O0-NEXT:    stwx r3, r1, r4
+; LE-P10-O0-NEXT:    lwz r3, 20(r29)
 ; LE-P10-O0-NEXT:    stw r3, 32764(r1)
 ; LE-P10-O0-NEXT:    lis r3, 0
 ; LE-P10-O0-NEXT:    ori r3, r3, 32768
 ; LE-P10-O0-NEXT:    add r3, r1, r3
 ; LE-P10-O0-NEXT:    lis r4, 0
-; LE-P10-O0-NEXT:    ori r4, r4, 65508
+; LE-P10-O0-NEXT:    ori r4, r4, 65500
 ; LE-P10-O0-NEXT:    add r4, r1, r4
 ; LE-P10-O0-NEXT:    addi r5, r1, 32764
 ; LE-P10-O0-NEXT:    bl callee3@notoc
-; LE-P10-O0-NEXT:    mr r4, r3
-; LE-P10-O0-NEXT:    ld r3, 32752(r1) # 8-byte Folded Reload
-; LE-P10-O0-NEXT:    # kill: def $r4 killed $r4 killed $x4
-; LE-P10-O0-NEXT:    lwz r3, 16(r3)
-; LE-P10-O0-NEXT:    add r3, r3, r4
+; LE-P10-O0-NEXT:    # kill: def $r3 killed $r3 killed $x3
+; LE-P10-O0-NEXT:    lwz r4, 16(r29)
+; LE-P10-O0-NEXT:    add r3, r4, r3
 ; LE-P10-O0-NEXT:    clrldi r3, r3, 32
+; LE-P10-O0-NEXT:    ld r29, -24(r30) # 8-byte Folded Reload
 ; LE-P10-O0-NEXT:    mr r1, r30
 ; LE-P10-O0-NEXT:    ld r0, 16(r1)
 ; LE-P10-O0-NEXT:    ld r30, -16(r1)
-; LE-P10-O0-NEXT:    hashchk r0, -24(r1)
+; LE-P10-O0-NEXT:    hashchk r0, -32(r1)
 ; LE-P10-O0-NEXT:    mtlr r0
 ; LE-P10-O0-NEXT:    blr
 ;
@@ -3558,40 +3558,40 @@ define dso_local zeroext i32 @aligned(ptr nocapture readonly %in) #0 {
 ; LE-P9-O0-NEXT:    std r30, -16(r1)
 ; LE-P9-O0-NEXT:    mr r30, r1
 ; LE-P9-O0-NEXT:    std r0, 16(r1)
-; LE-P9-O0-NEXT:    hashst r0, -24(r1)
+; LE-P9-O0-NEXT:    hashst r0, -32(r1)
 ; LE-P9-O0-NEXT:    clrldi r0, r1, 49
 ; LE-P9-O0-NEXT:    lis r12, -1
 ; LE-P9-O0-NEXT:    subc r0, r12, r0
 ; LE-P9-O0-NEXT:    stdux r1, r1, r0
-; LE-P9-O0-NEXT:    std r3, 32752(r1) # 8-byte Folded Spill
-; LE-P9-O0-NEXT:    lwz r4, 4(r3)
-; LE-P9-O0-NEXT:    lis r5, 0
-; LE-P9-O0-NEXT:    ori r5, r5, 65508
-; LE-P9-O0-NEXT:    stwx r4, r1, r5
-; LE-P9-O0-NEXT:    lwz r4, 12(r3)
-; LE-P9-O0-NEXT:    lis r5, 0
-; LE-P9-O0-NEXT:    ori r5, r5, 32768
-; LE-P9-O0-NEXT:    stwx r4, r1, r5
-; LE-P9-O0-NEXT:    lwz r3, 20(r3)
+; LE-P9-O0-NEXT:    std r29, -24(r30) # 8-byte Folded Spill
+; LE-P9-O0-NEXT:    mr r29, r3
+; LE-P9-O0-NEXT:    lwz r3, 4(r29)
+; LE-P9-O0-NEXT:    lis r4, 0
+; LE-P9-O0-NEXT:    ori r4, r4, 65500
+; LE-P9-O0-NEXT:    stwx r3, r1, r4
+; LE-P9-O0-NEXT:    lwz r3, 12(r29)
+; LE-P9-O0-NEXT:    lis r4, 0
+; LE-P9-O0-NEXT:    ori r4, r4, 32768
+; LE-P9-O0-NEXT:    stwx r3, r1, r4
+; LE-P9-O0-NEXT:    lwz r3, 20(r29)
 ; LE-P9-O0-NEXT:    stw r3, 32764(r1)
 ; LE-P9-O0-NEXT:    lis r3, 0
 ; LE-P9-O0-NEXT:    ori r3, r3, 32768
 ; LE-P9-O0-NEXT:    add r3, r1, r3
 ; LE-P9-O0-NEXT:    lis r4, 0
-; LE-P9-O0-NEXT:    ori r4, r4, 65508
+; LE-P9-O0-NEXT:    ori r4, r4, 65500
 ; LE-P9-O0-NEXT:    add r4, r1, r4
 ; LE-P9-O0-NEXT:    addi r5, r1, 32764
 ; LE-P9-O0-NEXT:    bl callee3
 ; LE-P9-O0-NEXT:    nop
-; LE-P9-O0-NEXT:    mr r4, r3
-; LE-P9-O0-NEXT:    ld r3, 32752(r1) # 8-byte Folded Reload
-; LE-P9-O0-NEXT:    lwz r3, 16(r3)
-; LE-P9-O0-NEXT:    add r3, r3, r4
+; LE-P9-O0-NEXT:    lwz r4, 16(r29)
+; LE-P9-O0-NEXT:    add r3, r4, r3
 ; LE-P9-O0-NEXT:    clrldi r3, r3, 32
+; LE-P9-O0-NEXT:    ld r29, -24(r30) # 8-byte Folded Reload
 ; LE-P9-O0-NEXT:    mr r1, r30
 ; LE-P9-O0-NEXT:    ld r0, 16(r1)
 ; LE-P9-O0-NEXT:    ld r30, -16(r1)
-; LE-P9-O0-NEXT:    hashchk r0, -24(r1)
+; LE-P9-O0-NEXT:    hashchk r0, -32(r1)
 ; LE-P9-O0-NEXT:    mtlr r0
 ; LE-P9-O0-NEXT:    blr
 ;
@@ -3601,40 +3601,40 @@ define dso_local zeroext i32 @aligned(ptr nocapture readonly %in) #0 {
 ; LE-P8-O0-NEXT:    std r30, -16(r1)
 ; LE-P8-O0-NEXT:    mr r30, r1
 ; LE-P8-O0-NEXT:    std r0, 16(r1)
-; LE-P8-O0-NEXT:    hashst r0, -24(r1)
+; LE-P8-O0-NEXT:    hashst r0, -32(r1)
 ; LE-P8-O0-NEXT:    clrldi r0, r1, 49
 ; LE-P8-O0-NEXT:    lis r12, -1
 ; LE-P8-O0-NEXT:    subc r0, r12, r0
 ; LE-P8-O0-NEXT:    stdux r1, r1, r0
-; LE-P8-O0-NEXT:    std r3, 32752(r1) # 8-byte Folded Spill
-; LE-P8-O0-NEXT:    lwz r4, 4(r3)
-; LE-P8-O0-NEXT:    lis r5, 0
-; LE-P8-O0-NEXT:    ori r5, r5, 65508
-; LE-P8-O0-NEXT:    stwx r4, r1, r5
-; LE-P8-O0-NEXT:    lwz r4, 12(r3)
-; LE-P8-O0-NEXT:    lis r5, 0
-; LE-P8-O0-NEXT:    ori r5, r5, 32768
-; LE-P8-O0-NEXT:    stwx r4, r1, r5
-; LE-P8-O0-NEXT:    lwz r3, 20(r3)
+; LE-P8-O0-NEXT:    std r29, -24(r30) # 8-byte Folded Spill
+; LE-P8-O0-NEXT:    mr r29, r3
+; LE-P8-O0-NEXT:    lwz r3, 4(r29)
+; LE-P8-O0-NEXT:    lis r4, 0
+; LE-P8-O0-NEXT:    ori r4, r4, 65500
+; LE-P8-O0-NEXT:    stwx r3, r1, r4
+; LE-P8-O0-NEXT:    lwz r3, 12(r29)
+; LE-P8-O0-NEXT:    lis r4, 0
+; LE-P8-O0-NEXT:    ori r4, r4, 32768
+; LE-P8-O0-NEXT:    stwx r3, r1, r4
+; LE-P8-O0-NEXT:    lwz r3, 20(r29)
 ; LE-P8-O0-NEXT:    stw r3, 32764(r1)
 ; LE-P8-O0-NEXT:    lis r3, 0
 ; LE-P8-O0-NEXT:    ori r3, r3, 32768
 ; LE-P8-O0-NEXT:    add r3, r1, r3
 ; LE-P8-O0-NEXT:    lis r4, 0
-; LE-P8-O0-NEXT:    ori r4, r4, 65508
+; LE-P8-O0-NEXT:    ori r4, r4, 65500
 ; LE-P8-O0-NEXT:    add r4, r1, r4
 ; LE-P8-O0-NEXT:    addi r5, r1, 32764
 ; LE-P8-O0-NEXT:    bl callee3
 ; LE-P8-O0-NEXT:    nop
-; LE-P8-O0-NEXT:    mr r4, r3
-; LE-P8-O0-NEXT:    ld r3, 32752(r1) # 8-byte Folded Reload
-; LE-P8-O0-NEXT:    lwz r3, 16(r3)
-; LE-P8-O0-NEXT:    add r3, r3, r4
+; LE-P8-O0-NEXT:    lwz r4, 16(r29)
+; LE-P8-O0-NEXT:    add r3, r4, r3
 ; LE-P8-O0-NEXT:    clrldi r3, r3, 32
+; LE-P8-O0-NEXT:    ld r29, -24(r30) # 8-byte Folded Reload
 ; LE-P8-O0-NEXT:    mr r1, r30
 ; LE-P8-O0-NEXT:    ld r0, 16(r1)
 ; LE-P8-O0-NEXT:    ld r30, -16(r1)
-; LE-P8-O0-NEXT:    hashchk r0, -24(r1)
+; LE-P8-O0-NEXT:    hashchk r0, -32(r1)
 ; LE-P8-O0-NEXT:    mtlr r0
 ; LE-P8-O0-NEXT:    blr
 ;

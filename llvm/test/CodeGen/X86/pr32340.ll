@@ -14,26 +14,26 @@ define void @foo() {
 ; X64-LABEL: foo:
 ; X64:       # %bb.0: # %entry
 ; X64-NEXT:    movw $0, var_825
-; X64-NEXT:    movzwl var_32, %ecx
-; X64-NEXT:    movzwl var_901, %eax
-; X64-NEXT:    movl %ecx, %edx
-; X64-NEXT:    xorl %eax, %edx
-; X64-NEXT:    movl %ecx, %eax
-; X64-NEXT:    xorl %edx, %eax
-; X64-NEXT:    addl %ecx, %eax
-; X64-NEXT:    cltq
+; X64-NEXT:    movzwl var_32, %eax
+; X64-NEXT:    movzwl var_901, %ecx
+; X64-NEXT:    movl %eax, %edx
+; X64-NEXT:    xorl %ecx, %edx
+; X64-NEXT:    movl %eax, %ecx
+; X64-NEXT:    xorl %edx, %ecx
+; X64-NEXT:    addl %eax, %ecx
+; X64-NEXT:    movslq %ecx, %rax
 ; X64-NEXT:    movq %rax, var_826
 ; X64-NEXT:    movzwl var_32, %eax
 ; X64-NEXT:    # kill: def $rax killed $eax
 ; X64-NEXT:    movzwl var_901, %ecx
 ; X64-NEXT:    xorl $51981, %ecx # imm = 0xCB0D
-; X64-NEXT:    movslq %ecx, %rdx
-; X64-NEXT:    movabsq $-1142377792914660288, %rcx # imm = 0xF02575732E06E440
-; X64-NEXT:    xorq %rcx, %rdx
-; X64-NEXT:    movq %rax, %rcx
+; X64-NEXT:    movslq %ecx, %rcx
+; X64-NEXT:    movabsq $-1142377792914660288, %rdx # imm = 0xF02575732E06E440
 ; X64-NEXT:    xorq %rdx, %rcx
-; X64-NEXT:    xorq $-1, %rcx
-; X64-NEXT:    xorq %rcx, %rax
+; X64-NEXT:    movq %rax, %rdx
+; X64-NEXT:    xorq %rcx, %rdx
+; X64-NEXT:    xorq $-1, %rdx
+; X64-NEXT:    xorq %rdx, %rax
 ; X64-NEXT:    movq %rax, %rcx
 ; X64-NEXT:    orq var_57, %rcx
 ; X64-NEXT:    orq %rcx, %rax

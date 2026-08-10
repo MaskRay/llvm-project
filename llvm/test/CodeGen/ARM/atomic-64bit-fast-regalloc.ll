@@ -21,60 +21,62 @@ define void @test(ptr %ptr) {
 ; LE-NEXT:    str r0, [r6, #28] @ 4-byte Spill
 ; LE-NEXT:    b .LBB0_1
 ; LE-NEXT:  .LBB0_1: @ %block1
-; LE-NEXT:    ldr r0, [r6, #28] @ 4-byte Reload
-; LE-NEXT:    mov r1, sp
-; LE-NEXT:    sub r1, r1, #16
-; LE-NEXT:    bic r1, r1, #15
-; LE-NEXT:    mov sp, r1
+; LE-NEXT:    mov r0, sp
+; LE-NEXT:    sub r0, r0, #16
+; LE-NEXT:    bic r0, r0, #15
+; LE-NEXT:    mov sp, r0
 ; LE-NEXT:    dmb ish
+; LE-NEXT:    ldr r0, [r6, #28] @ 4-byte Reload
 ; LE-NEXT:    ldrexd r2, r3, [r0]
-; LE-NEXT:    mov r0, r3
-; LE-NEXT:    mov r1, r2
+; LE-NEXT:    mov r1, r3
+; LE-NEXT:    @ kill: def $r2 killed $r2 killed $r2_r3
 ; LE-NEXT:    clrex
+; LE-NEXT:    str r2, [r6, #24] @ 4-byte Spill
 ; LE-NEXT:    str r1, [r6, #20] @ 4-byte Spill
-; LE-NEXT:    str r0, [r6, #24] @ 4-byte Spill
 ; LE-NEXT:    b .LBB0_2
 ; LE-NEXT:  .LBB0_2: @ %atomicrmw.start
 ; LE-NEXT:    @ =>This Loop Header: Depth=1
 ; LE-NEXT:    @ Child Loop BB0_3 Depth 2
-; LE-NEXT:    ldr r2, [r6, #24] @ 4-byte Reload
 ; LE-NEXT:    ldr r0, [r6, #20] @ 4-byte Reload
-; LE-NEXT:    ldr r8, [r6, #28] @ 4-byte Reload
-; LE-NEXT:    str r2, [r6, #16] @ 4-byte Spill
-; LE-NEXT:    str r0, [r6, #12] @ 4-byte Spill
-; LE-NEXT:    @ implicit-def: $r1
-; LE-NEXT:    @ implicit-def: $r3
-; LE-NEXT:    @ kill: def $r8 killed $r8 def $r8_r9
+; LE-NEXT:    mov r1, r0
+; LE-NEXT:    ldr r2, [r6, #24] @ 4-byte Reload
+; LE-NEXT:    mov r3, r2
+; LE-NEXT:    @ implicit-def: $r12
+; LE-NEXT:    @ implicit-def: $lr
+; LE-NEXT:    ldr lr, [r6, #28] @ 4-byte Reload
+; LE-NEXT:    mov r4, lr
+; LE-NEXT:    mov r5, r12
+; LE-NEXT:    mov r8, r3
 ; LE-NEXT:    mov r9, r1
-; LE-NEXT:    @ kill: def $r0 killed $r0 def $r0_r1
-; LE-NEXT:    mov r1, r2
 ; LE-NEXT:    mov r12, #0
-; LE-NEXT:    mov r2, r12
-; LE-NEXT:    mov r3, r12
+; LE-NEXT:    str r1, [r6, #16] @ 4-byte Spill
+; LE-NEXT:    mov r0, r12
+; LE-NEXT:    mov r1, r12
+; LE-NEXT:    str r3, [r6, #12] @ 4-byte Spill
 ; LE-NEXT:  .LBB0_3: @ %atomicrmw.start
 ; LE-NEXT:    @ Parent Loop BB0_2 Depth=1
 ; LE-NEXT:    @ => This Inner Loop Header: Depth=2
-; LE-NEXT:    ldrexd r4, r5, [r8]
-; LE-NEXT:    cmp r4, r0
-; LE-NEXT:    cmpeq r5, r1
+; LE-NEXT:    ldrexd r2, r3, [r4]
+; LE-NEXT:    cmp r2, r8
+; LE-NEXT:    cmpeq r3, r9
 ; LE-NEXT:    bne .LBB0_5
 ; LE-NEXT:  @ %bb.4: @ %atomicrmw.start
 ; LE-NEXT:    @ in Loop: Header=BB0_3 Depth=2
-; LE-NEXT:    strexd r9, r2, r3, [r8]
-; LE-NEXT:    cmp r9, #0
+; LE-NEXT:    strexd r5, r0, r1, [r4]
+; LE-NEXT:    cmp r5, #0
 ; LE-NEXT:    bne .LBB0_3
 ; LE-NEXT:  .LBB0_5: @ %atomicrmw.start
 ; LE-NEXT:    @ in Loop: Header=BB0_2 Depth=1
-; LE-NEXT:    ldr r2, [r6, #12] @ 4-byte Reload
+; LE-NEXT:    mov r0, r3
 ; LE-NEXT:    ldr r1, [r6, #16] @ 4-byte Reload
-; LE-NEXT:    mov r0, r5
-; LE-NEXT:    eor r3, r0, r1
-; LE-NEXT:    mov r1, r4
-; LE-NEXT:    eor r2, r1, r2
-; LE-NEXT:    orr r2, r2, r3
-; LE-NEXT:    cmp r2, #0
-; LE-NEXT:    str r1, [r6, #20] @ 4-byte Spill
-; LE-NEXT:    str r0, [r6, #24] @ 4-byte Spill
+; LE-NEXT:    eor r1, r0, r1
+; LE-NEXT:    @ kill: def $r2 killed $r2 killed $r2_r3
+; LE-NEXT:    ldr r3, [r6, #12] @ 4-byte Reload
+; LE-NEXT:    eor r3, r2, r3
+; LE-NEXT:    orr r1, r3, r1
+; LE-NEXT:    cmp r1, #0
+; LE-NEXT:    str r2, [r6, #24] @ 4-byte Spill
+; LE-NEXT:    str r0, [r6, #20] @ 4-byte Spill
 ; LE-NEXT:    bne .LBB0_2
 ; LE-NEXT:    b .LBB0_6
 ; LE-NEXT:  .LBB0_6: @ %atomicrmw.end
@@ -95,60 +97,62 @@ define void @test(ptr %ptr) {
 ; BE-NEXT:    str r0, [r6, #28] @ 4-byte Spill
 ; BE-NEXT:    b .LBB0_1
 ; BE-NEXT:  .LBB0_1: @ %block1
-; BE-NEXT:    ldr r0, [r6, #28] @ 4-byte Reload
-; BE-NEXT:    mov r1, sp
-; BE-NEXT:    sub r1, r1, #16
-; BE-NEXT:    bic r1, r1, #15
-; BE-NEXT:    mov sp, r1
+; BE-NEXT:    mov r0, sp
+; BE-NEXT:    sub r0, r0, #16
+; BE-NEXT:    bic r0, r0, #15
+; BE-NEXT:    mov sp, r0
 ; BE-NEXT:    dmb ish
+; BE-NEXT:    ldr r0, [r6, #28] @ 4-byte Reload
 ; BE-NEXT:    ldrexd r2, r3, [r0]
-; BE-NEXT:    mov r0, r3
-; BE-NEXT:    mov r1, r2
+; BE-NEXT:    mov r1, r3
+; BE-NEXT:    @ kill: def $r2 killed $r2 killed $r2_r3
 ; BE-NEXT:    clrex
+; BE-NEXT:    str r2, [r6, #24] @ 4-byte Spill
 ; BE-NEXT:    str r1, [r6, #20] @ 4-byte Spill
-; BE-NEXT:    str r0, [r6, #24] @ 4-byte Spill
 ; BE-NEXT:    b .LBB0_2
 ; BE-NEXT:  .LBB0_2: @ %atomicrmw.start
 ; BE-NEXT:    @ =>This Loop Header: Depth=1
 ; BE-NEXT:    @ Child Loop BB0_3 Depth 2
-; BE-NEXT:    ldr r2, [r6, #24] @ 4-byte Reload
 ; BE-NEXT:    ldr r0, [r6, #20] @ 4-byte Reload
-; BE-NEXT:    ldr r8, [r6, #28] @ 4-byte Reload
-; BE-NEXT:    str r2, [r6, #12] @ 4-byte Spill
-; BE-NEXT:    str r0, [r6, #16] @ 4-byte Spill
-; BE-NEXT:    @ implicit-def: $r1
-; BE-NEXT:    @ implicit-def: $r3
-; BE-NEXT:    @ kill: def $r8 killed $r8 def $r8_r9
+; BE-NEXT:    mov r1, r0
+; BE-NEXT:    ldr r2, [r6, #24] @ 4-byte Reload
+; BE-NEXT:    mov r3, r2
+; BE-NEXT:    @ implicit-def: $r12
+; BE-NEXT:    @ implicit-def: $lr
+; BE-NEXT:    ldr lr, [r6, #28] @ 4-byte Reload
+; BE-NEXT:    mov r4, lr
+; BE-NEXT:    mov r5, r12
+; BE-NEXT:    mov r8, r3
 ; BE-NEXT:    mov r9, r1
-; BE-NEXT:    @ kill: def $r0 killed $r0 def $r0_r1
-; BE-NEXT:    mov r1, r2
 ; BE-NEXT:    mov r12, #0
-; BE-NEXT:    mov r2, r12
-; BE-NEXT:    mov r3, r12
+; BE-NEXT:    str r1, [r6, #16] @ 4-byte Spill
+; BE-NEXT:    mov r0, r12
+; BE-NEXT:    mov r1, r12
+; BE-NEXT:    str r3, [r6, #12] @ 4-byte Spill
 ; BE-NEXT:  .LBB0_3: @ %atomicrmw.start
 ; BE-NEXT:    @ Parent Loop BB0_2 Depth=1
 ; BE-NEXT:    @ => This Inner Loop Header: Depth=2
-; BE-NEXT:    ldrexd r4, r5, [r8]
-; BE-NEXT:    cmp r4, r0
-; BE-NEXT:    cmpeq r5, r1
+; BE-NEXT:    ldrexd r2, r3, [r4]
+; BE-NEXT:    cmp r2, r8
+; BE-NEXT:    cmpeq r3, r9
 ; BE-NEXT:    bne .LBB0_5
 ; BE-NEXT:  @ %bb.4: @ %atomicrmw.start
 ; BE-NEXT:    @ in Loop: Header=BB0_3 Depth=2
-; BE-NEXT:    strexd r9, r2, r3, [r8]
-; BE-NEXT:    cmp r9, #0
+; BE-NEXT:    strexd r5, r0, r1, [r4]
+; BE-NEXT:    cmp r5, #0
 ; BE-NEXT:    bne .LBB0_3
 ; BE-NEXT:  .LBB0_5: @ %atomicrmw.start
 ; BE-NEXT:    @ in Loop: Header=BB0_2 Depth=1
-; BE-NEXT:    ldr r2, [r6, #12] @ 4-byte Reload
-; BE-NEXT:    ldr r0, [r6, #16] @ 4-byte Reload
-; BE-NEXT:    mov r1, r4
-; BE-NEXT:    eor r3, r1, r0
-; BE-NEXT:    mov r0, r5
-; BE-NEXT:    eor r2, r0, r2
-; BE-NEXT:    orr r2, r2, r3
-; BE-NEXT:    cmp r2, #0
-; BE-NEXT:    str r1, [r6, #20] @ 4-byte Spill
+; BE-NEXT:    mov r0, r2
+; BE-NEXT:    ldr r1, [r6, #12] @ 4-byte Reload
+; BE-NEXT:    eor r1, r0, r1
+; BE-NEXT:    mov r2, r3
+; BE-NEXT:    ldr r3, [r6, #16] @ 4-byte Reload
+; BE-NEXT:    eor r3, r2, r3
+; BE-NEXT:    orr r1, r3, r1
+; BE-NEXT:    cmp r1, #0
 ; BE-NEXT:    str r0, [r6, #24] @ 4-byte Spill
+; BE-NEXT:    str r2, [r6, #20] @ 4-byte Spill
 ; BE-NEXT:    bne .LBB0_2
 ; BE-NEXT:    b .LBB0_6
 ; BE-NEXT:  .LBB0_6: @ %atomicrmw.end

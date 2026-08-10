@@ -110,10 +110,10 @@ define i32 @test_choice2(fp128 %a, fp128 %b) #0 {
 ; P9-NEXT:    std 0, 128(1)
 ; P9-NEXT:    xscmpuqp 0, 2, 3
 ; P9-NEXT:    crmove 20, 3
-; P9-NEXT:    crnot 21, 20
-; P9-NEXT:    crmove 20, 1
 ; P9-NEXT:    crnot 20, 20
-; P9-NEXT:    crand 20, 20, 21
+; P9-NEXT:    crmove 21, 1
+; P9-NEXT:    crnot 21, 21
+; P9-NEXT:    crand 20, 21, 20
 ; P9-NEXT:    crxor 21, 21, 21
 ; P9-NEXT:    crxor 20, 20, 21
 ; P9-NEXT:    bc 12, 20, .LBB1_2

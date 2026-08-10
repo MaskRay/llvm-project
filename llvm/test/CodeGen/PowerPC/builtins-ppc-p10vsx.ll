@@ -332,10 +332,26 @@ entry:
 }
 
 define dso_local <1 x i128> @vec_xl_zext(i64 %__offset, ptr nocapture readonly %__pointer) {
-; CHECK-LABEL: vec_xl_zext:
-; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    lxvrbx v2, r4, r3
-; CHECK-NEXT:    blr
+; CHECK-LE-LABEL: vec_xl_zext:
+; CHECK-LE:       # %bb.0: # %entry
+; CHECK-LE-NEXT:    lxvrbx v2, r4, r3
+; CHECK-LE-NEXT:    blr
+;
+; CHECK-LINUXBE-LABEL: vec_xl_zext:
+; CHECK-LINUXBE:       # %bb.0: # %entry
+; CHECK-LINUXBE-NEXT:    lxvrbx v2, r4, r3
+; CHECK-LINUXBE-NEXT:    blr
+;
+; CHECK-O0-LABEL: vec_xl_zext:
+; CHECK-O0:       # %bb.0: # %entry
+; CHECK-O0-NEXT:    lxvrbx vs0, r4, r3
+; CHECK-O0-NEXT:    xxlor v2, vs0, vs0
+; CHECK-O0-NEXT:    blr
+;
+; CHECK-AIXBE-LABEL: vec_xl_zext:
+; CHECK-AIXBE:       # %bb.0: # %entry
+; CHECK-AIXBE-NEXT:    lxvrbx v2, r4, r3
+; CHECK-AIXBE-NEXT:    blr
 entry:
   %add.ptr = getelementptr inbounds i8, ptr %__pointer, i64 %__offset
   %0 = load i8, ptr %add.ptr, align 1
@@ -345,11 +361,30 @@ entry:
 }
 
 define dso_local <1 x i128> @vec_xl_zext_short(i64 %__offset, ptr nocapture readonly %__pointer) {
-; CHECK-LABEL: vec_xl_zext_short:
-; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    sldi r3, r3, 1
-; CHECK-NEXT:    lxvrhx v2, r4, r3
-; CHECK-NEXT:    blr
+; CHECK-LE-LABEL: vec_xl_zext_short:
+; CHECK-LE:       # %bb.0: # %entry
+; CHECK-LE-NEXT:    sldi r3, r3, 1
+; CHECK-LE-NEXT:    lxvrhx v2, r4, r3
+; CHECK-LE-NEXT:    blr
+;
+; CHECK-LINUXBE-LABEL: vec_xl_zext_short:
+; CHECK-LINUXBE:       # %bb.0: # %entry
+; CHECK-LINUXBE-NEXT:    sldi r3, r3, 1
+; CHECK-LINUXBE-NEXT:    lxvrhx v2, r4, r3
+; CHECK-LINUXBE-NEXT:    blr
+;
+; CHECK-O0-LABEL: vec_xl_zext_short:
+; CHECK-O0:       # %bb.0: # %entry
+; CHECK-O0-NEXT:    sldi r3, r3, 1
+; CHECK-O0-NEXT:    lxvrhx vs0, r4, r3
+; CHECK-O0-NEXT:    xxlor v2, vs0, vs0
+; CHECK-O0-NEXT:    blr
+;
+; CHECK-AIXBE-LABEL: vec_xl_zext_short:
+; CHECK-AIXBE:       # %bb.0: # %entry
+; CHECK-AIXBE-NEXT:    sldi r3, r3, 1
+; CHECK-AIXBE-NEXT:    lxvrhx v2, r4, r3
+; CHECK-AIXBE-NEXT:    blr
 entry:
   %add.ptr = getelementptr inbounds i16, ptr %__pointer, i64 %__offset
   %0 = load i16, ptr %add.ptr, align 2
@@ -359,11 +394,30 @@ entry:
 }
 
 define dso_local <1 x i128> @vec_xl_zext_word(i64 %__offset, ptr nocapture readonly %__pointer) {
-; CHECK-LABEL: vec_xl_zext_word:
-; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    sldi r3, r3, 2
-; CHECK-NEXT:    lxvrwx v2, r4, r3
-; CHECK-NEXT:    blr
+; CHECK-LE-LABEL: vec_xl_zext_word:
+; CHECK-LE:       # %bb.0: # %entry
+; CHECK-LE-NEXT:    sldi r3, r3, 2
+; CHECK-LE-NEXT:    lxvrwx v2, r4, r3
+; CHECK-LE-NEXT:    blr
+;
+; CHECK-LINUXBE-LABEL: vec_xl_zext_word:
+; CHECK-LINUXBE:       # %bb.0: # %entry
+; CHECK-LINUXBE-NEXT:    sldi r3, r3, 2
+; CHECK-LINUXBE-NEXT:    lxvrwx v2, r4, r3
+; CHECK-LINUXBE-NEXT:    blr
+;
+; CHECK-O0-LABEL: vec_xl_zext_word:
+; CHECK-O0:       # %bb.0: # %entry
+; CHECK-O0-NEXT:    sldi r3, r3, 2
+; CHECK-O0-NEXT:    lxvrwx vs0, r4, r3
+; CHECK-O0-NEXT:    xxlor v2, vs0, vs0
+; CHECK-O0-NEXT:    blr
+;
+; CHECK-AIXBE-LABEL: vec_xl_zext_word:
+; CHECK-AIXBE:       # %bb.0: # %entry
+; CHECK-AIXBE-NEXT:    sldi r3, r3, 2
+; CHECK-AIXBE-NEXT:    lxvrwx v2, r4, r3
+; CHECK-AIXBE-NEXT:    blr
 entry:
   %add.ptr = getelementptr inbounds i32, ptr %__pointer, i64 %__offset
   %0 = load i32, ptr %add.ptr, align 4
@@ -373,11 +427,30 @@ entry:
 }
 
 define dso_local <1 x i128> @vec_xl_zext_dw(i64 %__offset, ptr nocapture readonly %__pointer) {
-; CHECK-LABEL: vec_xl_zext_dw:
-; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    sldi r3, r3, 3
-; CHECK-NEXT:    lxvrdx v2, r4, r3
-; CHECK-NEXT:    blr
+; CHECK-LE-LABEL: vec_xl_zext_dw:
+; CHECK-LE:       # %bb.0: # %entry
+; CHECK-LE-NEXT:    sldi r3, r3, 3
+; CHECK-LE-NEXT:    lxvrdx v2, r4, r3
+; CHECK-LE-NEXT:    blr
+;
+; CHECK-LINUXBE-LABEL: vec_xl_zext_dw:
+; CHECK-LINUXBE:       # %bb.0: # %entry
+; CHECK-LINUXBE-NEXT:    sldi r3, r3, 3
+; CHECK-LINUXBE-NEXT:    lxvrdx v2, r4, r3
+; CHECK-LINUXBE-NEXT:    blr
+;
+; CHECK-O0-LABEL: vec_xl_zext_dw:
+; CHECK-O0:       # %bb.0: # %entry
+; CHECK-O0-NEXT:    sldi r3, r3, 3
+; CHECK-O0-NEXT:    lxvrdx vs0, r4, r3
+; CHECK-O0-NEXT:    xxlor v2, vs0, vs0
+; CHECK-O0-NEXT:    blr
+;
+; CHECK-AIXBE-LABEL: vec_xl_zext_dw:
+; CHECK-AIXBE:       # %bb.0: # %entry
+; CHECK-AIXBE-NEXT:    sldi r3, r3, 3
+; CHECK-AIXBE-NEXT:    lxvrdx v2, r4, r3
+; CHECK-AIXBE-NEXT:    blr
 entry:
   %add.ptr = getelementptr inbounds i64, ptr %__pointer, i64 %__offset
   %0 = load i64, ptr %add.ptr, align 8
@@ -387,37 +460,13 @@ entry:
 }
 
 define dso_local <1 x i128> @vec_xl_sext_b(i64 %offset, ptr %p) {
-; CHECK-LE-LABEL: vec_xl_sext_b:
-; CHECK-LE:       # %bb.0: # %entry
-; CHECK-LE-NEXT:    lbzx r3, r4, r3
-; CHECK-LE-NEXT:    extsb r3, r3
-; CHECK-LE-NEXT:    sradi r4, r3, 63
-; CHECK-LE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-LE-NEXT:    blr
-;
-; CHECK-LINUXBE-LABEL: vec_xl_sext_b:
-; CHECK-LINUXBE:       # %bb.0: # %entry
-; CHECK-LINUXBE-NEXT:    lbzx r3, r4, r3
-; CHECK-LINUXBE-NEXT:    extsb r3, r3
-; CHECK-LINUXBE-NEXT:    sradi r4, r3, 63
-; CHECK-LINUXBE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-LINUXBE-NEXT:    blr
-;
-; CHECK-O0-LABEL: vec_xl_sext_b:
-; CHECK-O0:       # %bb.0: # %entry
-; CHECK-O0-NEXT:    lbzx r3, r4, r3
-; CHECK-O0-NEXT:    extsb r4, r3
-; CHECK-O0-NEXT:    sradi r3, r4, 63
-; CHECK-O0-NEXT:    mtvsrdd v2, r3, r4
-; CHECK-O0-NEXT:    blr
-;
-; CHECK-AIXBE-LABEL: vec_xl_sext_b:
-; CHECK-AIXBE:       # %bb.0: # %entry
-; CHECK-AIXBE-NEXT:    lbzx r3, r4, r3
-; CHECK-AIXBE-NEXT:    extsb r3, r3
-; CHECK-AIXBE-NEXT:    sradi r4, r3, 63
-; CHECK-AIXBE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-AIXBE-NEXT:    blr
+; CHECK-LABEL: vec_xl_sext_b:
+; CHECK:       # %bb.0: # %entry
+; CHECK-NEXT:    lbzx r3, r4, r3
+; CHECK-NEXT:    extsb r3, r3
+; CHECK-NEXT:    sradi r4, r3, 63
+; CHECK-NEXT:    mtvsrdd v2, r4, r3
+; CHECK-NEXT:    blr
 entry:
   %add.ptr = getelementptr inbounds i8, ptr %p, i64 %offset
   %0 = load i8, ptr %add.ptr, align 1
@@ -427,37 +476,13 @@ entry:
 }
 
 define dso_local <1 x i128> @vec_xl_sext_h(i64 %offset, ptr %p) {
-; CHECK-LE-LABEL: vec_xl_sext_h:
-; CHECK-LE:       # %bb.0: # %entry
-; CHECK-LE-NEXT:    sldi r3, r3, 1
-; CHECK-LE-NEXT:    lhax r3, r4, r3
-; CHECK-LE-NEXT:    sradi r4, r3, 63
-; CHECK-LE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-LE-NEXT:    blr
-;
-; CHECK-LINUXBE-LABEL: vec_xl_sext_h:
-; CHECK-LINUXBE:       # %bb.0: # %entry
-; CHECK-LINUXBE-NEXT:    sldi r3, r3, 1
-; CHECK-LINUXBE-NEXT:    lhax r3, r4, r3
-; CHECK-LINUXBE-NEXT:    sradi r4, r3, 63
-; CHECK-LINUXBE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-LINUXBE-NEXT:    blr
-;
-; CHECK-O0-LABEL: vec_xl_sext_h:
-; CHECK-O0:       # %bb.0: # %entry
-; CHECK-O0-NEXT:    sldi r3, r3, 1
-; CHECK-O0-NEXT:    lhax r4, r4, r3
-; CHECK-O0-NEXT:    sradi r3, r4, 63
-; CHECK-O0-NEXT:    mtvsrdd v2, r3, r4
-; CHECK-O0-NEXT:    blr
-;
-; CHECK-AIXBE-LABEL: vec_xl_sext_h:
-; CHECK-AIXBE:       # %bb.0: # %entry
-; CHECK-AIXBE-NEXT:    sldi r3, r3, 1
-; CHECK-AIXBE-NEXT:    lhax r3, r4, r3
-; CHECK-AIXBE-NEXT:    sradi r4, r3, 63
-; CHECK-AIXBE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-AIXBE-NEXT:    blr
+; CHECK-LABEL: vec_xl_sext_h:
+; CHECK:       # %bb.0: # %entry
+; CHECK-NEXT:    sldi r3, r3, 1
+; CHECK-NEXT:    lhax r3, r4, r3
+; CHECK-NEXT:    sradi r4, r3, 63
+; CHECK-NEXT:    mtvsrdd v2, r4, r3
+; CHECK-NEXT:    blr
 entry:
   %add.ptr = getelementptr inbounds i16, ptr %p, i64 %offset
   %0 = load i16, ptr %add.ptr, align 2
@@ -467,37 +492,13 @@ entry:
 }
 
 define dso_local <1 x i128> @vec_xl_sext_w(i64 %offset, ptr %p) {
-; CHECK-LE-LABEL: vec_xl_sext_w:
-; CHECK-LE:       # %bb.0: # %entry
-; CHECK-LE-NEXT:    sldi r3, r3, 2
-; CHECK-LE-NEXT:    lwax r3, r4, r3
-; CHECK-LE-NEXT:    sradi r4, r3, 63
-; CHECK-LE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-LE-NEXT:    blr
-;
-; CHECK-LINUXBE-LABEL: vec_xl_sext_w:
-; CHECK-LINUXBE:       # %bb.0: # %entry
-; CHECK-LINUXBE-NEXT:    sldi r3, r3, 2
-; CHECK-LINUXBE-NEXT:    lwax r3, r4, r3
-; CHECK-LINUXBE-NEXT:    sradi r4, r3, 63
-; CHECK-LINUXBE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-LINUXBE-NEXT:    blr
-;
-; CHECK-O0-LABEL: vec_xl_sext_w:
-; CHECK-O0:       # %bb.0: # %entry
-; CHECK-O0-NEXT:    sldi r3, r3, 2
-; CHECK-O0-NEXT:    lwax r4, r4, r3
-; CHECK-O0-NEXT:    sradi r3, r4, 63
-; CHECK-O0-NEXT:    mtvsrdd v2, r3, r4
-; CHECK-O0-NEXT:    blr
-;
-; CHECK-AIXBE-LABEL: vec_xl_sext_w:
-; CHECK-AIXBE:       # %bb.0: # %entry
-; CHECK-AIXBE-NEXT:    sldi r3, r3, 2
-; CHECK-AIXBE-NEXT:    lwax r3, r4, r3
-; CHECK-AIXBE-NEXT:    sradi r4, r3, 63
-; CHECK-AIXBE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-AIXBE-NEXT:    blr
+; CHECK-LABEL: vec_xl_sext_w:
+; CHECK:       # %bb.0: # %entry
+; CHECK-NEXT:    sldi r3, r3, 2
+; CHECK-NEXT:    lwax r3, r4, r3
+; CHECK-NEXT:    sradi r4, r3, 63
+; CHECK-NEXT:    mtvsrdd v2, r4, r3
+; CHECK-NEXT:    blr
 entry:
   %add.ptr = getelementptr inbounds i32, ptr %p, i64 %offset
   %0 = load i32, ptr %add.ptr, align 4
@@ -507,37 +508,13 @@ entry:
 }
 
 define dso_local <1 x i128> @vec_xl_sext_d(i64 %offset, ptr %p) {
-; CHECK-LE-LABEL: vec_xl_sext_d:
-; CHECK-LE:       # %bb.0: # %entry
-; CHECK-LE-NEXT:    sldi r3, r3, 3
-; CHECK-LE-NEXT:    ldx r3, r4, r3
-; CHECK-LE-NEXT:    sradi r4, r3, 63
-; CHECK-LE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-LE-NEXT:    blr
-;
-; CHECK-LINUXBE-LABEL: vec_xl_sext_d:
-; CHECK-LINUXBE:       # %bb.0: # %entry
-; CHECK-LINUXBE-NEXT:    sldi r3, r3, 3
-; CHECK-LINUXBE-NEXT:    ldx r3, r4, r3
-; CHECK-LINUXBE-NEXT:    sradi r4, r3, 63
-; CHECK-LINUXBE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-LINUXBE-NEXT:    blr
-;
-; CHECK-O0-LABEL: vec_xl_sext_d:
-; CHECK-O0:       # %bb.0: # %entry
-; CHECK-O0-NEXT:    sldi r3, r3, 3
-; CHECK-O0-NEXT:    ldx r4, r4, r3
-; CHECK-O0-NEXT:    sradi r3, r4, 63
-; CHECK-O0-NEXT:    mtvsrdd v2, r3, r4
-; CHECK-O0-NEXT:    blr
-;
-; CHECK-AIXBE-LABEL: vec_xl_sext_d:
-; CHECK-AIXBE:       # %bb.0: # %entry
-; CHECK-AIXBE-NEXT:    sldi r3, r3, 3
-; CHECK-AIXBE-NEXT:    ldx r3, r4, r3
-; CHECK-AIXBE-NEXT:    sradi r4, r3, 63
-; CHECK-AIXBE-NEXT:    mtvsrdd v2, r4, r3
-; CHECK-AIXBE-NEXT:    blr
+; CHECK-LABEL: vec_xl_sext_d:
+; CHECK:       # %bb.0: # %entry
+; CHECK-NEXT:    sldi r3, r3, 3
+; CHECK-NEXT:    ldx r3, r4, r3
+; CHECK-NEXT:    sradi r4, r3, 63
+; CHECK-NEXT:    mtvsrdd v2, r4, r3
+; CHECK-NEXT:    blr
 entry:
   %add.ptr = getelementptr inbounds i64, ptr %p, i64 %offset
   %0 = load i64, ptr %add.ptr, align 8

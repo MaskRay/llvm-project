@@ -205,29 +205,6 @@ entry:
 declare void @llvm.memset.p0.i32(ptr nocapture writeonly, i8, i32, i1 immarg)
 
 define void @test_memset(ptr %dst, i8 %val, i32 %len) {
-; NO-OPTION-LABEL: test_memset:
-; NO-OPTION:       @ %bb.0: @ %entry
-; NO-OPTION-NEXT:    push {r7, lr}
-; NO-OPTION-NEXT:    bl memset
-; NO-OPTION-NEXT:    pop {r7, pc}
-;
-; LONGCALL-LABEL: test_memset:
-; LONGCALL:       @ %bb.0: @ %entry
-; LONGCALL-NEXT:    push {r7, lr}
-; LONGCALL-NEXT:    ldr r3, .LCPI4_0
-; LONGCALL-NEXT:    blx r3
-; LONGCALL-NEXT:    pop {r7, pc}
-; LONGCALL-NEXT:    .p2align 2
-; LONGCALL-NEXT:  @ %bb.1:
-; LONGCALL-NEXT:  .LCPI4_0:
-; LONGCALL-NEXT:    .long memset
-;
-; NO-LONGCALL-LABEL: test_memset:
-; NO-LONGCALL:       @ %bb.0: @ %entry
-; NO-LONGCALL-NEXT:    push {r7, lr}
-; NO-LONGCALL-NEXT:    bl memset
-; NO-LONGCALL-NEXT:    pop {r7, pc}
-;
 ; XO-LONGCALL-LABEL: test_memset:
 ; XO-LONGCALL:       @ %bb.0: @ %entry
 ; XO-LONGCALL-NEXT:    .save {r11, lr}

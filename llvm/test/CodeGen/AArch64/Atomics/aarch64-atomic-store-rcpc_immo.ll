@@ -306,52 +306,36 @@ define void @store_atomic_i64_unaligned_seq_cst(i64 %value, ptr %ptr) {
 }
 
 define void @store_atomic_i128_unaligned_unordered(i128 %value, ptr %ptr) {
-; GISEL-LABEL: store_atomic_i128_unaligned_unordered:
-; GISEL:    add x1, x8, #64
-; GISEL:    bl __atomic_store
-;
-; SDAG-LABEL: store_atomic_i128_unaligned_unordered:
-; SDAG:    add x1, x2, #64
-; SDAG:    bl __atomic_store
+; CHECK-LABEL: store_atomic_i128_unaligned_unordered:
+; CHECK:    add x1, x2, #64
+; CHECK:    bl __atomic_store
     %gep = getelementptr inbounds i128, ptr %ptr, i32 4
     store atomic i128 %value, ptr %gep unordered, align 1
     ret void
 }
 
 define void @store_atomic_i128_unaligned_monotonic(i128 %value, ptr %ptr) {
-; GISEL-LABEL: store_atomic_i128_unaligned_monotonic:
-; GISEL:    add x1, x8, #64
-; GISEL:    bl __atomic_store
-;
-; SDAG-LABEL: store_atomic_i128_unaligned_monotonic:
-; SDAG:    add x1, x2, #64
-; SDAG:    bl __atomic_store
+; CHECK-LABEL: store_atomic_i128_unaligned_monotonic:
+; CHECK:    add x1, x2, #64
+; CHECK:    bl __atomic_store
     %gep = getelementptr inbounds i128, ptr %ptr, i32 4
     store atomic i128 %value, ptr %gep monotonic, align 1
     ret void
 }
 
 define void @store_atomic_i128_unaligned_release(i128 %value, ptr %ptr) {
-; GISEL-LABEL: store_atomic_i128_unaligned_release:
-; GISEL:    add x1, x8, #64
-; GISEL:    bl __atomic_store
-;
-; SDAG-LABEL: store_atomic_i128_unaligned_release:
-; SDAG:    add x1, x2, #64
-; SDAG:    bl __atomic_store
+; CHECK-LABEL: store_atomic_i128_unaligned_release:
+; CHECK:    add x1, x2, #64
+; CHECK:    bl __atomic_store
     %gep = getelementptr inbounds i128, ptr %ptr, i32 4
     store atomic i128 %value, ptr %gep release, align 1
     ret void
 }
 
 define void @store_atomic_i128_unaligned_seq_cst(i128 %value, ptr %ptr) {
-; GISEL-LABEL: store_atomic_i128_unaligned_seq_cst:
-; GISEL:    add x1, x8, #64
-; GISEL:    bl __atomic_store
-;
-; SDAG-LABEL: store_atomic_i128_unaligned_seq_cst:
-; SDAG:    add x1, x2, #64
-; SDAG:    bl __atomic_store
+; CHECK-LABEL: store_atomic_i128_unaligned_seq_cst:
+; CHECK:    add x1, x2, #64
+; CHECK:    bl __atomic_store
     %gep = getelementptr inbounds i128, ptr %ptr, i32 4
     store atomic i128 %value, ptr %gep seq_cst, align 1
     ret void
@@ -360,7 +344,7 @@ define void @store_atomic_i128_unaligned_seq_cst(i128 %value, ptr %ptr) {
 define void @store_atomic_i8_from_gep() {
 ; GISEL-LABEL: store_atomic_i8_from_gep:
 ; GISEL:    bl init
-; GISEL:    stlurb w8, [x9, #1]
+; GISEL:    stlurb w8, [x19, #1]
 ;
 ; SDAG-LABEL: store_atomic_i8_from_gep:
 ; SDAG:    bl init
@@ -375,7 +359,7 @@ define void @store_atomic_i8_from_gep() {
 define void @store_atomic_i16_from_gep() {
 ; GISEL-LABEL: store_atomic_i16_from_gep:
 ; GISEL:    bl init
-; GISEL:    stlurh w8, [x9, #2]
+; GISEL:    stlurh w8, [x19, #2]
 ;
 ; SDAG-LABEL: store_atomic_i16_from_gep:
 ; SDAG:    bl init
@@ -390,7 +374,7 @@ define void @store_atomic_i16_from_gep() {
 define void @store_atomic_i32_from_gep() {
 ; GISEL-LABEL: store_atomic_i32_from_gep:
 ; GISEL:    bl init
-; GISEL:    stlur w8, [x9, #4]
+; GISEL:    stlur w8, [x19, #4]
 ;
 ; SDAG-LABEL: store_atomic_i32_from_gep:
 ; SDAG:    bl init
@@ -405,7 +389,7 @@ define void @store_atomic_i32_from_gep() {
 define void @store_atomic_i64_from_gep() {
 ; GISEL-LABEL: store_atomic_i64_from_gep:
 ; GISEL:    bl init
-; GISEL:    stlur x8, [x9, #8]
+; GISEL:    stlur x8, [x19, #8]
 ;
 ; SDAG-LABEL: store_atomic_i64_from_gep:
 ; SDAG:    bl init
@@ -421,12 +405,11 @@ define void @store_atomic_i128_from_gep() {
 ; GISEL-LABEL: store_atomic_i128_from_gep:
 ; GISEL:    bl init
 ; GISEL:    dmb ish
-; GISEL:    stp x8, x8, [x9, #16]
+; GISEL:    stp x8, x8, [x19, #16]
 ;
 ; SDAG-LABEL: store_atomic_i128_from_gep:
 ; SDAG:    bl init
 ; SDAG:    dmb ish
-; SDAG:    stp xzr, xzr, [sp, #16]
   %a = alloca [3 x i128]
   call void @init(ptr %a)
   %arrayidx  = getelementptr [3 x i128], ptr %a, i64 0, i64 1

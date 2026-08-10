@@ -21,25 +21,27 @@ define fastcc i64 @baz() {
 ; CHECK-LABEL: baz:
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    sub sp, sp, #32
-; CHECK-NEXT:    str x30, [sp, #16] // 8-byte Spill
+; CHECK-NEXT:    stp x30, x19, [sp, #16] // 16-byte Folded Spill
 ; CHECK-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-NEXT:    .cfi_offset w19, -8
 ; CHECK-NEXT:    .cfi_offset w30, -16
 ; CHECK-NEXT:    mov x8, sp
-; CHECK-NEXT:    mov x7, xzr
+; CHECK-NEXT:    mov x9, xzr
 ; CHECK-NEXT:    str xzr, [x8]
-; CHECK-NEXT:    mov x0, x7
-; CHECK-NEXT:    mov x1, x7
-; CHECK-NEXT:    mov x2, x7
-; CHECK-NEXT:    mov x3, x7
-; CHECK-NEXT:    mov x4, x7
-; CHECK-NEXT:    mov x5, x7
-; CHECK-NEXT:    mov x6, x7
+; CHECK-NEXT:    mov x0, x9
+; CHECK-NEXT:    mov x1, x9
+; CHECK-NEXT:    mov x2, x9
+; CHECK-NEXT:    mov x3, x9
+; CHECK-NEXT:    mov x4, x9
+; CHECK-NEXT:    mov x5, x9
+; CHECK-NEXT:    mov x6, x9
+; CHECK-NEXT:    mov x7, x9
 ; CHECK-NEXT:    bl foo
 ; CHECK-NEXT:    sub sp, sp, #16
-; CHECK-NEXT:    str x0, [sp, #8] // 8-byte Spill
+; CHECK-NEXT:    mov x19, x0
 ; CHECK-NEXT:    bl bar
-; CHECK-NEXT:    ldr x0, [sp, #8] // 8-byte Reload
-; CHECK-NEXT:    ldr x30, [sp, #16] // 8-byte Reload
+; CHECK-NEXT:    mov x0, x19
+; CHECK-NEXT:    ldp x30, x19, [sp, #16] // 16-byte Folded Reload
 ; CHECK-NEXT:    add sp, sp, #32
 ; CHECK-NEXT:    ret
 entry:

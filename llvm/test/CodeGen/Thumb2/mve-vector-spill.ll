@@ -8,15 +8,18 @@ define arm_aapcs_vfpcc void @spill_vector_i32(<4 x i32> %v, ptr %p) {
 ; CHECK:       @ %bb.0: @ %entry
 ; CHECK-NEXT:    .save {r7, lr}
 ; CHECK-NEXT:    push {r7, lr}
-; CHECK-NEXT:    .pad #24
-; CHECK-NEXT:    sub sp, #24
-; CHECK-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-NEXT:    vstrw.32 q0, [sp, #8] @ 16-byte Spill
+; CHECK-NEXT:    .vsave {d8, d9}
+; CHECK-NEXT:    vpush {d8, d9}
+; CHECK-NEXT:    .pad #8
+; CHECK-NEXT:    sub sp, #8
+; CHECK-NEXT:    mov lr, r0
+; CHECK-NEXT:    vmov q4, q0
+; CHECK-NEXT:    str.w lr, [sp, #4] @ 4-byte Spill
 ; CHECK-NEXT:    bl external_function
-; CHECK-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
-; CHECK-NEXT:    vldrw.u32 q0, [sp, #8] @ 16-byte Reload
-; CHECK-NEXT:    vstrw.32 q0, [r0]
-; CHECK-NEXT:    add sp, #24
+; CHECK-NEXT:    ldr.w lr, [sp, #4] @ 4-byte Reload
+; CHECK-NEXT:    vstrw.32 q4, [lr]
+; CHECK-NEXT:    add sp, #8
+; CHECK-NEXT:    vpop {d8, d9}
 ; CHECK-NEXT:    pop {r7, pc}
 entry:
   call void @external_function()
@@ -29,15 +32,18 @@ define arm_aapcs_vfpcc void @spill_vector_i16(<8 x i16> %v, ptr %p) {
 ; CHECK:       @ %bb.0: @ %entry
 ; CHECK-NEXT:    .save {r7, lr}
 ; CHECK-NEXT:    push {r7, lr}
-; CHECK-NEXT:    .pad #24
-; CHECK-NEXT:    sub sp, #24
-; CHECK-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-NEXT:    vstrw.32 q0, [sp, #8] @ 16-byte Spill
+; CHECK-NEXT:    .vsave {d8, d9}
+; CHECK-NEXT:    vpush {d8, d9}
+; CHECK-NEXT:    .pad #8
+; CHECK-NEXT:    sub sp, #8
+; CHECK-NEXT:    mov lr, r0
+; CHECK-NEXT:    vmov q4, q0
+; CHECK-NEXT:    str.w lr, [sp, #4] @ 4-byte Spill
 ; CHECK-NEXT:    bl external_function
-; CHECK-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
-; CHECK-NEXT:    vldrw.u32 q0, [sp, #8] @ 16-byte Reload
-; CHECK-NEXT:    vstrh.16 q0, [r0]
-; CHECK-NEXT:    add sp, #24
+; CHECK-NEXT:    ldr.w lr, [sp, #4] @ 4-byte Reload
+; CHECK-NEXT:    vstrh.16 q4, [lr]
+; CHECK-NEXT:    add sp, #8
+; CHECK-NEXT:    vpop {d8, d9}
 ; CHECK-NEXT:    pop {r7, pc}
 entry:
   call void @external_function()
@@ -50,15 +56,18 @@ define arm_aapcs_vfpcc void @spill_vector_i8(<16 x i8> %v, ptr %p) {
 ; CHECK:       @ %bb.0: @ %entry
 ; CHECK-NEXT:    .save {r7, lr}
 ; CHECK-NEXT:    push {r7, lr}
-; CHECK-NEXT:    .pad #24
-; CHECK-NEXT:    sub sp, #24
-; CHECK-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-NEXT:    vstrw.32 q0, [sp, #8] @ 16-byte Spill
+; CHECK-NEXT:    .vsave {d8, d9}
+; CHECK-NEXT:    vpush {d8, d9}
+; CHECK-NEXT:    .pad #8
+; CHECK-NEXT:    sub sp, #8
+; CHECK-NEXT:    mov lr, r0
+; CHECK-NEXT:    vmov q4, q0
+; CHECK-NEXT:    str.w lr, [sp, #4] @ 4-byte Spill
 ; CHECK-NEXT:    bl external_function
-; CHECK-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
-; CHECK-NEXT:    vldrw.u32 q0, [sp, #8] @ 16-byte Reload
-; CHECK-NEXT:    vstrb.8 q0, [r0]
-; CHECK-NEXT:    add sp, #24
+; CHECK-NEXT:    ldr.w lr, [sp, #4] @ 4-byte Reload
+; CHECK-NEXT:    vstrb.8 q4, [lr]
+; CHECK-NEXT:    add sp, #8
+; CHECK-NEXT:    vpop {d8, d9}
 ; CHECK-NEXT:    pop {r7, pc}
 entry:
   call void @external_function()
@@ -71,15 +80,18 @@ define arm_aapcs_vfpcc void @spill_vector_i64(<2 x i64> %v, ptr %p) {
 ; CHECK:       @ %bb.0: @ %entry
 ; CHECK-NEXT:    .save {r7, lr}
 ; CHECK-NEXT:    push {r7, lr}
-; CHECK-NEXT:    .pad #24
-; CHECK-NEXT:    sub sp, #24
-; CHECK-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-NEXT:    vstrw.32 q0, [sp, #8] @ 16-byte Spill
+; CHECK-NEXT:    .vsave {d8, d9}
+; CHECK-NEXT:    vpush {d8, d9}
+; CHECK-NEXT:    .pad #8
+; CHECK-NEXT:    sub sp, #8
+; CHECK-NEXT:    mov lr, r0
+; CHECK-NEXT:    vmov q4, q0
+; CHECK-NEXT:    str.w lr, [sp, #4] @ 4-byte Spill
 ; CHECK-NEXT:    bl external_function
-; CHECK-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
-; CHECK-NEXT:    vldrw.u32 q0, [sp, #8] @ 16-byte Reload
-; CHECK-NEXT:    vstrw.32 q0, [r0]
-; CHECK-NEXT:    add sp, #24
+; CHECK-NEXT:    ldr.w lr, [sp, #4] @ 4-byte Reload
+; CHECK-NEXT:    vstrw.32 q4, [lr]
+; CHECK-NEXT:    add sp, #8
+; CHECK-NEXT:    vpop {d8, d9}
 ; CHECK-NEXT:    pop {r7, pc}
 entry:
   call void @external_function()
@@ -92,15 +104,18 @@ define arm_aapcs_vfpcc void @spill_vector_f32(<4 x float> %v, ptr %p) {
 ; CHECK:       @ %bb.0: @ %entry
 ; CHECK-NEXT:    .save {r7, lr}
 ; CHECK-NEXT:    push {r7, lr}
-; CHECK-NEXT:    .pad #24
-; CHECK-NEXT:    sub sp, #24
-; CHECK-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-NEXT:    vstrw.32 q0, [sp, #8] @ 16-byte Spill
+; CHECK-NEXT:    .vsave {d8, d9}
+; CHECK-NEXT:    vpush {d8, d9}
+; CHECK-NEXT:    .pad #8
+; CHECK-NEXT:    sub sp, #8
+; CHECK-NEXT:    mov lr, r0
+; CHECK-NEXT:    vmov q4, q0
+; CHECK-NEXT:    str.w lr, [sp, #4] @ 4-byte Spill
 ; CHECK-NEXT:    bl external_function
-; CHECK-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
-; CHECK-NEXT:    vldrw.u32 q0, [sp, #8] @ 16-byte Reload
-; CHECK-NEXT:    vstrw.32 q0, [r0]
-; CHECK-NEXT:    add sp, #24
+; CHECK-NEXT:    ldr.w lr, [sp, #4] @ 4-byte Reload
+; CHECK-NEXT:    vstrw.32 q4, [lr]
+; CHECK-NEXT:    add sp, #8
+; CHECK-NEXT:    vpop {d8, d9}
 ; CHECK-NEXT:    pop {r7, pc}
 entry:
   call void @external_function()
@@ -113,15 +128,18 @@ define arm_aapcs_vfpcc void @spill_vector_f16(<8 x half> %v, ptr %p) {
 ; CHECK:       @ %bb.0: @ %entry
 ; CHECK-NEXT:    .save {r7, lr}
 ; CHECK-NEXT:    push {r7, lr}
-; CHECK-NEXT:    .pad #24
-; CHECK-NEXT:    sub sp, #24
-; CHECK-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-NEXT:    vstrw.32 q0, [sp, #8] @ 16-byte Spill
+; CHECK-NEXT:    .vsave {d8, d9}
+; CHECK-NEXT:    vpush {d8, d9}
+; CHECK-NEXT:    .pad #8
+; CHECK-NEXT:    sub sp, #8
+; CHECK-NEXT:    mov lr, r0
+; CHECK-NEXT:    vmov q4, q0
+; CHECK-NEXT:    str.w lr, [sp, #4] @ 4-byte Spill
 ; CHECK-NEXT:    bl external_function
-; CHECK-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
-; CHECK-NEXT:    vldrw.u32 q0, [sp, #8] @ 16-byte Reload
-; CHECK-NEXT:    vstrw.32 q0, [r0]
-; CHECK-NEXT:    add sp, #24
+; CHECK-NEXT:    ldr.w lr, [sp, #4] @ 4-byte Reload
+; CHECK-NEXT:    vstrw.32 q4, [lr]
+; CHECK-NEXT:    add sp, #8
+; CHECK-NEXT:    vpop {d8, d9}
 ; CHECK-NEXT:    pop {r7, pc}
 entry:
   call void @external_function()
@@ -134,15 +152,18 @@ define arm_aapcs_vfpcc void @spill_vector_f64(<2 x double> %v, ptr %p) {
 ; CHECK:       @ %bb.0: @ %entry
 ; CHECK-NEXT:    .save {r7, lr}
 ; CHECK-NEXT:    push {r7, lr}
-; CHECK-NEXT:    .pad #24
-; CHECK-NEXT:    sub sp, #24
-; CHECK-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-NEXT:    vstrw.32 q0, [sp, #8] @ 16-byte Spill
+; CHECK-NEXT:    .vsave {d8, d9}
+; CHECK-NEXT:    vpush {d8, d9}
+; CHECK-NEXT:    .pad #8
+; CHECK-NEXT:    sub sp, #8
+; CHECK-NEXT:    mov lr, r0
+; CHECK-NEXT:    vmov q4, q0
+; CHECK-NEXT:    str.w lr, [sp, #4] @ 4-byte Spill
 ; CHECK-NEXT:    bl external_function
-; CHECK-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
-; CHECK-NEXT:    vldrw.u32 q0, [sp, #8] @ 16-byte Reload
-; CHECK-NEXT:    vstrw.32 q0, [r0]
-; CHECK-NEXT:    add sp, #24
+; CHECK-NEXT:    ldr.w lr, [sp, #4] @ 4-byte Reload
+; CHECK-NEXT:    vstrw.32 q4, [lr]
+; CHECK-NEXT:    add sp, #8
+; CHECK-NEXT:    vpop {d8, d9}
 ; CHECK-NEXT:    pop {r7, pc}
 entry:
   call void @external_function()

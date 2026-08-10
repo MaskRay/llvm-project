@@ -12,37 +12,39 @@ define i64 @test0(i64 %n, ptr %p) nounwind {
 ; RV64-NEXT:    lpad 0
 ; RV64-NEXT:    addi sp, sp, -64
 ; RV64-NEXT:    sd ra, 56(sp) # 8-byte Folded Spill
-; RV64-NEXT:    sd a0, 0(sp) # 8-byte Folded Spill
+; RV64-NEXT:    sd s0, 48(sp) # 8-byte Folded Spill
+; RV64-NEXT:    mv s0, a0
 ; RV64-NEXT:    lui a0, %hi(f)
 ; RV64-NEXT:    addi a0, a0, %lo(f)
-; RV64-NEXT:    sw a0, 44(sp)
+; RV64-NEXT:    sw a0, 36(sp)
 ; RV64-NEXT:    srli a0, a0, 32
-; RV64-NEXT:    sw a0, 48(sp)
-; RV64-NEXT:    sw a1, 36(sp)
-; RV64-NEXT:    srli a0, a1, 32
 ; RV64-NEXT:    sw a0, 40(sp)
+; RV64-NEXT:    sw a1, 28(sp)
+; RV64-NEXT:    srli a0, a1, 32
+; RV64-NEXT:    sw a0, 32(sp)
 ; RV64-NEXT:    li a0, 23
-; RV64-NEXT:    sw a0, 16(sp)
+; RV64-NEXT:    sw a0, 8(sp)
 ; RV64-NEXT:    lui a0, 56
 ; RV64-NEXT:    addi a0, a0, 103
-; RV64-NEXT:    sw a0, 32(sp)
+; RV64-NEXT:    sw a0, 24(sp)
 ; RV64-NEXT:    lui a0, 4324
 ; RV64-NEXT:    addi a0, a0, -509
-; RV64-NEXT:    sw a0, 28(sp)
+; RV64-NEXT:    sw a0, 20(sp)
 ; RV64-NEXT:    lui a0, 6371
 ; RV64-NEXT:    addi a0, a0, 899
-; RV64-NEXT:    sw a0, 24(sp)
+; RV64-NEXT:    sw a0, 16(sp)
 ; RV64-NEXT:    lui a0, 1
 ; RV64-NEXT:    addi a0, a0, -489
-; RV64-NEXT:    sw a0, 20(sp)
-; RV64-NEXT:    addi a1, sp, 36
-; RV64-NEXT:    addi a0, sp, 16
-; RV64-NEXT:    sd a0, 8(sp) # 8-byte Folded Spill
+; RV64-NEXT:    sw a0, 12(sp)
+; RV64-NEXT:    addi a1, sp, 28
+; RV64-NEXT:    addi a0, sp, 8
+; RV64-NEXT:    sd a0, 0(sp) # 8-byte Folded Spill
 ; RV64-NEXT:    call __clear_cache
-; RV64-NEXT:    ld a0, 0(sp) # 8-byte Folded Reload
-; RV64-NEXT:    ld a1, 8(sp) # 8-byte Folded Reload
+; RV64-NEXT:    mv a0, s0
+; RV64-NEXT:    ld a1, 0(sp) # 8-byte Folded Reload
 ; RV64-NEXT:    jalr a1
 ; RV64-NEXT:    ld ra, 56(sp) # 8-byte Folded Reload
+; RV64-NEXT:    ld s0, 48(sp) # 8-byte Folded Reload
 ; RV64-NEXT:    addi sp, sp, 64
 ; RV64-NEXT:    ret
 ;
@@ -51,38 +53,40 @@ define i64 @test0(i64 %n, ptr %p) nounwind {
 ; RV64-LINUX-NEXT:    lpad 0
 ; RV64-LINUX-NEXT:    addi sp, sp, -64
 ; RV64-LINUX-NEXT:    sd ra, 56(sp) # 8-byte Folded Spill
-; RV64-LINUX-NEXT:    sd a0, 0(sp) # 8-byte Folded Spill
+; RV64-LINUX-NEXT:    sd s0, 48(sp) # 8-byte Folded Spill
+; RV64-LINUX-NEXT:    mv s0, a0
 ; RV64-LINUX-NEXT:    lui a0, %hi(f)
 ; RV64-LINUX-NEXT:    addi a0, a0, %lo(f)
-; RV64-LINUX-NEXT:    sw a0, 44(sp)
+; RV64-LINUX-NEXT:    sw a0, 36(sp)
 ; RV64-LINUX-NEXT:    srli a0, a0, 32
-; RV64-LINUX-NEXT:    sw a0, 48(sp)
-; RV64-LINUX-NEXT:    sw a1, 36(sp)
-; RV64-LINUX-NEXT:    srli a0, a1, 32
 ; RV64-LINUX-NEXT:    sw a0, 40(sp)
+; RV64-LINUX-NEXT:    sw a1, 28(sp)
+; RV64-LINUX-NEXT:    srli a0, a1, 32
+; RV64-LINUX-NEXT:    sw a0, 32(sp)
 ; RV64-LINUX-NEXT:    li a0, 23
-; RV64-LINUX-NEXT:    sw a0, 16(sp)
+; RV64-LINUX-NEXT:    sw a0, 8(sp)
 ; RV64-LINUX-NEXT:    lui a0, 56
 ; RV64-LINUX-NEXT:    addi a0, a0, 103
-; RV64-LINUX-NEXT:    sw a0, 32(sp)
+; RV64-LINUX-NEXT:    sw a0, 24(sp)
 ; RV64-LINUX-NEXT:    lui a0, 4324
 ; RV64-LINUX-NEXT:    addi a0, a0, -509
-; RV64-LINUX-NEXT:    sw a0, 28(sp)
+; RV64-LINUX-NEXT:    sw a0, 20(sp)
 ; RV64-LINUX-NEXT:    lui a0, 6371
 ; RV64-LINUX-NEXT:    addi a0, a0, 899
-; RV64-LINUX-NEXT:    sw a0, 24(sp)
+; RV64-LINUX-NEXT:    sw a0, 16(sp)
 ; RV64-LINUX-NEXT:    lui a0, 1
 ; RV64-LINUX-NEXT:    addi a0, a0, -489
-; RV64-LINUX-NEXT:    sw a0, 20(sp)
-; RV64-LINUX-NEXT:    addi a1, sp, 36
-; RV64-LINUX-NEXT:    addi a0, sp, 16
-; RV64-LINUX-NEXT:    sd a0, 8(sp) # 8-byte Folded Spill
+; RV64-LINUX-NEXT:    sw a0, 12(sp)
+; RV64-LINUX-NEXT:    addi a1, sp, 28
+; RV64-LINUX-NEXT:    addi a0, sp, 8
 ; RV64-LINUX-NEXT:    li a2, 0
+; RV64-LINUX-NEXT:    sd a0, 0(sp) # 8-byte Folded Spill
 ; RV64-LINUX-NEXT:    call __riscv_flush_icache
-; RV64-LINUX-NEXT:    ld a0, 0(sp) # 8-byte Folded Reload
-; RV64-LINUX-NEXT:    ld a1, 8(sp) # 8-byte Folded Reload
+; RV64-LINUX-NEXT:    mv a0, s0
+; RV64-LINUX-NEXT:    ld a1, 0(sp) # 8-byte Folded Reload
 ; RV64-LINUX-NEXT:    jalr a1
 ; RV64-LINUX-NEXT:    ld ra, 56(sp) # 8-byte Folded Reload
+; RV64-LINUX-NEXT:    ld s0, 48(sp) # 8-byte Folded Reload
 ; RV64-LINUX-NEXT:    addi sp, sp, 64
 ; RV64-LINUX-NEXT:    ret
   %alloca = alloca [36 x i8], align 8

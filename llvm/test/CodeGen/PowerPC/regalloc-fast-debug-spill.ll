@@ -26,12 +26,12 @@ define void @read_to_end(i1 %0) personality ptr null {
 ; CHECK-NEXT:    andi. 3, 3, 1
 ; CHECK-NEXT:    mfocrf 3, 128
 ; CHECK-NEXT:    rlwinm 3, 3, 1, 0, 0
-; CHECK-NEXT:    stw 3, 60(1)
-; CHECK-NEXT:    ld 3, 0(0)
-; CHECK-NEXT:    std 3, 64(1) # 8-byte Folded Spill
-; CHECK-NEXT:    li 3, 0
-; CHECK-NEXT:    std 3, 72(1) # 8-byte Folded Spill
-; CHECK-NEXT:    #DEBUG_VALUE: spec_extend<u8, alloc::alloc::Global>:iterator <- [DW_OP_LLVM_arg 0, DW_OP_LLVM_arg 1, DW_OP_constu 1, DW_OP_mul, DW_OP_plus, DW_OP_stack_value, DW_OP_LLVM_fragment 64 64] undef, $x3
+; CHECK-NEXT:    stw 3, 76(1)
+; CHECK-NEXT:    ld 4, 0(0)
+; CHECK-NEXT:    std 4, 64(1) # 8-byte Folded Spill
+; CHECK-NEXT:    li 5, 0
+; CHECK-NEXT:    std 5, 56(1) # 8-byte Folded Spill
+; CHECK-NEXT:    #DEBUG_VALUE: spec_extend<u8, alloc::alloc::Global>:iterator <- [DW_OP_LLVM_arg 0, DW_OP_LLVM_arg 1, DW_OP_constu 1, DW_OP_mul, DW_OP_plus, DW_OP_stack_value, DW_OP_LLVM_fragment 64 64] $x4, $x5
 ; CHECK-NEXT:    creqv 20, 20, 20
 ; CHECK-NEXT:    crxor 20, 1, 20
 ; CHECK-NEXT:    bc 12, 20, .LBB0_2
@@ -42,17 +42,17 @@ define void @read_to_end(i1 %0) personality ptr null {
 ; CHECK-NEXT:    mtlr 0
 ; CHECK-NEXT:    blr
 ; CHECK-NEXT:  .LBB0_2:
-; CHECK-NEXT:    ld 5, 72(1) # 8-byte Folded Reload
-; CHECK-NEXT:    ld 4, 64(1) # 8-byte Folded Reload
 ; CHECK-NEXT:    li 3, 0
+; CHECK-NEXT:    ld 4, 64(1) # 8-byte Folded Reload
+; CHECK-NEXT:    ld 5, 56(1) # 8-byte Folded Reload
 ; CHECK-NEXT:    bl memcpy
 ; CHECK-NEXT:    nop
-; CHECK-NEXT:    lwz 4, 60(1)
-; CHECK-NEXT:    # implicit-def: $cr5lt
-; CHECK-NEXT:    mfocrf 3, 4
-; CHECK-NEXT:    rlwimi 3, 4, 12, 20, 20
-; CHECK-NEXT:    mtocrf 4, 3
-; CHECK-NEXT:    bc 12, 20, .LBB0_4
+; CHECK-NEXT:    lwz 4, 76(1)
+; CHECK-NEXT:    # implicit-def: $cr0gt
+; CHECK-NEXT:    mfocrf 3, 128
+; CHECK-NEXT:    rlwimi 3, 4, 31, 1, 1
+; CHECK-NEXT:    mtocrf 128, 3
+; CHECK-NEXT:    bc 12, 1, .LBB0_4
 ; CHECK-NEXT:    b .LBB0_3
 ; CHECK-NEXT:  .LBB0_3:
 ; CHECK-NEXT:    b .LBB0_4

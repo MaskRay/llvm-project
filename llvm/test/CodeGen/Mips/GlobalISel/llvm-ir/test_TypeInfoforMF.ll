@@ -26,9 +26,9 @@ entry:
 define i32 @outgoing_gpr_instr(ptr %i32_ptr1, ptr %i32_ptr2) {
 ; MIPS32-LABEL: outgoing_gpr_instr:
 ; MIPS32:       # %bb.0: # %entry
-; MIPS32-NEXT:    lw $2, 0($4)
-; MIPS32-NEXT:    lw $1, 0($5)
-; MIPS32-NEXT:    addu $2, $1, $2
+; MIPS32-NEXT:    lw $1, 0($4)
+; MIPS32-NEXT:    lw $2, 0($5)
+; MIPS32-NEXT:    addu $2, $2, $1
 ; MIPS32-NEXT:    jr $ra
 ; MIPS32-NEXT:    nop
 entry:
@@ -56,10 +56,11 @@ entry:
 define i32 @incoming_gpr(i32 %incoming_phys_reg, i1 %test, ptr %a) {
 ; MIPS32-LABEL: incoming_gpr:
 ; MIPS32:       # %bb.0: # %entry
-; MIPS32-NEXT:    move $2, $4
 ; MIPS32-NEXT:    lw $1, 0($6)
-; MIPS32-NEXT:    andi $3, $5, 1
-; MIPS32-NEXT:    movn $2, $1, $3
+; MIPS32-NEXT:    andi $2, $5, 1
+; MIPS32-NEXT:    move $3, $4
+; MIPS32-NEXT:    movn $3, $1, $2
+; MIPS32-NEXT:    move $2, $3
 ; MIPS32-NEXT:    jr $ra
 ; MIPS32-NEXT:    nop
 entry:
@@ -71,10 +72,11 @@ entry:
 define float @incoming_fpr(float %incoming_phys_reg, i1 %test, ptr %a) {
 ; MIPS32-LABEL: incoming_fpr:
 ; MIPS32:       # %bb.0: # %entry
-; MIPS32-NEXT:    mov.s $f0, $f12
-; MIPS32-NEXT:    lwc1 $f1, 0($6)
+; MIPS32-NEXT:    lwc1 $f0, 0($6)
 ; MIPS32-NEXT:    andi $1, $5, 1
-; MIPS32-NEXT:    movn.s $f0, $f1, $1
+; MIPS32-NEXT:    mov.s $f1, $f12
+; MIPS32-NEXT:    movn.s $f1, $f0, $1
+; MIPS32-NEXT:    mov.s $f0, $f1
 ; MIPS32-NEXT:    jr $ra
 ; MIPS32-NEXT:    nop
 entry:
@@ -103,10 +105,11 @@ entry:
 define float @incoming_float_instr(float %val1, float %val2, ptr %float_ptr, i1 %test) {
 ; MIPS32-LABEL: incoming_float_instr:
 ; MIPS32:       # %bb.0: # %entry
-; MIPS32-NEXT:    lwc1 $f1, 0($6)
-; MIPS32-NEXT:    add.s $f0, $f14, $f12
+; MIPS32-NEXT:    lwc1 $f0, 0($6)
+; MIPS32-NEXT:    add.s $f1, $f14, $f12
 ; MIPS32-NEXT:    andi $1, $7, 1
-; MIPS32-NEXT:    movn.s $f0, $f1, $1
+; MIPS32-NEXT:    movn.s $f1, $f0, $1
+; MIPS32-NEXT:    mov.s $f0, $f1
 ; MIPS32-NEXT:    jr $ra
 ; MIPS32-NEXT:    nop
 entry:

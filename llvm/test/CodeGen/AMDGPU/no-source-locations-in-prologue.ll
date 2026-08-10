@@ -234,6 +234,7 @@ define hidden void @_ZL3barv() #0 !dbg !1644 {
 ; CHECK-NEXT:    v_writelane_b32 v40, s30, 0
 ; CHECK-NEXT:    v_writelane_b32 v40, s31, 1
 ; CHECK-NEXT:    .cfi_llvm_vector_registers 16, 2600, 0, 32, 2600, 1, 32
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:  .Ltmp0:
 ; CHECK-NEXT:    .loc 0 31 3 prologue_end ; lane-info.cpp:31:3
 ; CHECK-NEXT:    s_getpc_b64 s[16:17]
@@ -242,6 +243,7 @@ define hidden void @_ZL3barv() #0 !dbg !1644 {
 ; CHECK-NEXT:    s_load_dwordx2 s[16:17], s[16:17], 0x0
 ; CHECK-NEXT:    s_mov_b64 s[22:23], s[2:3]
 ; CHECK-NEXT:    s_mov_b64 s[20:21], s[0:1]
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:    s_mov_b64 s[0:1], s[20:21]
 ; CHECK-NEXT:    s_mov_b64 s[2:3], s[22:23]
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)

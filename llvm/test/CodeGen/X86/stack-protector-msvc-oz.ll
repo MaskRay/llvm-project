@@ -68,10 +68,10 @@ define void @test(ptr %a) nounwind ssp minsize {
 ; MSVC-X86-O0-NEXT:    movl %ecx, (%esp)
 ; MSVC-X86-O0-NEXT:    movl %eax, {{[0-9]+}}(%esp)
 ; MSVC-X86-O0-NEXT:    calll _strcpy
-; MSVC-X86-O0-NEXT:    leal LC, %ecx
-; MSVC-X86-O0-NEXT:    leal {{[0-9]+}}(%esp), %eax
-; MSVC-X86-O0-NEXT:    movl %ecx, (%esp)
-; MSVC-X86-O0-NEXT:    movl %eax, {{[0-9]+}}(%esp)
+; MSVC-X86-O0-NEXT:    leal LC, %eax
+; MSVC-X86-O0-NEXT:    leal {{[0-9]+}}(%esp), %ecx
+; MSVC-X86-O0-NEXT:    movl %eax, (%esp)
+; MSVC-X86-O0-NEXT:    movl %ecx, {{[0-9]+}}(%esp)
 ; MSVC-X86-O0-NEXT:    calll _printf
 ; MSVC-X86-O0-NEXT:  # %bb.1: # %return
 ; MSVC-X86-O0-NEXT:    movl {{[0-9]+}}(%esp), %ecx

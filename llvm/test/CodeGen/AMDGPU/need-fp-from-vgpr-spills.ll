@@ -36,11 +36,13 @@ define internal fastcc void @csr_vgpr_spill_fp_callee() #0 {
 ; CHECK-NEXT:    buffer_store_dword v40, off, s[0:3], s33 ; 4-byte Folded Spill
 ; CHECK-NEXT:    v_writelane_b32 v1, s30, 0
 ; CHECK-NEXT:    v_writelane_b32 v1, s31, 1
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:    s_getpc_b64 s[16:17]
 ; CHECK-NEXT:    s_add_u32 s16, s16, callee_has_fp@rel32@lo+4
 ; CHECK-NEXT:    s_addc_u32 s17, s17, callee_has_fp@rel32@hi+12
 ; CHECK-NEXT:    s_mov_b64 s[22:23], s[2:3]
 ; CHECK-NEXT:    s_mov_b64 s[20:21], s[0:1]
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:    s_mov_b64 s[0:1], s[20:21]
 ; CHECK-NEXT:    s_mov_b64 s[2:3], s[22:23]
 ; CHECK-NEXT:    s_swappc_b64 s[30:31], s[16:17]
@@ -71,24 +73,30 @@ define amdgpu_kernel void @kernel_call() {
 ; CHECK-NEXT:    s_addc_u32 flat_scratch_hi, s13, 0
 ; CHECK-NEXT:    s_add_u32 s0, s0, s17
 ; CHECK-NEXT:    s_addc_u32 s1, s1, 0
-; CHECK-NEXT:    ; implicit-def: $vgpr3 : SGPR spill to VGPR lane
-; CHECK-NEXT:    v_writelane_b32 v3, s16, 0
-; CHECK-NEXT:    s_mov_b32 s13, s15
-; CHECK-NEXT:    s_mov_b32 s12, s14
-; CHECK-NEXT:    v_readlane_b32 s14, v3, 0
-; CHECK-NEXT:    s_getpc_b64 s[16:17]
-; CHECK-NEXT:    s_add_u32 s16, s16, csr_vgpr_spill_fp_callee@rel32@lo+4
-; CHECK-NEXT:    s_addc_u32 s17, s17, csr_vgpr_spill_fp_callee@rel32@hi+12
+; CHECK-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; CHECK-NEXT:    s_getpc_b64 s[12:13]
+; CHECK-NEXT:    s_add_u32 s12, s12, csr_vgpr_spill_fp_callee@rel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s13, s13, csr_vgpr_spill_fp_callee@rel32@hi+12
 ; CHECK-NEXT:    s_mov_b64 s[22:23], s[2:3]
 ; CHECK-NEXT:    s_mov_b64 s[20:21], s[0:1]
-; CHECK-NEXT:    s_mov_b32 s15, 20
-; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s15, v2
-; CHECK-NEXT:    s_mov_b32 s15, 10
-; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s15, v1
+; CHECK-NEXT:    s_mov_b32 s17, 20
+; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s17, v2
+; CHECK-NEXT:    s_mov_b32 s17, 10
+; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s17, v1
 ; CHECK-NEXT:    v_or3_b32 v31, v0, v1, v2
+; CHECK-NEXT:    ; implicit-def: $vgpr3 : SGPR spill to VGPR lane
+; CHECK-NEXT:    v_writelane_b32 v3, s12, 0
+; CHECK-NEXT:    v_writelane_b32 v3, s13, 1
+; CHECK-NEXT:    s_mov_b32 s12, s14
+; CHECK-NEXT:    s_mov_b32 s13, s15
+; CHECK-NEXT:    s_mov_b32 s14, s16
 ; CHECK-NEXT:    ; implicit-def: $sgpr15
 ; CHECK-NEXT:    s_mov_b64 s[0:1], s[20:21]
 ; CHECK-NEXT:    s_mov_b64 s[2:3], s[22:23]
+; CHECK-NEXT:    v_readlane_b32 s16, v3, 0
+; CHECK-NEXT:    v_readlane_b32 s17, v3, 1
 ; CHECK-NEXT:    s_swappc_b64 s[30:31], s[16:17]
 ; CHECK-NEXT:    s_endpgm
 bb:
@@ -106,12 +114,14 @@ define internal fastcc void @csr_vgpr_spill_fp_tailcall_callee() #0 {
 ; CHECK-NEXT:    s_mov_b64 exec, s[16:17]
 ; CHECK-NEXT:    buffer_store_dword v40, off, s[0:3], s32 ; 4-byte Folded Spill
 ; CHECK-NEXT:    v_writelane_b32 v1, s33, 0
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:    ;;#ASMSTART
 ; CHECK-NEXT:    ; clobber csr v40
 ; CHECK-NEXT:    ;;#ASMEND
 ; CHECK-NEXT:    s_getpc_b64 s[16:17]
 ; CHECK-NEXT:    s_add_u32 s16, s16, callee_has_fp@rel32@lo+4
 ; CHECK-NEXT:    s_addc_u32 s17, s17, callee_has_fp@rel32@hi+12
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:    v_readlane_b32 s33, v1, 0
 ; CHECK-NEXT:    buffer_load_dword v40, off, s[0:3], s32 ; 4-byte Folded Reload
 ; CHECK-NEXT:    s_xor_saveexec_b64 s[18:19], -1
@@ -132,24 +142,30 @@ define amdgpu_kernel void @kernel_tailcall() {
 ; CHECK-NEXT:    s_addc_u32 flat_scratch_hi, s13, 0
 ; CHECK-NEXT:    s_add_u32 s0, s0, s17
 ; CHECK-NEXT:    s_addc_u32 s1, s1, 0
-; CHECK-NEXT:    ; implicit-def: $vgpr3 : SGPR spill to VGPR lane
-; CHECK-NEXT:    v_writelane_b32 v3, s16, 0
-; CHECK-NEXT:    s_mov_b32 s13, s15
-; CHECK-NEXT:    s_mov_b32 s12, s14
-; CHECK-NEXT:    v_readlane_b32 s14, v3, 0
-; CHECK-NEXT:    s_getpc_b64 s[16:17]
-; CHECK-NEXT:    s_add_u32 s16, s16, csr_vgpr_spill_fp_tailcall_callee@rel32@lo+4
-; CHECK-NEXT:    s_addc_u32 s17, s17, csr_vgpr_spill_fp_tailcall_callee@rel32@hi+12
+; CHECK-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; CHECK-NEXT:    s_getpc_b64 s[12:13]
+; CHECK-NEXT:    s_add_u32 s12, s12, csr_vgpr_spill_fp_tailcall_callee@rel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s13, s13, csr_vgpr_spill_fp_tailcall_callee@rel32@hi+12
 ; CHECK-NEXT:    s_mov_b64 s[22:23], s[2:3]
 ; CHECK-NEXT:    s_mov_b64 s[20:21], s[0:1]
-; CHECK-NEXT:    s_mov_b32 s15, 20
-; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s15, v2
-; CHECK-NEXT:    s_mov_b32 s15, 10
-; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s15, v1
+; CHECK-NEXT:    s_mov_b32 s17, 20
+; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s17, v2
+; CHECK-NEXT:    s_mov_b32 s17, 10
+; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s17, v1
 ; CHECK-NEXT:    v_or3_b32 v31, v0, v1, v2
+; CHECK-NEXT:    ; implicit-def: $vgpr3 : SGPR spill to VGPR lane
+; CHECK-NEXT:    v_writelane_b32 v3, s12, 0
+; CHECK-NEXT:    v_writelane_b32 v3, s13, 1
+; CHECK-NEXT:    s_mov_b32 s12, s14
+; CHECK-NEXT:    s_mov_b32 s13, s15
+; CHECK-NEXT:    s_mov_b32 s14, s16
 ; CHECK-NEXT:    ; implicit-def: $sgpr15
 ; CHECK-NEXT:    s_mov_b64 s[0:1], s[20:21]
 ; CHECK-NEXT:    s_mov_b64 s[2:3], s[22:23]
+; CHECK-NEXT:    v_readlane_b32 s16, v3, 0
+; CHECK-NEXT:    v_readlane_b32 s17, v3, 1
 ; CHECK-NEXT:    s_swappc_b64 s[30:31], s[16:17]
 ; CHECK-NEXT:    s_endpgm
 bb:
@@ -182,11 +198,13 @@ define hidden i32 @caller_save_vgpr_spill_fp_tail_call() #0 {
 ; CHECK-NEXT:    s_add_i32 s32, s32, 0x400
 ; CHECK-NEXT:    v_writelane_b32 v1, s30, 0
 ; CHECK-NEXT:    v_writelane_b32 v1, s31, 1
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:    s_getpc_b64 s[16:17]
 ; CHECK-NEXT:    s_add_u32 s16, s16, tail_call@rel32@lo+4
 ; CHECK-NEXT:    s_addc_u32 s17, s17, tail_call@rel32@hi+12
 ; CHECK-NEXT:    s_mov_b64 s[22:23], s[2:3]
 ; CHECK-NEXT:    s_mov_b64 s[20:21], s[0:1]
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:    s_mov_b64 s[0:1], s[20:21]
 ; CHECK-NEXT:    s_mov_b64 s[2:3], s[22:23]
 ; CHECK-NEXT:    s_swappc_b64 s[30:31], s[16:17]
@@ -216,11 +234,13 @@ define hidden i32 @caller_save_vgpr_spill_fp() #0 {
 ; CHECK-NEXT:    s_add_i32 s32, s32, 0x400
 ; CHECK-NEXT:    v_writelane_b32 v2, s30, 0
 ; CHECK-NEXT:    v_writelane_b32 v2, s31, 1
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:    s_getpc_b64 s[16:17]
 ; CHECK-NEXT:    s_add_u32 s16, s16, caller_save_vgpr_spill_fp_tail_call@rel32@lo+4
 ; CHECK-NEXT:    s_addc_u32 s17, s17, caller_save_vgpr_spill_fp_tail_call@rel32@hi+12
 ; CHECK-NEXT:    s_mov_b64 s[22:23], s[2:3]
 ; CHECK-NEXT:    s_mov_b64 s[20:21], s[0:1]
+; CHECK-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; CHECK-NEXT:    s_mov_b64 s[0:1], s[20:21]
 ; CHECK-NEXT:    s_mov_b64 s[2:3], s[22:23]
 ; CHECK-NEXT:    s_swappc_b64 s[30:31], s[16:17]
@@ -246,25 +266,32 @@ define protected amdgpu_kernel void @kernel() {
 ; CHECK-NEXT:    s_addc_u32 flat_scratch_hi, s13, 0
 ; CHECK-NEXT:    s_add_u32 s0, s0, s17
 ; CHECK-NEXT:    s_addc_u32 s1, s1, 0
-; CHECK-NEXT:    ; implicit-def: $vgpr3 : SGPR spill to VGPR lane
-; CHECK-NEXT:    v_writelane_b32 v3, s16, 0
-; CHECK-NEXT:    s_mov_b32 s13, s15
-; CHECK-NEXT:    s_mov_b32 s12, s14
-; CHECK-NEXT:    v_readlane_b32 s14, v3, 0
-; CHECK-NEXT:    s_getpc_b64 s[16:17]
-; CHECK-NEXT:    s_add_u32 s16, s16, caller_save_vgpr_spill_fp@rel32@lo+4
-; CHECK-NEXT:    s_addc_u32 s17, s17, caller_save_vgpr_spill_fp@rel32@hi+12
+; CHECK-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; CHECK-NEXT:    s_getpc_b64 s[12:13]
+; CHECK-NEXT:    s_add_u32 s12, s12, caller_save_vgpr_spill_fp@rel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s13, s13, caller_save_vgpr_spill_fp@rel32@hi+12
 ; CHECK-NEXT:    s_mov_b64 s[22:23], s[2:3]
 ; CHECK-NEXT:    s_mov_b64 s[20:21], s[0:1]
-; CHECK-NEXT:    s_mov_b32 s15, 20
-; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s15, v2
-; CHECK-NEXT:    s_mov_b32 s15, 10
-; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s15, v1
+; CHECK-NEXT:    s_mov_b32 s17, 20
+; CHECK-NEXT:    v_lshlrev_b32_e64 v2, s17, v2
+; CHECK-NEXT:    s_mov_b32 s17, 10
+; CHECK-NEXT:    v_lshlrev_b32_e64 v1, s17, v1
 ; CHECK-NEXT:    v_or3_b32 v31, v0, v1, v2
+; CHECK-NEXT:    ; implicit-def: $vgpr3 : SGPR spill to VGPR lane
+; CHECK-NEXT:    v_writelane_b32 v3, s12, 0
+; CHECK-NEXT:    v_writelane_b32 v3, s13, 1
+; CHECK-NEXT:    s_mov_b32 s12, s14
+; CHECK-NEXT:    s_mov_b32 s13, s15
+; CHECK-NEXT:    s_mov_b32 s14, s16
 ; CHECK-NEXT:    ; implicit-def: $sgpr15
 ; CHECK-NEXT:    s_mov_b64 s[0:1], s[20:21]
 ; CHECK-NEXT:    s_mov_b64 s[2:3], s[22:23]
+; CHECK-NEXT:    v_readlane_b32 s16, v3, 0
+; CHECK-NEXT:    v_readlane_b32 s17, v3, 1
 ; CHECK-NEXT:    s_swappc_b64 s[30:31], s[16:17]
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; CHECK-NEXT:    s_endpgm
 entry:
   %call = call i32 @caller_save_vgpr_spill_fp()

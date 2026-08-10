@@ -217,55 +217,65 @@ define dso_local zeroext i32 @func(double noundef %0, double noundef %1) #0 {
 ; PPC-LABEL: func:
 ; PPC:       # %bb.0:
 ; PPC-NEXT:    mflr 0
-; PPC-NEXT:    stwu 1, -32(1)
-; PPC-NEXT:    stw 0, 36(1)
+; PPC-NEXT:    stwu 1, -48(1)
+; PPC-NEXT:    stw 0, 52(1)
+; PPC-NEXT:    stw 29, 36(1) # 4-byte Folded Spill
+; PPC-NEXT:    stw 30, 40(1) # 4-byte Folded Spill
+; PPC-NEXT:    # kill: def $r7 killed $r6
+; PPC-NEXT:    # kill: def $r7 killed $r5
+; PPC-NEXT:    # kill: def $r7 killed $r4
+; PPC-NEXT:    # kill: def $r7 killed $r3
 ; PPC-NEXT:    stw 4, 28(1)
 ; PPC-NEXT:    stw 3, 24(1)
 ; PPC-NEXT:    stw 6, 20(1)
 ; PPC-NEXT:    stw 5, 16(1)
-; PPC-NEXT:    lwz 3, 24(1)
-; PPC-NEXT:    stw 3, 8(1) # 4-byte Folded Spill
-; PPC-NEXT:    lwz 3, 28(1)
-; PPC-NEXT:    stw 3, 12(1) # 4-byte Folded Spill
+; PPC-NEXT:    lwz 30, 24(1)
+; PPC-NEXT:    lwz 29, 28(1)
 ; PPC-NEXT:    lwz 3, 16(1)
 ; PPC-NEXT:    lwz 4, 20(1)
 ; PPC-NEXT:    lis 5, -15888
 ; PPC-NEXT:    li 6, 0
 ; PPC-NEXT:    bl __muldf3
-; PPC-NEXT:    mr 5, 3
-; PPC-NEXT:    lwz 3, 8(1) # 4-byte Folded Reload
-; PPC-NEXT:    mr 6, 4
-; PPC-NEXT:    lwz 4, 12(1) # 4-byte Folded Reload
+; PPC-NEXT:    stw 3, 12(1) # 4-byte Folded Spill
+; PPC-NEXT:    mr 3, 30
+; PPC-NEXT:    stw 4, 8(1) # 4-byte Folded Spill
+; PPC-NEXT:    mr 4, 29
+; PPC-NEXT:    lwz 5, 12(1) # 4-byte Folded Reload
+; PPC-NEXT:    lwz 6, 8(1) # 4-byte Folded Reload
 ; PPC-NEXT:    bl __adddf3
 ; PPC-NEXT:    bl __fixunsdfsi
-; PPC-NEXT:    lwz 0, 36(1)
-; PPC-NEXT:    addi 1, 1, 32
+; PPC-NEXT:    lwz 30, 40(1) # 4-byte Folded Reload
+; PPC-NEXT:    lwz 29, 36(1) # 4-byte Folded Reload
+; PPC-NEXT:    lwz 0, 52(1)
+; PPC-NEXT:    addi 1, 1, 48
 ; PPC-NEXT:    mtlr 0
 ; PPC-NEXT:    blr
 ;
 ; PPC64-LABEL: func:
 ; PPC64:       # %bb.0:
 ; PPC64-NEXT:    mflr 0
-; PPC64-NEXT:    stdu 1, -144(1)
-; PPC64-NEXT:    std 0, 160(1)
+; PPC64-NEXT:    stdu 1, -160(1)
+; PPC64-NEXT:    std 0, 176(1)
+; PPC64-NEXT:    std 30, 144(1) # 8-byte Folded Spill
 ; PPC64-NEXT:    std 3, 136(1)
 ; PPC64-NEXT:    std 4, 128(1)
-; PPC64-NEXT:    ld 3, 136(1)
-; PPC64-NEXT:    std 3, 120(1) # 8-byte Folded Spill
+; PPC64-NEXT:    ld 30, 136(1)
 ; PPC64-NEXT:    ld 3, 128(1)
 ; PPC64-NEXT:    li 4, 3103
 ; PPC64-NEXT:    rldic 4, 4, 52, 0
 ; PPC64-NEXT:    bl __muldf3
 ; PPC64-NEXT:    nop
-; PPC64-NEXT:    mr 4, 3
-; PPC64-NEXT:    ld 3, 120(1) # 8-byte Folded Reload
+; PPC64-NEXT:    std 3, 120(1) # 8-byte Folded Spill
+; PPC64-NEXT:    mr 3, 30
+; PPC64-NEXT:    ld 4, 120(1) # 8-byte Folded Reload
 ; PPC64-NEXT:    bl __adddf3
 ; PPC64-NEXT:    nop
 ; PPC64-NEXT:    bl __fixunsdfsi
 ; PPC64-NEXT:    nop
 ; PPC64-NEXT:    # kill: def $r3 killed $r3 killed $x3
 ; PPC64-NEXT:    clrldi 3, 3, 32
-; PPC64-NEXT:    addi 1, 1, 144
+; PPC64-NEXT:    ld 30, 144(1) # 8-byte Folded Reload
+; PPC64-NEXT:    addi 1, 1, 160
 ; PPC64-NEXT:    ld 0, 16(1)
 ; PPC64-NEXT:    mtlr 0
 ; PPC64-NEXT:    blr
@@ -273,28 +283,30 @@ define dso_local zeroext i32 @func(double noundef %0, double noundef %1) #0 {
 ; PPC64LE-LABEL: func:
 ; PPC64LE:       # %bb.0:
 ; PPC64LE-NEXT:    mflr 0
-; PPC64LE-NEXT:    stdu 1, -64(1)
-; PPC64LE-NEXT:    std 0, 80(1)
+; PPC64LE-NEXT:    std 30, -16(1) # 8-byte Folded Spill
+; PPC64LE-NEXT:    stdu 1, -80(1)
+; PPC64LE-NEXT:    std 0, 96(1)
 ; PPC64LE-NEXT:    std 3, 56(1)
 ; PPC64LE-NEXT:    std 4, 48(1)
-; PPC64LE-NEXT:    ld 3, 56(1)
-; PPC64LE-NEXT:    std 3, 40(1) # 8-byte Folded Spill
+; PPC64LE-NEXT:    ld 30, 56(1)
 ; PPC64LE-NEXT:    ld 3, 48(1)
 ; PPC64LE-NEXT:    li 4, 3103
 ; PPC64LE-NEXT:    rldic 4, 4, 52, 0
 ; PPC64LE-NEXT:    bl __muldf3
 ; PPC64LE-NEXT:    nop
-; PPC64LE-NEXT:    mr 4, 3
-; PPC64LE-NEXT:    ld 3, 40(1) # 8-byte Folded Reload
+; PPC64LE-NEXT:    std 3, 40(1) # 8-byte Folded Spill
+; PPC64LE-NEXT:    mr 3, 30
+; PPC64LE-NEXT:    ld 4, 40(1) # 8-byte Folded Reload
 ; PPC64LE-NEXT:    bl __adddf3
 ; PPC64LE-NEXT:    nop
 ; PPC64LE-NEXT:    bl __fixunsdfsi
 ; PPC64LE-NEXT:    nop
 ; PPC64LE-NEXT:    # kill: def $r3 killed $r3 killed $x3
 ; PPC64LE-NEXT:    clrldi 3, 3, 32
-; PPC64LE-NEXT:    addi 1, 1, 64
+; PPC64LE-NEXT:    addi 1, 1, 80
 ; PPC64LE-NEXT:    ld 0, 16(1)
 ; PPC64LE-NEXT:    mtlr 0
+; PPC64LE-NEXT:    ld 30, -16(1) # 8-byte Folded Reload
 ; PPC64LE-NEXT:    blr
   %3 = alloca double, align 8
   %4 = alloca double, align 8
@@ -312,26 +324,23 @@ define dso_local zeroext i32 @func(double noundef %0, double noundef %1) #0 {
 define zeroext i1 @ppcf128_soften(ppc_fp128 %a) #0 {
 ; PPC-LABEL: ppcf128_soften:
 ; PPC:       # %bb.0: # %entry
-; PPC-NEXT:    stwu 1, -16(1)
-; PPC-NEXT:    stw 5, 8(1) # 4-byte Folded Spill
-; PPC-NEXT:    mr 5, 4
-; PPC-NEXT:    lwz 4, 8(1) # 4-byte Folded Reload
-; PPC-NEXT:    stw 5, 12(1) # 4-byte Folded Spill
-; PPC-NEXT:    mr 5, 3
-; PPC-NEXT:    lwz 3, 12(1) # 4-byte Folded Reload
-; PPC-NEXT:    xoris 4, 5, 65520
-; PPC-NEXT:    or 4, 3, 4
-; PPC-NEXT:    cntlzw 4, 4
-; PPC-NEXT:    clrlwi 5, 5, 1
-; PPC-NEXT:    or 3, 3, 5
+; PPC-NEXT:    # kill: def $r6 killed $r6
+; PPC-NEXT:    # kill: def $r5 killed $r5
+; PPC-NEXT:    # kill: def $r5 killed $r4
+; PPC-NEXT:    # kill: def $r5 killed $r3
+; PPC-NEXT:    xoris 5, 3, 65520
+; PPC-NEXT:    or 5, 4, 5
+; PPC-NEXT:    cntlzw 5, 5
+; PPC-NEXT:    clrlwi 3, 3, 1
+; PPC-NEXT:    or 3, 4, 3
 ; PPC-NEXT:    cntlzw 3, 3
-; PPC-NEXT:    or 3, 3, 4
+; PPC-NEXT:    or 3, 3, 5
 ; PPC-NEXT:    srwi 3, 3, 5
-; PPC-NEXT:    addi 1, 1, 16
 ; PPC-NEXT:    blr
 ;
 ; PPC64-LABEL: ppcf128_soften:
 ; PPC64:       # %bb.0: # %entry
+; PPC64-NEXT:    # kill: def $x4 killed $x4
 ; PPC64-NEXT:    li 4, 4095
 ; PPC64-NEXT:    rldic 4, 4, 52, 0
 ; PPC64-NEXT:    cmpld 7, 3, 4
@@ -341,24 +350,25 @@ define zeroext i1 @ppcf128_soften(ppc_fp128 %a) #0 {
 ; PPC64-NEXT:    cmpldi 7, 3, 0
 ; PPC64-NEXT:    mfcr 3 # cr7
 ; PPC64-NEXT:    rlwinm 3, 3, 31, 31, 31
-; PPC64-NEXT:    or 4, 3, 4
-; PPC64-NEXT:    # implicit-def: $x3
-; PPC64-NEXT:    mr 3, 4
-; PPC64-NEXT:    clrldi 3, 3, 32
+; PPC64-NEXT:    or 3, 3, 4
+; PPC64-NEXT:    # implicit-def: $x4
+; PPC64-NEXT:    mr 4, 3
+; PPC64-NEXT:    clrldi 3, 4, 32
 ; PPC64-NEXT:    blr
 ;
 ; PPC64LE-LABEL: ppcf128_soften:
 ; PPC64LE:       # %bb.0: # %entry
+; PPC64LE-NEXT:    # kill: def $x3 killed $x3
 ; PPC64LE-NEXT:    li 3, 4095
 ; PPC64LE-NEXT:    rldic 3, 3, 52, 0
 ; PPC64LE-NEXT:    cmpd 4, 3
-; PPC64LE-NEXT:    crmove 21, 2
-; PPC64LE-NEXT:    clrldi. 3, 4, 1
 ; PPC64LE-NEXT:    crmove 20, 2
-; PPC64LE-NEXT:    cror 20, 20, 21
-; PPC64LE-NEXT:    li 4, 0
-; PPC64LE-NEXT:    li 3, 1
-; PPC64LE-NEXT:    isel 3, 3, 4, 20
+; PPC64LE-NEXT:    clrldi. 3, 4, 1
+; PPC64LE-NEXT:    crmove 21, 2
+; PPC64LE-NEXT:    cror 20, 21, 20
+; PPC64LE-NEXT:    li 3, 0
+; PPC64LE-NEXT:    li 4, 1
+; PPC64LE-NEXT:    isel 3, 4, 3, 20
 ; PPC64LE-NEXT:    blr
 entry:
   %fpclass = tail call i1 @llvm.is.fpclass.ppcf128(ppc_fp128 %a, i32 100)

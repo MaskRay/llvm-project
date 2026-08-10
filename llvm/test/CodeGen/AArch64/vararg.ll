@@ -86,17 +86,17 @@ define i64 @vararg(...) #0 {
 ; CHECK-GI-NEXT:    str q5, [sp, #96]
 ; CHECK-GI-NEXT:    str q6, [sp, #112]
 ; CHECK-GI-NEXT:    str q7, [sp, #128]
-; CHECK-GI-NEXT:    add x9, sp, #8
-; CHECK-GI-NEXT:    add x8, x29, #16
-; CHECK-GI-NEXT:    str x8, [x9]
-; CHECK-GI-NEXT:    add x8, x29, #0
-; CHECK-GI-NEXT:    str x8, [x9, #8]
-; CHECK-GI-NEXT:    add x8, sp, #144
-; CHECK-GI-NEXT:    str x8, [x9, #16]
-; CHECK-GI-NEXT:    mov w8, #-64 // =0xffffffc0
-; CHECK-GI-NEXT:    str w8, [x9, #24]
-; CHECK-GI-NEXT:    mov w8, #-128 // =0xffffff80
-; CHECK-GI-NEXT:    str w8, [x9, #28]
+; CHECK-GI-NEXT:    add x8, sp, #8
+; CHECK-GI-NEXT:    add x9, x29, #16
+; CHECK-GI-NEXT:    str x9, [x8]
+; CHECK-GI-NEXT:    add x9, x29, #0
+; CHECK-GI-NEXT:    str x9, [x8, #8]
+; CHECK-GI-NEXT:    add x9, sp, #144
+; CHECK-GI-NEXT:    str x9, [x8, #16]
+; CHECK-GI-NEXT:    mov w9, #-64 // =0xffffffc0
+; CHECK-GI-NEXT:    str w9, [x8, #24]
+; CHECK-GI-NEXT:    mov w9, #-128 // =0xffffff80
+; CHECK-GI-NEXT:    str w9, [x8, #28]
 ; CHECK-GI-NEXT:    mov w8, #1 // =0x1
 ; CHECK-GI-NEXT:    mov w0, w8
 ; CHECK-GI-NEXT:    .cfi_def_cfa wsp, 224
@@ -171,19 +171,20 @@ define i64 @vararg_many_gpr(i64 %a1, i64 %a2, i64 %a3, i64 %a4, i64 %a5, i64 %a6
 ; CHECK-GI-NEXT:    str q5, [sp, #96]
 ; CHECK-GI-NEXT:    str q6, [sp, #112]
 ; CHECK-GI-NEXT:    str q7, [sp, #128]
-; CHECK-GI-NEXT:    add x9, sp, #8
-; CHECK-GI-NEXT:    add x8, x29, #16
-; CHECK-GI-NEXT:    str x8, [x9]
-; CHECK-GI-NEXT:    add x8, x29, #0
-; CHECK-GI-NEXT:    str x8, [x9, #8]
-; CHECK-GI-NEXT:    add x8, sp, #144
-; CHECK-GI-NEXT:    str x8, [x9, #16]
-; CHECK-GI-NEXT:    mov w8, #-8 // =0xfffffff8
-; CHECK-GI-NEXT:    str w8, [x9, #24]
-; CHECK-GI-NEXT:    mov w8, #-128 // =0xffffff80
-; CHECK-GI-NEXT:    str w8, [x9, #28]
+; CHECK-GI-NEXT:    add x8, sp, #8
+; CHECK-GI-NEXT:    add x9, x29, #16
+; CHECK-GI-NEXT:    str x9, [x8]
+; CHECK-GI-NEXT:    add x9, x29, #0
+; CHECK-GI-NEXT:    str x9, [x8, #8]
+; CHECK-GI-NEXT:    add x9, sp, #144
+; CHECK-GI-NEXT:    str x9, [x8, #16]
+; CHECK-GI-NEXT:    mov w9, #-8 // =0xfffffff8
+; CHECK-GI-NEXT:    str w9, [x8, #24]
+; CHECK-GI-NEXT:    mov w9, #-128 // =0xffffff80
+; CHECK-GI-NEXT:    str w9, [x8, #28]
 ; CHECK-GI-NEXT:    mov w8, #1 // =0x1
-; CHECK-GI-NEXT:    mov w0, w8
+; CHECK-GI-NEXT:    mov w7, w8
+; CHECK-GI-NEXT:    mov x0, x7
 ; CHECK-GI-NEXT:    .cfi_def_cfa wsp, 176
 ; CHECK-GI-NEXT:    ldp x29, x30, [sp, #160] // 16-byte Folded Reload
 ; CHECK-GI-NEXT:    add sp, sp, #176
@@ -256,17 +257,17 @@ define i64 @vararg_many_float(float %a1, float %a2, float %a3, float %a4, float 
 ; CHECK-GI-NEXT:    str x6, [sp, #80]
 ; CHECK-GI-NEXT:    str x7, [sp, #88]
 ; CHECK-GI-NEXT:    str q7, [sp, #16]
-; CHECK-GI-NEXT:    add x9, sp, #8
-; CHECK-GI-NEXT:    add x8, x29, #16
-; CHECK-GI-NEXT:    str x8, [x9]
-; CHECK-GI-NEXT:    add x8, sp, #96
-; CHECK-GI-NEXT:    str x8, [x9, #8]
-; CHECK-GI-NEXT:    add x8, sp, #32
-; CHECK-GI-NEXT:    str x8, [x9, #16]
-; CHECK-GI-NEXT:    mov w8, #-64 // =0xffffffc0
-; CHECK-GI-NEXT:    str w8, [x9, #24]
-; CHECK-GI-NEXT:    mov w8, #-16 // =0xfffffff0
-; CHECK-GI-NEXT:    str w8, [x9, #28]
+; CHECK-GI-NEXT:    add x8, sp, #8
+; CHECK-GI-NEXT:    add x9, x29, #16
+; CHECK-GI-NEXT:    str x9, [x8]
+; CHECK-GI-NEXT:    add x9, sp, #96
+; CHECK-GI-NEXT:    str x9, [x8, #8]
+; CHECK-GI-NEXT:    add x9, sp, #32
+; CHECK-GI-NEXT:    str x9, [x8, #16]
+; CHECK-GI-NEXT:    mov w9, #-64 // =0xffffffc0
+; CHECK-GI-NEXT:    str w9, [x8, #24]
+; CHECK-GI-NEXT:    mov w9, #-16 // =0xfffffff0
+; CHECK-GI-NEXT:    str w9, [x8, #28]
 ; CHECK-GI-NEXT:    mov w8, #1 // =0x1
 ; CHECK-GI-NEXT:    mov w0, w8
 ; CHECK-GI-NEXT:    .cfi_def_cfa wsp, 112
@@ -351,19 +352,20 @@ define i64 @gpr1_fpr1(i32 %i, float %f, ...) #0 {
 ; CHECK-GI-NEXT:    str q5, [sp, #80]
 ; CHECK-GI-NEXT:    str q6, [sp, #96]
 ; CHECK-GI-NEXT:    str q7, [sp, #112]
-; CHECK-GI-NEXT:    add x9, sp, #8
-; CHECK-GI-NEXT:    add x8, x29, #16
-; CHECK-GI-NEXT:    str x8, [x9]
-; CHECK-GI-NEXT:    add x8, x29, #0
-; CHECK-GI-NEXT:    str x8, [x9, #8]
-; CHECK-GI-NEXT:    add x8, sp, #128
-; CHECK-GI-NEXT:    str x8, [x9, #16]
-; CHECK-GI-NEXT:    mov w8, #-56 // =0xffffffc8
-; CHECK-GI-NEXT:    str w8, [x9, #24]
-; CHECK-GI-NEXT:    mov w8, #-112 // =0xffffff90
-; CHECK-GI-NEXT:    str w8, [x9, #28]
+; CHECK-GI-NEXT:    add x8, sp, #8
+; CHECK-GI-NEXT:    add x9, x29, #16
+; CHECK-GI-NEXT:    str x9, [x8]
+; CHECK-GI-NEXT:    add x9, x29, #0
+; CHECK-GI-NEXT:    str x9, [x8, #8]
+; CHECK-GI-NEXT:    add x9, sp, #128
+; CHECK-GI-NEXT:    str x9, [x8, #16]
+; CHECK-GI-NEXT:    mov w9, #-56 // =0xffffffc8
+; CHECK-GI-NEXT:    str w9, [x8, #24]
+; CHECK-GI-NEXT:    mov w9, #-112 // =0xffffff90
+; CHECK-GI-NEXT:    str w9, [x8, #28]
 ; CHECK-GI-NEXT:    mov w8, #1 // =0x1
-; CHECK-GI-NEXT:    mov w0, w8
+; CHECK-GI-NEXT:    mov w1, w8
+; CHECK-GI-NEXT:    mov x0, x1
 ; CHECK-GI-NEXT:    .cfi_def_cfa wsp, 208
 ; CHECK-GI-NEXT:    ldp x29, x30, [sp, #192] // 16-byte Folded Reload
 ; CHECK-GI-NEXT:    add sp, sp, #208

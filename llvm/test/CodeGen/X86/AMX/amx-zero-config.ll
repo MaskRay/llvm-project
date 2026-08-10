@@ -71,31 +71,31 @@ define void @foo(ptr %buf) nounwind {
 ; AVX512-O0-NEXT:    # kill: def $zmm0 killed $xmm0
 ; AVX512-O0-NEXT:    vmovups %zmm0, {{[0-9]+}}(%rsp)
 ; AVX512-O0-NEXT:    movb $1, {{[0-9]+}}(%rsp)
-; AVX512-O0-NEXT:    movw $32, %cx
-; AVX512-O0-NEXT:    movw $8, %ax
-; AVX512-O0-NEXT:    # implicit-def: $al
-; AVX512-O0-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-O0-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-O0-NEXT:    movw $32, %ax
+; AVX512-O0-NEXT:    movw $8, %cx
+; AVX512-O0-NEXT:    # implicit-def: $cl
+; AVX512-O0-NEXT:    movb %cl, {{[0-9]+}}(%rsp)
+; AVX512-O0-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
 ; AVX512-O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
 ; AVX512-O0-NEXT:    tilezero %tmm0
-; AVX512-O0-NEXT:    movl $64, %esi
-; AVX512-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX512-O0-NEXT:    movw $32, %cx
-; AVX512-O0-NEXT:    movw $8, %ax
-; AVX512-O0-NEXT:    tilestored %tmm0, (%rdx,%rsi)
-; AVX512-O0-NEXT:    movl $64, %esi
-; AVX512-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX512-O0-NEXT:    movw $32, %cx
-; AVX512-O0-NEXT:    movw $8, %ax
-; AVX512-O0-NEXT:    # implicit-def: $al
-; AVX512-O0-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-O0-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-O0-NEXT:    movl $64, %eax
+; AVX512-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX512-O0-NEXT:    movw $32, %dx
+; AVX512-O0-NEXT:    movw $8, %si
+; AVX512-O0-NEXT:    tilestored %tmm0, (%rcx,%rax)
+; AVX512-O0-NEXT:    movl $64, %eax
+; AVX512-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX512-O0-NEXT:    movw $32, %dx
+; AVX512-O0-NEXT:    movw $8, %si
+; AVX512-O0-NEXT:    # implicit-def: $sil
+; AVX512-O0-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; AVX512-O0-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
 ; AVX512-O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; AVX512-O0-NEXT:    tileloadd (%rdx,%rsi), %tmm0
-; AVX512-O0-NEXT:    movl $1024, %edx # imm = 0x400
+; AVX512-O0-NEXT:    tileloadd (%rcx,%rax), %tmm0
+; AVX512-O0-NEXT:    movl $1024, %eax # imm = 0x400
 ; AVX512-O0-NEXT:    movw $32, %cx
-; AVX512-O0-NEXT:    movw $8, %ax
-; AVX512-O0-NEXT:    tilestored %tmm0, (%rdi,%rdx)
+; AVX512-O0-NEXT:    movw $8, %dx
+; AVX512-O0-NEXT:    tilestored %tmm0, (%rdi,%rax)
 ; AVX512-O0-NEXT:    movq %rbp, %rsp
 ; AVX512-O0-NEXT:    popq %rbp
 ; AVX512-O0-NEXT:    tilerelease
@@ -113,31 +113,31 @@ define void @foo(ptr %buf) nounwind {
 ; AVX2-O0-NEXT:    vmovups %ymm0, {{[0-9]+}}(%rsp)
 ; AVX2-O0-NEXT:    vmovups %ymm0, {{[0-9]+}}(%rsp)
 ; AVX2-O0-NEXT:    movb $1, {{[0-9]+}}(%rsp)
-; AVX2-O0-NEXT:    movw $32, %cx
-; AVX2-O0-NEXT:    movw $8, %ax
-; AVX2-O0-NEXT:    # implicit-def: $al
-; AVX2-O0-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX2-O0-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX2-O0-NEXT:    movw $32, %ax
+; AVX2-O0-NEXT:    movw $8, %cx
+; AVX2-O0-NEXT:    # implicit-def: $cl
+; AVX2-O0-NEXT:    movb %cl, {{[0-9]+}}(%rsp)
+; AVX2-O0-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
 ; AVX2-O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
 ; AVX2-O0-NEXT:    tilezero %tmm0
-; AVX2-O0-NEXT:    movl $64, %esi
-; AVX2-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX2-O0-NEXT:    movw $32, %cx
-; AVX2-O0-NEXT:    movw $8, %ax
-; AVX2-O0-NEXT:    tilestored %tmm0, (%rdx,%rsi)
-; AVX2-O0-NEXT:    movl $64, %esi
-; AVX2-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; AVX2-O0-NEXT:    movw $32, %cx
-; AVX2-O0-NEXT:    movw $8, %ax
-; AVX2-O0-NEXT:    # implicit-def: $al
-; AVX2-O0-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX2-O0-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX2-O0-NEXT:    movl $64, %eax
+; AVX2-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX2-O0-NEXT:    movw $32, %dx
+; AVX2-O0-NEXT:    movw $8, %si
+; AVX2-O0-NEXT:    tilestored %tmm0, (%rcx,%rax)
+; AVX2-O0-NEXT:    movl $64, %eax
+; AVX2-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; AVX2-O0-NEXT:    movw $32, %dx
+; AVX2-O0-NEXT:    movw $8, %si
+; AVX2-O0-NEXT:    # implicit-def: $sil
+; AVX2-O0-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; AVX2-O0-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
 ; AVX2-O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; AVX2-O0-NEXT:    tileloadd (%rdx,%rsi), %tmm0
-; AVX2-O0-NEXT:    movl $1024, %edx # imm = 0x400
+; AVX2-O0-NEXT:    tileloadd (%rcx,%rax), %tmm0
+; AVX2-O0-NEXT:    movl $1024, %eax # imm = 0x400
 ; AVX2-O0-NEXT:    movw $32, %cx
-; AVX2-O0-NEXT:    movw $8, %ax
-; AVX2-O0-NEXT:    tilestored %tmm0, (%rdi,%rdx)
+; AVX2-O0-NEXT:    movw $8, %dx
+; AVX2-O0-NEXT:    tilestored %tmm0, (%rdi,%rax)
 ; AVX2-O0-NEXT:    movq %rbp, %rsp
 ; AVX2-O0-NEXT:    popq %rbp
 ; AVX2-O0-NEXT:    tilerelease
@@ -156,31 +156,31 @@ define void @foo(ptr %buf) nounwind {
 ; SSE2-O0-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp)
 ; SSE2-O0-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp)
 ; SSE2-O0-NEXT:    movb $1, {{[0-9]+}}(%rsp)
-; SSE2-O0-NEXT:    movw $32, %cx
-; SSE2-O0-NEXT:    movw $8, %ax
-; SSE2-O0-NEXT:    # implicit-def: $al
-; SSE2-O0-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; SSE2-O0-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; SSE2-O0-NEXT:    movw $32, %ax
+; SSE2-O0-NEXT:    movw $8, %cx
+; SSE2-O0-NEXT:    # implicit-def: $cl
+; SSE2-O0-NEXT:    movb %cl, {{[0-9]+}}(%rsp)
+; SSE2-O0-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
 ; SSE2-O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
 ; SSE2-O0-NEXT:    tilezero %tmm0
-; SSE2-O0-NEXT:    movl $64, %esi
-; SSE2-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; SSE2-O0-NEXT:    movw $32, %cx
-; SSE2-O0-NEXT:    movw $8, %ax
-; SSE2-O0-NEXT:    tilestored %tmm0, (%rdx,%rsi)
-; SSE2-O0-NEXT:    movl $64, %esi
-; SSE2-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; SSE2-O0-NEXT:    movw $32, %cx
-; SSE2-O0-NEXT:    movw $8, %ax
-; SSE2-O0-NEXT:    # implicit-def: $al
-; SSE2-O0-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; SSE2-O0-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; SSE2-O0-NEXT:    movl $64, %eax
+; SSE2-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; SSE2-O0-NEXT:    movw $32, %dx
+; SSE2-O0-NEXT:    movw $8, %si
+; SSE2-O0-NEXT:    tilestored %tmm0, (%rcx,%rax)
+; SSE2-O0-NEXT:    movl $64, %eax
+; SSE2-O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; SSE2-O0-NEXT:    movw $32, %dx
+; SSE2-O0-NEXT:    movw $8, %si
+; SSE2-O0-NEXT:    # implicit-def: $sil
+; SSE2-O0-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; SSE2-O0-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
 ; SSE2-O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; SSE2-O0-NEXT:    tileloadd (%rdx,%rsi), %tmm0
-; SSE2-O0-NEXT:    movl $1024, %edx # imm = 0x400
+; SSE2-O0-NEXT:    tileloadd (%rcx,%rax), %tmm0
+; SSE2-O0-NEXT:    movl $1024, %eax # imm = 0x400
 ; SSE2-O0-NEXT:    movw $32, %cx
-; SSE2-O0-NEXT:    movw $8, %ax
-; SSE2-O0-NEXT:    tilestored %tmm0, (%rdi,%rdx)
+; SSE2-O0-NEXT:    movw $8, %dx
+; SSE2-O0-NEXT:    tilestored %tmm0, (%rdi,%rax)
 ; SSE2-O0-NEXT:    movq %rbp, %rsp
 ; SSE2-O0-NEXT:    popq %rbp
 ; SSE2-O0-NEXT:    tilerelease

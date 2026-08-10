@@ -10,12 +10,11 @@ declare float @llvm.experimental.constrained.uitofp.f32.i16(i16, metadata, metad
 define i32 @test(i32 %a, i16 %b) #0 {
 ; CHECK-LABEL: test:
 ; CHECK:       @ %bb.0: @ %entry
-; CHECK-NEXT:    mov r2, r1
-; CHECK-NEXT:    mov r1, r0
-; CHECK-NEXT:    sxth r0, r2
-; CHECK-NEXT:    vmov s0, r1
+; CHECK-NEXT:    sxth r2, r1
+; CHECK-NEXT:    @ kill: def $r1 killed $r1
+; CHECK-NEXT:    vmov s0, r0
 ; CHECK-NEXT:    vcvt.f32.s32 s0, s0
-; CHECK-NEXT:    vmov s2, r0
+; CHECK-NEXT:    vmov s2, r2
 ; CHECK-NEXT:    vcvt.f32.s32 s2, s2
 ; CHECK-NEXT:    vcmp.f32 s0, s2
 ; CHECK-NEXT:    vmrs APSR_nzcv, fpscr
@@ -46,12 +45,11 @@ entry:
 define i32 @test2(i32 %a, i16 %b) #0 {
 ; CHECK-LABEL: test2:
 ; CHECK:       @ %bb.0: @ %entry
-; CHECK-NEXT:    mov r2, r1
-; CHECK-NEXT:    mov r1, r0
-; CHECK-NEXT:    uxth r0, r2
-; CHECK-NEXT:    vmov s0, r1
+; CHECK-NEXT:    uxth r2, r1
+; CHECK-NEXT:    @ kill: def $r1 killed $r1
+; CHECK-NEXT:    vmov s0, r0
 ; CHECK-NEXT:    vcvt.f32.s32 s0, s0
-; CHECK-NEXT:    vmov s2, r0
+; CHECK-NEXT:    vmov s2, r2
 ; CHECK-NEXT:    vcvt.f32.u32 s2, s2
 ; CHECK-NEXT:    vcmp.f32 s0, s2
 ; CHECK-NEXT:    vmrs APSR_nzcv, fpscr

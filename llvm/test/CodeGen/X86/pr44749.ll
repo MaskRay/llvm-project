@@ -8,24 +8,24 @@ define i32 @a() {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    movb $0, %al
 ; CHECK-NEXT:    callq _b
-; CHECK-NEXT:    cvtsi2sd %eax, %xmm1
-; CHECK-NEXT:    movq _calloc@GOTPCREL(%rip), %rdx
-; CHECK-NEXT:    addq $1, %rdx
-; CHECK-NEXT:    xorl %eax, %eax
-; CHECK-NEXT:    movl $1, %ecx
-; CHECK-NEXT:    cmpq $0, %rdx
-; CHECK-NEXT:    cmovnel %ecx, %eax
 ; CHECK-NEXT:    cvtsi2sd %eax, %xmm0
+; CHECK-NEXT:    movq _calloc@GOTPCREL(%rip), %rax
+; CHECK-NEXT:    addq $1, %rax
+; CHECK-NEXT:    xorl %ecx, %ecx
+; CHECK-NEXT:    movl $1, %edx
+; CHECK-NEXT:    cmpq $0, %rax
+; CHECK-NEXT:    cmovnel %edx, %ecx
+; CHECK-NEXT:    cvtsi2sd %ecx, %xmm1
 ; CHECK-NEXT:    movsd {{.*#+}} xmm2 = [1.0E+2,0.0E+0]
-; CHECK-NEXT:    subsd %xmm2, %xmm0
-; CHECK-NEXT:    movsd {{.*#+}} xmm3 = [1.0E+0,0.0E+0]
-; CHECK-NEXT:    movsd {{.*#+}} xmm2 = [3.1400000000000001E+0,0.0E+0]
-; CHECK-NEXT:    cmplesd %xmm1, %xmm0
-; CHECK-NEXT:    movaps %xmm0, %xmm1
-; CHECK-NEXT:    andpd %xmm3, %xmm1
-; CHECK-NEXT:    andnpd %xmm2, %xmm0
-; CHECK-NEXT:    orpd %xmm1, %xmm0
-; CHECK-NEXT:    cvttsd2si %xmm0, %eax
+; CHECK-NEXT:    subsd %xmm2, %xmm1
+; CHECK-NEXT:    movsd {{.*#+}} xmm2 = [1.0E+0,0.0E+0]
+; CHECK-NEXT:    movsd {{.*#+}} xmm3 = [3.1400000000000001E+0,0.0E+0]
+; CHECK-NEXT:    cmplesd %xmm0, %xmm1
+; CHECK-NEXT:    movaps %xmm1, %xmm0
+; CHECK-NEXT:    andpd %xmm2, %xmm0
+; CHECK-NEXT:    andnpd %xmm3, %xmm1
+; CHECK-NEXT:    orpd %xmm0, %xmm1
+; CHECK-NEXT:    cvttsd2si %xmm1, %eax
 ; CHECK-NEXT:    popq %rcx
 ; CHECK-NEXT:    retq
 entry:

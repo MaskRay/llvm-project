@@ -35,31 +35,38 @@ define i32 @foo2(ptr noundef %0) {
 ; CHECK-LABEL: foo2:
 ; CHECK:         .cfi_startproc
 ; CHECK-NEXT:  ; %bb.0: ; %entry
-; CHECK-NEXT:    suba.l #4, %sp
-; CHECK-NEXT:    .cfi_def_cfa_offset -8
-; CHECK-NEXT:    move.l (8,%sp), %a0
+; CHECK-NEXT:    suba.l #8, %sp
+; CHECK-NEXT:    .cfi_def_cfa_offset -12
+; CHECK-NEXT:    movem.l %d2, (4,%sp) ; 8-byte Folded Spill
+; CHECK-NEXT:    move.l (12,%sp), %a0
 ; CHECK-NEXT:    move.b (%a0), %d0
-; CHECK-NEXT:    movem.w %d0, (0,%sp)
-; CHECK-NEXT:    and.b #1, %d0
 ; CHECK-NEXT:    movem.w %d0, (2,%sp)
-; CHECK-NEXT:    sub.b #1, %d0
+; CHECK-NEXT:    move.b %d0, %d1
+; CHECK-NEXT:    movem.w %d1, (0,%sp)
+; CHECK-NEXT:    and.b #1, %d1
+; CHECK-NEXT:    movem.w %d1, (0,%sp)
+; CHECK-NEXT:    move.b %d1, %d2
+; CHECK-NEXT:    sub.b #1, %d2
 ; CHECK-NEXT:    bgt .LBB1_2
 ; CHECK-NEXT:  ; %bb.1: ; %if
-; CHECK-NEXT:    movem.w (2,%sp), %d0
-; CHECK-NEXT:    movem.w (0,%sp), %d1
+; CHECK-NEXT:    movem.w (0,%sp), %d0
+; CHECK-NEXT:    movem.w (2,%sp), %d1
 ; CHECK-NEXT:    add.b %d1, %d0
+; CHECK-NEXT:    movem.w %d0, (0,%sp)
 ; CHECK-NEXT:    bra .LBB1_3
 ; CHECK-NEXT:  .LBB1_2: ; %else
-; CHECK-NEXT:    movem.w (2,%sp), %d1
-; CHECK-NEXT:    movem.w (0,%sp), %d0
-; CHECK-NEXT:    sub.b %d1, %d0
-; CHECK-NEXT:    movem.w %d0, (0,%sp)
-; CHECK-NEXT:  .LBB1_3: ; %cont
-; CHECK-NEXT:    movem.w %d0, (2,%sp)
 ; CHECK-NEXT:    movem.w (2,%sp), %d0
+; CHECK-NEXT:    movem.w (0,%sp), %d1
+; CHECK-NEXT:    sub.b %d1, %d0
+; CHECK-NEXT:    movem.w %d0, (2,%sp)
+; CHECK-NEXT:    move.b %d0, %d1
+; CHECK-NEXT:    movem.w %d1, (0,%sp)
+; CHECK-NEXT:  .LBB1_3: ; %cont
+; CHECK-NEXT:    movem.w (0,%sp), %d0
 ; CHECK-NEXT:    ext.w %d0
 ; CHECK-NEXT:    ext.l %d0
-; CHECK-NEXT:    adda.l #4, %sp
+; CHECK-NEXT:    movem.l (4,%sp), %d2 ; 8-byte Folded Reload
+; CHECK-NEXT:    adda.l #8, %sp
 ; CHECK-NEXT:    rts
 entry:
   %1 = getelementptr i8, ptr %0, i32 0

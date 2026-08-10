@@ -23,19 +23,19 @@ define void @atomic_store_cstexpr_addr(i32 %val) #0 {
 define i32 @cmpxchg_cstexpr_addr(i32 %cmp, i32 %new, ptr %ps) #0 {
 ; CHECK-LABEL: cmpxchg_cstexpr_addr:
 ; CHECK:       ; %bb.0:
-; CHECK-NEXT:    mov w8, w0
-; CHECK-NEXT:    adrp x10, _g@PAGE
-; CHECK-NEXT:    add x10, x10, _g@PAGEOFF
+; CHECK-NEXT:    adrp x8, _g@PAGE
+; CHECK-NEXT:    add x8, x8, _g@PAGEOFF
 ; CHECK-NEXT:  LBB1_1: ; =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    ldaxr w0, [x10]
-; CHECK-NEXT:    cmp w0, w8
+; CHECK-NEXT:    ldaxr w9, [x8]
+; CHECK-NEXT:    cmp w9, w0
 ; CHECK-NEXT:    b.ne LBB1_3
 ; CHECK-NEXT:  ; %bb.2: ; in Loop: Header=BB1_1 Depth=1
-; CHECK-NEXT:    stlxr w9, w1, [x10]
-; CHECK-NEXT:    cbnz w9, LBB1_1
+; CHECK-NEXT:    stlxr w10, w1, [x8]
+; CHECK-NEXT:    cbnz w10, LBB1_1
 ; CHECK-NEXT:  LBB1_3:
-; CHECK-NEXT:    subs w8, w0, w8
+; CHECK-NEXT:    subs w8, w9, w0
 ; CHECK-NEXT:    cset w8, eq
+; CHECK-NEXT:    mov w0, w9
 ; CHECK-NEXT:    str w8, [x2]
 ; CHECK-NEXT:    ret
   %tmp0 = cmpxchg ptr inttoptr (i32 ptrtoint (ptr @g to i32) to ptr), i32 %cmp, i32 %new seq_cst seq_cst

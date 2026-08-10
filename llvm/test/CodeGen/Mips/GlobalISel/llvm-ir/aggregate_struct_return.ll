@@ -6,10 +6,10 @@ define { float, float } @add_complex_float(ptr %a, ptr %b) {
 ; MIPS32:       # %bb.0: # %entry
 ; MIPS32-NEXT:    lwc1 $f0, 0($4)
 ; MIPS32-NEXT:    lwc1 $f1, 4($4)
-; MIPS32-NEXT:    lwc1 $f3, 0($5)
-; MIPS32-NEXT:    lwc1 $f2, 4($5)
-; MIPS32-NEXT:    add.s $f0, $f0, $f3
-; MIPS32-NEXT:    add.s $f2, $f1, $f2
+; MIPS32-NEXT:    lwc1 $f2, 0($5)
+; MIPS32-NEXT:    lwc1 $f3, 4($5)
+; MIPS32-NEXT:    add.s $f0, $f0, $f2
+; MIPS32-NEXT:    add.s $f2, $f1, $f3
 ; MIPS32-NEXT:    jr $ra
 ; MIPS32-NEXT:    nop
 entry:
@@ -33,10 +33,10 @@ define { double, double } @add_complex_double(ptr %a, ptr %b) {
 ; MIPS32:       # %bb.0: # %entry
 ; MIPS32-NEXT:    ldc1 $f0, 0($4)
 ; MIPS32-NEXT:    ldc1 $f2, 8($4)
-; MIPS32-NEXT:    ldc1 $f6, 0($5)
-; MIPS32-NEXT:    ldc1 $f4, 8($5)
-; MIPS32-NEXT:    add.d $f0, $f0, $f6
-; MIPS32-NEXT:    add.d $f2, $f2, $f4
+; MIPS32-NEXT:    ldc1 $f4, 0($5)
+; MIPS32-NEXT:    ldc1 $f6, 8($5)
+; MIPS32-NEXT:    add.d $f0, $f0, $f4
+; MIPS32-NEXT:    add.d $f2, $f2, $f6
 ; MIPS32-NEXT:    jr $ra
 ; MIPS32-NEXT:    nop
 entry:
@@ -62,13 +62,15 @@ define void @call_ret_complex_float(ptr %z) {
 ; MIPS32-NEXT:    addiu $sp, $sp, -24
 ; MIPS32-NEXT:    .cfi_def_cfa_offset 24
 ; MIPS32-NEXT:    sw $ra, 20($sp) # 4-byte Folded Spill
+; MIPS32-NEXT:    sw $16, 16($sp) # 4-byte Folded Spill
 ; MIPS32-NEXT:    .cfi_offset 31, -4
-; MIPS32-NEXT:    sw $4, 16($sp) # 4-byte Folded Spill
+; MIPS32-NEXT:    .cfi_offset 16, -8
+; MIPS32-NEXT:    move $16, $4
 ; MIPS32-NEXT:    jal ret_complex_float
 ; MIPS32-NEXT:    nop
-; MIPS32-NEXT:    lw $4, 16($sp) # 4-byte Folded Reload
-; MIPS32-NEXT:    swc1 $f0, 0($4)
-; MIPS32-NEXT:    swc1 $f2, 4($4)
+; MIPS32-NEXT:    swc1 $f0, 0($16)
+; MIPS32-NEXT:    swc1 $f2, 4($16)
+; MIPS32-NEXT:    lw $16, 16($sp) # 4-byte Folded Reload
 ; MIPS32-NEXT:    lw $ra, 20($sp) # 4-byte Folded Reload
 ; MIPS32-NEXT:    addiu $sp, $sp, 24
 ; MIPS32-NEXT:    jr $ra
@@ -91,13 +93,15 @@ define void @call_ret_complex_double(ptr %z) {
 ; MIPS32-NEXT:    addiu $sp, $sp, -24
 ; MIPS32-NEXT:    .cfi_def_cfa_offset 24
 ; MIPS32-NEXT:    sw $ra, 20($sp) # 4-byte Folded Spill
+; MIPS32-NEXT:    sw $16, 16($sp) # 4-byte Folded Spill
 ; MIPS32-NEXT:    .cfi_offset 31, -4
-; MIPS32-NEXT:    sw $4, 16($sp) # 4-byte Folded Spill
+; MIPS32-NEXT:    .cfi_offset 16, -8
+; MIPS32-NEXT:    move $16, $4
 ; MIPS32-NEXT:    jal ret_complex_double
 ; MIPS32-NEXT:    nop
-; MIPS32-NEXT:    lw $4, 16($sp) # 4-byte Folded Reload
-; MIPS32-NEXT:    sdc1 $f0, 0($4)
-; MIPS32-NEXT:    sdc1 $f2, 8($4)
+; MIPS32-NEXT:    sdc1 $f0, 0($16)
+; MIPS32-NEXT:    sdc1 $f2, 8($16)
+; MIPS32-NEXT:    lw $16, 16($sp) # 4-byte Folded Reload
 ; MIPS32-NEXT:    lw $ra, 20($sp) # 4-byte Folded Reload
 ; MIPS32-NEXT:    addiu $sp, $sp, 24
 ; MIPS32-NEXT:    jr $ra

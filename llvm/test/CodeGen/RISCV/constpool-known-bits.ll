@@ -5,17 +5,19 @@
 define i64 @test(i32 noundef signext %c, i32 noundef signext %d) {
 ; NOPIC-LABEL: test:
 ; NOPIC:       # %bb.0: # %entry
+; NOPIC-NEXT:    # kill: def $x11 killed $x11
+; NOPIC-NEXT:    # kill: def $x11 killed $x10
 ; NOPIC-NEXT:    slli a0, a0, 32
-; NOPIC-NEXT:    srli a1, a0, 32
-; NOPIC-NEXT:    lui a0, %hi(.LCPI0_0)
-; NOPIC-NEXT:    ld a0, %lo(.LCPI0_0)(a0)
-; NOPIC-NEXT:    mul a0, a1, a0
-; NOPIC-NEXT:    addi a0, a0, 127
-; NOPIC-NEXT:    mul a0, a1, a0
+; NOPIC-NEXT:    srli a0, a0, 32
+; NOPIC-NEXT:    lui a1, %hi(.LCPI0_0)
+; NOPIC-NEXT:    ld a1, %lo(.LCPI0_0)(a1)
+; NOPIC-NEXT:    mul a1, a0, a1
+; NOPIC-NEXT:    addi a1, a1, 127
+; NOPIC-NEXT:    mul a1, a0, a1
 ; NOPIC-NEXT:    lui a2, %hi(.LCPI0_1)
 ; NOPIC-NEXT:    ld a2, %lo(.LCPI0_1)(a2)
-; NOPIC-NEXT:    mul a0, a0, a2
-; NOPIC-NEXT:    add a0, a0, a1
+; NOPIC-NEXT:    mul a1, a1, a2
+; NOPIC-NEXT:    add a0, a1, a0
 ; NOPIC-NEXT:    lui a1, %hi(.LCPI0_2)
 ; NOPIC-NEXT:    ld a1, %lo(.LCPI0_2)(a1)
 ; NOPIC-NEXT:    add a0, a0, a1
@@ -23,21 +25,23 @@ define i64 @test(i32 noundef signext %c, i32 noundef signext %d) {
 ;
 ; PIC-LABEL: test:
 ; PIC:       # %bb.0: # %entry
+; PIC-NEXT:    # kill: def $x11 killed $x11
+; PIC-NEXT:    # kill: def $x11 killed $x10
 ; PIC-NEXT:    slli a0, a0, 32
-; PIC-NEXT:    srli a1, a0, 32
+; PIC-NEXT:    srli a0, a0, 32
 ; PIC-NEXT:  .Lpcrel_hi0:
-; PIC-NEXT:    auipc a0, %pcrel_hi(.LCPI0_0)
-; PIC-NEXT:    addi a0, a0, %pcrel_lo(.Lpcrel_hi0)
-; PIC-NEXT:    ld a0, 0(a0)
-; PIC-NEXT:    mul a0, a1, a0
-; PIC-NEXT:    addi a0, a0, 127
-; PIC-NEXT:    mul a0, a1, a0
+; PIC-NEXT:    auipc a1, %pcrel_hi(.LCPI0_0)
+; PIC-NEXT:    addi a1, a1, %pcrel_lo(.Lpcrel_hi0)
+; PIC-NEXT:    ld a1, 0(a1)
+; PIC-NEXT:    mul a1, a0, a1
+; PIC-NEXT:    addi a1, a1, 127
+; PIC-NEXT:    mul a1, a0, a1
 ; PIC-NEXT:  .Lpcrel_hi1:
 ; PIC-NEXT:    auipc a2, %pcrel_hi(.LCPI0_1)
 ; PIC-NEXT:    addi a2, a2, %pcrel_lo(.Lpcrel_hi1)
 ; PIC-NEXT:    ld a2, 0(a2)
-; PIC-NEXT:    mul a0, a0, a2
-; PIC-NEXT:    add a0, a0, a1
+; PIC-NEXT:    mul a1, a1, a2
+; PIC-NEXT:    add a0, a1, a0
 ; PIC-NEXT:  .Lpcrel_hi2:
 ; PIC-NEXT:    auipc a1, %pcrel_hi(.LCPI0_2)
 ; PIC-NEXT:    addi a1, a1, %pcrel_lo(.Lpcrel_hi2)

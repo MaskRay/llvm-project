@@ -9,9 +9,9 @@ define i1 @Test(double %a) {
 ; CHECK-NEXT:    mffprwz 3, 0
 ; CHECK-NEXT:    cmplwi 3, 65534
 ; CHECK-NEXT:    crmove 20, 2
-; CHECK-NEXT:    li 4, 0
-; CHECK-NEXT:    li 3, 1
-; CHECK-NEXT:    isel 3, 3, 4, 20
+; CHECK-NEXT:    li 3, 0
+; CHECK-NEXT:    li 4, 1
+; CHECK-NEXT:    isel 3, 4, 3, 20
 ; CHECK-NEXT:    blr
 entry:
   %conv = fptoui double %a to i16

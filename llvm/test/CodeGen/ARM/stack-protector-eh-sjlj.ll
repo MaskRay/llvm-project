@@ -61,11 +61,12 @@ define ptr @foo() #0 personality ptr @__gxx_personality_sj0 {
 ; CHECK-NEXT:    cmp r0, r1
 ; CHECK-NEXT:    bne LBB0_7
 ; CHECK-NEXT:  @ %bb.1: @ %SP_return
-; CHECK-NEXT:  Ltmp0:
-; CHECK-NEXT:    movs r1, #0
-; CHECK-NEXT:    mov r0, r1
+; CHECK-NEXT:  Ltmp0: @ EH_LABEL
+; CHECK-NEXT:    movs r0, #0
+; CHECK-NEXT:    str r0, [sp, #8] @ 4-byte Spill
+; CHECK-NEXT:    ldr r1, [sp, #8] @ 4-byte Reload
 ; CHECK-NEXT:    bl _foo2
-; CHECK-NEXT:  Ltmp1:
+; CHECK-NEXT:  Ltmp1: @ EH_LABEL
 ; CHECK-NEXT:    b LBB0_2
 ; CHECK-NEXT:  LBB0_2:
 ; CHECK-NEXT:    movs r0, #2
@@ -80,15 +81,16 @@ define ptr @foo() #0 personality ptr @__gxx_personality_sj0 {
 ; CHECK-NEXT:    cmp r0, r1
 ; CHECK-NEXT:    bne LBB0_7
 ; CHECK-NEXT:  @ %bb.3: @ %SP_return2
-; CHECK-NEXT:  Ltmp2:
-; CHECK-NEXT:    movs r2, #0
-; CHECK-NEXT:    mov r0, r2
-; CHECK-NEXT:    mov r1, r2
+; CHECK-NEXT:  Ltmp2: @ EH_LABEL
+; CHECK-NEXT:    movs r0, #0
+; CHECK-NEXT:    str r0, [sp, #4] @ 4-byte Spill
+; CHECK-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-NEXT:    ldr r2, [sp, #4] @ 4-byte Reload
 ; CHECK-NEXT:    bl _foo3
-; CHECK-NEXT:  Ltmp3:
+; CHECK-NEXT:  Ltmp3: @ EH_LABEL
 ; CHECK-NEXT:    b LBB0_6
 ; CHECK-NEXT:  LBB0_4:
-; CHECK-NEXT:  Ltmp4:
+; CHECK-NEXT:  Ltmp4: @ EH_LABEL
 ; CHECK-NEXT:    ldr r0, [sp, #20]
 ; CHECK-NEXT:    ldr r0, [sp, #24]
 ; CHECK-NEXT:    add r0, sp, #12
@@ -117,11 +119,11 @@ define ptr @foo() #0 personality ptr @__gxx_personality_sj0 {
 ; CHECK-NEXT:    bl ___stack_chk_fail
 ; CHECK-NEXT:  LBB0_8:
 ; CHECK-NEXT:    ldr r0, [sp, #16]
-; CHECK-NEXT:    str r0, [sp, #8] @ 4-byte Spill
+; CHECK-NEXT:    str r0, [sp] @ 4-byte Spill
 ; CHECK-NEXT:    cmp r0, #2
 ; CHECK-NEXT:    bhi LBB0_12
 ; CHECK-NEXT:  @ %bb.9:
-; CHECK-NEXT:    ldr r1, [sp, #8] @ 4-byte Reload
+; CHECK-NEXT:    ldr r1, [sp] @ 4-byte Reload
 ; CHECK-NEXT:  LCPI0_2:
 ; CHECK-NEXT:    tbb [pc, r1]
 ; CHECK-NEXT:  @ %bb.10:

@@ -254,11 +254,12 @@ define i64 @test_old_load_64bit(ptr %p) {
 ;
 ; ARMOPTNONE-LABEL: test_old_load_64bit:
 ; ARMOPTNONE:       @ %bb.0:
-; ARMOPTNONE-NEXT:    ldrexd r2, r3, [r0]
-; ARMOPTNONE-NEXT:    mov r0, r2
-; ARMOPTNONE-NEXT:    mov r1, r3
+; ARMOPTNONE-NEXT:    ldrexd r0, r1, [r0]
+; ARMOPTNONE-NEXT:    mov r2, r0
+; ARMOPTNONE-NEXT:    @ kill: def $r1 killed $r1 killed $r0_r1
 ; ARMOPTNONE-NEXT:    clrex
 ; ARMOPTNONE-NEXT:    dmb ish
+; ARMOPTNONE-NEXT:    mov r0, r2
 ; ARMOPTNONE-NEXT:    bx lr
 ;
 ; THUMBTWO-LABEL: test_old_load_64bit:
@@ -327,57 +328,60 @@ define void @test_old_store_64bit(ptr %p, i64 %v) {
 ; ARMOPTNONE-NEXT:    push {r4, r5, r7, r8, r10, r11, lr}
 ; ARMOPTNONE-NEXT:    add r7, sp, #20
 ; ARMOPTNONE-NEXT:    sub sp, sp, #24
-; ARMOPTNONE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    str r2, [sp, #16] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:    dmb ish
-; ARMOPTNONE-NEXT:    ldrexd r2, r3, [r0]
-; ARMOPTNONE-NEXT:    mov r0, r3
-; ARMOPTNONE-NEXT:    mov r1, r2
+; ARMOPTNONE-NEXT:    ldrexd r4, r5, [r0]
+; ARMOPTNONE-NEXT:    mov r3, r5
+; ARMOPTNONE-NEXT:    mov r9, r4
 ; ARMOPTNONE-NEXT:    clrex
-; ARMOPTNONE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    str r9, [sp, #8] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    str r3, [sp, #4] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:    b LBB5_1
 ; ARMOPTNONE-NEXT:  LBB5_1: @ %atomicrmw.start
 ; ARMOPTNONE-NEXT:    @ =>This Loop Header: Depth=1
 ; ARMOPTNONE-NEXT:    @ Child Loop BB5_2 Depth 2
-; ARMOPTNONE-NEXT:    ldr r3, [sp, #20] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    ldr r2, [sp, #16] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    ldr r12, [sp, #8] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    ldr r8, [sp, #4] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    str r3, [sp] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    @ implicit-def: $r1
+; ARMOPTNONE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r1, r0
+; ARMOPTNONE-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r3, r2
 ; ARMOPTNONE-NEXT:    @ implicit-def: $r9
-; ARMOPTNONE-NEXT:    @ kill: def $r8 killed $r8 def $r8_r9
-; ARMOPTNONE-NEXT:    mov r9, r1
-; ARMOPTNONE-NEXT:    @ kill: def $r0 killed $r0 def $r0_r1
-; ARMOPTNONE-NEXT:    mov r1, r12
-; ARMOPTNONE-NEXT:    mov r10, r2
-; ARMOPTNONE-NEXT:    mov r11, r3
+; ARMOPTNONE-NEXT:    @ implicit-def: $r12
+; ARMOPTNONE-NEXT:    ldr r12, [sp, #20] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r4, r12
+; ARMOPTNONE-NEXT:    mov r5, r9
+; ARMOPTNONE-NEXT:    ldr r9, [sp, #12] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r8, r9
+; ARMOPTNONE-NEXT:    ldr r12, [sp, #16] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r9, r12
+; ARMOPTNONE-NEXT:    mov r10, r3
+; ARMOPTNONE-NEXT:    mov r11, r1
+; ARMOPTNONE-NEXT:    str r1, [sp] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:  LBB5_2: @ %atomicrmw.start
 ; ARMOPTNONE-NEXT:    @ Parent Loop BB5_1 Depth=1
 ; ARMOPTNONE-NEXT:    @ => This Inner Loop Header: Depth=2
-; ARMOPTNONE-NEXT:    ldrexd r4, r5, [r8]
-; ARMOPTNONE-NEXT:    cmp r4, r10
-; ARMOPTNONE-NEXT:    cmpeq r5, r11
+; ARMOPTNONE-NEXT:    ldrexd r0, r1, [r4]
+; ARMOPTNONE-NEXT:    cmp r0, r10
+; ARMOPTNONE-NEXT:    cmpeq r1, r11
 ; ARMOPTNONE-NEXT:    bne LBB5_4
 ; ARMOPTNONE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; ARMOPTNONE-NEXT:    @ in Loop: Header=BB5_2 Depth=2
-; ARMOPTNONE-NEXT:    strexd r9, r0, r1, [r8]
-; ARMOPTNONE-NEXT:    cmp r9, #0
+; ARMOPTNONE-NEXT:    strexd r5, r8, r9, [r4]
+; ARMOPTNONE-NEXT:    cmp r5, #0
 ; ARMOPTNONE-NEXT:    bne LBB5_2
 ; ARMOPTNONE-NEXT:  LBB5_4: @ %atomicrmw.start
 ; ARMOPTNONE-NEXT:    @ in Loop: Header=BB5_1 Depth=1
-; ARMOPTNONE-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    mov r0, r5
-; ARMOPTNONE-NEXT:    eor r3, r0, r1
-; ARMOPTNONE-NEXT:    mov r1, r4
-; ARMOPTNONE-NEXT:    eor r2, r1, r2
-; ARMOPTNONE-NEXT:    orr r2, r2, r3
-; ARMOPTNONE-NEXT:    cmp r2, #0
-; ARMOPTNONE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    mov r9, r1
+; ARMOPTNONE-NEXT:    ldr r12, [sp] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    eor r12, r9, r12
+; ARMOPTNONE-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
+; ARMOPTNONE-NEXT:    eor r1, r0, r3
+; ARMOPTNONE-NEXT:    orr r1, r1, r12
+; ARMOPTNONE-NEXT:    cmp r1, #0
+; ARMOPTNONE-NEXT:    mov r2, r0
+; ARMOPTNONE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    str r9, [sp, #4] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:    bne LBB5_1
 ; ARMOPTNONE-NEXT:    b LBB5_5
 ; ARMOPTNONE-NEXT:  LBB5_5: @ %atomicrmw.end
@@ -610,12 +614,13 @@ define double @load_atomic_f64__seq_cst(ptr %ptr) {
 ;
 ; ARMOPTNONE-LABEL: load_atomic_f64__seq_cst:
 ; ARMOPTNONE:       @ %bb.0:
-; ARMOPTNONE-NEXT:    ldrexd r2, r3, [r0]
-; ARMOPTNONE-NEXT:    mov r1, r3
-; ARMOPTNONE-NEXT:    mov r0, r2
+; ARMOPTNONE-NEXT:    ldrexd r0, r1, [r0]
+; ARMOPTNONE-NEXT:    mov r2, r1
+; ARMOPTNONE-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; ARMOPTNONE-NEXT:    clrex
 ; ARMOPTNONE-NEXT:    dmb ish
-; ARMOPTNONE-NEXT:    vmov d16, r0, r1
+; ARMOPTNONE-NEXT:    vmov d16, r0, r2
+; ARMOPTNONE-NEXT:    mov r1, r2
 ; ARMOPTNONE-NEXT:    bx lr
 ;
 ; THUMBTWO-LABEL: load_atomic_f64__seq_cst:
@@ -672,16 +677,11 @@ define void @store_atomic_f16__seq_cst(ptr %ptr, half %val1) {
 ;
 ; ARMOPTNONE-LABEL: store_atomic_f16__seq_cst:
 ; ARMOPTNONE:       @ %bb.0:
-; ARMOPTNONE-NEXT:    sub sp, sp, #4
-; ARMOPTNONE-NEXT:    str r1, [sp] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    mov r1, r0
-; ARMOPTNONE-NEXT:    ldr r0, [sp] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    vmov s0, r0
-; ARMOPTNONE-NEXT:    vmov r0, s0
+; ARMOPTNONE-NEXT:    vmov s0, r1
+; ARMOPTNONE-NEXT:    vmov r1, s0
 ; ARMOPTNONE-NEXT:    dmb ish
-; ARMOPTNONE-NEXT:    strh r0, [r1]
+; ARMOPTNONE-NEXT:    strh r1, [r0]
 ; ARMOPTNONE-NEXT:    dmb ish
-; ARMOPTNONE-NEXT:    add sp, sp, #4
 ; ARMOPTNONE-NEXT:    bx lr
 ;
 ; THUMBTWO-LABEL: store_atomic_f16__seq_cst:
@@ -733,16 +733,11 @@ define void @store_atomic_bf16__seq_cst(ptr %ptr, bfloat %val1) {
 ;
 ; ARMOPTNONE-LABEL: store_atomic_bf16__seq_cst:
 ; ARMOPTNONE:       @ %bb.0:
-; ARMOPTNONE-NEXT:    sub sp, sp, #4
-; ARMOPTNONE-NEXT:    str r1, [sp] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    mov r1, r0
-; ARMOPTNONE-NEXT:    ldr r0, [sp] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    vmov s0, r0
-; ARMOPTNONE-NEXT:    vmov r0, s0
+; ARMOPTNONE-NEXT:    vmov s0, r1
+; ARMOPTNONE-NEXT:    vmov r1, s0
 ; ARMOPTNONE-NEXT:    dmb ish
-; ARMOPTNONE-NEXT:    strh r0, [r1]
+; ARMOPTNONE-NEXT:    strh r1, [r0]
 ; ARMOPTNONE-NEXT:    dmb ish
-; ARMOPTNONE-NEXT:    add sp, sp, #4
 ; ARMOPTNONE-NEXT:    bx lr
 ;
 ; THUMBTWO-LABEL: store_atomic_bf16__seq_cst:
@@ -794,16 +789,11 @@ define void @store_atomic_f32__seq_cst(ptr %ptr, float %val1) {
 ;
 ; ARMOPTNONE-LABEL: store_atomic_f32__seq_cst:
 ; ARMOPTNONE:       @ %bb.0:
-; ARMOPTNONE-NEXT:    sub sp, sp, #4
-; ARMOPTNONE-NEXT:    str r1, [sp] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    mov r1, r0
-; ARMOPTNONE-NEXT:    ldr r0, [sp] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    vmov s0, r0
-; ARMOPTNONE-NEXT:    vmov r0, s0
+; ARMOPTNONE-NEXT:    vmov s0, r1
+; ARMOPTNONE-NEXT:    vmov r1, s0
 ; ARMOPTNONE-NEXT:    dmb ish
-; ARMOPTNONE-NEXT:    str r0, [r1]
+; ARMOPTNONE-NEXT:    str r1, [r0]
 ; ARMOPTNONE-NEXT:    dmb ish
-; ARMOPTNONE-NEXT:    add sp, sp, #4
 ; ARMOPTNONE-NEXT:    bx lr
 ;
 ; THUMBTWO-LABEL: store_atomic_f32__seq_cst:
@@ -867,59 +857,62 @@ define void @store_atomic_f64__seq_cst(ptr %ptr, double %val1) {
 ; ARMOPTNONE-NEXT:    push {r4, r5, r7, r8, r10, r11, lr}
 ; ARMOPTNONE-NEXT:    add r7, sp, #20
 ; ARMOPTNONE-NEXT:    sub sp, sp, #24
-; ARMOPTNONE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:    vmov d16, r1, r2
 ; ARMOPTNONE-NEXT:    vmov r1, r2, d16
-; ARMOPTNONE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    dmb ish
-; ARMOPTNONE-NEXT:    ldrexd r2, r3, [r0]
-; ARMOPTNONE-NEXT:    mov r0, r3
-; ARMOPTNONE-NEXT:    mov r1, r2
-; ARMOPTNONE-NEXT:    clrex
+; ARMOPTNONE-NEXT:    str r2, [sp, #12] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    dmb ish
+; ARMOPTNONE-NEXT:    ldrexd r4, r5, [r0]
+; ARMOPTNONE-NEXT:    mov r3, r5
+; ARMOPTNONE-NEXT:    mov r9, r4
+; ARMOPTNONE-NEXT:    clrex
+; ARMOPTNONE-NEXT:    str r9, [sp, #8] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    str r3, [sp, #4] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:    b LBB13_1
 ; ARMOPTNONE-NEXT:  LBB13_1: @ %atomicrmw.start
 ; ARMOPTNONE-NEXT:    @ =>This Loop Header: Depth=1
 ; ARMOPTNONE-NEXT:    @ Child Loop BB13_2 Depth 2
-; ARMOPTNONE-NEXT:    ldr r3, [sp, #20] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    ldr r2, [sp, #16] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    ldr r12, [sp, #8] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    ldr r8, [sp, #4] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    str r3, [sp] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    @ implicit-def: $r1
+; ARMOPTNONE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r1, r0
+; ARMOPTNONE-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r3, r2
 ; ARMOPTNONE-NEXT:    @ implicit-def: $r9
-; ARMOPTNONE-NEXT:    @ kill: def $r8 killed $r8 def $r8_r9
-; ARMOPTNONE-NEXT:    mov r9, r1
-; ARMOPTNONE-NEXT:    @ kill: def $r0 killed $r0 def $r0_r1
-; ARMOPTNONE-NEXT:    mov r1, r12
-; ARMOPTNONE-NEXT:    mov r10, r2
-; ARMOPTNONE-NEXT:    mov r11, r3
+; ARMOPTNONE-NEXT:    @ implicit-def: $r12
+; ARMOPTNONE-NEXT:    ldr r12, [sp, #20] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r4, r12
+; ARMOPTNONE-NEXT:    mov r5, r9
+; ARMOPTNONE-NEXT:    ldr r9, [sp, #16] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r8, r9
+; ARMOPTNONE-NEXT:    ldr r12, [sp, #12] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    mov r9, r12
+; ARMOPTNONE-NEXT:    mov r10, r3
+; ARMOPTNONE-NEXT:    mov r11, r1
+; ARMOPTNONE-NEXT:    str r1, [sp] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:  LBB13_2: @ %atomicrmw.start
 ; ARMOPTNONE-NEXT:    @ Parent Loop BB13_1 Depth=1
 ; ARMOPTNONE-NEXT:    @ => This Inner Loop Header: Depth=2
-; ARMOPTNONE-NEXT:    ldrexd r4, r5, [r8]
-; ARMOPTNONE-NEXT:    cmp r4, r10
-; ARMOPTNONE-NEXT:    cmpeq r5, r11
+; ARMOPTNONE-NEXT:    ldrexd r0, r1, [r4]
+; ARMOPTNONE-NEXT:    cmp r0, r10
+; ARMOPTNONE-NEXT:    cmpeq r1, r11
 ; ARMOPTNONE-NEXT:    bne LBB13_4
 ; ARMOPTNONE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; ARMOPTNONE-NEXT:    @ in Loop: Header=BB13_2 Depth=2
-; ARMOPTNONE-NEXT:    strexd r9, r0, r1, [r8]
-; ARMOPTNONE-NEXT:    cmp r9, #0
+; ARMOPTNONE-NEXT:    strexd r5, r8, r9, [r4]
+; ARMOPTNONE-NEXT:    cmp r5, #0
 ; ARMOPTNONE-NEXT:    bne LBB13_2
 ; ARMOPTNONE-NEXT:  LBB13_4: @ %atomicrmw.start
 ; ARMOPTNONE-NEXT:    @ in Loop: Header=BB13_1 Depth=1
-; ARMOPTNONE-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; ARMOPTNONE-NEXT:    mov r0, r5
-; ARMOPTNONE-NEXT:    eor r3, r0, r1
-; ARMOPTNONE-NEXT:    mov r1, r4
-; ARMOPTNONE-NEXT:    eor r2, r1, r2
-; ARMOPTNONE-NEXT:    orr r2, r2, r3
-; ARMOPTNONE-NEXT:    cmp r2, #0
-; ARMOPTNONE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
-; ARMOPTNONE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    mov r9, r1
+; ARMOPTNONE-NEXT:    ldr r12, [sp] @ 4-byte Reload
+; ARMOPTNONE-NEXT:    eor r12, r9, r12
+; ARMOPTNONE-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
+; ARMOPTNONE-NEXT:    eor r1, r0, r3
+; ARMOPTNONE-NEXT:    orr r1, r1, r12
+; ARMOPTNONE-NEXT:    cmp r1, #0
+; ARMOPTNONE-NEXT:    mov r2, r0
+; ARMOPTNONE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
+; ARMOPTNONE-NEXT:    str r9, [sp, #4] @ 4-byte Spill
 ; ARMOPTNONE-NEXT:    bne LBB13_1
 ; ARMOPTNONE-NEXT:    b LBB13_5
 ; ARMOPTNONE-NEXT:  LBB13_5: @ %atomicrmw.end

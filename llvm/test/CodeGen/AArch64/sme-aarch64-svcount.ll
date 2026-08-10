@@ -90,12 +90,12 @@ define void @test_pass_5args(target("aarch64.svcount") %arg) nounwind {
 ; CHECK-O0:       // %bb.0:
 ; CHECK-O0-NEXT:    stp x29, x30, [sp, #-16]! // 16-byte Folded Spill
 ; CHECK-O0-NEXT:    addvl sp, sp, #-1
-; CHECK-O0-NEXT:    mov p3.b, p0.b
-; CHECK-O0-NEXT:    str p3, [sp, #7, mul vl]
+; CHECK-O0-NEXT:    str p0, [sp, #7, mul vl]
 ; CHECK-O0-NEXT:    addpl x0, sp, #7
-; CHECK-O0-NEXT:    mov p0.b, p3.b
-; CHECK-O0-NEXT:    mov p1.b, p3.b
-; CHECK-O0-NEXT:    mov p2.b, p3.b
+; CHECK-O0-NEXT:    str p0, [sp, #6, mul vl] // 2-byte Spill
+; CHECK-O0-NEXT:    ldr p1, [sp, #6, mul vl] // 2-byte Reload
+; CHECK-O0-NEXT:    ldr p2, [sp, #6, mul vl] // 2-byte Reload
+; CHECK-O0-NEXT:    ldr p3, [sp, #6, mul vl] // 2-byte Reload
 ; CHECK-O0-NEXT:    bl take_svcount_5
 ; CHECK-O0-NEXT:    addvl sp, sp, #1
 ; CHECK-O0-NEXT:    ldp x29, x30, [sp], #16 // 16-byte Folded Reload
@@ -121,14 +121,12 @@ define void @test_pass_5args(target("aarch64.svcount") %arg) nounwind {
 define target("aarch64.svcount") @test_sel(target("aarch64.svcount") %x, target("aarch64.svcount") %y, i1 %cmp) {
 ; CHECK-O0-LABEL: test_sel:
 ; CHECK-O0:       // %bb.0:
-; CHECK-O0-NEXT:    mov p2.b, p1.b
-; CHECK-O0-NEXT:    mov p1.b, p0.b
-; CHECK-O0-NEXT:    // implicit-def: $x8
-; CHECK-O0-NEXT:    mov w8, w0
-; CHECK-O0-NEXT:    sbfx x9, x8, #0, #1
-; CHECK-O0-NEXT:    mov x8, xzr
-; CHECK-O0-NEXT:    whilelo p0.b, x8, x9
-; CHECK-O0-NEXT:    sel p0.b, p0, p1.b, p2.b
+; CHECK-O0-NEXT:    // implicit-def: $x1
+; CHECK-O0-NEXT:    mov w1, w0
+; CHECK-O0-NEXT:    sbfx x8, x1, #0, #1
+; CHECK-O0-NEXT:    mov x9, xzr
+; CHECK-O0-NEXT:    whilelo p2.b, x9, x8
+; CHECK-O0-NEXT:    sel p0.b, p2, p0.b, p1.b
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O3-LABEL: test_sel:
@@ -145,13 +143,11 @@ define target("aarch64.svcount") @test_sel(target("aarch64.svcount") %x, target(
 define target("aarch64.svcount") @test_sel_cc(target("aarch64.svcount") %x, target("aarch64.svcount") %y, i32 %k) {
 ; CHECK-O0-LABEL: test_sel_cc:
 ; CHECK-O0:       // %bb.0:
-; CHECK-O0-NEXT:    mov p2.b, p1.b
-; CHECK-O0-NEXT:    mov p1.b, p0.b
 ; CHECK-O0-NEXT:    subs w8, w0, #42
-; CHECK-O0-NEXT:    csetm x9, gt
-; CHECK-O0-NEXT:    mov x8, xzr
-; CHECK-O0-NEXT:    whilelo p0.b, x8, x9
-; CHECK-O0-NEXT:    sel p0.b, p0, p1.b, p2.b
+; CHECK-O0-NEXT:    csetm x8, gt
+; CHECK-O0-NEXT:    mov x9, xzr
+; CHECK-O0-NEXT:    whilelo p2.b, x9, x8
+; CHECK-O0-NEXT:    sel p0.b, p2, p0.b, p1.b
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O3-LABEL: test_sel_cc:

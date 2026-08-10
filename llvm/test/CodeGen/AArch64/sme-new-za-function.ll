@@ -33,21 +33,22 @@ define i32 @private_za_multiple_exit(i32 %a, i32 %b, i64 %cond) "aarch64_new_za"
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    sub sp, sp, #16
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
-; CHECK-NEXT:    str w1, [sp, #8] // 4-byte Spill
-; CHECK-NEXT:    str w0, [sp, #12] // 4-byte Spill
+; CHECK-NEXT:    str w1, [sp, #12] // 4-byte Spill
+; CHECK-NEXT:    str w0, [sp, #8] // 4-byte Spill
 ; CHECK-NEXT:    subs x8, x2, #1
 ; CHECK-NEXT:    b.ne .LBB1_2
 ; CHECK-NEXT:    b .LBB1_1
 ; CHECK-NEXT:  .LBB1_1: // %if.else
-; CHECK-NEXT:    ldr w8, [sp, #12] // 4-byte Reload
-; CHECK-NEXT:    ldr w9, [sp, #8] // 4-byte Reload
-; CHECK-NEXT:    add w0, w8, w9
+; CHECK-NEXT:    ldr w0, [sp, #8] // 4-byte Reload
+; CHECK-NEXT:    ldr w1, [sp, #12] // 4-byte Reload
+; CHECK-NEXT:    add w8, w0, w1
+; CHECK-NEXT:    mov w0, w8
 ; CHECK-NEXT:    add sp, sp, #16
 ; CHECK-NEXT:    ret
 ; CHECK-NEXT:  .LBB1_2: // %if.end
-; CHECK-NEXT:    ldr w8, [sp, #12] // 4-byte Reload
-; CHECK-NEXT:    ldr w9, [sp, #8] // 4-byte Reload
-; CHECK-NEXT:    subs w0, w8, w9
+; CHECK-NEXT:    ldr w0, [sp, #8] // 4-byte Reload
+; CHECK-NEXT:    ldr w1, [sp, #12] // 4-byte Reload
+; CHECK-NEXT:    subs w0, w0, w1
 ; CHECK-NEXT:    add sp, sp, #16
 ; CHECK-NEXT:    ret
 entry:

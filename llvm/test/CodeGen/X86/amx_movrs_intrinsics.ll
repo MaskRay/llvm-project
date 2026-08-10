@@ -18,19 +18,16 @@ define void @test_amx_internal(i16 %m, i16 %n, ptr %buf, i64 %s) {
 ; CHECK-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:    movb $1, {{[0-9]+}}(%rsp)
-; CHECK-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; CHECK-NEXT:    movl %esi, %eax
-; CHECK-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rsi # 8-byte Reload
-; CHECK-NEXT:    movw %ax, %cx
-; CHECK-NEXT:    movw %di, %ax
-; CHECK-NEXT:    # implicit-def: $al
-; CHECK-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; CHECK-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; CHECK-NEXT:    movw %si, %ax
+; CHECK-NEXT:    movw %di, %si
+; CHECK-NEXT:    # implicit-def: $sil
+; CHECK-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; CHECK-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; CHECK-NEXT:    tileloaddrs (%rdx,%rsi), %tmm0
-; CHECK-NEXT:    movl $64, %esi
+; CHECK-NEXT:    tileloaddrs (%rdx,%rcx), %tmm0
+; CHECK-NEXT:    movl $64, %ecx
 ; CHECK-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; CHECK-NEXT:    tilestored %tmm0, (%rdx,%rsi)
+; CHECK-NEXT:    tilestored %tmm0, (%rdx,%rcx)
 ; CHECK-NEXT:    movq %rbp, %rsp
 ; CHECK-NEXT:    popq %rbp
 ; CHECK-NEXT:    .cfi_def_cfa %rsp, 8
@@ -54,21 +51,16 @@ define void @test_amx_internal(i16 %m, i16 %n, ptr %buf, i64 %s) {
 ; EGPR-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp) # encoding: [0x0f,0x11,0x84,0x24,0xe0,0x03,0x00,0x00]
 ; EGPR-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp) # encoding: [0x0f,0x11,0x84,0x24,0xf0,0x03,0x00,0x00]
 ; EGPR-NEXT:    movb $1, {{[0-9]+}}(%rsp) # encoding: [0xc6,0x84,0x24,0xc0,0x03,0x00,0x00,0x01]
-; EGPR-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; EGPR-NEXT:    # encoding: [0x48,0x89,0x8c,0x24,0xb8,0x03,0x00,0x00]
-; EGPR-NEXT:    movl %esi, %eax # encoding: [0x89,0xf0]
-; EGPR-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rsi # 8-byte Reload
-; EGPR-NEXT:    # encoding: [0x48,0x8b,0xb4,0x24,0xb8,0x03,0x00,0x00]
-; EGPR-NEXT:    movw %ax, %cx # encoding: [0x66,0x89,0xc1]
-; EGPR-NEXT:    movw %di, %ax # encoding: [0x66,0x89,0xf8]
-; EGPR-NEXT:    # implicit-def: $al
-; EGPR-NEXT:    movb %al, {{[0-9]+}}(%rsp) # encoding: [0x88,0x84,0x24,0xf0,0x03,0x00,0x00]
-; EGPR-NEXT:    movw %cx, {{[0-9]+}}(%rsp) # encoding: [0x66,0x89,0x8c,0x24,0xd0,0x03,0x00,0x00]
+; EGPR-NEXT:    movw %si, %ax # encoding: [0x66,0x89,0xf0]
+; EGPR-NEXT:    movw %di, %si # encoding: [0x66,0x89,0xfe]
+; EGPR-NEXT:    # implicit-def: $sil
+; EGPR-NEXT:    movb %sil, {{[0-9]+}}(%rsp) # encoding: [0x40,0x88,0xb4,0x24,0xf0,0x03,0x00,0x00]
+; EGPR-NEXT:    movw %ax, {{[0-9]+}}(%rsp) # encoding: [0x66,0x89,0x84,0x24,0xd0,0x03,0x00,0x00]
 ; EGPR-NEXT:    ldtilecfg {{[0-9]+}}(%rsp) # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x78,0x49,0x84,0x24,0xc0,0x03,0x00,0x00]
-; EGPR-NEXT:    tileloaddrs (%rdx,%rsi), %tmm0 # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x7b,0x4a,0x04,0x32]
-; EGPR-NEXT:    movl $64, %esi # encoding: [0xbe,0x40,0x00,0x00,0x00]
+; EGPR-NEXT:    tileloaddrs (%rdx,%rcx), %tmm0 # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x7b,0x4a,0x04,0x0a]
+; EGPR-NEXT:    movl $64, %ecx # encoding: [0xb9,0x40,0x00,0x00,0x00]
 ; EGPR-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx # encoding: [0x48,0x8d,0x94,0x24,0x00,0x04,0x00,0x00]
-; EGPR-NEXT:    tilestored %tmm0, (%rdx,%rsi) # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x7a,0x4b,0x04,0x32]
+; EGPR-NEXT:    tilestored %tmm0, (%rdx,%rcx) # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x7a,0x4b,0x04,0x0a]
 ; EGPR-NEXT:    movq %rbp, %rsp # encoding: [0x48,0x89,0xec]
 ; EGPR-NEXT:    popq %rbp # encoding: [0x5d]
 ; EGPR-NEXT:    .cfi_def_cfa %rsp, 8
@@ -115,19 +107,16 @@ define void @test_amx_t1_internal(i16 %m, i16 %n, ptr %buf, i64 %s) {
 ; CHECK-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:    movb $1, {{[0-9]+}}(%rsp)
-; CHECK-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; CHECK-NEXT:    movl %esi, %eax
-; CHECK-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rsi # 8-byte Reload
-; CHECK-NEXT:    movw %ax, %cx
-; CHECK-NEXT:    movw %di, %ax
-; CHECK-NEXT:    # implicit-def: $al
-; CHECK-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; CHECK-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; CHECK-NEXT:    movw %si, %ax
+; CHECK-NEXT:    movw %di, %si
+; CHECK-NEXT:    # implicit-def: $sil
+; CHECK-NEXT:    movb %sil, {{[0-9]+}}(%rsp)
+; CHECK-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; CHECK-NEXT:    tileloaddrst1 (%rdx,%rsi), %tmm0
-; CHECK-NEXT:    movl $64, %esi
+; CHECK-NEXT:    tileloaddrst1 (%rdx,%rcx), %tmm0
+; CHECK-NEXT:    movl $64, %ecx
 ; CHECK-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; CHECK-NEXT:    tilestored %tmm0, (%rdx,%rsi)
+; CHECK-NEXT:    tilestored %tmm0, (%rdx,%rcx)
 ; CHECK-NEXT:    movq %rbp, %rsp
 ; CHECK-NEXT:    popq %rbp
 ; CHECK-NEXT:    .cfi_def_cfa %rsp, 8
@@ -151,21 +140,16 @@ define void @test_amx_t1_internal(i16 %m, i16 %n, ptr %buf, i64 %s) {
 ; EGPR-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp) # encoding: [0x0f,0x11,0x84,0x24,0xe0,0x03,0x00,0x00]
 ; EGPR-NEXT:    movups %xmm0, {{[0-9]+}}(%rsp) # encoding: [0x0f,0x11,0x84,0x24,0xf0,0x03,0x00,0x00]
 ; EGPR-NEXT:    movb $1, {{[0-9]+}}(%rsp) # encoding: [0xc6,0x84,0x24,0xc0,0x03,0x00,0x00,0x01]
-; EGPR-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; EGPR-NEXT:    # encoding: [0x48,0x89,0x8c,0x24,0xb8,0x03,0x00,0x00]
-; EGPR-NEXT:    movl %esi, %eax # encoding: [0x89,0xf0]
-; EGPR-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rsi # 8-byte Reload
-; EGPR-NEXT:    # encoding: [0x48,0x8b,0xb4,0x24,0xb8,0x03,0x00,0x00]
-; EGPR-NEXT:    movw %ax, %cx # encoding: [0x66,0x89,0xc1]
-; EGPR-NEXT:    movw %di, %ax # encoding: [0x66,0x89,0xf8]
-; EGPR-NEXT:    # implicit-def: $al
-; EGPR-NEXT:    movb %al, {{[0-9]+}}(%rsp) # encoding: [0x88,0x84,0x24,0xf0,0x03,0x00,0x00]
-; EGPR-NEXT:    movw %cx, {{[0-9]+}}(%rsp) # encoding: [0x66,0x89,0x8c,0x24,0xd0,0x03,0x00,0x00]
+; EGPR-NEXT:    movw %si, %ax # encoding: [0x66,0x89,0xf0]
+; EGPR-NEXT:    movw %di, %si # encoding: [0x66,0x89,0xfe]
+; EGPR-NEXT:    # implicit-def: $sil
+; EGPR-NEXT:    movb %sil, {{[0-9]+}}(%rsp) # encoding: [0x40,0x88,0xb4,0x24,0xf0,0x03,0x00,0x00]
+; EGPR-NEXT:    movw %ax, {{[0-9]+}}(%rsp) # encoding: [0x66,0x89,0x84,0x24,0xd0,0x03,0x00,0x00]
 ; EGPR-NEXT:    ldtilecfg {{[0-9]+}}(%rsp) # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x78,0x49,0x84,0x24,0xc0,0x03,0x00,0x00]
-; EGPR-NEXT:    tileloaddrst1 (%rdx,%rsi), %tmm0 # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x79,0x4a,0x04,0x32]
-; EGPR-NEXT:    movl $64, %esi # encoding: [0xbe,0x40,0x00,0x00,0x00]
+; EGPR-NEXT:    tileloaddrst1 (%rdx,%rcx), %tmm0 # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x79,0x4a,0x04,0x0a]
+; EGPR-NEXT:    movl $64, %ecx # encoding: [0xb9,0x40,0x00,0x00,0x00]
 ; EGPR-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx # encoding: [0x48,0x8d,0x94,0x24,0x00,0x04,0x00,0x00]
-; EGPR-NEXT:    tilestored %tmm0, (%rdx,%rsi) # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x7a,0x4b,0x04,0x32]
+; EGPR-NEXT:    tilestored %tmm0, (%rdx,%rcx) # EVEX TO VEX Compression encoding: [0xc4,0xe2,0x7a,0x4b,0x04,0x0a]
 ; EGPR-NEXT:    movq %rbp, %rsp # encoding: [0x48,0x89,0xec]
 ; EGPR-NEXT:    popq %rbp # encoding: [0x5d]
 ; EGPR-NEXT:    .cfi_def_cfa %rsp, 8

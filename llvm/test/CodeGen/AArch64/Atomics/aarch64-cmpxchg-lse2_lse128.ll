@@ -965,7 +965,7 @@ define dso_local i64 @cmpxchg_i64_aligned_seq_cst_seq_cst_weak(i64 %expected, i6
 
 define dso_local i128 @cmpxchg_i128_aligned_monotonic_monotonic(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_monotonic_monotonic:
-; -O0:    casp x2, x3, x0, x1, [x4]
+; -O0:    casp x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_monotonic_monotonic:
 ; -O1:    casp x0, x1, x2, x3, [x4]
@@ -976,7 +976,7 @@ define dso_local i128 @cmpxchg_i128_aligned_monotonic_monotonic(i128 %expected, 
 
 define dso_local i128 @cmpxchg_i128_aligned_monotonic_monotonic_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_monotonic_monotonic_weak:
-; -O0:    casp x2, x3, x0, x1, [x4]
+; -O0:    casp x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_monotonic_monotonic_weak:
 ; -O1:    casp x0, x1, x2, x3, [x4]
@@ -987,7 +987,7 @@ define dso_local i128 @cmpxchg_i128_aligned_monotonic_monotonic_weak(i128 %expec
 
 define dso_local i128 @cmpxchg_i128_aligned_monotonic_acquire(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_monotonic_acquire:
-; -O0:    caspa x2, x3, x0, x1, [x4]
+; -O0:    caspa x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_monotonic_acquire:
 ; -O1:    caspa x0, x1, x2, x3, [x4]
@@ -998,7 +998,7 @@ define dso_local i128 @cmpxchg_i128_aligned_monotonic_acquire(i128 %expected, i1
 
 define dso_local i128 @cmpxchg_i128_aligned_monotonic_acquire_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_monotonic_acquire_weak:
-; -O0:    caspa x2, x3, x0, x1, [x4]
+; -O0:    caspa x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_monotonic_acquire_weak:
 ; -O1:    caspa x0, x1, x2, x3, [x4]
@@ -1009,7 +1009,7 @@ define dso_local i128 @cmpxchg_i128_aligned_monotonic_acquire_weak(i128 %expecte
 
 define dso_local i128 @cmpxchg_i128_aligned_monotonic_seq_cst(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_monotonic_seq_cst:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_monotonic_seq_cst:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1020,7 +1020,7 @@ define dso_local i128 @cmpxchg_i128_aligned_monotonic_seq_cst(i128 %expected, i1
 
 define dso_local i128 @cmpxchg_i128_aligned_monotonic_seq_cst_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_monotonic_seq_cst_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_monotonic_seq_cst_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1031,7 +1031,7 @@ define dso_local i128 @cmpxchg_i128_aligned_monotonic_seq_cst_weak(i128 %expecte
 
 define dso_local i128 @cmpxchg_i128_aligned_acquire_monotonic(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acquire_monotonic:
-; -O0:    caspa x2, x3, x0, x1, [x4]
+; -O0:    caspa x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acquire_monotonic:
 ; -O1:    caspa x0, x1, x2, x3, [x4]
@@ -1042,7 +1042,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acquire_monotonic(i128 %expected, i1
 
 define dso_local i128 @cmpxchg_i128_aligned_acquire_monotonic_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acquire_monotonic_weak:
-; -O0:    caspa x2, x3, x0, x1, [x4]
+; -O0:    caspa x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acquire_monotonic_weak:
 ; -O1:    caspa x0, x1, x2, x3, [x4]
@@ -1053,7 +1053,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acquire_monotonic_weak(i128 %expecte
 
 define dso_local i128 @cmpxchg_i128_aligned_acquire_acquire(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acquire_acquire:
-; -O0:    caspa x2, x3, x0, x1, [x4]
+; -O0:    caspa x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acquire_acquire:
 ; -O1:    caspa x0, x1, x2, x3, [x4]
@@ -1064,7 +1064,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acquire_acquire(i128 %expected, i128
 
 define dso_local i128 @cmpxchg_i128_aligned_acquire_acquire_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acquire_acquire_weak:
-; -O0:    caspa x2, x3, x0, x1, [x4]
+; -O0:    caspa x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acquire_acquire_weak:
 ; -O1:    caspa x0, x1, x2, x3, [x4]
@@ -1075,7 +1075,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acquire_acquire_weak(i128 %expected,
 
 define dso_local i128 @cmpxchg_i128_aligned_acquire_seq_cst(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acquire_seq_cst:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acquire_seq_cst:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1086,7 +1086,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acquire_seq_cst(i128 %expected, i128
 
 define dso_local i128 @cmpxchg_i128_aligned_acquire_seq_cst_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acquire_seq_cst_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acquire_seq_cst_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1097,7 +1097,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acquire_seq_cst_weak(i128 %expected,
 
 define dso_local i128 @cmpxchg_i128_aligned_release_monotonic(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_release_monotonic:
-; -O0:    caspl x2, x3, x0, x1, [x4]
+; -O0:    caspl x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_release_monotonic:
 ; -O1:    caspl x0, x1, x2, x3, [x4]
@@ -1108,7 +1108,7 @@ define dso_local i128 @cmpxchg_i128_aligned_release_monotonic(i128 %expected, i1
 
 define dso_local i128 @cmpxchg_i128_aligned_release_monotonic_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_release_monotonic_weak:
-; -O0:    caspl x2, x3, x0, x1, [x4]
+; -O0:    caspl x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_release_monotonic_weak:
 ; -O1:    caspl x0, x1, x2, x3, [x4]
@@ -1119,7 +1119,7 @@ define dso_local i128 @cmpxchg_i128_aligned_release_monotonic_weak(i128 %expecte
 
 define dso_local i128 @cmpxchg_i128_aligned_release_acquire(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_release_acquire:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_release_acquire:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1130,7 +1130,7 @@ define dso_local i128 @cmpxchg_i128_aligned_release_acquire(i128 %expected, i128
 
 define dso_local i128 @cmpxchg_i128_aligned_release_acquire_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_release_acquire_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_release_acquire_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1141,7 +1141,7 @@ define dso_local i128 @cmpxchg_i128_aligned_release_acquire_weak(i128 %expected,
 
 define dso_local i128 @cmpxchg_i128_aligned_release_seq_cst(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_release_seq_cst:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_release_seq_cst:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1152,7 +1152,7 @@ define dso_local i128 @cmpxchg_i128_aligned_release_seq_cst(i128 %expected, i128
 
 define dso_local i128 @cmpxchg_i128_aligned_release_seq_cst_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_release_seq_cst_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_release_seq_cst_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1163,7 +1163,7 @@ define dso_local i128 @cmpxchg_i128_aligned_release_seq_cst_weak(i128 %expected,
 
 define dso_local i128 @cmpxchg_i128_aligned_acq_rel_monotonic(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acq_rel_monotonic:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acq_rel_monotonic:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1174,7 +1174,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acq_rel_monotonic(i128 %expected, i1
 
 define dso_local i128 @cmpxchg_i128_aligned_acq_rel_monotonic_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acq_rel_monotonic_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acq_rel_monotonic_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1185,7 +1185,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acq_rel_monotonic_weak(i128 %expecte
 
 define dso_local i128 @cmpxchg_i128_aligned_acq_rel_acquire(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acq_rel_acquire:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acq_rel_acquire:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1196,7 +1196,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acq_rel_acquire(i128 %expected, i128
 
 define dso_local i128 @cmpxchg_i128_aligned_acq_rel_acquire_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acq_rel_acquire_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acq_rel_acquire_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1207,7 +1207,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acq_rel_acquire_weak(i128 %expected,
 
 define dso_local i128 @cmpxchg_i128_aligned_acq_rel_seq_cst(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acq_rel_seq_cst:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acq_rel_seq_cst:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1218,7 +1218,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acq_rel_seq_cst(i128 %expected, i128
 
 define dso_local i128 @cmpxchg_i128_aligned_acq_rel_seq_cst_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_acq_rel_seq_cst_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_acq_rel_seq_cst_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1229,7 +1229,7 @@ define dso_local i128 @cmpxchg_i128_aligned_acq_rel_seq_cst_weak(i128 %expected,
 
 define dso_local i128 @cmpxchg_i128_aligned_seq_cst_monotonic(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_seq_cst_monotonic:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_seq_cst_monotonic:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1240,7 +1240,7 @@ define dso_local i128 @cmpxchg_i128_aligned_seq_cst_monotonic(i128 %expected, i1
 
 define dso_local i128 @cmpxchg_i128_aligned_seq_cst_monotonic_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_seq_cst_monotonic_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_seq_cst_monotonic_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1251,7 +1251,7 @@ define dso_local i128 @cmpxchg_i128_aligned_seq_cst_monotonic_weak(i128 %expecte
 
 define dso_local i128 @cmpxchg_i128_aligned_seq_cst_acquire(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_seq_cst_acquire:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_seq_cst_acquire:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1262,7 +1262,7 @@ define dso_local i128 @cmpxchg_i128_aligned_seq_cst_acquire(i128 %expected, i128
 
 define dso_local i128 @cmpxchg_i128_aligned_seq_cst_acquire_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_seq_cst_acquire_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_seq_cst_acquire_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1273,7 +1273,7 @@ define dso_local i128 @cmpxchg_i128_aligned_seq_cst_acquire_weak(i128 %expected,
 
 define dso_local i128 @cmpxchg_i128_aligned_seq_cst_seq_cst(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_seq_cst_seq_cst:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_seq_cst_seq_cst:
 ; -O1:    caspal x0, x1, x2, x3, [x4]
@@ -1284,7 +1284,7 @@ define dso_local i128 @cmpxchg_i128_aligned_seq_cst_seq_cst(i128 %expected, i128
 
 define dso_local i128 @cmpxchg_i128_aligned_seq_cst_seq_cst_weak(i128 %expected, i128 %new, ptr %ptr) {
 ; -O0-LABEL: cmpxchg_i128_aligned_seq_cst_seq_cst_weak:
-; -O0:    caspal x2, x3, x0, x1, [x4]
+; -O0:    caspal x6, x7, x0, x1, [x4]
 ;
 ; -O1-LABEL: cmpxchg_i128_aligned_seq_cst_seq_cst_weak:
 ; -O1:    caspal x0, x1, x2, x3, [x4]

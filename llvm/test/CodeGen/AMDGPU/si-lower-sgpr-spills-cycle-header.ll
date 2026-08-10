@@ -12,153 +12,171 @@ define amdgpu_kernel void @loop_sgpr_spill_implicit_def_in_preheader(
   ; CHECK-NEXT:   successors: %bb.1(0x80000000)
   ; CHECK-NEXT:   liveins: $sgpr8_sgpr9
   ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   renamable $sgpr8_sgpr9 = COPY killed $sgpr8_sgpr9
   ; CHECK-NEXT:   dead renamable $sgpr4_sgpr5 = S_LOAD_DWORDX2_IMM renamable $sgpr8_sgpr9, 0, 0 :: (dereferenceable invariant load (s64) from constant-pool, align 16, addrspace 4)
   ; CHECK-NEXT:   renamable $sgpr4_sgpr5 = S_LOAD_DWORDX2_IMM killed renamable $sgpr8_sgpr9, 0, 0 :: (dereferenceable invariant load (s64) from %ir.out.kernarg.offset, align 16, addrspace 4)
   ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = IMPLICIT_DEF
   ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr4, 0, [[DEF]], implicit-def $sgpr4_sgpr5, implicit $sgpr4_sgpr5
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr5, 1, [[DEF]], implicit killed $sgpr4_sgpr5
-  ; CHECK-NEXT:   renamable $sgpr4_sgpr5 = IMPLICIT_DEF
-  ; CHECK-NEXT:   renamable $sgpr4 = S_LOAD_DWORD_IMM killed renamable $sgpr4_sgpr5, 0, 0 :: (load (s32) from `ptr addrspace(4) poison`, addrspace 4)
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr4, 2, [[DEF]]
-  ; CHECK-NEXT:   renamable $sgpr11 = COPY renamable $sgpr4
-  ; CHECK-NEXT:   renamable $sgpr10 = COPY renamable $sgpr4
-  ; CHECK-NEXT:   renamable $sgpr9 = COPY renamable $sgpr4
-  ; CHECK-NEXT:   renamable $sgpr8 = COPY renamable $sgpr4
-  ; CHECK-NEXT:   renamable $sgpr7 = COPY renamable $sgpr4
-  ; CHECK-NEXT:   renamable $sgpr6 = COPY renamable $sgpr4
-  ; CHECK-NEXT:   renamable $sgpr5 = COPY renamable $sgpr4
-  ; CHECK-NEXT:   renamable $sgpr12 = S_MOV_B32 0
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr12, 3, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr11, 4, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr10, 5, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr9, 6, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr8, 7, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr7, 8, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr6, 9, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr5, 10, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr4, 11, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr5, 1, [[DEF]], implicit $sgpr4_sgpr5
+  ; CHECK-NEXT:   renamable $sgpr6_sgpr7 = IMPLICIT_DEF
+  ; CHECK-NEXT:   renamable $sgpr6 = S_LOAD_DWORD_IMM killed renamable $sgpr6_sgpr7, 0, 0 :: (load (s32) from `ptr addrspace(4) poison`, addrspace 4)
+  ; CHECK-NEXT:   renamable $sgpr7 = COPY renamable $sgpr6
+  ; CHECK-NEXT:   renamable $sgpr8 = COPY renamable $sgpr6
+  ; CHECK-NEXT:   renamable $sgpr9 = COPY renamable $sgpr6
+  ; CHECK-NEXT:   renamable $sgpr10 = COPY renamable $sgpr6
+  ; CHECK-NEXT:   renamable $sgpr11 = COPY renamable $sgpr6
+  ; CHECK-NEXT:   renamable $sgpr12 = COPY renamable $sgpr6
+  ; CHECK-NEXT:   renamable $sgpr13 = COPY renamable $sgpr6
+  ; CHECK-NEXT:   renamable $sgpr14 = S_MOV_B32 0
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr14, 2, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr7, 3, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr8, 4, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr9, 5, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr10, 6, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr11, 7, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr12, 8, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr13, 9, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr6, 10, [[DEF]]
   ; CHECK-NEXT:   S_BRANCH %bb.1
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.1.loop.header:
   ; CHECK-NEXT:   successors: %bb.2(0x40000000), %bb.3(0x40000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   $sgpr6 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 3
-  ; CHECK-NEXT:   $sgpr4 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 4
-  ; CHECK-NEXT:   $sgpr5 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 5
-  ; CHECK-NEXT:   $sgpr7 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 6
-  ; CHECK-NEXT:   $sgpr8 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 7
-  ; CHECK-NEXT:   $sgpr9 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 8
-  ; CHECK-NEXT:   $sgpr10 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 9
-  ; CHECK-NEXT:   $sgpr11 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 10
-  ; CHECK-NEXT:   $sgpr12 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 11
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr12, 12, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr11, 13, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr10, 14, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr9, 15, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr8, 16, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr7, 17, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr5, 18, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr4, 19, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr6, 20, [[DEF]]
-  ; CHECK-NEXT:   renamable $sgpr4_sgpr5 = S_MOV_B64 -1
-  ; CHECK-NEXT:   renamable $sgpr7 = S_MOV_B32 0
-  ; CHECK-NEXT:   S_CMP_EQ_U32 renamable $sgpr6, killed renamable $sgpr7, implicit-def $scc
-  ; CHECK-NEXT:   renamable $sgpr6_sgpr7 = S_CSELECT_B64 -1, 0, implicit killed $scc
-  ; CHECK-NEXT:   renamable $sgpr6_sgpr7 = S_XOR_B64 killed renamable $sgpr6_sgpr7, renamable $sgpr4_sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $vcc = S_AND_B64 $exec, killed renamable $sgpr6_sgpr7, implicit-def dead $scc
+  ; CHECK-NEXT:   $sgpr4 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 10
+  ; CHECK-NEXT:   renamable $sgpr5 = COPY renamable $sgpr4
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr5, 11, [[DEF]]
+  ; CHECK-NEXT:   $sgpr6 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 9
+  ; CHECK-NEXT:   renamable $sgpr7 = COPY renamable $sgpr6
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr7, 12, [[DEF]]
+  ; CHECK-NEXT:   $sgpr8 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 8
+  ; CHECK-NEXT:   renamable $sgpr9 = COPY renamable $sgpr8
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr9, 13, [[DEF]]
+  ; CHECK-NEXT:   $sgpr10 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 7
+  ; CHECK-NEXT:   renamable $sgpr11 = COPY renamable $sgpr10
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr11, 14, [[DEF]]
+  ; CHECK-NEXT:   $sgpr12 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 6
+  ; CHECK-NEXT:   renamable $sgpr13 = COPY renamable $sgpr12
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr13, 15, [[DEF]]
+  ; CHECK-NEXT:   $sgpr14 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 5
+  ; CHECK-NEXT:   renamable $sgpr15 = COPY renamable $sgpr14
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr15, 16, [[DEF]]
+  ; CHECK-NEXT:   $vcc_lo = SI_RESTORE_S32_FROM_VGPR [[DEF]], 4
+  ; CHECK-NEXT:   renamable $vcc_hi = COPY renamable $vcc_lo
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $vcc_hi, 17, [[DEF]]
+  ; CHECK-NEXT:   $vcc_hi = SI_RESTORE_S32_FROM_VGPR [[DEF]], 3
+  ; CHECK-NEXT:   renamable $sgpr4 = COPY renamable $vcc_hi
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr4, 18, [[DEF]]
+  ; CHECK-NEXT:   $sgpr4 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 2
+  ; CHECK-NEXT:   renamable $sgpr6 = COPY renamable $sgpr4
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr6, 19, [[DEF]]
+  ; CHECK-NEXT:   renamable $sgpr8_sgpr9 = S_MOV_B64 -1
+  ; CHECK-NEXT:   renamable $sgpr10 = S_MOV_B32 0
+  ; CHECK-NEXT:   S_CMP_EQ_U32 renamable $sgpr6, killed renamable $sgpr10, implicit-def $scc
+  ; CHECK-NEXT:   renamable $sgpr12_sgpr13 = S_CSELECT_B64 -1, 0, implicit killed $scc
+  ; CHECK-NEXT:   renamable $sgpr12_sgpr13 = S_XOR_B64 killed renamable $sgpr12_sgpr13, renamable $sgpr8_sgpr9, implicit-def dead $scc
+  ; CHECK-NEXT:   renamable $sgpr12_sgpr13 = S_AND_B64 $exec, killed renamable $sgpr12_sgpr13, implicit-def dead $scc
+  ; CHECK-NEXT:   $vcc = COPY killed renamable $sgpr12_sgpr13
+  ; CHECK-NEXT:   renamable $sgpr10 = IMPLICIT_DEF
+  ; CHECK-NEXT:   renamable $sgpr12 = IMPLICIT_DEF
+  ; CHECK-NEXT:   renamable $sgpr13 = IMPLICIT_DEF
+  ; CHECK-NEXT:   renamable $sgpr14 = IMPLICIT_DEF
+  ; CHECK-NEXT:   renamable $sgpr4 = IMPLICIT_DEF
   ; CHECK-NEXT:   renamable $sgpr6 = IMPLICIT_DEF
-  ; CHECK-NEXT:   renamable $sgpr6 = IMPLICIT_DEF
-  ; CHECK-NEXT:   renamable $sgpr6 = IMPLICIT_DEF
-  ; CHECK-NEXT:   renamable $sgpr6 = IMPLICIT_DEF
-  ; CHECK-NEXT:   renamable $sgpr6 = IMPLICIT_DEF
-  ; CHECK-NEXT:   renamable $sgpr6 = IMPLICIT_DEF
-  ; CHECK-NEXT:   renamable $sgpr6 = IMPLICIT_DEF
-  ; CHECK-NEXT:   renamable $sgpr6 = IMPLICIT_DEF
-  ; CHECK-NEXT:   renamable $sgpr6 = IMPLICIT_DEF
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr4, 21, [[DEF]], implicit-def $sgpr4_sgpr5, implicit $sgpr4_sgpr5
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr5, 22, [[DEF]], implicit killed $sgpr4_sgpr5
+  ; CHECK-NEXT:   renamable $sgpr5 = IMPLICIT_DEF
+  ; CHECK-NEXT:   renamable $sgpr7 = IMPLICIT_DEF
+  ; CHECK-NEXT:   renamable $sgpr11 = IMPLICIT_DEF
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr8, 20, [[DEF]], implicit-def $sgpr8_sgpr9, implicit $sgpr8_sgpr9
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr9, 21, [[DEF]], implicit $sgpr8_sgpr9
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr11, 22, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr10, 23, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr12, 24, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr13, 25, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr14, 26, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr4, 27, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr6, 28, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr5, 29, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr7, 30, [[DEF]]
   ; CHECK-NEXT:   S_CBRANCH_VCCNZ %bb.3, implicit killed $vcc
   ; CHECK-NEXT:   S_BRANCH %bb.2
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.loop.latch:
   ; CHECK-NEXT:   successors: %bb.3(0x80000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   $sgpr4 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 20
-  ; CHECK-NEXT:   $sgpr6 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 12
-  ; CHECK-NEXT:   $sgpr13 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 13
-  ; CHECK-NEXT:   $sgpr12 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 14
-  ; CHECK-NEXT:   $sgpr11 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 15
-  ; CHECK-NEXT:   $sgpr10 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 16
-  ; CHECK-NEXT:   $sgpr9 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 17
-  ; CHECK-NEXT:   $sgpr8 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 18
-  ; CHECK-NEXT:   $sgpr7 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 19
-  ; CHECK-NEXT:   renamable $sgpr5 = S_MOV_B32 1
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr5, 23, [[DEF]]
-  ; CHECK-NEXT:   renamable $sgpr7 = S_ADD_I32 renamable $sgpr7, renamable $sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $sgpr8 = S_ADD_I32 renamable $sgpr8, renamable $sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $sgpr9 = S_ADD_I32 renamable $sgpr9, renamable $sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $sgpr10 = S_ADD_I32 renamable $sgpr10, renamable $sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $sgpr11 = S_ADD_I32 renamable $sgpr11, renamable $sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $sgpr12 = S_ADD_I32 renamable $sgpr12, renamable $sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $sgpr13 = S_ADD_I32 renamable $sgpr13, renamable $sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $sgpr14 = S_ADD_I32 renamable $sgpr6, renamable $sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $sgpr6 = nuw nsw S_ADD_I32 renamable $sgpr4, renamable $sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   renamable $sgpr4_sgpr5 = S_MOV_B64 0
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr14, 24, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr13, 25, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr12, 26, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr11, 27, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr10, 28, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr9, 29, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr8, 30, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr7, 31, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr6, 32, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr4, 21, [[DEF]], implicit-def $sgpr4_sgpr5, implicit $sgpr4_sgpr5
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr5, 22, [[DEF]], implicit killed $sgpr4_sgpr5
+  ; CHECK-NEXT:   renamable $sgpr4 = S_MOV_B32 1
+  ; CHECK-NEXT:   $sgpr5 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 18
+  ; CHECK-NEXT:   renamable $sgpr6 = S_ADD_I32 renamable $sgpr5, renamable $sgpr4, implicit-def dead $scc
+  ; CHECK-NEXT:   $sgpr7 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 17
+  ; CHECK-NEXT:   renamable $sgpr8 = S_ADD_I32 renamable $sgpr7, renamable $sgpr4, implicit-def dead $scc
+  ; CHECK-NEXT:   $sgpr9 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 16
+  ; CHECK-NEXT:   renamable $sgpr9 = S_ADD_I32 renamable $sgpr9, renamable $sgpr4, implicit-def dead $scc
+  ; CHECK-NEXT:   $sgpr10 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 15
+  ; CHECK-NEXT:   renamable $sgpr10 = S_ADD_I32 renamable $sgpr10, renamable $sgpr4, implicit-def dead $scc
+  ; CHECK-NEXT:   $sgpr11 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 14
+  ; CHECK-NEXT:   renamable $sgpr11 = S_ADD_I32 renamable $sgpr11, renamable $sgpr4, implicit-def dead $scc
+  ; CHECK-NEXT:   $sgpr12 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 13
+  ; CHECK-NEXT:   renamable $sgpr12 = S_ADD_I32 renamable $sgpr12, renamable $sgpr4, implicit-def dead $scc
+  ; CHECK-NEXT:   $sgpr13 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 12
+  ; CHECK-NEXT:   renamable $sgpr13 = S_ADD_I32 renamable $sgpr13, renamable $sgpr4, implicit-def dead $scc
+  ; CHECK-NEXT:   $sgpr14 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 11
+  ; CHECK-NEXT:   renamable $sgpr14 = S_ADD_I32 renamable $sgpr14, renamable $sgpr4, implicit-def dead $scc
+  ; CHECK-NEXT:   $sgpr15 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 19
+  ; CHECK-NEXT:   renamable $sgpr4 = nuw nsw S_ADD_I32 renamable $sgpr15, killed renamable $sgpr4, implicit-def dead $scc
+  ; CHECK-NEXT:   renamable $vcc = S_MOV_B64 0
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr14, 23, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr13, 24, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr12, 25, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr11, 26, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr10, 27, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr9, 28, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr8, 29, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr6, 30, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr4, 22, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $vcc_lo, 20, [[DEF]], implicit-def $vcc, implicit $vcc
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $vcc_hi, 21, [[DEF]], implicit $vcc
   ; CHECK-NEXT:   S_BRANCH %bb.3
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.3.Flow:
   ; CHECK-NEXT:   successors: %bb.4(0x40000000), %bb.1(0x40000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   $vcc_lo = SI_RESTORE_S32_FROM_VGPR [[DEF]], 21, implicit-def $vcc
-  ; CHECK-NEXT:   $vcc_hi = SI_RESTORE_S32_FROM_VGPR [[DEF]], 22
-  ; CHECK-NEXT:   $sgpr6 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 24
-  ; CHECK-NEXT:   $sgpr7 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 25
-  ; CHECK-NEXT:   $sgpr8 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 26
-  ; CHECK-NEXT:   $sgpr9 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 27
-  ; CHECK-NEXT:   $sgpr10 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 28
-  ; CHECK-NEXT:   $sgpr11 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 29
-  ; CHECK-NEXT:   $sgpr12 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 30
-  ; CHECK-NEXT:   $sgpr13 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 31
-  ; CHECK-NEXT:   $sgpr14 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 32
-  ; CHECK-NEXT:   renamable $sgpr4_sgpr5 = S_MOV_B64 -1
-  ; CHECK-NEXT:   renamable $vcc = S_XOR_B64 killed renamable $vcc, killed renamable $sgpr4_sgpr5, implicit-def dead $scc
-  ; CHECK-NEXT:   $sgpr5 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 19
+  ; CHECK-NEXT:   $sgpr4 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 22
+  ; CHECK-NEXT:   $sgpr5 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 30
+  ; CHECK-NEXT:   $sgpr6 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 29
+  ; CHECK-NEXT:   $sgpr7 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 28
+  ; CHECK-NEXT:   $sgpr8 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 27
+  ; CHECK-NEXT:   $sgpr9 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 26
+  ; CHECK-NEXT:   $sgpr10 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 25
+  ; CHECK-NEXT:   $sgpr11 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 24
+  ; CHECK-NEXT:   $sgpr12 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 23
+  ; CHECK-NEXT:   renamable $sgpr14_sgpr15 = S_MOV_B64 -1
+  ; CHECK-NEXT:   $vcc_lo = SI_RESTORE_S32_FROM_VGPR [[DEF]], 20, implicit-def $vcc
+  ; CHECK-NEXT:   $vcc_hi = SI_RESTORE_S32_FROM_VGPR [[DEF]], 21
+  ; CHECK-NEXT:   renamable $sgpr14_sgpr15 = S_XOR_B64 killed renamable $vcc, killed renamable $sgpr14_sgpr15, implicit-def dead $scc
+  ; CHECK-NEXT:   renamable $vcc = S_AND_B64 $exec, killed renamable $sgpr14_sgpr15, implicit-def dead $scc
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr4, 2, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr5, 3, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr6, 4, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr7, 5, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr8, 6, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr9, 7, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr10, 8, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr11, 9, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr12, 10, [[DEF]]
   ; CHECK-NEXT:   $sgpr4 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 18
-  ; CHECK-NEXT:   renamable $vcc = S_AND_B64 $exec, killed renamable $vcc, implicit-def dead $scc
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr14, 3, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr13, 4, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr12, 5, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr11, 6, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr10, 7, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr9, 8, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr8, 9, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr7, 10, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr6, 11, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr5, 33, [[DEF]]
-  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr4, 34, [[DEF]]
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr4, 31, [[DEF]]
+  ; CHECK-NEXT:   $sgpr5 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 17
+  ; CHECK-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr5, 32, [[DEF]]
   ; CHECK-NEXT:   S_CBRANCH_VCCNZ %bb.1, implicit killed $vcc
   ; CHECK-NEXT:   S_BRANCH %bb.4
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.4.exit:
+  ; CHECK-NEXT:   $sgpr4 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 31
+  ; CHECK-NEXT:   $sgpr5 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 32
+  ; CHECK-NEXT:   renamable $sgpr4 = S_ADD_I32 killed renamable $sgpr4, killed renamable $sgpr5, implicit-def dead $scc
+  ; CHECK-NEXT:   [[V_MOV_B32_e32_:%[0-9]+]]:vgpr_32 = V_MOV_B32_e32 0, implicit $exec
+  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:vgpr_32 = COPY killed renamable $sgpr4
   ; CHECK-NEXT:   $sgpr4 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 0, implicit-def $sgpr4_sgpr5
   ; CHECK-NEXT:   $sgpr5 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 1
-  ; CHECK-NEXT:   $sgpr7 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 34
-  ; CHECK-NEXT:   $sgpr6 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 33
-  ; CHECK-NEXT:   renamable $sgpr6 = S_ADD_I32 killed renamable $sgpr6, killed renamable $sgpr7, implicit-def dead $scc
-  ; CHECK-NEXT:   [[V_MOV_B32_e32_:%[0-9]+]]:vgpr_32 = V_MOV_B32_e32 0, implicit $exec
-  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:vgpr_32 = COPY killed renamable $sgpr6
-  ; CHECK-NEXT:   GLOBAL_STORE_DWORD_SADDR [[V_MOV_B32_e32_]], [[COPY]], killed renamable $sgpr4_sgpr5, 0, 0, implicit $exec :: (volatile store (s32) into %ir.out.load, addrspace 1)
+  ; CHECK-NEXT:   GLOBAL_STORE_DWORD_SADDR [[V_MOV_B32_e32_]], [[COPY]], renamable $sgpr4_sgpr5, 0, 0, implicit $exec :: (volatile store (s32) into %ir.out.load, addrspace 1)
   ; CHECK-NEXT:   S_ENDPGM 0
     ptr addrspace(1) %out) local_unnamed_addr #0 {
 entry:

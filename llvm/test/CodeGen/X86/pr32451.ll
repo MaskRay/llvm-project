@@ -9,23 +9,30 @@ target triple = "x86_64-unknown-linux-gnu"
 define ptr @japi1_convert_690(ptr, ptr, i32) {
 ; CHECK-LABEL: japi1_convert_690:
 ; CHECK:       # %bb.0: # %top
-; CHECK-NEXT:    subl $12, %esp
+; CHECK-NEXT:    pushl %edi
+; CHECK-NEXT:    .cfi_def_cfa_offset 8
+; CHECK-NEXT:    pushl %esi
+; CHECK-NEXT:    .cfi_def_cfa_offset 12
+; CHECK-NEXT:    pushl %eax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
-; CHECK-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; CHECK-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; CHECK-NEXT:    .cfi_offset %esi, -12
+; CHECK-NEXT:    .cfi_offset %edi, -8
+; CHECK-NEXT:    movl {{[0-9]+}}(%esp), %esi
 ; CHECK-NEXT:    calll julia.gc_root_decl@PLT
-; CHECK-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; CHECK-NEXT:    movl %eax, %edi
 ; CHECK-NEXT:    calll jl_get_ptls_states@PLT
-; CHECK-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; CHECK-NEXT:    movl 4(%eax), %eax
+; CHECK-NEXT:    movl 4(%esi), %eax
 ; CHECK-NEXT:    movb (%eax), %al
 ; CHECK-NEXT:    andb $1, %al
 ; CHECK-NEXT:    movzbl %al, %eax
 ; CHECK-NEXT:    movl %eax, (%esp)
 ; CHECK-NEXT:    calll jl_box_int32@PLT
-; CHECK-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
-; CHECK-NEXT:    movl %eax, (%ecx)
-; CHECK-NEXT:    addl $12, %esp
+; CHECK-NEXT:    movl %eax, (%edi)
+; CHECK-NEXT:    addl $4, %esp
+; CHECK-NEXT:    .cfi_def_cfa_offset 12
+; CHECK-NEXT:    popl %esi
+; CHECK-NEXT:    .cfi_def_cfa_offset 8
+; CHECK-NEXT:    popl %edi
 ; CHECK-NEXT:    .cfi_def_cfa_offset 4
 ; CHECK-NEXT:    retl
 top:

@@ -229,7 +229,7 @@ define dso_local i64 @load_atomic_i64_aligned_seq_cst_const(ptr readonly %ptr) {
 
 define dso_local i128 @load_atomic_i128_aligned_unordered(ptr %ptr) {
 ; -O0-LABEL: load_atomic_i128_aligned_unordered:
-; -O0:    casp x2, x3, x0, x1, [x8]
+; -O0:    casp x2, x3, x4, x5, [x0]
 ;
 ; -O1-LABEL: load_atomic_i128_aligned_unordered:
 ; -O1:    casp x2, x3, x2, x3, [x0]
@@ -239,7 +239,7 @@ define dso_local i128 @load_atomic_i128_aligned_unordered(ptr %ptr) {
 
 define dso_local i128 @load_atomic_i128_aligned_unordered_const(ptr readonly %ptr) {
 ; -O0-LABEL: load_atomic_i128_aligned_unordered_const:
-; -O0:    casp x2, x3, x0, x1, [x8]
+; -O0:    casp x2, x3, x4, x5, [x0]
 ;
 ; -O1-LABEL: load_atomic_i128_aligned_unordered_const:
 ; -O1:    casp x2, x3, x2, x3, [x0]
@@ -249,7 +249,7 @@ define dso_local i128 @load_atomic_i128_aligned_unordered_const(ptr readonly %pt
 
 define dso_local i128 @load_atomic_i128_aligned_monotonic(ptr %ptr) {
 ; -O0-LABEL: load_atomic_i128_aligned_monotonic:
-; -O0:    casp x2, x3, x0, x1, [x8]
+; -O0:    casp x2, x3, x4, x5, [x0]
 ;
 ; -O1-LABEL: load_atomic_i128_aligned_monotonic:
 ; -O1:    casp x2, x3, x2, x3, [x0]
@@ -259,7 +259,7 @@ define dso_local i128 @load_atomic_i128_aligned_monotonic(ptr %ptr) {
 
 define dso_local i128 @load_atomic_i128_aligned_monotonic_const(ptr readonly %ptr) {
 ; -O0-LABEL: load_atomic_i128_aligned_monotonic_const:
-; -O0:    casp x2, x3, x0, x1, [x8]
+; -O0:    casp x2, x3, x4, x5, [x0]
 ;
 ; -O1-LABEL: load_atomic_i128_aligned_monotonic_const:
 ; -O1:    casp x2, x3, x2, x3, [x0]
@@ -269,7 +269,7 @@ define dso_local i128 @load_atomic_i128_aligned_monotonic_const(ptr readonly %pt
 
 define dso_local i128 @load_atomic_i128_aligned_acquire(ptr %ptr) {
 ; -O0-LABEL: load_atomic_i128_aligned_acquire:
-; -O0:    caspa x2, x3, x0, x1, [x8]
+; -O0:    caspa x2, x3, x4, x5, [x0]
 ;
 ; -O1-LABEL: load_atomic_i128_aligned_acquire:
 ; -O1:    caspa x2, x3, x2, x3, [x0]
@@ -279,7 +279,7 @@ define dso_local i128 @load_atomic_i128_aligned_acquire(ptr %ptr) {
 
 define dso_local i128 @load_atomic_i128_aligned_acquire_const(ptr readonly %ptr) {
 ; -O0-LABEL: load_atomic_i128_aligned_acquire_const:
-; -O0:    caspa x2, x3, x0, x1, [x8]
+; -O0:    caspa x2, x3, x4, x5, [x0]
 ;
 ; -O1-LABEL: load_atomic_i128_aligned_acquire_const:
 ; -O1:    caspa x2, x3, x2, x3, [x0]
@@ -289,7 +289,7 @@ define dso_local i128 @load_atomic_i128_aligned_acquire_const(ptr readonly %ptr)
 
 define dso_local i128 @load_atomic_i128_aligned_seq_cst(ptr %ptr) {
 ; -O0-LABEL: load_atomic_i128_aligned_seq_cst:
-; -O0:    caspal x2, x3, x0, x1, [x8]
+; -O0:    caspal x2, x3, x4, x5, [x0]
 ;
 ; -O1-LABEL: load_atomic_i128_aligned_seq_cst:
 ; -O1:    caspal x2, x3, x2, x3, [x0]
@@ -299,7 +299,7 @@ define dso_local i128 @load_atomic_i128_aligned_seq_cst(ptr %ptr) {
 
 define dso_local i128 @load_atomic_i128_aligned_seq_cst_const(ptr readonly %ptr) {
 ; -O0-LABEL: load_atomic_i128_aligned_seq_cst_const:
-; -O0:    caspal x2, x3, x0, x1, [x8]
+; -O0:    caspal x2, x3, x4, x5, [x0]
 ;
 ; -O1-LABEL: load_atomic_i128_aligned_seq_cst_const:
 ; -O1:    caspal x2, x3, x2, x3, [x0]

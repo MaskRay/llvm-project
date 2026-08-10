@@ -93,66 +93,66 @@ define dso_local <16 x i32> @test_api(i16 signext %0, i16 signext %1) nounwind {
 ; O0:       # %bb.0:
 ; O0-NEXT:    pushq %rbp
 ; O0-NEXT:    movq %rsp, %rbp
+; O0-NEXT:    pushq %r14
+; O0-NEXT:    pushq %rbx
 ; O0-NEXT:    andq $-1024, %rsp # imm = 0xFC00
 ; O0-NEXT:    subq $4096, %rsp # imm = 0x1000
 ; O0-NEXT:    vpxor %xmm0, %xmm0, %xmm0
 ; O0-NEXT:    # kill: def $zmm0 killed $xmm0
 ; O0-NEXT:    vmovups %zmm0, {{[0-9]+}}(%rsp)
 ; O0-NEXT:    movb $1, {{[0-9]+}}(%rsp)
-; O0-NEXT:    movw %si, %cx
-; O0-NEXT:    movw %cx, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
-; O0-NEXT:    movw %di, %ax
-; O0-NEXT:    movw %ax, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
-; O0-NEXT:    movl $buf, %esi
-; O0-NEXT:    movl $32, %edi
+; O0-NEXT:    movw %si, %bx
+; O0-NEXT:    movw %di, %r14w
+; O0-NEXT:    movl $buf, %eax
+; O0-NEXT:    movl $32, %ecx
 ; O0-NEXT:    movw $8, %dx
-; O0-NEXT:    # implicit-def: $al
-; O0-NEXT:    movb %al, {{[0-9]+}}(%rsp)
+; O0-NEXT:    # implicit-def: $r14b
+; O0-NEXT:    movb %r14b, {{[0-9]+}}(%rsp)
 ; O0-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
 ; O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; O0-NEXT:    tileloadd (%rsi,%rdi), %tmm0
-; O0-NEXT:    movl $64, %edi
-; O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
+; O0-NEXT:    tileloadd (%rax,%rcx), %tmm0
+; O0-NEXT:    movl $64, %eax
+; O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
 ; O0-NEXT:    movw $8, %dx
-; O0-NEXT:    tilestored %tmm0, (%rsi,%rdi)
-; O0-NEXT:    movl $32, %esi
-; O0-NEXT:    movl $buf+1024, %edx
-; O0-NEXT:    movw $8, %ax
-; O0-NEXT:    # implicit-def: $al
-; O0-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; O0-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; O0-NEXT:    tilestored %tmm0, (%rcx,%rax)
+; O0-NEXT:    movl $32, %eax
+; O0-NEXT:    movl $buf+1024, %ecx
+; O0-NEXT:    movw $8, %dx
+; O0-NEXT:    # implicit-def: $dl
+; O0-NEXT:    movb %dl, {{[0-9]+}}(%rsp)
+; O0-NEXT:    movw %bx, {{[0-9]+}}(%rsp)
 ; O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; O0-NEXT:    tileloadd (%rdx,%rsi), %tmm0
-; O0-NEXT:    movl $64, %esi
-; O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; O0-NEXT:    movw $8, %ax
-; O0-NEXT:    tilestored %tmm0, (%rdx,%rsi)
+; O0-NEXT:    tileloadd (%rcx,%rax), %tmm0
+; O0-NEXT:    movl $64, %eax
+; O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; O0-NEXT:    movw $8, %dx
+; O0-NEXT:    tilestored %tmm0, (%rcx,%rax)
 ; O0-NEXT:    vzeroupper
 ; O0-NEXT:    callq foo
-; O0-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %dx # 2-byte Reload
-; O0-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %ax # 2-byte Reload
-; O0-NEXT:    movl $64, %edi
-; O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
-; O0-NEXT:    movw $8, %cx
-; O0-NEXT:    # implicit-def: $cl
-; O0-NEXT:    movb %cl, {{[0-9]+}}(%rsp)
+; O0-NEXT:    movl $64, %eax
+; O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; O0-NEXT:    movw $8, %dx
+; O0-NEXT:    # implicit-def: $dl
+; O0-NEXT:    movb %dl, {{[0-9]+}}(%rsp)
+; O0-NEXT:    movw %bx, {{[0-9]+}}(%rsp)
+; O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
+; O0-NEXT:    tileloadd (%rcx,%rax), %tmm0
+; O0-NEXT:    movw $8, %ax
+; O0-NEXT:    tilemovrow $2, %tmm0, %zmm0
+; O0-NEXT:    movl $64, %eax
+; O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rcx
+; O0-NEXT:    movw $8, %dx
+; O0-NEXT:    # implicit-def: $r14b
+; O0-NEXT:    movb %r14b, {{[0-9]+}}(%rsp)
 ; O0-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
 ; O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; O0-NEXT:    tileloadd (%rsi,%rdi), %tmm0
-; O0-NEXT:    movw $8, %cx
-; O0-NEXT:    tilemovrow $2, %tmm0, %zmm0
-; O0-NEXT:    movl $64, %esi
-; O0-NEXT:    leaq {{[0-9]+}}(%rsp), %rdx
-; O0-NEXT:    movw $8, %cx
-; O0-NEXT:    # implicit-def: $al
-; O0-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; O0-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
-; O0-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; O0-NEXT:    tileloadd (%rdx,%rsi), %tmm0
-; O0-NEXT:    movw $8, %cx
+; O0-NEXT:    tileloadd (%rcx,%rax), %tmm0
+; O0-NEXT:    movw $8, %ax
 ; O0-NEXT:    tilemovrow $2, %tmm0, %zmm1
 ; O0-NEXT:    vpaddd %zmm1, %zmm0, %zmm0
-; O0-NEXT:    movq %rbp, %rsp
+; O0-NEXT:    leaq -16(%rbp), %rsp
+; O0-NEXT:    popq %rbx
+; O0-NEXT:    popq %r14
 ; O0-NEXT:    popq %rbp
 ; O0-NEXT:    tilerelease
 ; O0-NEXT:    retq

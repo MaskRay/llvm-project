@@ -82,32 +82,34 @@ define void @test() #0 {
 ; GCN-O0-NEXT:    s_add_i32 s32, s32, 0x400
 ; GCN-O0-NEXT:    v_writelane_b32 v40, s30, 0
 ; GCN-O0-NEXT:    v_writelane_b32 v40, s31, 1
+; GCN-O0-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
 ; GCN-O0-NEXT:    ;;#ASMSTART
 ; GCN-O0-NEXT:    ; def s16
 ; GCN-O0-NEXT:    ;;#ASMEND
+; GCN-O0-NEXT:    s_getpc_b64 s[18:19]
+; GCN-O0-NEXT:    s_add_u32 s18, s18, ext_func@gotpcrel32@lo+4
+; GCN-O0-NEXT:    s_addc_u32 s19, s19, ext_func@gotpcrel32@hi+12
+; GCN-O0-NEXT:    s_load_dwordx2 s[18:19], s[18:19], 0x0
+; GCN-O0-NEXT:    s_mov_b64 s[22:23], s[2:3]
+; GCN-O0-NEXT:    s_mov_b64 s[20:21], s[0:1]
+; GCN-O0-NEXT:    ; kill: def $vgpr31 killed $vgpr31 killed $exec
+; GCN-O0-NEXT:    s_mov_b64 s[0:1], s[20:21]
+; GCN-O0-NEXT:    s_mov_b64 s[2:3], s[22:23]
 ; GCN-O0-NEXT:    ; implicit-def: $vgpr39 : SGPR spill to VGPR lane
 ; GCN-O0-NEXT:    v_writelane_b32 v39, s16, 0
 ; GCN-O0-NEXT:    s_or_saveexec_b64 s[28:29], -1
 ; GCN-O0-NEXT:    buffer_store_dword v39, off, s[0:3], s33 ; 4-byte Folded Spill
 ; GCN-O0-NEXT:    s_mov_b64 exec, s[28:29]
-; GCN-O0-NEXT:    s_getpc_b64 s[16:17]
-; GCN-O0-NEXT:    s_add_u32 s16, s16, ext_func@gotpcrel32@lo+4
-; GCN-O0-NEXT:    s_addc_u32 s17, s17, ext_func@gotpcrel32@hi+12
-; GCN-O0-NEXT:    s_load_dwordx2 s[16:17], s[16:17], 0x0
-; GCN-O0-NEXT:    s_mov_b64 s[22:23], s[2:3]
-; GCN-O0-NEXT:    s_mov_b64 s[20:21], s[0:1]
-; GCN-O0-NEXT:    s_mov_b64 s[0:1], s[20:21]
-; GCN-O0-NEXT:    s_mov_b64 s[2:3], s[22:23]
 ; GCN-O0-NEXT:    s_waitcnt lgkmcnt(0)
-; GCN-O0-NEXT:    s_swappc_b64 s[30:31], s[16:17]
+; GCN-O0-NEXT:    s_swappc_b64 s[30:31], s[18:19]
+; GCN-O0-NEXT:    ; implicit-def: $sgpr4_sgpr5
+; GCN-O0-NEXT:    v_mov_b32_e32 v0, s4
+; GCN-O0-NEXT:    v_mov_b32_e32 v1, s5
 ; GCN-O0-NEXT:    s_or_saveexec_b64 s[28:29], -1
 ; GCN-O0-NEXT:    buffer_load_dword v39, off, s[0:3], s33 ; 4-byte Folded Reload
 ; GCN-O0-NEXT:    s_mov_b64 exec, s[28:29]
 ; GCN-O0-NEXT:    s_waitcnt vmcnt(0)
 ; GCN-O0-NEXT:    v_readlane_b32 s4, v39, 0
-; GCN-O0-NEXT:    ; implicit-def: $sgpr6_sgpr7
-; GCN-O0-NEXT:    v_mov_b32_e32 v0, s6
-; GCN-O0-NEXT:    v_mov_b32_e32 v1, s7
 ; GCN-O0-NEXT:    v_mov_b32_e32 v2, s4
 ; GCN-O0-NEXT:    global_store_dword v[0:1], v2, off
 ; GCN-O0-NEXT:    s_waitcnt vmcnt(0)

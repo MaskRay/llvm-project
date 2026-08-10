@@ -26,8 +26,9 @@ define fastcc i32 @vec_reduce_and_v256i32(<256 x i32> %v) {
 ; CHECK-NEXT:    lvl %s0
 ; CHECK-NEXT:    vrand %v0, %v0
 ; CHECK-NEXT:    lvs %s0, %v0(0)
+; CHECK-NEXT:    or %s0, 0, %s0
+; CHECK-NEXT:    # implicit-def: $sx1
 ; CHECK-NEXT:    or %s1, 0, %s0
-; CHECK-NEXT:    # implicit-def: $sx0
 ; CHECK-NEXT:    or %s0, 0, %s1
 ; CHECK-NEXT:    b.l.t (, %s10)
   %r = call i32 @llvm.vector.reduce.and.v256i32( <256 x i32> %v)

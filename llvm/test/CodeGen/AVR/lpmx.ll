@@ -22,8 +22,9 @@ define i16 @foo0(i16 %a) addrspace(1) {
 ; CHECK-O0-NEXT:    out 61, r28
 ; CHECK-O0-NEXT:    std Y+2, r25
 ; CHECK-O0-NEXT:    std Y+1, r24
-; CHECK-O0-NEXT:    ldd r30, Y+1
-; CHECK-O0-NEXT:    ldd r31, Y+2
+; CHECK-O0-NEXT:    ldd r24, Y+1
+; CHECK-O0-NEXT:    ldd r25, Y+2
+; CHECK-O0-NEXT:    movw r30, r24
 ; CHECK-O0-NEXT:    lsl r30
 ; CHECK-O0-NEXT:    rol r31
 ; CHECK-O0-NEXT:    subi r30, lo8(-(arr0))

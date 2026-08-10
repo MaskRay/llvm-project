@@ -185,9 +185,9 @@ define bfloat @sitofp_bf_i1(i1 %a) nounwind ssp {
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    sbfx w8, w0, #0, #1
 ; CHECK-NEXT:    scvtf s0, w8
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16
@@ -205,9 +205,9 @@ define bfloat @sitofp_bf_i8(i8 %a) nounwind ssp {
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    sxtb w8, w0
 ; CHECK-NEXT:    scvtf s0, w8
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16
@@ -225,9 +225,9 @@ define bfloat @sitofp_bf_i16(i16 %a) nounwind ssp {
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    sxth w8, w0
 ; CHECK-NEXT:    scvtf s0, w8
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16
@@ -245,9 +245,9 @@ define bfloat @sitofp_bf_i32(i32 %a) nounwind ssp {
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    scvtf d0, w0
 ; CHECK-NEXT:    fcvtxn s0, d0
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16
@@ -264,26 +264,26 @@ define bfloat @sitofp_bf_i164(i64 %a) nounwind ssp {
 ; CHECK-LABEL: sitofp_bf_i164:
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    subs x8, x0, #0
-; CHECK-NEXT:    cneg x10, x0, mi
-; CHECK-NEXT:    and x8, x10, #0xfffffffffffff000
-; CHECK-NEXT:    lsr x9, x10, #53
-; CHECK-NEXT:    subs x9, x9, #0
-; CHECK-NEXT:    csel x8, x8, x10, ne
-; CHECK-NEXT:    scvtf d0, x8
-; CHECK-NEXT:    fmov x8, d0
-; CHECK-NEXT:    and x9, x0, #0x8000000000000000
-; CHECK-NEXT:    orr x8, x8, x9
-; CHECK-NEXT:    cset w9, ne
-; CHECK-NEXT:    ands x10, x10, #0xfff
-; CHECK-NEXT:    csel w9, wzr, w9, eq
-; CHECK-NEXT:    mov w9, w9
-; CHECK-NEXT:    // kill: def $x9 killed $w9
-; CHECK-NEXT:    orr x8, x8, x9
+; CHECK-NEXT:    cneg x8, x0, mi
+; CHECK-NEXT:    and x9, x8, #0xfffffffffffff000
+; CHECK-NEXT:    lsr x10, x8, #53
+; CHECK-NEXT:    subs x10, x10, #0
+; CHECK-NEXT:    csel x9, x9, x8, ne
+; CHECK-NEXT:    scvtf d0, x9
+; CHECK-NEXT:    fmov x9, d0
+; CHECK-NEXT:    and x10, x0, #0x8000000000000000
+; CHECK-NEXT:    orr x9, x9, x10
+; CHECK-NEXT:    cset w10, ne
+; CHECK-NEXT:    ands x8, x8, #0xfff
+; CHECK-NEXT:    csel w8, wzr, w10, eq
+; CHECK-NEXT:    mov w8, w8
+; CHECK-NEXT:    // kill: def $x8 killed $w8
+; CHECK-NEXT:    orr x8, x9, x8
 ; CHECK-NEXT:    fmov d0, x8
 ; CHECK-NEXT:    fcvtxn s0, d0
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16
@@ -301,9 +301,9 @@ define bfloat @uitofp_bf_i1(i1 %a) nounwind ssp {
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    and w8, w0, #0x1
 ; CHECK-NEXT:    ucvtf s0, w8
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16
@@ -321,9 +321,9 @@ define bfloat @uitofp_bf_i8(i8 %a) nounwind ssp {
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    and w8, w0, #0xff
 ; CHECK-NEXT:    ucvtf s0, w8
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16
@@ -341,9 +341,9 @@ define bfloat @uitofp_bf_i16(i16 %a) nounwind ssp {
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    and w8, w0, #0xffff
 ; CHECK-NEXT:    ucvtf s0, w8
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16
@@ -361,9 +361,9 @@ define bfloat @uitofp_bf_i32(i32 %a) nounwind ssp {
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    ucvtf d0, w0
 ; CHECK-NEXT:    fcvtxn s0, d0
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16
@@ -393,9 +393,9 @@ define bfloat @uitofp_bf_i64(i64 %a) nounwind ssp {
 ; CHECK-NEXT:    orr x8, x8, x9
 ; CHECK-NEXT:    fmov d0, x8
 ; CHECK-NEXT:    fcvtxn s0, d0
-; CHECK-NEXT:    fmov w9, s0
-; CHECK-NEXT:    ubfx w8, w9, #16, #1
-; CHECK-NEXT:    add w8, w8, w9
+; CHECK-NEXT:    fmov w8, s0
+; CHECK-NEXT:    ubfx w9, w8, #16, #1
+; CHECK-NEXT:    add w8, w9, w8
 ; CHECK-NEXT:    mov w9, #32767 // =0x7fff
 ; CHECK-NEXT:    add w8, w8, w9
 ; CHECK-NEXT:    lsr w8, w8, #16

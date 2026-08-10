@@ -6,13 +6,16 @@ define <2 x double> @fixed_length(<2 x double> %a, <2 x double> %b) nounwind {
 ; CHECK-LABEL: fixed_length:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetivli zero, 2, e64, m1, ta, ma
-; CHECK-NEXT:    vmv1r.v v10, v9
-; CHECK-NEXT:    # kill: def $v11 killed $v10 killed $vtype
-; CHECK-NEXT:    # kill: def $v9 killed $v8 killed $vtype
-; CHECK-NEXT:    # implicit-def: $v9
-; CHECK-NEXT:    vfadd.vv v9, v8, v10
+; CHECK-NEXT:    # kill: def $v9 killed $v9 killed $vtype
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    # kill: def $v10 killed $v9 killed $vtype
+; CHECK-NEXT:    # kill: def $v11 killed $v8 killed $vtype
+; CHECK-NEXT:    # implicit-def: $v10
+; CHECK-NEXT:    vfadd.vv v10, v8, v9
 ; CHECK-NEXT:    # implicit-def: $v8
-; CHECK-NEXT:    vfadd.vv v8, v9, v10
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    vfadd.vv v8, v10, v9
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    ret
 entry:
   %1 = fadd <2 x double> %a, %b
@@ -24,11 +27,14 @@ define <vscale x 1 x double> @scalable(<vscale x 1 x double> %a, <vscale x 1 x d
 ; CHECK-LABEL: scalable:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetvli a0, zero, e64, m1, ta, ma
-; CHECK-NEXT:    vmv1r.v v10, v9
-; CHECK-NEXT:    # implicit-def: $v9
-; CHECK-NEXT:    vfadd.vv v9, v8, v10
+; CHECK-NEXT:    # kill: def $v9 killed $v9 killed $vtype
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    # implicit-def: $v10
+; CHECK-NEXT:    vfadd.vv v10, v8, v9
 ; CHECK-NEXT:    # implicit-def: $v8
-; CHECK-NEXT:    vfadd.vv v8, v9, v10
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    vfadd.vv v8, v10, v9
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    ret
 entry:
   %1 = fadd <vscale x 1 x double> %a, %b
@@ -40,13 +46,18 @@ define <vscale x 1 x double> @intrinsic_same_vlmax(<vscale x 1 x double> %a, <vs
 ; CHECK-LABEL: intrinsic_same_vlmax:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetvli a0, zero, e32, mf2, ta, ma
-; CHECK-NEXT:    vmv1r.v v10, v9
-; CHECK-NEXT:    # implicit-def: $v9
+; CHECK-NEXT:    # kill: def $v9 killed $v9 killed $vtype
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    # implicit-def: $v10
 ; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
-; CHECK-NEXT:    vfadd.vv v9, v8, v10
+; CHECK-NEXT:    vfadd.vv v10, v8, v9
 ; CHECK-NEXT:    # implicit-def: $v8
 ; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
-; CHECK-NEXT:    vfadd.vv v8, v9, v10
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
+; CHECK-NEXT:    vfadd.vv v8, v10, v9
+; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    ret
 entry:
   %0 = tail call i64 @llvm.riscv.vsetvlimax(i64 2, i64 7)
@@ -67,13 +78,18 @@ define <vscale x 1 x double> @intrinsic_same_avl_imm(<vscale x 1 x double> %a, <
 ; CHECK-LABEL: intrinsic_same_avl_imm:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetivli a0, 2, e32, mf2, ta, ma
-; CHECK-NEXT:    vmv1r.v v10, v9
-; CHECK-NEXT:    # implicit-def: $v9
+; CHECK-NEXT:    # kill: def $v9 killed $v9 killed $vtype
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    # implicit-def: $v10
 ; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
-; CHECK-NEXT:    vfadd.vv v9, v8, v10
+; CHECK-NEXT:    vfadd.vv v10, v8, v9
 ; CHECK-NEXT:    # implicit-def: $v8
 ; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
-; CHECK-NEXT:    vfadd.vv v8, v9, v10
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
+; CHECK-NEXT:    vfadd.vv v8, v10, v9
+; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    ret
 entry:
   %0 = tail call i64 @llvm.riscv.vsetvli(i64 2, i64 2, i64 7)
@@ -94,14 +110,19 @@ define <vscale x 1 x double> @intrinsic_same_avl_reg(i64 %avl, <vscale x 1 x dou
 ; CHECK-LABEL: intrinsic_same_avl_reg:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetivli zero, 1, e8, m1, ta, ma
-; CHECK-NEXT:    vmv1r.v v10, v9
+; CHECK-NEXT:    # kill: def $v9 killed $v9 killed $vtype
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    vsetvli a0, a0, e32, mf2, ta, ma
-; CHECK-NEXT:    # implicit-def: $v9
+; CHECK-NEXT:    # implicit-def: $v10
 ; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
-; CHECK-NEXT:    vfadd.vv v9, v8, v10
+; CHECK-NEXT:    vfadd.vv v10, v8, v9
 ; CHECK-NEXT:    # implicit-def: $v8
 ; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
-; CHECK-NEXT:    vfadd.vv v8, v9, v10
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
+; CHECK-NEXT:    vfadd.vv v8, v10, v9
+; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    ret
 entry:
   %0 = tail call i64 @llvm.riscv.vsetvli(i64 %avl, i64 2, i64 7)
@@ -122,15 +143,20 @@ define <vscale x 1 x double> @intrinsic_diff_avl_reg(i64 %avl, i64 %avl2, <vscal
 ; CHECK-LABEL: intrinsic_diff_avl_reg:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetivli zero, 1, e8, m1, ta, ma
-; CHECK-NEXT:    vmv1r.v v10, v9
+; CHECK-NEXT:    # kill: def $v9 killed $v9 killed $vtype
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    vsetvli a0, a0, e32, mf2, ta, ma
-; CHECK-NEXT:    # implicit-def: $v9
+; CHECK-NEXT:    # implicit-def: $v10
 ; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
-; CHECK-NEXT:    vfadd.vv v9, v8, v10
+; CHECK-NEXT:    vfadd.vv v10, v8, v9
 ; CHECK-NEXT:    vsetvli a0, a1, e32, mf2, ta, ma
 ; CHECK-NEXT:    # implicit-def: $v8
+; CHECK-NEXT:    vsetvli zero, a1, e32, mf2, ta, ma
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
-; CHECK-NEXT:    vfadd.vv v8, v9, v10
+; CHECK-NEXT:    vfadd.vv v8, v10, v9
+; CHECK-NEXT:    vsetvli zero, a0, e64, m1, tu, ma
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    ret
 entry:
   %0 = tail call i64 @llvm.riscv.vsetvli(i64 %avl, i64 2, i64 7)
@@ -152,29 +178,34 @@ define <64 x i8> @coalesce_avl_move_crash(<16 x i8> %0) {
 ; CHECK-LABEL: coalesce_avl_move_crash:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetivli zero, 16, e8, m1, tu, ma
-; CHECK-NEXT:    vmv1r.v v10, v8
-; CHECK-NEXT:    # implicit-def: $v8m2
-; CHECK-NEXT:    vmv1r.v v8, v10
-; CHECK-NEXT:    # implicit-def: $v12
-; CHECK-NEXT:    vmv.v.i v12, 0
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
 ; CHECK-NEXT:    # implicit-def: $v10m2
-; CHECK-NEXT:    vmv1r.v v10, v12
+; CHECK-NEXT:    vmv1r.v v10, v8
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    # implicit-def: $v8
+; CHECK-NEXT:    # kill: def $v8 killed $v8 killed $vtype
+; CHECK-NEXT:    vmv.v.i v8, 0
+; CHECK-NEXT:    # implicit-def: $v12m2
+; CHECK-NEXT:    vmv1r.v v12, v8
 ; CHECK-NEXT:    li a0, 32
-; CHECK-NEXT:    vmv1r.v v11, v12
+; CHECK-NEXT:    vmv1r.v v13, v8
 ; CHECK-NEXT:    vsetvli zero, a0, e8, m2, ta, ma
-; CHECK-NEXT:    vslideup.vi v8, v10, 16
+; CHECK-NEXT:    vslideup.vi v10, v12, 16
 ; CHECK-NEXT:    # implicit-def: $v12m4
 ; CHECK-NEXT:    vsetvli zero, a0, e8, m2, ta, ma
-; CHECK-NEXT:    vmv2r.v v12, v8
-; CHECK-NEXT:    # implicit-def: $v16m2
+; CHECK-NEXT:    vmv2r.v v12, v10
+; CHECK-NEXT:    # implicit-def: $v8m2
 ; CHECK-NEXT:    vsetvli zero, a0, e8, m2, tu, ma
-; CHECK-NEXT:    vmv.v.i v16, 0
-; CHECK-NEXT:    # implicit-def: $v8m4
+; CHECK-NEXT:    vmv.v.i v8, 0
+; CHECK-NEXT:    # implicit-def: $v16m4
 ; CHECK-NEXT:    vsetvli zero, a0, e8, m2, tu, ma
-; CHECK-NEXT:    vmv2r.v v8, v16
+; CHECK-NEXT:    vmv2r.v v16, v8
 ; CHECK-NEXT:    li a1, 64
 ; CHECK-NEXT:    vsetvli zero, a0, e8, m2, tu, ma
-; CHECK-NEXT:    vmv2r.v v14, v16
+; CHECK-NEXT:    vmv2r.v v14, v8
+; CHECK-NEXT:    vsetvli zero, a0, e8, m2, tu, ma
+; CHECK-NEXT:    vmv4r.v v8, v16
 ; CHECK-NEXT:    vsetvli zero, a1, e8, m4, ta, ma
 ; CHECK-NEXT:    vslideup.vx v8, v12, a0
 ; CHECK-NEXT:    ret

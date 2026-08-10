@@ -9,16 +9,18 @@ define i32 @test() {
 ; CHECK-LABEL: test:
 ; CHECK:       ; %bb.0: ; %entry
 ; CHECK-NEXT:    sub sp, sp, #80
+; CHECK-NEXT:    stp x20, x19, [sp, #48] ; 16-byte Folded Spill
 ; CHECK-NEXT:    stp x29, x30, [sp, #64] ; 16-byte Folded Spill
 ; CHECK-NEXT:    .cfi_def_cfa_offset 80
 ; CHECK-NEXT:    .cfi_offset w30, -8
 ; CHECK-NEXT:    .cfi_offset w29, -16
+; CHECK-NEXT:    .cfi_offset w19, -24
+; CHECK-NEXT:    .cfi_offset w20, -32
 ; CHECK-NEXT:    mov x8, #0 ; =0x0
 ; CHECK-NEXT:    ldr s0, [x8]
 ; CHECK-NEXT:    ; kill: def $d0 killed $s0
 ; CHECK-NEXT:    mov x8, sp
-; CHECK-NEXT:    mov w9, #0 ; =0x0
-; CHECK-NEXT:    str w9, [sp, #60] ; 4-byte Spill
+; CHECK-NEXT:    mov w19, #0 ; =0x0
 ; CHECK-NEXT:    str xzr, [x8]
 ; CHECK-NEXT:    str xzr, [x8, #8]
 ; CHECK-NEXT:    str xzr, [x8, #16]
@@ -28,8 +30,9 @@ define i32 @test() {
 ; CHECK-NEXT:    mov x8, #0 ; =0x0
 ; CHECK-NEXT:    mov x0, x8
 ; CHECK-NEXT:    blr x8
-; CHECK-NEXT:    ldr w0, [sp, #60] ; 4-byte Reload
+; CHECK-NEXT:    mov x0, x19
 ; CHECK-NEXT:    ldp x29, x30, [sp, #64] ; 16-byte Folded Reload
+; CHECK-NEXT:    ldp x20, x19, [sp, #48] ; 16-byte Folded Reload
 ; CHECK-NEXT:    add sp, sp, #80
 ; CHECK-NEXT:    ret
 entry:

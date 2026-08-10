@@ -12,17 +12,19 @@ body:             |
   bb.0:
     ; CHECK-LABEL: name: foo
     ; CHECK: renamable $eax = IMPLICIT_DEF
-    ; CHECK: renamable $edx = MOVZX32rm8 renamable $eax, 1, $noreg, 0, $noreg :: (load (s8) from `ptr undef` + 20, align 4, basealign 16)
-    ; CHECK: dead renamable $ecx = MOV32rm renamable $eax, 1, $noreg, 0, $noreg :: (load (s32) from `ptr undef` + 12, basealign 16)
-    ; CHECK: renamable $al = MOV8rm killed renamable $eax, 1, $noreg, 0, $noreg :: (load (s8) from `ptr undef`, align 4)
-    ; CHECK: renamable $esi = IMPLICIT_DEF
-    ; CHECK: renamable $ecx = IMPLICIT_DEF
-    ; CHECK: renamable $ecx = CMOV32rr renamable $ecx, killed renamable $esi, 2, implicit undef $eflags
-    ; CHECK: renamable $cl = MOV8ri -128
-    ; CHECK: $cl = IMPLICIT_DEF
-    ; CHECK: renamable $eax = COPY renamable $edx
-    ; CHECK: dead renamable $eax = SHRD32rrCL renamable $eax, killed renamable $edx, implicit-def dead $eflags, implicit killed $cl
-    ; CHECK: RET32
+    ; CHECK-NEXT: renamable $ecx = MOVZX32rm8 renamable $eax, 1, $noreg, 0, $noreg :: (load (s8) from `ptr undef` + 20, align 4, basealign 16)
+    ; CHECK-NEXT: dead renamable $edx = MOV32rm renamable $eax, 1, $noreg, 0, $noreg :: (load (s32) from `ptr undef` + 12, basealign 16)
+    ; CHECK-NEXT: renamable $al = MOV8rm killed renamable $eax, 1, $noreg, 0, $noreg :: (load (s8) from `ptr undef`, align 4)
+    ; CHECK-NEXT: renamable $edx = IMPLICIT_DEF
+    ; CHECK-NEXT: renamable $esi = IMPLICIT_DEF
+    ; CHECK-NEXT: renamable $esi = CMOV32rr renamable $esi, killed renamable $edx, 2, implicit undef $eflags
+    ; CHECK-NEXT: renamable $dl = MOV8ri -128
+    ; CHECK-NEXT: MOV32mr %stack.0, 1, $noreg, 0, $noreg, killed $ecx :: (store (s32) into %stack.0)
+    ; CHECK-NEXT: $cl = IMPLICIT_DEF
+    ; CHECK-NEXT: $eax = MOV32rm %stack.0, 1, $noreg, 0, $noreg :: (load (s32) from %stack.0)
+    ; CHECK-NEXT: renamable $esi = COPY renamable $eax
+    ; CHECK-NEXT: dead renamable $esi = SHRD32rrCL renamable $esi, killed renamable $eax, implicit-def dead $eflags, implicit killed $cl
+    ; CHECK-NEXT: RET32
     %0:gr32 = IMPLICIT_DEF
     %1:gr32 = MOVZX32rm8 %0, 1, $noreg, 0, $noreg :: (load (s8) from `ptr undef` + 20, align 4, basealign 16)
     %2:gr32 = MOV32rm %0, 1, $noreg, 0, $noreg :: (load (s32) from `ptr undef` + 12, basealign 16)

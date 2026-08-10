@@ -11,12 +11,15 @@ tracksRegLiveness: true
 body:             |
   ; CHECK-LABEL: name: live_through_ecx
   ; CHECK: bb.0:
-  ; CHECK:   successors: %bb.1(0x80000000)
-  ; CHECK:   liveins: $ecx
-  ; CHECK:   NOOP implicit $ecx
-  ; CHECK: bb.1:
-  ; CHECK:   liveins: $ecx
-  ; CHECK:   RET implicit killed $ecx
+  ; CHECK-NEXT:   successors: %bb.1(0x80000000)
+  ; CHECK-NEXT:   liveins: $ecx
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   NOOP implicit $ecx
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.1:
+  ; CHECK-NEXT:   liveins: $ecx
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   RET implicit killed $ecx
   bb.0:
     liveins: $ecx
     NOOP implicit $ecx
@@ -34,12 +37,17 @@ tracksRegLiveness: true
 body:             |
   ; CHECK-LABEL: name: live_out_ecx
   ; CHECK: bb.0:
-  ; CHECK:   successors: %bb.1(0x80000000)
-  ; CHECK:   liveins: $eax, $ebx
-  ; CHECK:   renamable $ecx = COPY killed $ebx
-  ; CHECK: bb.1:
-  ; CHECK:   liveins: $ecx
-  ; CHECK:   RET implicit killed $ecx
+  ; CHECK-NEXT:   successors: %bb.1(0x80000000)
+  ; CHECK-NEXT:   liveins: $eax, $ebx
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   dead renamable $eax = COPY killed $eax
+  ; CHECK-NEXT:   renamable $ebx = COPY killed $ebx
+  ; CHECK-NEXT:   $ecx = COPY killed renamable $ebx
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.1:
+  ; CHECK-NEXT:   liveins: $ecx
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   RET implicit killed $ecx
   bb.0:
     liveins: $eax, $ebx
     %0:gr32 = COPY $eax
@@ -59,12 +67,17 @@ tracksRegLiveness: true
 body:             |
   ; CHECK-LABEL: name: live_out_eflags
   ; CHECK: bb.0:
-  ; CHECK:   successors: %bb.1(0x80000000)
-  ; CHECK:   liveins: $eax, $ebx
-  ; CHECK:   TEST32rr killed renamable $eax, killed renamable $ebx, implicit-def $eflags
-  ; CHECK: bb.1:
-  ; CHECK:   liveins: $eflags
-  ; CHECK:   RET implicit killed $eflags
+  ; CHECK-NEXT:   successors: %bb.1(0x80000000)
+  ; CHECK-NEXT:   liveins: $eax, $ebx
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   renamable $eax = COPY killed $eax
+  ; CHECK-NEXT:   renamable $ebx = COPY killed $ebx
+  ; CHECK-NEXT:   TEST32rr killed renamable $eax, killed renamable $ebx, implicit-def $eflags
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.1:
+  ; CHECK-NEXT:   liveins: $eflags
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   RET implicit killed $eflags
   bb.0:
     liveins: $eax, $ebx
     %0:gr32 = COPY $eax

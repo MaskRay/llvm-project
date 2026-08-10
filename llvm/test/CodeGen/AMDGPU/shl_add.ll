@@ -28,7 +28,11 @@ define amdgpu_ps float @shl_add(i32 %a, i32 %b, i32 %c) {
 ;
 ; GFX9-O0-LABEL: shl_add:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, v1, v2
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    ; return to shader part epilog
   %x = shl i32 %a, %b
   %result = add i32 %x, %c
@@ -57,8 +61,10 @@ define amdgpu_ps float @shl_add_vgpr_a(i32 %a, i32 inreg %b, i32 inreg %c) {
 ;
 ; GFX9-O0-LABEL: shl_add_vgpr_a:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    v_lshlrev_b32_e64 v0, s2, v0
 ; GFX9-O0-NEXT:    v_add_u32_e64 v0, v0, s3
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    ; return to shader part epilog
   %x = shl i32 %a, %b
   %result = add i32 %x, %c
@@ -85,7 +91,11 @@ define amdgpu_ps float @shl_add_vgpr_all(i32 %a, i32 %b, i32 %c) {
 ;
 ; GFX9-O0-LABEL: shl_add_vgpr_all:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, v1, v2
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    ; return to shader part epilog
   %x = shl i32 %a, %b
   %result = add i32 %x, %c
@@ -112,7 +122,10 @@ define amdgpu_ps float @shl_add_vgpr_ab(i32 %a, i32 %b, i32 inreg %c) {
 ;
 ; GFX9-O0-LABEL: shl_add_vgpr_ab:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, v1, s2
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    ; return to shader part epilog
   %x = shl i32 %a, %b
   %result = add i32 %x, %c
@@ -139,8 +152,11 @@ define amdgpu_ps float @shl_add_vgpr_const(i32 %a, i32 %b) {
 ;
 ; GFX9-O0-LABEL: shl_add_vgpr_const:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_mov_b32 s0, 3
 ; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s0, v1
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    ; return to shader part epilog
   %x = shl i32 %a, 3
   %result = add i32 %x, %b
@@ -176,19 +192,21 @@ define i32 @v_shl1_add_chain(i32 %src) {
 ;
 ; GFX9-O0-LABEL: v_shl1_add_chain:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX9-O0-NEXT:    s_mov_b32 s5, 0x5020100
-; GFX9-O0-NEXT:    s_mov_b32 s4, 1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
+; GFX9-O0-NEXT:    s_mov_b32 s4, 0x5020100
+; GFX9-O0-NEXT:    s_mov_b32 s5, 1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
   %s1 = shl i32 %src, 1
   %a1 = add i32 %s1, 84017408
@@ -226,19 +244,21 @@ define i32 @v_shl2_add_chain(i32 %src) {
 ;
 ; GFX9-O0-LABEL: v_shl2_add_chain:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX9-O0-NEXT:    s_mov_b32 s5, 0x5020100
-; GFX9-O0-NEXT:    s_mov_b32 s4, 2
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
+; GFX9-O0-NEXT:    s_mov_b32 s4, 0x5020100
+; GFX9-O0-NEXT:    s_mov_b32 s5, 2
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
   %s1 = shl i32 %src, 2
   %a1 = add i32 %s1, 84017408
@@ -276,19 +296,21 @@ define i32 @v_shl3_add_chain(i32 %src) {
 ;
 ; GFX9-O0-LABEL: v_shl3_add_chain:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX9-O0-NEXT:    s_mov_b32 s5, 0x5020100
-; GFX9-O0-NEXT:    s_mov_b32 s4, 3
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
+; GFX9-O0-NEXT:    s_mov_b32 s4, 0x5020100
+; GFX9-O0-NEXT:    s_mov_b32 s5, 3
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
   %s1 = shl i32 %src, 3
   %a1 = add i32 %s1, 84017408
@@ -326,19 +348,21 @@ define i32 @v_shl4_add_chain(i32 %src) {
 ;
 ; GFX9-O0-LABEL: v_shl4_add_chain:
 ; GFX9-O0:       ; %bb.0:
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX9-O0-NEXT:    s_mov_b32 s5, 0x5020100
-; GFX9-O0-NEXT:    s_mov_b32 s4, 4
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
-; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s5
-; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s4, v1
+; GFX9-O0-NEXT:    s_mov_b32 s4, 0x5020100
+; GFX9-O0-NEXT:    s_mov_b32 s5, 4
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    v_mov_b32_e32 v1, s4
+; GFX9-O0-NEXT:    v_lshl_add_u32 v0, v0, s5, v1
+; GFX9-O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX9-O0-NEXT:    s_setpc_b64 s[30:31]
   %s1 = shl i32 %src, 4
   %a1 = add i32 %s1, 84017408

@@ -107,17 +107,18 @@ define void @test_fpextend_fp128(ptr %p, ptr %out) nounwind {
 ; V8-UNOPT-NEXT:    call _Q_stoq
 ; V8-UNOPT-NEXT:    ld [%fp+-20], %o0
 ; V8-UNOPT-NEXT:    unimp 16
-; V8-UNOPT-NEXT:    ldd [%fp+-16], %f4
-; V8-UNOPT-NEXT:    ! implicit-def: $q0
+; V8-UNOPT-NEXT:    ldd [%fp+-16], %f0
+; V8-UNOPT-NEXT:    ! implicit-def: $q1
+; V8-UNOPT-NEXT:    fmovs %f0, %f4
+; V8-UNOPT-NEXT:    fmovs %f1, %f5
+; V8-UNOPT-NEXT:    ldd [%fp+-8], %f0
+; V8-UNOPT-NEXT:    fmovs %f0, %f6
+; V8-UNOPT-NEXT:    fmovs %f1, %f7
+; V8-UNOPT-NEXT:    fmovs %f6, %f0
+; V8-UNOPT-NEXT:    fmovs %f7, %f1
+; V8-UNOPT-NEXT:    std %f0, [%i1+8]
 ; V8-UNOPT-NEXT:    fmovs %f4, %f0
 ; V8-UNOPT-NEXT:    fmovs %f5, %f1
-; V8-UNOPT-NEXT:    ldd [%fp+-8], %f4
-; V8-UNOPT-NEXT:    fmovs %f4, %f2
-; V8-UNOPT-NEXT:    fmovs %f5, %f3
-; V8-UNOPT-NEXT:    fmovs %f2, %f4
-; V8-UNOPT-NEXT:    fmovs %f3, %f5
-; V8-UNOPT-NEXT:    std %f4, [%i1+8]
-; V8-UNOPT-NEXT:    ! kill: def $d0 killed $d0 killed $q0
 ; V8-UNOPT-NEXT:    std %f0, [%i1]
 ; V8-UNOPT-NEXT:    ret
 ; V8-UNOPT-NEXT:    restore
@@ -174,10 +175,10 @@ define void @test_fptrunc_float(float %f, ptr %p) nounwind {
 ; V8-UNOPT-LABEL: test_fptrunc_float:
 ; V8-UNOPT:       ! %bb.0:
 ; V8-UNOPT-NEXT:    save %sp, -96, %sp
-; V8-UNOPT-NEXT:    mov %i0, %o0
-; V8-UNOPT-NEXT:    st %o0, [%fp+-4]
-; V8-UNOPT-NEXT:    call __truncsfhf2
+; V8-UNOPT-NEXT:    st %i0, [%fp+-4]
 ; V8-UNOPT-NEXT:    ld [%fp+-4], %f0
+; V8-UNOPT-NEXT:    call __truncsfhf2
+; V8-UNOPT-NEXT:    mov %i0, %o0
 ; V8-UNOPT-NEXT:    sth %o0, [%i1]
 ; V8-UNOPT-NEXT:    ret
 ; V8-UNOPT-NEXT:    restore
@@ -222,12 +223,10 @@ define void @test_fptrunc_double(double %d, ptr %p) nounwind {
 ; V8-UNOPT-LABEL: test_fptrunc_double:
 ; V8-UNOPT:       ! %bb.0:
 ; V8-UNOPT-NEXT:    save %sp, -112, %sp
-; V8-UNOPT-NEXT:    mov %i1, %i3
+; V8-UNOPT-NEXT:    ! implicit-def: $i4_i5
 ; V8-UNOPT-NEXT:    mov %i0, %i4
-; V8-UNOPT-NEXT:    ! implicit-def: $i0_i1
-; V8-UNOPT-NEXT:    mov %i4, %i0
-; V8-UNOPT-NEXT:    mov %i3, %i1
-; V8-UNOPT-NEXT:    std %i0, [%fp+-8]
+; V8-UNOPT-NEXT:    mov %i1, %i5
+; V8-UNOPT-NEXT:    std %i4, [%fp+-8]
 ; V8-UNOPT-NEXT:    ldd [%fp+-8], %f0
 ; V8-UNOPT-NEXT:    std %f0, [%fp+-16]
 ; V8-UNOPT-NEXT:    ldd [%fp+-16], %i0
@@ -282,17 +281,18 @@ define void @test_fptrunc_fp128(ptr %dp, ptr %p) nounwind {
 ; V8-UNOPT-LABEL: test_fptrunc_fp128:
 ; V8-UNOPT:       ! %bb.0:
 ; V8-UNOPT-NEXT:    save %sp, -112, %sp
-; V8-UNOPT-NEXT:    ldd [%i0], %f4
-; V8-UNOPT-NEXT:    ! implicit-def: $q0
+; V8-UNOPT-NEXT:    ldd [%i0], %f0
+; V8-UNOPT-NEXT:    ! implicit-def: $q1
+; V8-UNOPT-NEXT:    fmovs %f0, %f4
+; V8-UNOPT-NEXT:    fmovs %f1, %f5
+; V8-UNOPT-NEXT:    ldd [%i0+8], %f0
+; V8-UNOPT-NEXT:    fmovs %f0, %f6
+; V8-UNOPT-NEXT:    fmovs %f1, %f7
+; V8-UNOPT-NEXT:    fmovs %f6, %f0
+; V8-UNOPT-NEXT:    fmovs %f7, %f1
+; V8-UNOPT-NEXT:    std %f0, [%fp+-8]
 ; V8-UNOPT-NEXT:    fmovs %f4, %f0
 ; V8-UNOPT-NEXT:    fmovs %f5, %f1
-; V8-UNOPT-NEXT:    ldd [%i0+8], %f4
-; V8-UNOPT-NEXT:    fmovs %f4, %f2
-; V8-UNOPT-NEXT:    fmovs %f5, %f3
-; V8-UNOPT-NEXT:    fmovs %f2, %f4
-; V8-UNOPT-NEXT:    fmovs %f3, %f5
-; V8-UNOPT-NEXT:    std %f4, [%fp+-8]
-; V8-UNOPT-NEXT:    ! kill: def $d0 killed $d0 killed $q0
 ; V8-UNOPT-NEXT:    std %f0, [%fp+-16]
 ; V8-UNOPT-NEXT:    call __trunctfhf2
 ; V8-UNOPT-NEXT:    add %fp, -16, %o0
@@ -351,10 +351,9 @@ define void @test_fadd(ptr %p, ptr %q) nounwind {
 ; V8-UNOPT:       ! %bb.0:
 ; V8-UNOPT-NEXT:    save %sp, -104, %sp
 ; V8-UNOPT-NEXT:    lduh [%i0], %i2
-; V8-UNOPT-NEXT:    st %i2, [%fp+-12] ! 4-byte Folded Spill
 ; V8-UNOPT-NEXT:    call __extendhfsf2
 ; V8-UNOPT-NEXT:    lduh [%i1], %o0
-; V8-UNOPT-NEXT:    ld [%fp+-12], %o0 ! 4-byte Folded Reload
+; V8-UNOPT-NEXT:    mov %i2, %o0
 ; V8-UNOPT-NEXT:    call __extendhfsf2
 ; V8-UNOPT-NEXT:    st %f0, [%fp+-8]
 ; V8-UNOPT-NEXT:    ld [%fp+-8], %f1 ! 4-byte Folded Reload
@@ -429,10 +428,9 @@ define void @test_fmul(ptr %p, ptr %q) nounwind {
 ; V8-UNOPT:       ! %bb.0:
 ; V8-UNOPT-NEXT:    save %sp, -104, %sp
 ; V8-UNOPT-NEXT:    lduh [%i0], %i2
-; V8-UNOPT-NEXT:    st %i2, [%fp+-12] ! 4-byte Folded Spill
 ; V8-UNOPT-NEXT:    call __extendhfsf2
 ; V8-UNOPT-NEXT:    lduh [%i1], %o0
-; V8-UNOPT-NEXT:    ld [%fp+-12], %o0 ! 4-byte Folded Reload
+; V8-UNOPT-NEXT:    mov %i2, %o0
 ; V8-UNOPT-NEXT:    call __extendhfsf2
 ; V8-UNOPT-NEXT:    st %f0, [%fp+-8]
 ; V8-UNOPT-NEXT:    ld [%fp+-8], %f1 ! 4-byte Folded Reload

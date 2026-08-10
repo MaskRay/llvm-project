@@ -11,16 +11,14 @@
 define i32 @constant_to_rhs(i32 %x) {
 ; RV32-O0-LABEL: constant_to_rhs:
 ; RV32-O0:       # %bb.0:
-; RV32-O0-NEXT:    mv a1, a0
-; RV32-O0-NEXT:    li a0, 1
-; RV32-O0-NEXT:    add a0, a0, a1
+; RV32-O0-NEXT:    li a1, 1
+; RV32-O0-NEXT:    add a0, a1, a0
 ; RV32-O0-NEXT:    ret
 ;
 ; RV64-O0-LABEL: constant_to_rhs:
 ; RV64-O0:       # %bb.0:
-; RV64-O0-NEXT:    mv a1, a0
-; RV64-O0-NEXT:    li a0, 1
-; RV64-O0-NEXT:    addw a0, a0, a1
+; RV64-O0-NEXT:    li a1, 1
+; RV64-O0-NEXT:    addw a0, a1, a0
 ; RV64-O0-NEXT:    sext.w a0, a0
 ; RV64-O0-NEXT:    ret
 ;

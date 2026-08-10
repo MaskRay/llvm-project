@@ -117,13 +117,13 @@ define dso_local void @store_atomic_i64_aligned_seq_cst(i64 %value, ptr %ptr) {
 
 define dso_local void @store_atomic_i128_aligned_unordered(i128 %value, ptr %ptr) {
 ; -O0-LABEL: store_atomic_i128_aligned_unordered:
-; -O0:    ldxp x12, x10, [x9]
-; -O0:    cmp x10, x11
-; -O0:    cmp x12, x13
-; -O0:    stxp w8, x15, x14, [x9]
-; -O0:    stxp w8, x12, x10, [x9]
-; -O0:    subs x12, x12, x13
-; -O0:    ccmp x10, x11, #0, eq
+; -O0:    ldxp x15, x14, [x2]
+; -O0:    cmp x14, x9
+; -O0:    cmp x15, x11
+; -O0:    stxp w16, x13, x12, [x2]
+; -O0:    stxp w16, x15, x14, [x2]
+; -O0:    subs x11, x15, x11
+; -O0:    ccmp x14, x9, #0, eq
 ;
 ; -O1-LABEL: store_atomic_i128_aligned_unordered:
 ; -O1:    ldxp xzr, x8, [x2]
@@ -134,13 +134,13 @@ define dso_local void @store_atomic_i128_aligned_unordered(i128 %value, ptr %ptr
 
 define dso_local void @store_atomic_i128_aligned_monotonic(i128 %value, ptr %ptr) {
 ; -O0-LABEL: store_atomic_i128_aligned_monotonic:
-; -O0:    ldxp x12, x10, [x9]
-; -O0:    cmp x10, x11
-; -O0:    cmp x12, x13
-; -O0:    stxp w8, x15, x14, [x9]
-; -O0:    stxp w8, x12, x10, [x9]
-; -O0:    subs x12, x12, x13
-; -O0:    ccmp x10, x11, #0, eq
+; -O0:    ldxp x15, x14, [x2]
+; -O0:    cmp x14, x9
+; -O0:    cmp x15, x11
+; -O0:    stxp w16, x13, x12, [x2]
+; -O0:    stxp w16, x15, x14, [x2]
+; -O0:    subs x11, x15, x11
+; -O0:    ccmp x14, x9, #0, eq
 ;
 ; -O1-LABEL: store_atomic_i128_aligned_monotonic:
 ; -O1:    ldxp xzr, x8, [x2]
@@ -151,13 +151,13 @@ define dso_local void @store_atomic_i128_aligned_monotonic(i128 %value, ptr %ptr
 
 define dso_local void @store_atomic_i128_aligned_release(i128 %value, ptr %ptr) {
 ; -O0-LABEL: store_atomic_i128_aligned_release:
-; -O0:    ldxp x12, x10, [x9]
-; -O0:    cmp x10, x11
-; -O0:    cmp x12, x13
-; -O0:    stlxp w8, x15, x14, [x9]
-; -O0:    stlxp w8, x12, x10, [x9]
-; -O0:    subs x12, x12, x13
-; -O0:    ccmp x10, x11, #0, eq
+; -O0:    ldxp x15, x14, [x2]
+; -O0:    cmp x14, x9
+; -O0:    cmp x15, x11
+; -O0:    stlxp w16, x13, x12, [x2]
+; -O0:    stlxp w16, x15, x14, [x2]
+; -O0:    subs x11, x15, x11
+; -O0:    ccmp x14, x9, #0, eq
 ;
 ; -O1-LABEL: store_atomic_i128_aligned_release:
 ; -O1:    ldxp xzr, x8, [x2]
@@ -168,13 +168,13 @@ define dso_local void @store_atomic_i128_aligned_release(i128 %value, ptr %ptr) 
 
 define dso_local void @store_atomic_i128_aligned_seq_cst(i128 %value, ptr %ptr) {
 ; -O0-LABEL: store_atomic_i128_aligned_seq_cst:
-; -O0:    ldaxp x12, x10, [x9]
-; -O0:    cmp x10, x11
-; -O0:    cmp x12, x13
-; -O0:    stlxp w8, x15, x14, [x9]
-; -O0:    stlxp w8, x12, x10, [x9]
-; -O0:    subs x12, x12, x13
-; -O0:    ccmp x10, x11, #0, eq
+; -O0:    ldaxp x15, x14, [x2]
+; -O0:    cmp x14, x9
+; -O0:    cmp x15, x11
+; -O0:    stlxp w16, x13, x12, [x2]
+; -O0:    stlxp w16, x15, x14, [x2]
+; -O0:    subs x11, x15, x11
+; -O0:    ccmp x14, x9, #0, eq
 ;
 ; -O1-LABEL: store_atomic_i128_aligned_seq_cst:
 ; -O1:    ldaxp xzr, x8, [x2]

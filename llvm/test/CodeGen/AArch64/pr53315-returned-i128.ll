@@ -4,17 +4,15 @@
 define void @test() nounwind {
 ; CHECK-LABEL: test:
 ; CHECK:       // %bb.0:
-; CHECK-NEXT:    sub sp, sp, #32
-; CHECK-NEXT:    str x30, [sp, #16] // 8-byte Spill
-; CHECK-NEXT:    mov x1, xzr
-; CHECK-NEXT:    str x1, [sp, #8] // 8-byte Spill
-; CHECK-NEXT:    mov x0, x1
+; CHECK-NEXT:    stp x30, x19, [sp, #-16]! // 16-byte Folded Spill
+; CHECK-NEXT:    mov x19, xzr
+; CHECK-NEXT:    mov x0, x19
+; CHECK-NEXT:    mov x1, x19
 ; CHECK-NEXT:    bl returns_arg
-; CHECK-NEXT:    ldr x1, [sp, #8] // 8-byte Reload
-; CHECK-NEXT:    mov x0, x1
+; CHECK-NEXT:    mov x0, x19
+; CHECK-NEXT:    mov x1, x19
 ; CHECK-NEXT:    bl accepts_arg
-; CHECK-NEXT:    ldr x30, [sp, #16] // 8-byte Reload
-; CHECK-NEXT:    add sp, sp, #32
+; CHECK-NEXT:    ldp x30, x19, [sp], #16 // 16-byte Folded Reload
 ; CHECK-NEXT:    ret
   %x = call i128 @returns_arg(i128 0)
   call void @accepts_arg(i128 %x)

@@ -29,10 +29,10 @@ define fastcc i32 @vp_reduce_and_v256i32(i32 %s, <256 x i32> %v, <256 x i1> %m, 
 ; CHECK-NEXT:    lvl %s1
 ; CHECK-NEXT:    vrand %v0, %v0, %vm1
 ; CHECK-NEXT:    lvs %s1, %v0(0)
+; CHECK-NEXT:    or %s1, 0, %s1
+; CHECK-NEXT:    # implicit-def: $sx2
 ; CHECK-NEXT:    or %s2, 0, %s1
-; CHECK-NEXT:    # implicit-def: $sx1
-; CHECK-NEXT:    or %s1, 0, %s2
-; CHECK-NEXT:    and %s0, %s0, %s1
+; CHECK-NEXT:    and %s0, %s0, %s2
 ; CHECK-NEXT:    b.l.t (, %s10)
   %r = call i32 @llvm.vp.reduce.and.v256i32(i32 %s, <256 x i32> %v, <256 x i1> %m, i32 %n)
   ret i32 %r

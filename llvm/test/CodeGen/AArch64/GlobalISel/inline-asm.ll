@@ -6,9 +6,9 @@ define void @test_asm() {
 ; O0-LABEL: test_asm:
 ; O0:       // %bb.0:
 ; O0-NEXT:    mov w8, #42 // =0x2a
-; O0-NEXT:    // kill: def $x8 killed $w8
+; O0-NEXT:    mov w0, w8
 ; O0-NEXT:    //APP
-; O0-NEXT:    mov x0, x8
+; O0-NEXT:    mov x0, x0
 ; O0-NEXT:    //NO_APP
 ; O0-NEXT:    ret
 ;

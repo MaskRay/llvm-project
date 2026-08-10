@@ -65,56 +65,53 @@ body:             |
     ; CHECK-NEXT: renamable $zmm0 = SUBREG_TO_REG killed renamable $xmm0, %subreg.sub_xmm
     ; CHECK-NEXT: VMOVUPSZmr %stack.5, 1, $noreg, 0, $noreg, killed renamable $zmm0 :: (store (s512) into %stack.5, align 4)
     ; CHECK-NEXT: MOV8mi %stack.5, 1, $noreg, 0, $noreg, 1 :: (store (s512) into %stack.5, align 4)
-    ; CHECK-NEXT: MOV64mr %stack.8, 1, $noreg, 0, $noreg, $rsi :: (store (s64) into %stack.8)
-    ; CHECK-NEXT: renamable $rsi = MOV32ri64 16
-    ; CHECK-NEXT: renamable $rdx = LEA64r %stack.2, 1, $noreg, 0, $noreg
-    ; CHECK-NEXT: renamable $cx = MOV16ri 16
-    ; CHECK-NEXT: MOV16mr %stack.7, 1, $noreg, 0, $noreg, $cx :: (store (s16) into %stack.7)
-    ; CHECK-NEXT: renamable $ax = MOV16ri 2
-    ; CHECK-NEXT: MOV16mr %stack.6, 1, $noreg, 0, $noreg, $ax :: (store (s16) into %stack.6)
-    ; CHECK-NEXT: $al = IMPLICIT_DEF
-    ; CHECK-NEXT: MOV8mr %stack.5, 1, $noreg, 48, $noreg, $al :: (store (s512) into %stack.5 + 48, align 4)
-    ; CHECK-NEXT: MOV16mr %stack.5, 1, $noreg, 16, $noreg, $cx :: (store (s512) into %stack.5 + 16, align 4)
-    ; CHECK-NEXT: $al = IMPLICIT_DEF
-    ; CHECK-NEXT: MOV8mr %stack.5, 1, $noreg, 48, $noreg, $al :: (store (s512) into %stack.5 + 48, align 4)
-    ; CHECK-NEXT: MOV16mr %stack.5, 1, $noreg, 16, $noreg, $cx :: (store (s512) into %stack.5 + 16, align 4)
+    ; CHECK-NEXT: renamable $rsi = COPY killed $rsi
+    ; CHECK-NEXT: renamable $rdi = COPY killed $rdi
+    ; CHECK-NEXT: renamable $rdi = COPY killed renamable $rdi
+    ; CHECK-NEXT: renamable $rbx = COPY killed renamable $rsi
+    ; CHECK-NEXT: renamable $rax = MOV32ri64 16
+    ; CHECK-NEXT: renamable $rcx = LEA64r %stack.2, 1, $noreg, 0, $noreg
+    ; CHECK-NEXT: renamable $r14w = MOV16ri 16
+    ; CHECK-NEXT: renamable $r15w = MOV16ri 2
+    ; CHECK-NEXT: $r15b = IMPLICIT_DEF
+    ; CHECK-NEXT: MOV8mr %stack.5, 1, $noreg, 48, $noreg, $r15b :: (store (s512) into %stack.5 + 48, align 4)
+    ; CHECK-NEXT: MOV16mr %stack.5, 1, $noreg, 16, $noreg, $r14w :: (store (s512) into %stack.5 + 16, align 4)
+    ; CHECK-NEXT: $r15b = IMPLICIT_DEF
+    ; CHECK-NEXT: MOV8mr %stack.5, 1, $noreg, 48, $noreg, $r15b :: (store (s512) into %stack.5 + 48, align 4)
+    ; CHECK-NEXT: MOV16mr %stack.5, 1, $noreg, 16, $noreg, $r14w :: (store (s512) into %stack.5 + 16, align 4)
     ; CHECK-NEXT: PLDTILECFGV %stack.5, 1, $noreg, 0, $noreg, implicit-def dead $tmm0, implicit-def dead $tmm1, implicit-def dead $tmm2, implicit-def dead $tmm3, implicit-def dead $tmm4, implicit-def dead $tmm5, implicit-def dead $tmm6, implicit-def dead $tmm7 :: (load (s512) from %stack.5, align 4)
-    ; CHECK-NEXT: renamable $tmm0 = PTILELOADDV renamable $ax, renamable $cx, killed renamable $rdx, 1, killed renamable $rsi, 0, $noreg
-    ; CHECK-NEXT: renamable $rsi = MOV32ri64 64
-    ; CHECK-NEXT: renamable $rdx = LEA64r %stack.1, 1, $noreg, 0, $noreg
-    ; CHECK-NEXT: PTILESTOREDV renamable $ax, renamable $cx, killed renamable $rdx, 1, killed renamable $rsi, 0, $noreg, killed renamable $tmm0
-    ; CHECK-NEXT: renamable $rsi = MOV32ri64 64
-    ; CHECK-NEXT: renamable $rdx = LEA64r %stack.1, 1, $noreg, 0, $noreg
-    ; CHECK-NEXT: renamable $tmm0 = PTILELOADDV renamable $ax, renamable $cx, killed renamable $rdx, 1, killed renamable $rsi, 0, $noreg
-    ; CHECK-NEXT: renamable $rdx = MOV32ri64 16
-    ; CHECK-NEXT: PTILESTOREDV renamable $ax, renamable $cx, killed renamable $rdi, 1, killed renamable $rdx, 0, $noreg, killed renamable $tmm0
+    ; CHECK-NEXT: renamable $tmm0 = PTILELOADDV renamable $r15w, renamable $r14w, killed renamable $rcx, 1, killed renamable $rax, 0, $noreg
+    ; CHECK-NEXT: renamable $rax = MOV32ri64 64
+    ; CHECK-NEXT: renamable $rcx = LEA64r %stack.1, 1, $noreg, 0, $noreg
+    ; CHECK-NEXT: PTILESTOREDV renamable $r15w, renamable $r14w, killed renamable $rcx, 1, killed renamable $rax, 0, $noreg, killed renamable $tmm0
+    ; CHECK-NEXT: renamable $rax = MOV32ri64 64
+    ; CHECK-NEXT: renamable $rcx = LEA64r %stack.1, 1, $noreg, 0, $noreg
+    ; CHECK-NEXT: renamable $tmm0 = PTILELOADDV renamable $r15w, renamable $r14w, killed renamable $rcx, 1, killed renamable $rax, 0, $noreg
+    ; CHECK-NEXT: renamable $rax = MOV32ri64 16
+    ; CHECK-NEXT: PTILESTOREDV renamable $r15w, renamable $r14w, killed renamable $rdi, 1, killed renamable $rax, 0, $noreg, killed renamable $tmm0
     ; CHECK-NEXT: ADJCALLSTACKDOWN64 0, 0, 0, implicit-def $rsp, implicit-def dead $eflags, implicit-def $ssp, implicit $rsp, implicit $ssp
     ; CHECK-NEXT: CALL64pcrel32 &foo, csr_64, implicit $rsp, implicit $ssp, implicit-def $rax
-    ; CHECK-NEXT: $rsi = MOV64rm %stack.8, 1, $noreg, 0, $noreg :: (load (s64) from %stack.8)
-    ; CHECK-NEXT: $cx = MOV16rm %stack.7, 1, $noreg, 0, $noreg :: (load (s16) from %stack.7)
     ; CHECK-NEXT: ADJCALLSTACKUP64 0, 0, implicit-def $rsp, implicit-def dead $eflags, implicit-def $ssp, implicit $rsp, implicit $ssp
-    ; CHECK-NEXT: renamable $rdx = COPY $rax
-    ; CHECK-NEXT: $ax = MOV16rm %stack.6, 1, $noreg, 0, $noreg :: (load (s16) from %stack.6)
-    ; CHECK-NEXT: MOV64mr killed renamable $rsi, 1, $noreg, 0, $noreg, killed renamable $rdx
-    ; CHECK-NEXT: renamable $rdx = MOV64rm %stack.4, 1, $noreg, 0, $noreg
-    ; CHECK-NEXT: renamable $rsi = MOV32ri64 16
-    ; CHECK-NEXT: $al = IMPLICIT_DEF
-    ; CHECK-NEXT: MOV8mr %stack.5, 1, $noreg, 48, $noreg, $al :: (store (s512) into %stack.5 + 48, align 4)
-    ; CHECK-NEXT: MOV16mr %stack.5, 1, $noreg, 16, $noreg, $cx :: (store (s512) into %stack.5 + 16, align 4)
-    ; CHECK-NEXT: $al = IMPLICIT_DEF
-    ; CHECK-NEXT: MOV8mr %stack.5, 1, $noreg, 48, $noreg, $al :: (store (s512) into %stack.5 + 48, align 4)
-    ; CHECK-NEXT: MOV16mr %stack.5, 1, $noreg, 16, $noreg, $cx :: (store (s512) into %stack.5 + 16, align 4)
+    ; CHECK-NEXT: MOV64mr killed renamable $rbx, 1, $noreg, 0, $noreg, killed renamable $rax
+    ; CHECK-NEXT: renamable $rax = MOV64rm %stack.4, 1, $noreg, 0, $noreg
+    ; CHECK-NEXT: renamable $rcx = MOV32ri64 16
+    ; CHECK-NEXT: $r15b = IMPLICIT_DEF
+    ; CHECK-NEXT: MOV8mr %stack.5, 1, $noreg, 48, $noreg, $r15b :: (store (s512) into %stack.5 + 48, align 4)
+    ; CHECK-NEXT: MOV16mr %stack.5, 1, $noreg, 16, $noreg, $r14w :: (store (s512) into %stack.5 + 16, align 4)
+    ; CHECK-NEXT: $r15b = IMPLICIT_DEF
+    ; CHECK-NEXT: MOV8mr %stack.5, 1, $noreg, 48, $noreg, $r15b :: (store (s512) into %stack.5 + 48, align 4)
+    ; CHECK-NEXT: MOV16mr %stack.5, 1, $noreg, 16, $noreg, $r14w :: (store (s512) into %stack.5 + 16, align 4)
     ; CHECK-NEXT: PLDTILECFGV %stack.5, 1, $noreg, 0, $noreg, implicit-def dead $tmm0, implicit-def dead $tmm1, implicit-def dead $tmm2, implicit-def dead $tmm3, implicit-def dead $tmm4, implicit-def dead $tmm5, implicit-def dead $tmm6, implicit-def dead $tmm7 :: (load (s512) from %stack.5, align 4)
-    ; CHECK-NEXT: renamable $tmm0 = PTILELOADDV renamable $ax, renamable $cx, killed renamable $rdx, 1, killed renamable $rsi, 0, $noreg
-    ; CHECK-NEXT: renamable $rsi = MOV32ri64 64
-    ; CHECK-NEXT: renamable $rdx = LEA64r %stack.0, 1, $noreg, 0, $noreg
-    ; CHECK-NEXT: PTILESTOREDV renamable $ax, renamable $cx, killed renamable $rdx, 1, killed renamable $rsi, 0, $noreg, killed renamable $tmm0
-    ; CHECK-NEXT: renamable $rsi = MOV32ri64 64
-    ; CHECK-NEXT: renamable $rdx = LEA64r %stack.0, 1, $noreg, 0, $noreg
-    ; CHECK-NEXT: renamable $tmm0 = PTILELOADDV renamable $ax, renamable $cx, killed renamable $rdx, 1, killed renamable $rsi, 0, $noreg
-    ; CHECK-NEXT: renamable $rsi = MOV32ri64 16
-    ; CHECK-NEXT: renamable $rdx = LEA64r %stack.4, 1, $noreg, 0, $noreg
-    ; CHECK-NEXT: PTILESTOREDV killed renamable $ax, killed renamable $cx, killed renamable $rdx, 1, killed renamable $rsi, 0, $noreg, killed renamable $tmm0
+    ; CHECK-NEXT: renamable $tmm0 = PTILELOADDV renamable $r15w, renamable $r14w, killed renamable $rax, 1, killed renamable $rcx, 0, $noreg
+    ; CHECK-NEXT: renamable $rax = MOV32ri64 64
+    ; CHECK-NEXT: renamable $rcx = LEA64r %stack.0, 1, $noreg, 0, $noreg
+    ; CHECK-NEXT: PTILESTOREDV renamable $r15w, renamable $r14w, killed renamable $rcx, 1, killed renamable $rax, 0, $noreg, killed renamable $tmm0
+    ; CHECK-NEXT: renamable $rax = MOV32ri64 64
+    ; CHECK-NEXT: renamable $rcx = LEA64r %stack.0, 1, $noreg, 0, $noreg
+    ; CHECK-NEXT: renamable $tmm0 = PTILELOADDV renamable $r15w, renamable $r14w, killed renamable $rcx, 1, killed renamable $rax, 0, $noreg
+    ; CHECK-NEXT: renamable $rax = MOV32ri64 16
+    ; CHECK-NEXT: renamable $rcx = LEA64r %stack.4, 1, $noreg, 0, $noreg
+    ; CHECK-NEXT: PTILESTOREDV killed renamable $r15w, killed renamable $r14w, killed renamable $rcx, 1, killed renamable $rax, 0, $noreg, killed renamable $tmm0
     ; CHECK-NEXT: RET64
     %2:gr64 = COPY $rsi
     %0:gr64 = COPY $rdi

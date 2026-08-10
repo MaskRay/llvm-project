@@ -8,15 +8,14 @@ declare void @use(ptr, i64)
 define void @test(ptr %p) nounwind {
 ; CHECK-LABEL: test:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    pushq %rax
-; CHECK-NEXT:    movq %rdi, (%rsp) # 8-byte Spill
+; CHECK-NEXT:    pushq %rbx
+; CHECK-NEXT:    movq %rdi, %rbx
 ; CHECK-NEXT:    callq get@PLT
-; CHECK-NEXT:    movq (%rsp), %rdi # 8-byte Reload
-; CHECK-NEXT:    movq %rdx, %rsi
-; CHECK-NEXT:    movq %rsi, (%rdi)
+; CHECK-NEXT:    movq %rdx, (%rbx)
 ; CHECK-NEXT:    # implicit-def: $rdi
+; CHECK-NEXT:    movq %rdx, %rsi
 ; CHECK-NEXT:    callq use@PLT
-; CHECK-NEXT:    popq %rax
+; CHECK-NEXT:    popq %rbx
 ; CHECK-NEXT:    retq
   %struct = call { ptr, i64 } @get()
   %struct.1 = extractvalue { ptr, i64 } %struct, 1

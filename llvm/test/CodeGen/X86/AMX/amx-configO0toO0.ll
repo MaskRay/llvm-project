@@ -10,6 +10,11 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512:       # %bb.0: # %entry
 ; AVX512-NEXT:    pushq %rbp
 ; AVX512-NEXT:    movq %rsp, %rbp
+; AVX512-NEXT:    pushq %r15
+; AVX512-NEXT:    pushq %r14
+; AVX512-NEXT:    pushq %r13
+; AVX512-NEXT:    pushq %r12
+; AVX512-NEXT:    pushq %rbx
 ; AVX512-NEXT:    andq $-1024, %rsp # imm = 0xFC00
 ; AVX512-NEXT:    subq $25600, %rsp # imm = 0x6400
 ; AVX512-NEXT:    vxorps %xmm0, %xmm0, %xmm0
@@ -53,15 +58,15 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq $32, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw (%rax), %si
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw 2(%rax), %dx
+; AVX512-NEXT:    movw (%rax), %ax
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rcx
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rcx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw 2(%rcx), %cx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rdx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rdx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rsi, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %cx
 ; AVX512-NEXT:    # implicit-def: $al
@@ -81,15 +86,15 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq $32, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw (%rax), %si
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw 2(%rax), %dx
+; AVX512-NEXT:    movw (%rax), %ax
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rcx
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rcx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw 2(%rcx), %cx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rdx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rdx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rsi, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %cx
 ; AVX512-NEXT:    # implicit-def: $al
@@ -109,15 +114,15 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq $32, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw (%rax), %si
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw 2(%rax), %dx
+; AVX512-NEXT:    movw (%rax), %ax
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rcx
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rcx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw 2(%rcx), %cx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rdx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rdx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rsi, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %cx
 ; AVX512-NEXT:    # implicit-def: $al
@@ -139,15 +144,15 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq $32, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw (%rax), %si
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw 2(%rax), %dx
+; AVX512-NEXT:    movw (%rax), %ax
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rcx
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rcx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw 2(%rcx), %cx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rdx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rdx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rsi, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %cx
 ; AVX512-NEXT:    # implicit-def: $al
@@ -167,15 +172,15 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq $32, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw (%rax), %si
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw 2(%rax), %dx
+; AVX512-NEXT:    movw (%rax), %ax
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rcx
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rcx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw 2(%rcx), %cx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rdx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rdx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rsi, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %cx
 ; AVX512-NEXT:    # implicit-def: $al
@@ -195,15 +200,15 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq $32, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw (%rax), %si
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw 2(%rax), %dx
+; AVX512-NEXT:    movw (%rax), %ax
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rcx
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rcx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw 2(%rcx), %cx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rdx
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rdx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %rsi, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %cx
 ; AVX512-NEXT:    # implicit-def: $al
@@ -220,54 +225,35 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:  .LBB0_3: # %if.end
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdi
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
-; AVX512-NEXT:    movl $1088, %edx # imm = 0x440
-; AVX512-NEXT:    movq %rdx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; AVX512-NEXT:    movl $1088, %ebx # imm = 0x440
+; AVX512-NEXT:    movq %rbx, %rdx
 ; AVX512-NEXT:    callq memcpy@PLT
-; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rdx # 8-byte Reload
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdi
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movq %rbx, %rdx
 ; AVX512-NEXT:    callq memcpy@PLT
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
-; AVX512-NEXT:    movw %ax, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
-; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
-; AVX512-NEXT:    movw %ax, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
-; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
-; AVX512-NEXT:    movw %ax, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %r14
+; AVX512-NEXT:    movq %r14, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %r15w
+; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %r12w
+; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %r13w
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
 ; AVX512-NEXT:    vmovdqa64 64(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 128(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 192(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 256(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 320(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 384(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 448(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 512(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 576(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 640(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 704(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 768(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 832(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 896(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 960(%rax), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 1024(%rax), %zmm0
+; AVX512-NEXT:    vmovdqa64 128(%rax), %zmm1
+; AVX512-NEXT:    vmovdqa64 192(%rax), %zmm2
+; AVX512-NEXT:    vmovdqa64 256(%rax), %zmm3
+; AVX512-NEXT:    vmovdqa64 320(%rax), %zmm4
+; AVX512-NEXT:    vmovdqa64 384(%rax), %zmm5
+; AVX512-NEXT:    vmovdqa64 448(%rax), %zmm6
+; AVX512-NEXT:    vmovdqa64 512(%rax), %zmm7
+; AVX512-NEXT:    vmovdqa64 576(%rax), %zmm8
+; AVX512-NEXT:    vmovdqa64 640(%rax), %zmm9
+; AVX512-NEXT:    vmovdqa64 704(%rax), %zmm10
+; AVX512-NEXT:    vmovdqa64 768(%rax), %zmm11
+; AVX512-NEXT:    vmovdqa64 832(%rax), %zmm12
+; AVX512-NEXT:    vmovdqa64 896(%rax), %zmm13
+; AVX512-NEXT:    vmovdqa64 960(%rax), %zmm14
+; AVX512-NEXT:    vmovdqa64 1024(%rax), %zmm15
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm17
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm18
@@ -284,71 +270,38 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm29
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm30
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm31
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm1
-; AVX512-NEXT:    vmovaps %zmm1, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm1
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm2
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm3
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm4
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm5
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm6
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm7
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm8
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm9
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm10
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm11
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm12
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm13
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm14
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm15
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm31, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm30, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm29, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm28, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm27, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm26, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm25, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm24, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm23, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm22, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm21, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm20, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm19, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm18, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm17, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm16, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
 ; AVX512-NEXT:    vmovdqa64 %zmm15, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm14, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm13, {{[0-9]+}}(%rsp)
@@ -365,56 +318,87 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    vmovdqa64 %zmm2, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm1, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm31, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm30, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm29, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm28, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm27, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm26, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm25, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm24, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm23, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm22, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm21, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm20, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm19, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm18, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm17, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm16, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdi
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
-; AVX512-NEXT:    movl $1024, %edx # imm = 0x400
-; AVX512-NEXT:    movq %rdx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; AVX512-NEXT:    movl $1024, %eax # imm = 0x400
+; AVX512-NEXT:    movq %rax, %rdx
+; AVX512-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; AVX512-NEXT:    vzeroupper
 ; AVX512-NEXT:    callq memcpy@PLT
-; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rdx # 8-byte Reload
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdi
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rax # 8-byte Reload
+; AVX512-NEXT:    movq %rax, %rdx
 ; AVX512-NEXT:    callq memcpy@PLT
-; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rdx # 8-byte Reload
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdi
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rax # 8-byte Reload
+; AVX512-NEXT:    movq %rax, %rdx
 ; AVX512-NEXT:    callq memcpy@PLT
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %di # 2-byte Reload
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %cx # 2-byte Reload
-; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rsi # 8-byte Reload
-; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rdx # 8-byte Reload
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %ax # 2-byte Reload
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
-; AVX512-NEXT:    vmovaps %zmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm1
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm2
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm3
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm4
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm5
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm6
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm7
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm8
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm9
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm10
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm11
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm12
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm13
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm14
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm15
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm17
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm18
@@ -431,74 +415,41 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm29
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm30
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm31
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm1
-; AVX512-NEXT:    vmovaps %zmm1, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm1
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm2
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm3
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm4
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm5
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm6
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm7
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm8
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm9
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm10
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm11
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm12
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm13
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm14
-; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm15
-; AVX512-NEXT:    movw %di, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %ax, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
-; AVX512-NEXT:    vmovdqa64 %zmm31, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm30, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm29, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm28, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm27, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm26, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm25, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm24, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm23, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm22, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm21, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm20, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm19, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm18, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm17, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    vmovdqa64 %zmm16, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    vmovaps %zmm16, {{[-0-9]+}}(%r{{[sb]}}p) # 64-byte Spill
+; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm16
+; AVX512-NEXT:    movw %r12w, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %r15w, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %r13w, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm15, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm14, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm13, {{[0-9]+}}(%rsp)
@@ -514,51 +465,96 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    vmovdqa64 %zmm3, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm2, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm1, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm31, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm30, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm29, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm28, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm27, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm26, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm25, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm24, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm23, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm22, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm21, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm20, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm19, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm18, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm17, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovdqa64 %zmm16, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
+; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %zmm0 # 64-byte Reload
 ; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
 ; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %cx
-; AVX512-NEXT:    movzwl {{[0-9]+}}(%rsp), %r8d
-; AVX512-NEXT:    movw %r8w, %di
-; AVX512-NEXT:    shrl $2, %r8d
-; AVX512-NEXT:    movw %r8w, %r9w
+; AVX512-NEXT:    movzwl {{[0-9]+}}(%rsp), %edx
+; AVX512-NEXT:    movw %dx, %si
+; AVX512-NEXT:    shrl $2, %edx
+; AVX512-NEXT:    # kill: def $dx killed $dx killed $edx
 ; AVX512-NEXT:    # implicit-def: $al
 ; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    # implicit-def: $r9b
-; AVX512-NEXT:    movb %r9b, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    # implicit-def: $dl
+; AVX512-NEXT:    movb %dl, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    # implicit-def: $al
 ; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %di, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    # implicit-def: $al
 ; AVX512-NEXT:    movb %al, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movw %cx, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movl $64, %r8d
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %r10
-; AVX512-NEXT:    tileloadd (%r10,%r8), %tmm0
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %r10
-; AVX512-NEXT:    tileloadd (%r10,%r8), %tmm1
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %r10
-; AVX512-NEXT:    tileloadd (%r10,%r8), %tmm2
+; AVX512-NEXT:    movl $64, %edi
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %r8
+; AVX512-NEXT:    tileloadd (%r8,%rdi), %tmm0
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %r8
+; AVX512-NEXT:    tileloadd (%r8,%rdi), %tmm1
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %r8
+; AVX512-NEXT:    tileloadd (%r8,%rdi), %tmm2
 ; AVX512-NEXT:    tdpbssd %tmm2, %tmm1, %tmm0
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rdi
-; AVX512-NEXT:    addq $64, %rdi
-; AVX512-NEXT:    tilestored %tmm0, (%rdi,%r8)
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rdx
+; AVX512-NEXT:    addq $64, %rdx
+; AVX512-NEXT:    tilestored %tmm0, (%rdx,%rdi)
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdi
+; AVX512-NEXT:    movq %r14, %rsi
+; AVX512-NEXT:    movq %rbx, %rdx
 ; AVX512-NEXT:    vzeroupper
 ; AVX512-NEXT:    callq memcpy@PLT
-; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rdx # 8-byte Reload
 ; AVX512-NEXT:    movq $buf, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq $32, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
-; AVX512-NEXT:    movw %ax, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
-; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %ax
-; AVX512-NEXT:    movw %ax, {{[-0-9]+}}(%r{{[sb]}}p) # 2-byte Spill
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rax
-; AVX512-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %bx
+; AVX512-NEXT:    movw {{[0-9]+}}(%rsp), %r14w
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %r15
+; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %r12
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm1
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm2
@@ -593,12 +589,10 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    vmovdqa64 %zmm0, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdi
 ; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rsi
+; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %r13 # 8-byte Reload
+; AVX512-NEXT:    movq %r13, %rdx
 ; AVX512-NEXT:    vzeroupper
 ; AVX512-NEXT:    callq memcpy@PLT
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %si # 2-byte Reload
-; AVX512-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %dx # 2-byte Reload
-; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rcx # 8-byte Reload
-; AVX512-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rax # 8-byte Reload
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm0
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm1
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm2
@@ -615,10 +609,10 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm13
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm14
 ; AVX512-NEXT:    vmovdqa64 {{[0-9]+}}(%rsp), %zmm15
-; AVX512-NEXT:    movw %si, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movw %dx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rcx, {{[0-9]+}}(%rsp)
-; AVX512-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %bx, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movw %r14w, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %r15, {{[0-9]+}}(%rsp)
+; AVX512-NEXT:    movq %r12, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm15, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm14, {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    vmovdqa64 %zmm13, {{[0-9]+}}(%rsp)
@@ -643,11 +637,16 @@ define dso_local void @test_api(i32 %cond, i16 signext %row, i16 signext %col) #
 ; AVX512-NEXT:    ldtilecfg {{[0-9]+}}(%rsp)
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rdx
 ; AVX512-NEXT:    movq {{[0-9]+}}(%rsp), %rsi
-; AVX512-NEXT:    movl $64, %r8d
-; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %rdi
-; AVX512-NEXT:    tileloadd (%rdi,%r8), %tmm0
+; AVX512-NEXT:    movl $64, %edi
+; AVX512-NEXT:    leaq {{[0-9]+}}(%rsp), %r8
+; AVX512-NEXT:    tileloadd (%r8,%rdi), %tmm0
 ; AVX512-NEXT:    tilestored %tmm0, (%rdx,%rsi)
-; AVX512-NEXT:    movq %rbp, %rsp
+; AVX512-NEXT:    leaq -40(%rbp), %rsp
+; AVX512-NEXT:    popq %rbx
+; AVX512-NEXT:    popq %r12
+; AVX512-NEXT:    popq %r13
+; AVX512-NEXT:    popq %r14
+; AVX512-NEXT:    popq %r15
 ; AVX512-NEXT:    popq %rbp
 ; AVX512-NEXT:    tilerelease
 ; AVX512-NEXT:    vzeroupper

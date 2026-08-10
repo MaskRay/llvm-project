@@ -9,34 +9,37 @@ define i64 @adder(i64 %lhs, i64 %rhs) {
 ; CHECK-LABEL: adder:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    addq %rsi, %rdi
-; CHECK-NEXT:    seto %dl
-; CHECK-NEXT:    xorl %eax, %eax
-; CHECK-NEXT:    # kill: def $rax killed $eax
-; CHECK-NEXT:    movl $148, %ecx
-; CHECK-NEXT:    testb $1, %dl
-; CHECK-NEXT:    cmovneq %rcx, %rax
+; CHECK-NEXT:    seto %al
+; CHECK-NEXT:    xorl %ecx, %ecx
+; CHECK-NEXT:    # kill: def $rcx killed $ecx
+; CHECK-NEXT:    movl $148, %edx
+; CHECK-NEXT:    testb $1, %al
+; CHECK-NEXT:    movq %rcx, %rax
+; CHECK-NEXT:    cmovneq %rdx, %rax
 ; CHECK-NEXT:    retq
 ;
 ; SETZUCC-LABEL: adder:
 ; SETZUCC:       # %bb.0:
 ; SETZUCC-NEXT:    addq %rsi, %rdi
-; SETZUCC-NEXT:    setzuo %dl
-; SETZUCC-NEXT:    xorl %eax, %eax
-; SETZUCC-NEXT:    # kill: def $rax killed $eax
-; SETZUCC-NEXT:    movl $148, %ecx
-; SETZUCC-NEXT:    testb $1, %dl
-; SETZUCC-NEXT:    cmovneq %rcx, %rax
+; SETZUCC-NEXT:    setzuo %al
+; SETZUCC-NEXT:    xorl %ecx, %ecx
+; SETZUCC-NEXT:    # kill: def $rcx killed $ecx
+; SETZUCC-NEXT:    movl $148, %edx
+; SETZUCC-NEXT:    testb $1, %al
+; SETZUCC-NEXT:    movq %rcx, %rax
+; SETZUCC-NEXT:    cmovneq %rdx, %rax
 ; SETZUCC-NEXT:    retq
 ;
 ; NO-SETZUCC-LABEL: adder:
 ; NO-SETZUCC:       # %bb.0:
 ; NO-SETZUCC-NEXT:    addq %rsi, %rdi
-; NO-SETZUCC-NEXT:    seto %dl
-; NO-SETZUCC-NEXT:    xorl %eax, %eax
-; NO-SETZUCC-NEXT:    # kill: def $rax killed $eax
-; NO-SETZUCC-NEXT:    movl $148, %ecx
-; NO-SETZUCC-NEXT:    testb $1, %dl
-; NO-SETZUCC-NEXT:    cmovneq %rcx, %rax
+; NO-SETZUCC-NEXT:    seto %al
+; NO-SETZUCC-NEXT:    xorl %ecx, %ecx
+; NO-SETZUCC-NEXT:    # kill: def $rcx killed $ecx
+; NO-SETZUCC-NEXT:    movl $148, %edx
+; NO-SETZUCC-NEXT:    testb $1, %al
+; NO-SETZUCC-NEXT:    movq %rcx, %rax
+; NO-SETZUCC-NEXT:    cmovneq %rdx, %rax
 ; NO-SETZUCC-NEXT:    retq
 	%res = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %lhs, i64 %rhs)
 	%errorbit = extractvalue { i64, i1 } %res, 1
@@ -50,34 +53,37 @@ define i64 @adder_constexpr(i64 %lhs, i64 %rhs) {
 ; CHECK-LABEL: adder_constexpr:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    addq %rsi, %rdi
-; CHECK-NEXT:    seto %dl
-; CHECK-NEXT:    movq a@GOTPCREL(%rip), %rax
-; CHECK-NEXT:    addq $5, %rax
-; CHECK-NEXT:    movl $148, %ecx
-; CHECK-NEXT:    testb $1, %dl
-; CHECK-NEXT:    cmovneq %rcx, %rax
+; CHECK-NEXT:    seto %al
+; CHECK-NEXT:    movq a@GOTPCREL(%rip), %rcx
+; CHECK-NEXT:    addq $5, %rcx
+; CHECK-NEXT:    movl $148, %edx
+; CHECK-NEXT:    testb $1, %al
+; CHECK-NEXT:    movq %rcx, %rax
+; CHECK-NEXT:    cmovneq %rdx, %rax
 ; CHECK-NEXT:    retq
 ;
 ; SETZUCC-LABEL: adder_constexpr:
 ; SETZUCC:       # %bb.0:
 ; SETZUCC-NEXT:    addq %rsi, %rdi
-; SETZUCC-NEXT:    setzuo %dl
-; SETZUCC-NEXT:    movq a@GOTPCREL(%rip), %rax
-; SETZUCC-NEXT:    addq $5, %rax
-; SETZUCC-NEXT:    movl $148, %ecx
-; SETZUCC-NEXT:    testb $1, %dl
-; SETZUCC-NEXT:    cmovneq %rcx, %rax
+; SETZUCC-NEXT:    setzuo %al
+; SETZUCC-NEXT:    movq a@GOTPCREL(%rip), %rcx
+; SETZUCC-NEXT:    addq $5, %rcx
+; SETZUCC-NEXT:    movl $148, %edx
+; SETZUCC-NEXT:    testb $1, %al
+; SETZUCC-NEXT:    movq %rcx, %rax
+; SETZUCC-NEXT:    cmovneq %rdx, %rax
 ; SETZUCC-NEXT:    retq
 ;
 ; NO-SETZUCC-LABEL: adder_constexpr:
 ; NO-SETZUCC:       # %bb.0:
 ; NO-SETZUCC-NEXT:    addq %rsi, %rdi
-; NO-SETZUCC-NEXT:    seto %dl
-; NO-SETZUCC-NEXT:    movq a@GOTPCREL(%rip), %rax
-; NO-SETZUCC-NEXT:    addq $5, %rax
-; NO-SETZUCC-NEXT:    movl $148, %ecx
-; NO-SETZUCC-NEXT:    testb $1, %dl
-; NO-SETZUCC-NEXT:    cmovneq %rcx, %rax
+; NO-SETZUCC-NEXT:    seto %al
+; NO-SETZUCC-NEXT:    movq a@GOTPCREL(%rip), %rcx
+; NO-SETZUCC-NEXT:    addq $5, %rcx
+; NO-SETZUCC-NEXT:    movl $148, %edx
+; NO-SETZUCC-NEXT:    testb $1, %al
+; NO-SETZUCC-NEXT:    movq %rcx, %rax
+; NO-SETZUCC-NEXT:    cmovneq %rdx, %rax
 ; NO-SETZUCC-NEXT:    retq
   %res = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %lhs, i64 %rhs)
   %errorbit = extractvalue { i64, i1 } %res, 1

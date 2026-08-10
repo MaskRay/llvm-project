@@ -17,7 +17,7 @@ body: |
   ; SPILLED-NEXT:   successors: %bb.1(0x80000000)
   ; SPILLED-NEXT: {{  $}}
   ; SPILLED-NEXT:   S_NOP 0, implicit-def renamable $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15
-  ; SPILLED-NEXT:   SI_SPILL_S384_SAVE killed $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15, %stack.0, implicit $exec, implicit $sgpr32 :: (store (s384) into %stack.0, align 4, addrspace 5)
+  ; SPILLED-NEXT:   SI_SPILL_S384_SAVE $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15, %stack.0, implicit $exec, implicit $sgpr32 :: (store (s384) into %stack.0, align 4, addrspace 5)
   ; SPILLED-NEXT:   S_CBRANCH_SCC1 %bb.1, implicit undef $scc
   ; SPILLED-NEXT: {{  $}}
   ; SPILLED-NEXT: bb.1:
@@ -27,7 +27,7 @@ body: |
   ; SPILLED-NEXT: {{  $}}
   ; SPILLED-NEXT: bb.2:
   ; SPILLED-NEXT:   $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15 = SI_SPILL_S384_RESTORE %stack.0, implicit $exec, implicit $sgpr32 :: (load (s384) from %stack.0, align 4, addrspace 5)
-  ; SPILLED-NEXT:   S_NOP 0, implicit killed renamable $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15
+  ; SPILLED-NEXT:   S_NOP 0, implicit renamable $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15
   ;
   ; EXPANDED-LABEL: name: spill_restore_sgpr384
   ; EXPANDED: bb.0:
@@ -46,7 +46,7 @@ body: |
   ; EXPANDED-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr12, 8, [[DEF]]
   ; EXPANDED-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr13, 9, [[DEF]]
   ; EXPANDED-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr14, 10, [[DEF]]
-  ; EXPANDED-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR killed $sgpr15, 11, [[DEF]], implicit killed $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15
+  ; EXPANDED-NEXT:   [[DEF:%[0-9]+]]:vgpr_32 = SI_SPILL_S32_TO_VGPR $sgpr15, 11, [[DEF]], implicit $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15
   ; EXPANDED-NEXT:   S_CBRANCH_SCC1 %bb.1, implicit undef $scc
   ; EXPANDED-NEXT: {{  $}}
   ; EXPANDED-NEXT: bb.1:
@@ -67,7 +67,7 @@ body: |
   ; EXPANDED-NEXT:   $sgpr13 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 9
   ; EXPANDED-NEXT:   $sgpr14 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 10
   ; EXPANDED-NEXT:   $sgpr15 = SI_RESTORE_S32_FROM_VGPR [[DEF]], 11
-  ; EXPANDED-NEXT:   S_NOP 0, implicit killed renamable $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15
+  ; EXPANDED-NEXT:   S_NOP 0, implicit renamable $sgpr4_sgpr5_sgpr6_sgpr7_sgpr8_sgpr9_sgpr10_sgpr11_sgpr12_sgpr13_sgpr14_sgpr15
   bb.0:
     S_NOP 0, implicit-def %0:sgpr_384
     S_CBRANCH_SCC1 implicit undef $scc, %bb.1
@@ -91,7 +91,7 @@ body: |
   ; SPILLED-NEXT:   successors: %bb.1(0x80000000)
   ; SPILLED-NEXT: {{  $}}
   ; SPILLED-NEXT:   S_NOP 0, implicit-def renamable $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11
-  ; SPILLED-NEXT:   SI_SPILL_V384_SAVE killed $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11, %stack.0, $sgpr32, 0, implicit $exec :: (store (s384) into %stack.0, align 4, addrspace 5)
+  ; SPILLED-NEXT:   SI_SPILL_V384_SAVE $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11, %stack.0, $sgpr32, 0, implicit $exec :: (store (s384) into %stack.0, align 4, addrspace 5)
   ; SPILLED-NEXT:   S_CBRANCH_SCC1 %bb.1, implicit undef $scc
   ; SPILLED-NEXT: {{  $}}
   ; SPILLED-NEXT: bb.1:
@@ -101,14 +101,14 @@ body: |
   ; SPILLED-NEXT: {{  $}}
   ; SPILLED-NEXT: bb.2:
   ; SPILLED-NEXT:   $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11 = SI_SPILL_V384_RESTORE %stack.0, $sgpr32, 0, implicit $exec :: (load (s384) from %stack.0, align 4, addrspace 5)
-  ; SPILLED-NEXT:   S_NOP 0, implicit killed renamable $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11
+  ; SPILLED-NEXT:   S_NOP 0, implicit renamable $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11
   ;
   ; EXPANDED-LABEL: name: spill_restore_vgpr384
   ; EXPANDED: bb.0:
   ; EXPANDED-NEXT:   successors: %bb.1(0x80000000)
   ; EXPANDED-NEXT: {{  $}}
   ; EXPANDED-NEXT:   S_NOP 0, implicit-def renamable $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11
-  ; EXPANDED-NEXT:   SI_SPILL_V384_SAVE killed $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11, %stack.0, $sgpr32, 0, implicit $exec :: (store (s384) into %stack.0, align 4, addrspace 5)
+  ; EXPANDED-NEXT:   SI_SPILL_V384_SAVE $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11, %stack.0, $sgpr32, 0, implicit $exec :: (store (s384) into %stack.0, align 4, addrspace 5)
   ; EXPANDED-NEXT:   S_CBRANCH_SCC1 %bb.1, implicit undef $scc
   ; EXPANDED-NEXT: {{  $}}
   ; EXPANDED-NEXT: bb.1:
@@ -118,7 +118,7 @@ body: |
   ; EXPANDED-NEXT: {{  $}}
   ; EXPANDED-NEXT: bb.2:
   ; EXPANDED-NEXT:   $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11 = SI_SPILL_V384_RESTORE %stack.0, $sgpr32, 0, implicit $exec :: (load (s384) from %stack.0, align 4, addrspace 5)
-  ; EXPANDED-NEXT:   S_NOP 0, implicit killed renamable $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11
+  ; EXPANDED-NEXT:   S_NOP 0, implicit renamable $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7_vgpr8_vgpr9_vgpr10_vgpr11
   bb.0:
     S_NOP 0, implicit-def %0:vreg_384
     S_CBRANCH_SCC1 implicit undef $scc, %bb.1

@@ -26,19 +26,22 @@ define void @test1(ptr %P1, ptr %P2, ptr %P3) nounwind {
 ; LE-LABEL: test1:
 ; LE:       # %bb.0:
 ; LE-NEXT:    lxvd2x 0, 0, 3
-; LE-NEXT:    xxswapd 34, 0
+; LE-NEXT:    xxswapd 0, 0
+; LE-NEXT:    xxlor 34, 0, 0
 ; LE-NEXT:    vspltisb 3, -1
 ; LE-NEXT:    vslw 3, 3, 3
 ; LE-NEXT:    xxland 0, 34, 35
 ; LE-NEXT:    xxswapd 0, 0
 ; LE-NEXT:    stxvd2x 0, 0, 3
 ; LE-NEXT:    lxvd2x 0, 0, 4
-; LE-NEXT:    xxswapd 34, 0
+; LE-NEXT:    xxswapd 0, 0
+; LE-NEXT:    xxlor 34, 0, 0
 ; LE-NEXT:    xxlandc 0, 34, 35
 ; LE-NEXT:    xxswapd 0, 0
 ; LE-NEXT:    stxvd2x 0, 0, 4
 ; LE-NEXT:    lxvd2x 0, 0, 5
-; LE-NEXT:    xxswapd 34, 0
+; LE-NEXT:    xxswapd 0, 0
+; LE-NEXT:    xxlor 34, 0, 0
 ; LE-NEXT:    xvabssp 0, 34
 ; LE-NEXT:    xxswapd 0, 0
 ; LE-NEXT:    stxvd2x 0, 0, 5
@@ -70,9 +73,9 @@ define <4 x i32> @test_30() nounwind {
 define <4 x i32> @test_29() nounwind {
 ; CHECK-LABEL: test_29:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vspltisw 3, -16
-; CHECK-NEXT:    vspltisw 2, 13
-; CHECK-NEXT:    vsubuwm 2, 2, 3
+; CHECK-NEXT:    vspltisw 2, -16
+; CHECK-NEXT:    vspltisw 3, 13
+; CHECK-NEXT:    vsubuwm 2, 3, 2
 ; CHECK-NEXT:    blr
 	ret <4 x i32> < i32 29, i32 29, i32 29, i32 29 >
 }

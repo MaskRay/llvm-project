@@ -13,19 +13,19 @@
 ; Function Attrs: noinline nounwind optnone
 define internal void @loadFP(ptr %d) #0 {
 ; CHECK-LABEL: loadFP:
-; CHECK:         .localentry loadFP, 1
-; CHECK-NEXT:  # %bb.0: # %entry
+; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    mflr r0
 ; CHECK-NEXT:    std r0, 16(r1)
 ; CHECK-NEXT:    stdu r1, -112(r1)
 ; CHECK-NEXT:    std r3, 104(r1)
 ; CHECK-NEXT:    paddi r3, 0, .L.str@PCREL, 1
 ; CHECK-NEXT:    bl printf@notoc
-; CHECK-NEXT:    ld r4, 104(r1)
-; CHECK-NEXT:    pli r5, 1075049922
-; CHECK-NEXT:    pli r3, 2405181686
-; CHECK-NEXT:    rldimi r3, r5, 32, 0
-; CHECK-NEXT:    std r3, 0(r4)
+; CHECK-NEXT:    # kill: def $x3 killed $x3
+; CHECK-NEXT:    ld r3, 104(r1)
+; CHECK-NEXT:    pli r4, 1075049922
+; CHECK-NEXT:    pli r5, 2405181686
+; CHECK-NEXT:    rldimi r5, r4, 32, 0
+; CHECK-NEXT:    std r5, 0(r3)
 ; CHECK-NEXT:    addi r1, r1, 112
 ; CHECK-NEXT:    ld r0, 16(r1)
 ; CHECK-NEXT:    mtlr r0
@@ -44,8 +44,7 @@ declare signext i32 @printf(ptr, ...)
 ; Function Attrs: noinline nounwind optnone
 define internal void @loadGV() #0 {
 ; CHECK-LABEL: loadGV:
-; CHECK:         .localentry loadGV, 1
-; CHECK-NEXT:  # %bb.0: # %entry
+; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    mflr r0
 ; CHECK-NEXT:    std r0, 16(r1)
 ; CHECK-NEXT:    stdu r1, -96(r1)

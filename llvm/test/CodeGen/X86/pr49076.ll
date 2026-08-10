@@ -10,12 +10,12 @@ define void @foo() {
 ; CHECK-NEXT:  # %bb.1: # %BB0
 ; CHECK-NEXT:    vmovaps {{[-0-9]+}}(%r{{[sb]}}p), %xmm0 # 16-byte Reload
 ; CHECK-NEXT:    vpslld $31, %xmm0, %xmm0
-; CHECK-NEXT:    vpsrad $31, %xmm0, %xmm1
-; CHECK-NEXT:    vpmovsxdq %xmm1, %xmm2
-; CHECK-NEXT:    # implicit-def: $ymm0
-; CHECK-NEXT:    vmovaps %xmm2, %xmm0
-; CHECK-NEXT:    vpshufd {{.*#+}} xmm1 = xmm1[2,2,3,3]
-; CHECK-NEXT:    vinsertf128 $1, %xmm1, %ymm0, %ymm0
+; CHECK-NEXT:    vpsrad $31, %xmm0, %xmm0
+; CHECK-NEXT:    vpmovsxdq %xmm0, %xmm1
+; CHECK-NEXT:    # implicit-def: $ymm2
+; CHECK-NEXT:    vmovaps %xmm1, %xmm2
+; CHECK-NEXT:    vpshufd {{.*#+}} xmm0 = xmm0[2,2,3,3]
+; CHECK-NEXT:    vinsertf128 $1, %xmm0, %ymm2, %ymm0
 ; CHECK-NEXT:  # %bb.2: # %BB1
 ; CHECK-NEXT:    vzeroupper
 ; CHECK-NEXT:    retq

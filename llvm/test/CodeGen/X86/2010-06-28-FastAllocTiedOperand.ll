@@ -11,7 +11,10 @@ define i32 @func(ptr %s) nounwind ssp {
 ; CHECK-LABEL: func:
 ; CHECK:       ## %bb.0: ## %entry
 ; CHECK-NEXT:    pushl %esi
-; CHECK-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; CHECK-NEXT:    pushl %eax
+; CHECK-NEXT:    movl {{[0-9]+}}(%esp), %eax
+; CHECK-NEXT:    movl %eax, (%esp) ## 4-byte Spill
+; CHECK-NEXT:    movl %eax, %ecx
 ; CHECK-NEXT:    ## InlineAsm Start
 ; CHECK-NEXT:    arg0 %eax
 ; CHECK-NEXT:    arg1 %ecx
@@ -19,6 +22,7 @@ define i32 @func(ptr %s) nounwind ssp {
 ; CHECK-NEXT:    arg3 %esi
 ; CHECK-NEXT:    arg4 %ecx
 ; CHECK-NEXT:    ## InlineAsm End
+; CHECK-NEXT:    addl $4, %esp
 ; CHECK-NEXT:    popl %esi
 ; CHECK-NEXT:    retl
 entry:

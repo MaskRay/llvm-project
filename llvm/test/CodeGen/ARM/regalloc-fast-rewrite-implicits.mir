@@ -17,13 +17,14 @@ body:             |
     ; CHECK-LABEL: name: different_vreg
     ; CHECK: liveins: $d2, $d4, $d7
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $d5 = COPY killed $d4
-    ; CHECK-NEXT: renamable $d4 = COPY killed $d2
-    ; CHECK-NEXT: undef renamable $d0 = COPY renamable $d5, implicit-def $q0_q1
-    ; CHECK-NEXT: renamable $d1 = COPY renamable $d4
-    ; CHECK-NEXT: renamable $d2 = COPY killed renamable $d5
-    ; CHECK-NEXT: renamable $d3 = COPY killed renamable $d4
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit killed renamable $d7, implicit killed $q0_q1
+    ; CHECK-NEXT: renamable $d4 = COPY killed $d4
+    ; CHECK-NEXT: renamable $d2 = COPY killed $d2
+    ; CHECK-NEXT: renamable $d7 = COPY killed $d7
+    ; CHECK-NEXT: undef renamable $d16 = COPY renamable $d4, implicit-def $q8_q9
+    ; CHECK-NEXT: renamable $d17 = COPY renamable $d2
+    ; CHECK-NEXT: renamable $d18 = COPY killed renamable $d4
+    ; CHECK-NEXT: renamable $d19 = COPY killed renamable $d2
+    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit killed renamable $d7, implicit killed $q8_q9
     %0:dpr_vfp2 = COPY $d4
     %1:dpr_vfp2 = COPY $d2
     %2:dpr_vfp2 = COPY $d7
@@ -47,13 +48,13 @@ body:             |
     ; CHECK-LABEL: name: same_vreg_twice
     ; CHECK: liveins: $d2, $d4
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $d5 = COPY killed $d4
-    ; CHECK-NEXT: renamable $d4 = COPY killed $d2
-    ; CHECK-NEXT: undef renamable $d0 = COPY renamable $d5, implicit-def $q0_q1
-    ; CHECK-NEXT: renamable $d1 = COPY renamable $d4
-    ; CHECK-NEXT: renamable $d2 = COPY killed renamable $d5
-    ; CHECK-NEXT: renamable $d3 = COPY killed renamable $d4
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit renamable $d3, implicit killed $q0_q1
+    ; CHECK-NEXT: renamable $d4 = COPY killed $d4
+    ; CHECK-NEXT: renamable $d2 = COPY killed $d2
+    ; CHECK-NEXT: undef renamable $d16 = COPY renamable $d4, implicit-def $q8_q9
+    ; CHECK-NEXT: renamable $d17 = COPY renamable $d2
+    ; CHECK-NEXT: renamable $d18 = COPY killed renamable $d4
+    ; CHECK-NEXT: renamable $d19 = COPY killed renamable $d2
+    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit killed renamable $d19, implicit killed $q8_q9
     %0:dpr_vfp2 = COPY $d4
     %1:dpr_vfp2 = COPY $d2
     undef %4.dsub_0:dquad = COPY %0
@@ -72,7 +73,7 @@ body:             |
   bb.0:
 
     ; CHECK-LABEL: name: partial_dead
-    ; CHECK: tBL 14 /* CC::al */, $noreg, 0, csr_aapcs, implicit-def dead $lr, implicit $sp, implicit-def $sp, implicit-def dead $q0_q1, implicit-def dead $q2_q3
+    ; CHECK: tBL 14 /* CC::al */, $noreg, 0, csr_aapcs, implicit-def dead $lr, implicit $sp, implicit-def $sp, implicit-def undef renamable $d0, implicit-def undef renamable $d6, implicit-def $q0_q1, implicit-def $q2_q3
     ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg
     tBL 14, $noreg, 0, csr_aapcs, implicit-def dead $lr, implicit $sp, implicit-def $sp, implicit-def undef %0.dsub_0:dquad, implicit-def undef %1.dsub_2:dquad
     tBX_RET 14, $noreg

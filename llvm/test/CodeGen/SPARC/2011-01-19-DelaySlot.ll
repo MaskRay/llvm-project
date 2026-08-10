@@ -38,9 +38,9 @@ define i32 @test_jmpl(ptr nocapture %f, i32 %a, i32 %b) #0 {
 ; UNOPT-LABEL: test_jmpl:
 ; UNOPT:       ! %bb.0: ! %entry
 ; UNOPT-NEXT:    save %sp, -96, %sp
-; UNOPT-NEXT:    mov %i2, %o1
-; UNOPT-NEXT:    call %i0
 ; UNOPT-NEXT:    mov %i1, %o0
+; UNOPT-NEXT:    call %i0
+; UNOPT-NEXT:    mov %i2, %o1
 ; UNOPT-NEXT:    ret
 ; UNOPT-NEXT:    restore %g0, %o0, %o0
 entry:
@@ -74,31 +74,33 @@ define i32 @test_loop(i32 %a, i32 %b) nounwind readnone {
 ; UNOPT-LABEL: test_loop:
 ; UNOPT:       ! %bb.0: ! %entry
 ; UNOPT-NEXT:    add %sp, -104, %sp
-; UNOPT-NEXT:    mov %o1, %o2
-; UNOPT-NEXT:    st %o2, [%sp+92] ! 4-byte Folded Spill
-; UNOPT-NEXT:    mov %o0, %o1
-; UNOPT-NEXT:    mov %g0, %o0
-; UNOPT-NEXT:    cmp %o2, 1
-; UNOPT-NEXT:    st %o1, [%sp+96] ! 4-byte Folded Spill
+; UNOPT-NEXT:    st %o1, [%sp+100] ! 4-byte Folded Spill
+; UNOPT-NEXT:    mov %g0, %o2
+; UNOPT-NEXT:    cmp %o1, 1
+; UNOPT-NEXT:    st %o0, [%sp+96] ! 4-byte Folded Spill
 ; UNOPT-NEXT:    bl .LBB2_2
-; UNOPT-NEXT:    st %o0, [%sp+100]
+; UNOPT-NEXT:    st %o2, [%sp+92]
 ; UNOPT-NEXT:    ba .LBB2_1
 ; UNOPT-NEXT:    nop
 ; UNOPT-NEXT:  .LBB2_1: ! %bb
 ; UNOPT-NEXT:    ! =>This Inner Loop Header: Depth=1
-; UNOPT-NEXT:    ld [%sp+100], %o0 ! 4-byte Folded Reload
-; UNOPT-NEXT:    ld [%sp+96], %o3 ! 4-byte Folded Reload
-; UNOPT-NEXT:    ld [%sp+92], %o2 ! 4-byte Folded Reload
-; UNOPT-NEXT:    smul %o0, %o2, %o1
-; UNOPT-NEXT:    mov 1, %o4
-; UNOPT-NEXT:    andn %o4, %o0, %o4
-; UNOPT-NEXT:    sll %o1, %o4, %o1
-; UNOPT-NEXT:    add %o1, %o3, %o1
-; UNOPT-NEXT:    add %o0, 1, %o0
-; UNOPT-NEXT:    cmp %o0, %o2
-; UNOPT-NEXT:    st %o1, [%sp+96] ! 4-byte Folded Spill
+; UNOPT-NEXT:    ld [%sp+92], %o0 ! 4-byte Folded Reload
+; UNOPT-NEXT:    mov %o0, %o1
+; UNOPT-NEXT:    ld [%sp+96], %o2 ! 4-byte Folded Reload
+; UNOPT-NEXT:    mov %o2, %o3
+; UNOPT-NEXT:    ld [%sp+100], %o4 ! 4-byte Folded Reload
+; UNOPT-NEXT:    smul %o1, %o4, %o5
+; UNOPT-NEXT:    mov 1, %g2
+; UNOPT-NEXT:    andn %g2, %o1, %g2
+; UNOPT-NEXT:    sll %o5, %g2, %o5
+; UNOPT-NEXT:    add %o5, %o3, %o3
+; UNOPT-NEXT:    add %o1, 1, %o1
+; UNOPT-NEXT:    cmp %o1, %o4
+; UNOPT-NEXT:    mov %o3, %o2
+; UNOPT-NEXT:    st %o2, [%sp+96] ! 4-byte Folded Spill
+; UNOPT-NEXT:    mov %o1, %o0
 ; UNOPT-NEXT:    bne .LBB2_1
-; UNOPT-NEXT:    st %o0, [%sp+100]
+; UNOPT-NEXT:    st %o0, [%sp+92]
 ; UNOPT-NEXT:    ba .LBB2_2
 ; UNOPT-NEXT:    nop
 ; UNOPT-NEXT:  .LBB2_2: ! %bb5
@@ -229,14 +231,14 @@ define i32 @prevent_o7_in_call_delay_slot(i32 %i0) #0 {
 ; UNOPT-LABEL: prevent_o7_in_call_delay_slot:
 ; UNOPT:       ! %bb.0: ! %entry
 ; UNOPT-NEXT:    save %sp, -104, %sp
-; UNOPT-NEXT:    add %i0, 2, %o5
-; UNOPT-NEXT:    st %o5, [%fp+-4] ! 4-byte Folded Spill
-; UNOPT-NEXT:    add %i0, 3, %o7
-; UNOPT-NEXT:    st %o7, [%fp+-8] ! 4-byte Folded Spill
+; UNOPT-NEXT:    add %i0, 2, %i1
+; UNOPT-NEXT:    add %i0, 3, %i0
+; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
+; UNOPT-NEXT:    st %i1, [%fp+-8] ! 4-byte Folded Spill
 ; UNOPT-NEXT:    !APP
 ; UNOPT-NEXT:    !NO_APP
-; UNOPT-NEXT:    ld [%fp+-8], %i1 ! 4-byte Folded Reload
-; UNOPT-NEXT:    ld [%fp+-4], %i0 ! 4-byte Folded Reload
+; UNOPT-NEXT:    ld [%fp+-8], %i0 ! 4-byte Folded Reload
+; UNOPT-NEXT:    ld [%fp+-4], %i1 ! 4-byte Folded Reload
 ; UNOPT-NEXT:    call bar
 ; UNOPT-NEXT:    add %i0, %i1, %o0
 ; UNOPT-NEXT:    ret
@@ -265,14 +267,14 @@ define i32 @prevent_o7_in_restore_add_in_call_delay_slot(i32 %i0) nounwind {
 ; UNOPT-LABEL: prevent_o7_in_restore_add_in_call_delay_slot:
 ; UNOPT:       ! %bb.0: ! %entry
 ; UNOPT-NEXT:    save %sp, -104, %sp
-; UNOPT-NEXT:    add %i0, 2, %o5
-; UNOPT-NEXT:    st %o5, [%fp+-4] ! 4-byte Folded Spill
-; UNOPT-NEXT:    add %i0, 3, %o7
-; UNOPT-NEXT:    st %o7, [%fp+-8] ! 4-byte Folded Spill
+; UNOPT-NEXT:    add %i0, 2, %i1
+; UNOPT-NEXT:    add %i0, 3, %i0
+; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
+; UNOPT-NEXT:    st %i1, [%fp+-8] ! 4-byte Folded Spill
 ; UNOPT-NEXT:    !APP
 ; UNOPT-NEXT:    !NO_APP
-; UNOPT-NEXT:    ld [%fp+-8], %i1 ! 4-byte Folded Reload
-; UNOPT-NEXT:    ld [%fp+-4], %i0 ! 4-byte Folded Reload
+; UNOPT-NEXT:    ld [%fp+-8], %i0 ! 4-byte Folded Reload
+; UNOPT-NEXT:    ld [%fp+-4], %i1 ! 4-byte Folded Reload
 ; UNOPT-NEXT:    call bar
 ; UNOPT-NEXT:    restore %i0, %i1, %o0
 entry:
@@ -298,8 +300,8 @@ define i32 @prevent_o7_in_restore_add_ri_in_call_delay_slot(i32 %i0, i32 %i1) no
 ; UNOPT-LABEL: prevent_o7_in_restore_add_ri_in_call_delay_slot:
 ; UNOPT:       ! %bb.0: ! %entry
 ; UNOPT-NEXT:    save %sp, -96, %sp
-; UNOPT-NEXT:    add %i0, %i1, %o7
-; UNOPT-NEXT:    st %o7, [%fp+-4] ! 4-byte Folded Spill
+; UNOPT-NEXT:    add %i0, %i1, %i0
+; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
 ; UNOPT-NEXT:    !APP
 ; UNOPT-NEXT:    !NO_APP
 ; UNOPT-NEXT:    ld [%fp+-4], %i0 ! 4-byte Folded Reload
@@ -327,8 +329,8 @@ define i32 @prevent_o7_in_restore_or_in_call_delay_slot(i32 %i0) nounwind {
 ; UNOPT-LABEL: prevent_o7_in_restore_or_in_call_delay_slot:
 ; UNOPT:       ! %bb.0: ! %entry
 ; UNOPT-NEXT:    save %sp, -96, %sp
-; UNOPT-NEXT:    add %i0, 2, %o7
-; UNOPT-NEXT:    st %o7, [%fp+-4] ! 4-byte Folded Spill
+; UNOPT-NEXT:    add %i0, 2, %i0
+; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
 ; UNOPT-NEXT:    !APP
 ; UNOPT-NEXT:    !NO_APP
 ; UNOPT-NEXT:    ld [%fp+-4], %i0 ! 4-byte Folded Reload
@@ -488,16 +490,16 @@ define i32 @restore_sethi(i32 %a) {
 ; UNOPT-NEXT:    call bar
 ; UNOPT-NEXT:    mov %i0, %o0
 ; UNOPT-NEXT:    mov %g0, %i0
-; UNOPT-NEXT:    st %i0, [%fp+-8] ! 4-byte Folded Spill
-; UNOPT-NEXT:    sethi 3, %i0
+; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
+; UNOPT-NEXT:    sethi 3, %i1
 ; UNOPT-NEXT:    cmp %o0, 0
 ; UNOPT-NEXT:    bne .LBB13_2
-; UNOPT-NEXT:    st %i0, [%fp+-4]
+; UNOPT-NEXT:    st %i1, [%fp+-8]
 ; UNOPT-NEXT:  ! %bb.1: ! %entry
-; UNOPT-NEXT:    ld [%fp+-8], %i0 ! 4-byte Folded Reload
-; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
-; UNOPT-NEXT:  .LBB13_2: ! %entry
 ; UNOPT-NEXT:    ld [%fp+-4], %i0 ! 4-byte Folded Reload
+; UNOPT-NEXT:    st %i0, [%fp+-8] ! 4-byte Folded Spill
+; UNOPT-NEXT:  .LBB13_2: ! %entry
+; UNOPT-NEXT:    ld [%fp+-8], %i0 ! 4-byte Folded Reload
 ; UNOPT-NEXT:    ret
 ; UNOPT-NEXT:    restore
 entry:
@@ -538,16 +540,16 @@ define i32 @restore_sethi_3bit(i32 %a) {
 ; UNOPT-NEXT:    call bar
 ; UNOPT-NEXT:    mov %i0, %o0
 ; UNOPT-NEXT:    mov %g0, %i0
-; UNOPT-NEXT:    st %i0, [%fp+-8] ! 4-byte Folded Spill
-; UNOPT-NEXT:    sethi 6, %i0
+; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
+; UNOPT-NEXT:    sethi 6, %i1
 ; UNOPT-NEXT:    cmp %o0, 0
 ; UNOPT-NEXT:    bne .LBB14_2
-; UNOPT-NEXT:    st %i0, [%fp+-4]
+; UNOPT-NEXT:    st %i1, [%fp+-8]
 ; UNOPT-NEXT:  ! %bb.1: ! %entry
-; UNOPT-NEXT:    ld [%fp+-8], %i0 ! 4-byte Folded Reload
-; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
-; UNOPT-NEXT:  .LBB14_2: ! %entry
 ; UNOPT-NEXT:    ld [%fp+-4], %i0 ! 4-byte Folded Reload
+; UNOPT-NEXT:    st %i0, [%fp+-8] ! 4-byte Folded Spill
+; UNOPT-NEXT:  .LBB14_2: ! %entry
+; UNOPT-NEXT:    ld [%fp+-8], %i0 ! 4-byte Folded Reload
 ; UNOPT-NEXT:    ret
 ; UNOPT-NEXT:    restore
 entry:
@@ -588,16 +590,16 @@ define i32 @restore_sethi_large(i32 %a) {
 ; UNOPT-NEXT:    call bar
 ; UNOPT-NEXT:    mov %i0, %o0
 ; UNOPT-NEXT:    mov %g0, %i0
-; UNOPT-NEXT:    st %i0, [%fp+-8] ! 4-byte Folded Spill
-; UNOPT-NEXT:    sethi 4000, %i0
+; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
+; UNOPT-NEXT:    sethi 4000, %i1
 ; UNOPT-NEXT:    cmp %o0, 0
 ; UNOPT-NEXT:    bne .LBB15_2
-; UNOPT-NEXT:    st %i0, [%fp+-4]
+; UNOPT-NEXT:    st %i1, [%fp+-8]
 ; UNOPT-NEXT:  ! %bb.1: ! %entry
-; UNOPT-NEXT:    ld [%fp+-8], %i0 ! 4-byte Folded Reload
-; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
-; UNOPT-NEXT:  .LBB15_2: ! %entry
 ; UNOPT-NEXT:    ld [%fp+-4], %i0 ! 4-byte Folded Reload
+; UNOPT-NEXT:    st %i0, [%fp+-8] ! 4-byte Folded Spill
+; UNOPT-NEXT:  .LBB15_2: ! %entry
+; UNOPT-NEXT:    ld [%fp+-8], %i0 ! 4-byte Folded Reload
 ; UNOPT-NEXT:    ret
 ; UNOPT-NEXT:    restore
 entry:
@@ -629,26 +631,25 @@ define i32 @test_generic_inst(i32 %arg) #0 {
 ; UNOPT-LABEL: test_generic_inst:
 ; UNOPT:       ! %bb.0:
 ; UNOPT-NEXT:    save %sp, -104, %sp
-; UNOPT-NEXT:    mov %i0, %i1
 ; UNOPT-NEXT:    call bar
-; UNOPT-NEXT:    mov %i1, %o0
-; UNOPT-NEXT:    mov %o0, %i0
-; UNOPT-NEXT:    st %i0, [%fp+-4] ! 4-byte Folded Spill
-; UNOPT-NEXT:    and %o0, 1, %i0
-; UNOPT-NEXT:    ! fake_use: $i1
-; UNOPT-NEXT:    cmp %i0, 0
+; UNOPT-NEXT:    mov %i0, %o0
+; UNOPT-NEXT:    mov %o0, %i1
+; UNOPT-NEXT:    and %o0, 1, %i2
+; UNOPT-NEXT:    ! fake_use: $i0
+; UNOPT-NEXT:    cmp %i2, 0
 ; UNOPT-NEXT:    bne .LBB16_2
-; UNOPT-NEXT:    nop
+; UNOPT-NEXT:    st %i1, [%fp+-4]
 ; UNOPT-NEXT:    ba .LBB16_1
 ; UNOPT-NEXT:    nop
 ; UNOPT-NEXT:  .LBB16_1: ! %true
 ; UNOPT-NEXT:    call bar
 ; UNOPT-NEXT:    ld [%fp+-4], %o0
+; UNOPT-NEXT:    mov %o0, %i0
 ; UNOPT-NEXT:    ba .LBB16_3
-; UNOPT-NEXT:    st %o0, [%fp+-8]
+; UNOPT-NEXT:    st %i0, [%fp+-8]
 ; UNOPT-NEXT:  .LBB16_2: ! %false
-; UNOPT-NEXT:    ld [%fp+-4], %i0 ! 4-byte Folded Reload
-; UNOPT-NEXT:    add %i0, 1, %i0
+; UNOPT-NEXT:    ld [%fp+-4], %o0 ! 4-byte Folded Reload
+; UNOPT-NEXT:    add %o0, 1, %i0
 ; UNOPT-NEXT:    ba .LBB16_3
 ; UNOPT-NEXT:    st %i0, [%fp+-8]
 ; UNOPT-NEXT:  .LBB16_3: ! %cont

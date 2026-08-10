@@ -167,49 +167,57 @@ entry:
 define i32 @workgroup_acquire_load_av_none(ptr addrspace(1) %ptr) #0 {
 ; GFX90A-LABEL: workgroup_acquire_load_av_none:
 ; GFX90A:       ; %bb.0: ; %entry
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v2, v1
-; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v2
-; GFX90A-NEXT:    global_load_dword v0, v[0:1], off
+; GFX90A-NEXT:    v_mov_b32_e32 v2, v0
+; GFX90A-NEXT:    v_mov_b32_e32 v3, v1
+; GFX90A-NEXT:    global_load_dword v0, v[2:3], off
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX90A-TGSPLIT-LABEL: workgroup_acquire_load_av_none:
 ; GFX90A-TGSPLIT:       ; %bb.0: ; %entry
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v2, v1
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v2
-; GFX90A-TGSPLIT-NEXT:    global_load_dword v0, v[0:1], off glc
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v2, v0
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v3, v1
+; GFX90A-TGSPLIT-NEXT:    global_load_dword v0, v[2:3], off glc
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0)
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-WGP-LABEL: workgroup_acquire_load_av_none:
 ; GFX12-WGP:       ; %bb.0: ; %entry
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_expcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_kmcnt 0x0
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v2, v1
-; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v2
-; GFX12-WGP-NEXT:    global_load_b32 v0, v[0:1], off scope:SCOPE_SE
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v2, v0
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v1
+; GFX12-WGP-NEXT:    global_load_b32 v0, v[2:3], off scope:SCOPE_SE
 ; GFX12-WGP-NEXT:    s_wait_loadcnt 0x0
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-CU-LABEL: workgroup_acquire_load_av_none:
 ; GFX12-CU:       ; %bb.0: ; %entry
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-CU-NEXT:    s_wait_expcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_kmcnt 0x0
-; GFX12-CU-NEXT:    v_mov_b32_e32 v2, v1
-; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v2
-; GFX12-CU-NEXT:    global_load_b32 v0, v[0:1], off
+; GFX12-CU-NEXT:    v_mov_b32_e32 v2, v0
+; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v1
+; GFX12-CU-NEXT:    global_load_b32 v0, v[2:3], off
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt 0x0
 ; GFX12-CU-NEXT:    s_setpc_b64 s[30:31]
 entry:
@@ -220,50 +228,58 @@ entry:
 define i32 @agent_acquire_load_av_none(ptr addrspace(1) %ptr) #0 {
 ; GFX90A-LABEL: agent_acquire_load_av_none:
 ; GFX90A:       ; %bb.0: ; %entry
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v2, v1
-; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v2
-; GFX90A-NEXT:    global_load_dword v0, v[0:1], off glc
+; GFX90A-NEXT:    v_mov_b32_e32 v2, v0
+; GFX90A-NEXT:    v_mov_b32_e32 v3, v1
+; GFX90A-NEXT:    global_load_dword v0, v[2:3], off glc
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0)
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX90A-TGSPLIT-LABEL: agent_acquire_load_av_none:
 ; GFX90A-TGSPLIT:       ; %bb.0: ; %entry
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v2, v1
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v2
-; GFX90A-TGSPLIT-NEXT:    global_load_dword v0, v[0:1], off glc
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v2, v0
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v3, v1
+; GFX90A-TGSPLIT-NEXT:    global_load_dword v0, v[2:3], off glc
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0)
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-WGP-LABEL: agent_acquire_load_av_none:
 ; GFX12-WGP:       ; %bb.0: ; %entry
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_expcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_kmcnt 0x0
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v2, v1
-; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v2
-; GFX12-WGP-NEXT:    global_load_b32 v0, v[0:1], off scope:SCOPE_DEV
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v2, v0
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v1
+; GFX12-WGP-NEXT:    global_load_b32 v0, v[2:3], off scope:SCOPE_DEV
 ; GFX12-WGP-NEXT:    s_wait_loadcnt 0x0
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-CU-LABEL: agent_acquire_load_av_none:
 ; GFX12-CU:       ; %bb.0: ; %entry
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-CU-NEXT:    s_wait_expcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_kmcnt 0x0
-; GFX12-CU-NEXT:    v_mov_b32_e32 v2, v1
-; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v2
-; GFX12-CU-NEXT:    global_load_b32 v0, v[0:1], off scope:SCOPE_DEV
+; GFX12-CU-NEXT:    v_mov_b32_e32 v2, v0
+; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v1
+; GFX12-CU-NEXT:    global_load_b32 v0, v[2:3], off scope:SCOPE_DEV
 ; GFX12-CU-NEXT:    s_wait_loadcnt 0x0
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_setpc_b64 s[30:31]
 entry:
   %val = load atomic i32, ptr addrspace(1) %ptr syncscope("agent") acquire, align 4, !mmra !0
@@ -273,50 +289,58 @@ entry:
 define i32 @system_acquire_load_av_none(ptr addrspace(1) %ptr) #0 {
 ; GFX90A-LABEL: system_acquire_load_av_none:
 ; GFX90A:       ; %bb.0: ; %entry
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v2, v1
-; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v2
-; GFX90A-NEXT:    global_load_dword v0, v[0:1], off glc
+; GFX90A-NEXT:    v_mov_b32_e32 v2, v0
+; GFX90A-NEXT:    v_mov_b32_e32 v3, v1
+; GFX90A-NEXT:    global_load_dword v0, v[2:3], off glc
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0)
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX90A-TGSPLIT-LABEL: system_acquire_load_av_none:
 ; GFX90A-TGSPLIT:       ; %bb.0: ; %entry
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v2, v1
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v2
-; GFX90A-TGSPLIT-NEXT:    global_load_dword v0, v[0:1], off glc
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v2, v0
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v3, v1
+; GFX90A-TGSPLIT-NEXT:    global_load_dword v0, v[2:3], off glc
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0)
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-WGP-LABEL: system_acquire_load_av_none:
 ; GFX12-WGP:       ; %bb.0: ; %entry
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_expcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_kmcnt 0x0
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v2, v1
-; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v2
-; GFX12-WGP-NEXT:    global_load_b32 v0, v[0:1], off scope:SCOPE_SYS
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v2, v0
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v1
+; GFX12-WGP-NEXT:    global_load_b32 v0, v[2:3], off scope:SCOPE_SYS
 ; GFX12-WGP-NEXT:    s_wait_loadcnt 0x0
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-CU-LABEL: system_acquire_load_av_none:
 ; GFX12-CU:       ; %bb.0: ; %entry
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-CU-NEXT:    s_wait_expcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_kmcnt 0x0
-; GFX12-CU-NEXT:    v_mov_b32_e32 v2, v1
-; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v2
-; GFX12-CU-NEXT:    global_load_b32 v0, v[0:1], off scope:SCOPE_SYS
+; GFX12-CU-NEXT:    v_mov_b32_e32 v2, v0
+; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v1
+; GFX12-CU-NEXT:    global_load_b32 v0, v[2:3], off scope:SCOPE_SYS
 ; GFX12-CU-NEXT:    s_wait_loadcnt 0x0
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_setpc_b64 s[30:31]
 entry:
   %val = load atomic i32, ptr addrspace(1) %ptr acquire, align 4, !mmra !0
@@ -328,58 +352,66 @@ entry:
 define void @workgroup_release_store_av_none(ptr addrspace(1) %ptr, i32 %val) #0 {
 ; GFX90A-LABEL: workgroup_release_store_av_none:
 ; GFX90A:       ; %bb.0: ; %entry
+; GFX90A-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX90A-NEXT:    global_store_dword v[0:1], v2, off
+; GFX90A-NEXT:    global_store_dword v[4:5], v2, off
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX90A-TGSPLIT-LABEL: workgroup_release_store_av_none:
 ; GFX90A-TGSPLIT:       ; %bb.0: ; %entry
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    global_store_dword v[0:1], v2, off
+; GFX90A-TGSPLIT-NEXT:    global_store_dword v[4:5], v2, off
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-TGSPLIT-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-WGP-LABEL: workgroup_release_store_av_none:
 ; GFX12-WGP:       ; %bb.0: ; %entry
+; GFX12-WGP-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_expcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_kmcnt 0x0
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_storecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-WGP-NEXT:    global_store_b32 v[0:1], v2, off scope:SCOPE_SE
+; GFX12-WGP-NEXT:    global_store_b32 v[3:4], v2, off scope:SCOPE_SE
 ; GFX12-WGP-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-CU-LABEL: workgroup_release_store_av_none:
 ; GFX12-CU:       ; %bb.0: ; %entry
+; GFX12-CU-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-CU-NEXT:    s_wait_expcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_kmcnt 0x0
-; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-CU-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_storecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-CU-NEXT:    global_store_b32 v[0:1], v2, off
+; GFX12-CU-NEXT:    global_store_b32 v[3:4], v2, off
 ; GFX12-CU-NEXT:    s_setpc_b64 s[30:31]
 entry:
   store atomic i32 %val, ptr addrspace(1) %ptr syncscope("workgroup") release, align 4, !mmra !0
@@ -389,58 +421,66 @@ entry:
 define void @agent_release_store_av_none(ptr addrspace(1) %ptr, i32 %val) #0 {
 ; GFX90A-LABEL: agent_release_store_av_none:
 ; GFX90A:       ; %bb.0: ; %entry
+; GFX90A-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    global_store_dword v[0:1], v2, off
+; GFX90A-NEXT:    global_store_dword v[4:5], v2, off
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX90A-TGSPLIT-LABEL: agent_release_store_av_none:
 ; GFX90A-TGSPLIT:       ; %bb.0: ; %entry
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    global_store_dword v[0:1], v2, off
+; GFX90A-TGSPLIT-NEXT:    global_store_dword v[4:5], v2, off
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-TGSPLIT-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-WGP-LABEL: agent_release_store_av_none:
 ; GFX12-WGP:       ; %bb.0: ; %entry
+; GFX12-WGP-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_expcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_kmcnt 0x0
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_storecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-WGP-NEXT:    global_store_b32 v[0:1], v2, off scope:SCOPE_DEV
+; GFX12-WGP-NEXT:    global_store_b32 v[3:4], v2, off scope:SCOPE_DEV
 ; GFX12-WGP-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-CU-LABEL: agent_release_store_av_none:
 ; GFX12-CU:       ; %bb.0: ; %entry
+; GFX12-CU-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-CU-NEXT:    s_wait_expcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_kmcnt 0x0
-; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-CU-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_storecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-CU-NEXT:    global_store_b32 v[0:1], v2, off scope:SCOPE_DEV
+; GFX12-CU-NEXT:    global_store_b32 v[3:4], v2, off scope:SCOPE_DEV
 ; GFX12-CU-NEXT:    s_setpc_b64 s[30:31]
 entry:
   store atomic i32 %val, ptr addrspace(1) %ptr syncscope("agent") release, align 4, !mmra !0
@@ -450,58 +490,66 @@ entry:
 define void @system_release_store_av_none(ptr addrspace(1) %ptr, i32 %val) #0 {
 ; GFX90A-LABEL: system_release_store_av_none:
 ; GFX90A:       ; %bb.0: ; %entry
+; GFX90A-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    global_store_dword v[0:1], v2, off
+; GFX90A-NEXT:    global_store_dword v[4:5], v2, off
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX90A-TGSPLIT-LABEL: system_release_store_av_none:
 ; GFX90A-TGSPLIT:       ; %bb.0: ; %entry
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    global_store_dword v[0:1], v2, off
+; GFX90A-TGSPLIT-NEXT:    global_store_dword v[4:5], v2, off
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-TGSPLIT-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-WGP-LABEL: system_release_store_av_none:
 ; GFX12-WGP:       ; %bb.0: ; %entry
+; GFX12-WGP-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_expcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_kmcnt 0x0
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_storecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-WGP-NEXT:    global_store_b32 v[0:1], v2, off scope:SCOPE_SYS
+; GFX12-WGP-NEXT:    global_store_b32 v[3:4], v2, off scope:SCOPE_SYS
 ; GFX12-WGP-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-CU-LABEL: system_release_store_av_none:
 ; GFX12-CU:       ; %bb.0: ; %entry
+; GFX12-CU-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-CU-NEXT:    s_wait_expcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_kmcnt 0x0
-; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-CU-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_storecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-CU-NEXT:    global_store_b32 v[0:1], v2, off scope:SCOPE_SYS
+; GFX12-CU-NEXT:    global_store_b32 v[3:4], v2, off scope:SCOPE_SYS
 ; GFX12-CU-NEXT:    s_setpc_b64 s[30:31]
 entry:
   store atomic i32 %val, ptr addrspace(1) %ptr release, align 4, !mmra !0
@@ -513,60 +561,72 @@ entry:
 define i32 @agent_acq_rel_atomicrmw_av_none(ptr addrspace(1) %ptr, i32 %val) #0 {
 ; GFX90A-LABEL: agent_acq_rel_atomicrmw_av_none:
 ; GFX90A:       ; %bb.0: ; %entry
+; GFX90A-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    global_atomic_add v0, v[0:1], v2, off glc
+; GFX90A-NEXT:    global_atomic_add v0, v[4:5], v2, off glc
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0)
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX90A-TGSPLIT-LABEL: agent_acq_rel_atomicrmw_av_none:
 ; GFX90A-TGSPLIT:       ; %bb.0: ; %entry
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    global_atomic_add v0, v[0:1], v2, off glc
+; GFX90A-TGSPLIT-NEXT:    global_atomic_add v0, v[4:5], v2, off glc
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0)
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-WGP-LABEL: agent_acq_rel_atomicrmw_av_none:
 ; GFX12-WGP:       ; %bb.0: ; %entry
+; GFX12-WGP-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_expcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_kmcnt 0x0
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_storecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-WGP-NEXT:    global_atomic_add_u32 v0, v[0:1], v2, off th:TH_ATOMIC_RETURN scope:SCOPE_DEV
+; GFX12-WGP-NEXT:    global_atomic_add_u32 v0, v[3:4], v2, off th:TH_ATOMIC_RETURN scope:SCOPE_DEV
 ; GFX12-WGP-NEXT:    s_wait_loadcnt 0x0
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-CU-LABEL: agent_acq_rel_atomicrmw_av_none:
 ; GFX12-CU:       ; %bb.0: ; %entry
+; GFX12-CU-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-CU-NEXT:    s_wait_expcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_kmcnt 0x0
-; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-CU-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_storecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-CU-NEXT:    global_atomic_add_u32 v0, v[0:1], v2, off th:TH_ATOMIC_RETURN scope:SCOPE_DEV
+; GFX12-CU-NEXT:    global_atomic_add_u32 v0, v[3:4], v2, off th:TH_ATOMIC_RETURN scope:SCOPE_DEV
 ; GFX12-CU-NEXT:    s_wait_loadcnt 0x0
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_setpc_b64 s[30:31]
 entry:
   %ret = atomicrmw add ptr addrspace(1) %ptr, i32 %val syncscope("agent") acq_rel, !mmra !0
@@ -576,60 +636,72 @@ entry:
 define i32 @system_seq_cst_atomicrmw_av_none(ptr addrspace(1) %ptr, i32 %val) #0 {
 ; GFX90A-LABEL: system_seq_cst_atomicrmw_av_none:
 ; GFX90A:       ; %bb.0: ; %entry
+; GFX90A-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    global_atomic_add v0, v[0:1], v2, off glc
+; GFX90A-NEXT:    global_atomic_add v0, v[4:5], v2, off glc
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0)
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX90A-TGSPLIT-LABEL: system_seq_cst_atomicrmw_av_none:
 ; GFX90A-TGSPLIT:       ; %bb.0: ; %entry
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v3
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v5, v1
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    global_atomic_add v0, v[0:1], v2, off glc
+; GFX90A-TGSPLIT-NEXT:    global_atomic_add v0, v[4:5], v2, off glc
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0)
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-WGP-LABEL: system_seq_cst_atomicrmw_av_none:
 ; GFX12-WGP:       ; %bb.0: ; %entry
+; GFX12-WGP-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_expcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_kmcnt 0x0
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_storecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-WGP-NEXT:    global_atomic_add_u32 v0, v[0:1], v2, off th:TH_ATOMIC_RETURN scope:SCOPE_SYS
+; GFX12-WGP-NEXT:    global_atomic_add_u32 v0, v[3:4], v2, off th:TH_ATOMIC_RETURN scope:SCOPE_SYS
 ; GFX12-WGP-NEXT:    s_wait_loadcnt 0x0
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-CU-LABEL: system_seq_cst_atomicrmw_av_none:
 ; GFX12-CU:       ; %bb.0: ; %entry
+; GFX12-CU-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-CU-NEXT:    s_wait_expcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_kmcnt 0x0
-; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v1
-; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v3
+; GFX12-CU-NEXT:    v_mov_b32_e32 v3, v0
+; GFX12-CU-NEXT:    v_mov_b32_e32 v4, v1
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_storecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-CU-NEXT:    global_atomic_add_u32 v0, v[0:1], v2, off th:TH_ATOMIC_RETURN scope:SCOPE_SYS
+; GFX12-CU-NEXT:    global_atomic_add_u32 v0, v[3:4], v2, off th:TH_ATOMIC_RETURN scope:SCOPE_SYS
 ; GFX12-CU-NEXT:    s_wait_loadcnt 0x0
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_setpc_b64 s[30:31]
 entry:
   %ret = atomicrmw add ptr addrspace(1) %ptr, i32 %val seq_cst, !mmra !0
@@ -641,80 +713,98 @@ entry:
 define { i32, i1 } @cluster_acq_rel_cmpxchg_av_none(ptr addrspace(1) %ptr, i32 %cmp, i32 %new) #0 {
 ; GFX90A-LABEL: cluster_acq_rel_cmpxchg_av_none:
 ; GFX90A:       ; %bb.0: ; %entry
+; GFX90A-NEXT:    ; kill: def $vgpr3 killed $vgpr3 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v4, v3
-; GFX90A-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v1, v3
-; GFX90A-NEXT:    ; kill: def $vgpr4 killed $vgpr4 def $vgpr4_vgpr5 killed $exec
-; GFX90A-NEXT:    v_mov_b32_e32 v5, v2
+; GFX90A-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-NEXT:    v_mov_b32_e32 v5, v1
+; GFX90A-NEXT:    v_mov_b32_e32 v0, v3
+; GFX90A-NEXT:    v_mov_b32_e32 v1, v2
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    global_atomic_cmpswap v0, v[0:1], v[4:5], off glc
+; GFX90A-NEXT:    global_atomic_cmpswap v0, v[4:5], v[0:1], off glc
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-NEXT:    v_cmp_eq_u32_e64 s[4:5], v0, v2
 ; GFX90A-NEXT:    v_cndmask_b32_e64 v1, 0, 1, s[4:5]
+; GFX90A-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; GFX90A-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
 ; GFX90A-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX90A-TGSPLIT-LABEL: cluster_acq_rel_cmpxchg_av_none:
 ; GFX90A-TGSPLIT:       ; %bb.0: ; %entry
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr3 killed $vgpr3 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v4, v3
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v3, v1
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v3
-; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr4 killed $vgpr4 def $vgpr4_vgpr5 killed $exec
-; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v5, v2
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v4, v0
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v5, v1
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v0, v3
+; GFX90A-TGSPLIT-NEXT:    v_mov_b32_e32 v1, v2
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
-; GFX90A-TGSPLIT-NEXT:    global_atomic_cmpswap v0, v[0:1], v[4:5], off glc
+; GFX90A-TGSPLIT-NEXT:    global_atomic_cmpswap v0, v[4:5], v[0:1], off glc
 ; GFX90A-TGSPLIT-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-TGSPLIT-NEXT:    v_cmp_eq_u32_e64 s[4:5], v0, v2
 ; GFX90A-TGSPLIT-NEXT:    v_cndmask_b32_e64 v1, 0, 1, s[4:5]
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; GFX90A-TGSPLIT-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
 ; GFX90A-TGSPLIT-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-WGP-LABEL: cluster_acq_rel_cmpxchg_av_none:
 ; GFX12-WGP:       ; %bb.0: ; %entry
+; GFX12-WGP-NEXT:    ; kill: def $vgpr3 killed $vgpr3 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_expcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_kmcnt 0x0
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v4, v1
-; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v4
-; GFX12-WGP-NEXT:    ; kill: def $vgpr3 killed $vgpr3 def $vgpr3_vgpr4 killed $exec
-; GFX12-WGP-NEXT:    v_mov_b32_e32 v4, v2
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v4, v0
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v5, v1
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v0, v3
+; GFX12-WGP-NEXT:    v_mov_b32_e32 v1, v2
 ; GFX12-WGP-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_storecnt 0x0
 ; GFX12-WGP-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-WGP-NEXT:    global_atomic_cmpswap_b32 v0, v[0:1], v[3:4], off th:TH_ATOMIC_RETURN scope:SCOPE_DEV
+; GFX12-WGP-NEXT:    global_atomic_cmpswap_b32 v0, v[4:5], v[0:1], off th:TH_ATOMIC_RETURN scope:SCOPE_DEV
 ; GFX12-WGP-NEXT:    s_wait_loadcnt 0x0
 ; GFX12-WGP-NEXT:    v_cmp_eq_u32_e64 s0, v0, v2
 ; GFX12-WGP-NEXT:    s_wait_alu depctr_va_sdst(0)
 ; GFX12-WGP-NEXT:    v_cndmask_b32_e64 v1, 0, 1, s0
+; GFX12-WGP-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; GFX12-WGP-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
 ; GFX12-WGP-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX12-CU-LABEL: cluster_acq_rel_cmpxchg_av_none:
 ; GFX12-CU:       ; %bb.0: ; %entry
+; GFX12-CU-NEXT:    ; kill: def $vgpr3 killed $vgpr3 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-CU-NEXT:    s_wait_expcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_kmcnt 0x0
-; GFX12-CU-NEXT:    v_mov_b32_e32 v4, v1
-; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v4
-; GFX12-CU-NEXT:    ; kill: def $vgpr3 killed $vgpr3 def $vgpr3_vgpr4 killed $exec
-; GFX12-CU-NEXT:    v_mov_b32_e32 v4, v2
+; GFX12-CU-NEXT:    v_mov_b32_e32 v4, v0
+; GFX12-CU-NEXT:    v_mov_b32_e32 v5, v1
+; GFX12-CU-NEXT:    v_mov_b32_e32 v0, v3
+; GFX12-CU-NEXT:    v_mov_b32_e32 v1, v2
 ; GFX12-CU-NEXT:    s_wait_bvhcnt 0x0
 ; GFX12-CU-NEXT:    s_wait_samplecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_storecnt 0x0
 ; GFX12-CU-NEXT:    s_wait_loadcnt_dscnt 0x0
-; GFX12-CU-NEXT:    global_atomic_cmpswap_b32 v0, v[0:1], v[3:4], off th:TH_ATOMIC_RETURN scope:SCOPE_DEV
+; GFX12-CU-NEXT:    global_atomic_cmpswap_b32 v0, v[4:5], v[0:1], off th:TH_ATOMIC_RETURN scope:SCOPE_DEV
 ; GFX12-CU-NEXT:    s_wait_loadcnt 0x0
 ; GFX12-CU-NEXT:    v_cmp_eq_u32_e64 s0, v0, v2
 ; GFX12-CU-NEXT:    s_wait_alu depctr_va_sdst(0)
 ; GFX12-CU-NEXT:    v_cndmask_b32_e64 v1, 0, 1, s0
+; GFX12-CU-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; GFX12-CU-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
 ; GFX12-CU-NEXT:    s_setpc_b64 s[30:31]
 entry:
   %ret = cmpxchg ptr addrspace(1) %ptr, i32 %cmp, i32 %new syncscope("cluster") acq_rel acquire, !mmra !0

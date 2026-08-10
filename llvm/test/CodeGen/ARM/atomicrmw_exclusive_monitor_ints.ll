@@ -17,6 +17,8 @@
 define i8 @test_xchg_i8() {
 ; CHECK-ARM8-LABEL: test_xchg_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -27,40 +29,44 @@ define i8 @test_xchg_i8() {
 ; CHECK-ARM8-NEXT:  .LBB0_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB0_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-ARM8-NEXT:    mov r12, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    movw r2, :lower16:atomic_i8
+; CHECK-ARM8-NEXT:    movt r2, :upper16:atomic_i8
+; CHECK-ARM8-NEXT:    mov r3, #1
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB0_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB0_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexb r12, [r2]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB0_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB0_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb lr, r3, [r2]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB0_2
 ; CHECK-ARM8-NEXT:  .LBB0_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB0_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB0_1
 ; CHECK-ARM8-NEXT:    b .LBB0_5
 ; CHECK-ARM8-NEXT:  .LBB0_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_xchg_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI0_0
@@ -70,36 +76,38 @@ define i8 @test_xchg_i8() {
 ; CHECK-ARM6-NEXT:  .LBB0_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB0_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r3, .LCPI0_0
-; CHECK-ARM6-NEXT:    mov r12, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, .LCPI0_0
+; CHECK-ARM6-NEXT:    mov r3, #1
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB0_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB0_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexb r12, [r2]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB0_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB0_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb lr, r3, [r2]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB0_2
 ; CHECK-ARM6-NEXT:  .LBB0_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB0_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB0_1
 ; CHECK-ARM6-NEXT:    b .LBB0_5
 ; CHECK-ARM6-NEXT:  .LBB0_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI0_0:
@@ -107,6 +115,8 @@ define i8 @test_xchg_i8() {
 ;
 ; CHECK-THUMB7-LABEL: test_xchg_i8:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i8
@@ -117,37 +127,39 @@ define i8 @test_xchg_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB0_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB0_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    movw r2, :lower16:atomic_i8
+; CHECK-THUMB7-NEXT:    movt r2, :upper16:atomic_i8
+; CHECK-THUMB7-NEXT:    movs r3, #1
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB0_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB0_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexb r12, [r2]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB0_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB0_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r3, [r2]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB0_2
 ; CHECK-THUMB7-NEXT:  .LBB0_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB0_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB0_1
 ; CHECK-THUMB7-NEXT:    b .LBB0_5
 ; CHECK-THUMB7-NEXT:  .LBB0_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_xchg_i8:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -164,8 +176,8 @@ define i8 @test_xchg_i8() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_xchg_i8:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i8
@@ -176,37 +188,39 @@ define i8 @test_xchg_i8() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB0_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB0_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    movs r4, #1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB0_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB0_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexb r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB0_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB0_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB0_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB0_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB0_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB0_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB0_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB0_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw xchg ptr @atomic_i8, i8 1 monotonic
   ret i8 %0
@@ -214,6 +228,8 @@ entry:
 define i8 @test_add_i8() {
 ; CHECK-ARM8-LABEL: test_add_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -224,40 +240,44 @@ define i8 @test_add_i8() {
 ; CHECK-ARM8-NEXT:  .LBB1_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB1_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    add r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    add r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB1_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB1_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB1_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB1_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB1_2
 ; CHECK-ARM8-NEXT:  .LBB1_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB1_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB1_1
 ; CHECK-ARM8-NEXT:    b .LBB1_5
 ; CHECK-ARM8-NEXT:  .LBB1_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_add_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI1_0
@@ -267,36 +287,38 @@ define i8 @test_add_i8() {
 ; CHECK-ARM6-NEXT:  .LBB1_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB1_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    add r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    add r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI1_0
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB1_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB1_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB1_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB1_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB1_2
 ; CHECK-ARM6-NEXT:  .LBB1_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB1_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB1_1
 ; CHECK-ARM6-NEXT:    b .LBB1_5
 ; CHECK-ARM6-NEXT:  .LBB1_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI1_0:
@@ -304,6 +326,8 @@ define i8 @test_add_i8() {
 ;
 ; CHECK-THUMB7-LABEL: test_add_i8:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i8
@@ -314,37 +338,39 @@ define i8 @test_add_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB1_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB1_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    add.w r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    adds r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB1_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB1_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexb r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB1_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB1_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB1_2
 ; CHECK-THUMB7-NEXT:  .LBB1_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB1_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB1_1
 ; CHECK-THUMB7-NEXT:    b .LBB1_5
 ; CHECK-THUMB7-NEXT:  .LBB1_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_add_i8:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -361,8 +387,8 @@ define i8 @test_add_i8() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_add_i8:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i8
@@ -373,37 +399,39 @@ define i8 @test_add_i8() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB1_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB1_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    adds r4, r1, #1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    adds r2, r1, #1
 ; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB1_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB1_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexb r4, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB1_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB1_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r5, r2, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB1_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB1_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB1_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB1_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB1_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB1_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw add ptr @atomic_i8, i8 1 monotonic
   ret i8 %0
@@ -411,6 +439,8 @@ entry:
 define i8 @test_sub_i8() {
 ; CHECK-ARM8-LABEL: test_sub_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -421,40 +451,44 @@ define i8 @test_sub_i8() {
 ; CHECK-ARM8-NEXT:  .LBB2_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB2_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    sub r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    sub r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB2_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB2_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB2_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB2_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB2_2
 ; CHECK-ARM8-NEXT:  .LBB2_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB2_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB2_1
 ; CHECK-ARM8-NEXT:    b .LBB2_5
 ; CHECK-ARM8-NEXT:  .LBB2_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_sub_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI2_0
@@ -464,36 +498,38 @@ define i8 @test_sub_i8() {
 ; CHECK-ARM6-NEXT:  .LBB2_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB2_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    sub r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    sub r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI2_0
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB2_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB2_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB2_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB2_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB2_2
 ; CHECK-ARM6-NEXT:  .LBB2_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB2_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB2_1
 ; CHECK-ARM6-NEXT:    b .LBB2_5
 ; CHECK-ARM6-NEXT:  .LBB2_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI2_0:
@@ -501,6 +537,8 @@ define i8 @test_sub_i8() {
 ;
 ; CHECK-THUMB7-LABEL: test_sub_i8:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i8
@@ -511,37 +549,39 @@ define i8 @test_sub_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB2_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB2_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    sub.w r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    subs r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB2_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB2_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexb r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB2_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB2_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB2_2
 ; CHECK-THUMB7-NEXT:  .LBB2_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB2_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB2_1
 ; CHECK-THUMB7-NEXT:    b .LBB2_5
 ; CHECK-THUMB7-NEXT:  .LBB2_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_sub_i8:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -558,8 +598,8 @@ define i8 @test_sub_i8() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_sub_i8:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i8
@@ -570,37 +610,39 @@ define i8 @test_sub_i8() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB2_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB2_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    subs r4, r1, #1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    subs r2, r1, #1
 ; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB2_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB2_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexb r4, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB2_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB2_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r5, r2, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB2_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB2_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB2_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB2_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB2_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB2_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw sub ptr @atomic_i8, i8 1 monotonic
   ret i8 %0
@@ -608,6 +650,8 @@ entry:
 define i8 @test_and_i8() {
 ; CHECK-ARM8-LABEL: test_and_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -618,40 +662,44 @@ define i8 @test_and_i8() {
 ; CHECK-ARM8-NEXT:  .LBB3_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB3_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    and r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    and r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB3_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB3_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB3_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB3_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB3_2
 ; CHECK-ARM8-NEXT:  .LBB3_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB3_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB3_1
 ; CHECK-ARM8-NEXT:    b .LBB3_5
 ; CHECK-ARM8-NEXT:  .LBB3_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_and_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI3_0
@@ -661,36 +709,38 @@ define i8 @test_and_i8() {
 ; CHECK-ARM6-NEXT:  .LBB3_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB3_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    and r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    and r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI3_0
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB3_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB3_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB3_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB3_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB3_2
 ; CHECK-ARM6-NEXT:  .LBB3_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB3_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB3_1
 ; CHECK-ARM6-NEXT:    b .LBB3_5
 ; CHECK-ARM6-NEXT:  .LBB3_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI3_0:
@@ -698,6 +748,8 @@ define i8 @test_and_i8() {
 ;
 ; CHECK-THUMB7-LABEL: test_and_i8:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i8
@@ -708,37 +760,39 @@ define i8 @test_and_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB3_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB3_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    and r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    and r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB3_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB3_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexb r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB3_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB3_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB3_2
 ; CHECK-THUMB7-NEXT:  .LBB3_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB3_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB3_1
 ; CHECK-THUMB7-NEXT:    b .LBB3_5
 ; CHECK-THUMB7-NEXT:  .LBB3_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_and_i8:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -755,8 +809,8 @@ define i8 @test_and_i8() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_and_i8:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i8
@@ -767,39 +821,41 @@ define i8 @test_and_i8() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB3_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB3_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mov r4, r1
-; CHECK-THUMB8BASE-NEXT:    ands r4, r0
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    ands r3, r2
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i8
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB3_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB3_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexb r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB3_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB3_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB3_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB3_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB3_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB3_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB3_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB3_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw and ptr @atomic_i8, i8 1 monotonic
   ret i8 %0
@@ -807,6 +863,8 @@ entry:
 define i8 @test_nand_i8() {
 ; CHECK-ARM8-LABEL: test_nand_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -817,42 +875,46 @@ define i8 @test_nand_i8() {
 ; CHECK-ARM8-NEXT:  .LBB4_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB4_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mvn r0, r1
-; CHECK-ARM8-NEXT:    mvn r2, #1
-; CHECK-ARM8-NEXT:    orr r12, r0, r2
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    mvn r2, r1
+; CHECK-ARM8-NEXT:    mvn r3, #1
+; CHECK-ARM8-NEXT:    orr r2, r2, r3
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB4_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB4_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB4_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB4_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB4_2
 ; CHECK-ARM8-NEXT:  .LBB4_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB4_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB4_1
 ; CHECK-ARM8-NEXT:    b .LBB4_5
 ; CHECK-ARM8-NEXT:  .LBB4_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_nand_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI4_0
@@ -862,38 +924,40 @@ define i8 @test_nand_i8() {
 ; CHECK-ARM6-NEXT:  .LBB4_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB4_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mvn r0, r1
-; CHECK-ARM6-NEXT:    mvn r2, #1
-; CHECK-ARM6-NEXT:    orr r12, r0, r2
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    mvn r2, r1
+; CHECK-ARM6-NEXT:    mvn r3, #1
+; CHECK-ARM6-NEXT:    orr r2, r2, r3
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI4_0
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB4_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB4_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB4_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB4_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB4_2
 ; CHECK-ARM6-NEXT:  .LBB4_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB4_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB4_1
 ; CHECK-ARM6-NEXT:    b .LBB4_5
 ; CHECK-ARM6-NEXT:  .LBB4_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI4_0:
@@ -901,6 +965,8 @@ define i8 @test_nand_i8() {
 ;
 ; CHECK-THUMB7-LABEL: test_nand_i8:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i8
@@ -911,38 +977,40 @@ define i8 @test_nand_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB4_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB4_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    mvn r0, #1
-; CHECK-THUMB7-NEXT:    orn r12, r0, r1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    mvn r2, #1
+; CHECK-THUMB7-NEXT:    orn r2, r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB4_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB4_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexb r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB4_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB4_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB4_2
 ; CHECK-THUMB7-NEXT:  .LBB4_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB4_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB4_1
 ; CHECK-THUMB7-NEXT:    b .LBB4_5
 ; CHECK-THUMB7-NEXT:  .LBB4_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_nand_i8:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -959,8 +1027,8 @@ define i8 @test_nand_i8() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_nand_i8:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i8
@@ -971,40 +1039,42 @@ define i8 @test_nand_i8() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB4_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB4_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    mvns r4, r1
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mvns r0, r0
-; CHECK-THUMB8BASE-NEXT:    orrs r4, r0
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    mvns r2, r1
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    mvns r3, r3
+; CHECK-THUMB8BASE-NEXT:    orrs r2, r3
 ; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB4_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB4_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexb r4, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB4_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB4_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r5, r2, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB4_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB4_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB4_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB4_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB4_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB4_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw nand ptr @atomic_i8, i8 1 monotonic
   ret i8 %0
@@ -1012,6 +1082,8 @@ entry:
 define i8 @test_or_i8() {
 ; CHECK-ARM8-LABEL: test_or_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -1022,40 +1094,44 @@ define i8 @test_or_i8() {
 ; CHECK-ARM8-NEXT:  .LBB5_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB5_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    orr r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    orr r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB5_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB5_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB5_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB5_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB5_2
 ; CHECK-ARM8-NEXT:  .LBB5_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB5_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB5_1
 ; CHECK-ARM8-NEXT:    b .LBB5_5
 ; CHECK-ARM8-NEXT:  .LBB5_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_or_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI5_0
@@ -1065,36 +1141,38 @@ define i8 @test_or_i8() {
 ; CHECK-ARM6-NEXT:  .LBB5_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB5_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    orr r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    orr r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI5_0
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB5_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB5_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB5_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB5_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB5_2
 ; CHECK-ARM6-NEXT:  .LBB5_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB5_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB5_1
 ; CHECK-ARM6-NEXT:    b .LBB5_5
 ; CHECK-ARM6-NEXT:  .LBB5_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI5_0:
@@ -1102,6 +1180,8 @@ define i8 @test_or_i8() {
 ;
 ; CHECK-THUMB7-LABEL: test_or_i8:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i8
@@ -1112,37 +1192,39 @@ define i8 @test_or_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB5_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB5_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    orr r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    orr r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB5_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB5_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexb r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB5_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB5_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB5_2
 ; CHECK-THUMB7-NEXT:  .LBB5_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB5_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB5_1
 ; CHECK-THUMB7-NEXT:    b .LBB5_5
 ; CHECK-THUMB7-NEXT:  .LBB5_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_or_i8:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -1159,8 +1241,8 @@ define i8 @test_or_i8() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_or_i8:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i8
@@ -1171,39 +1253,41 @@ define i8 @test_or_i8() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB5_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB5_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mov r4, r1
-; CHECK-THUMB8BASE-NEXT:    orrs r4, r0
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    orrs r3, r2
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i8
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB5_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB5_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexb r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB5_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB5_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB5_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB5_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB5_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB5_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB5_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB5_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw or ptr @atomic_i8, i8 1 monotonic
   ret i8 %0
@@ -1211,6 +1295,8 @@ entry:
 define i8 @test_xor_i8() {
 ; CHECK-ARM8-LABEL: test_xor_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -1221,40 +1307,44 @@ define i8 @test_xor_i8() {
 ; CHECK-ARM8-NEXT:  .LBB6_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB6_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    eor r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    eor r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB6_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB6_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB6_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB6_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB6_2
 ; CHECK-ARM8-NEXT:  .LBB6_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB6_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB6_1
 ; CHECK-ARM8-NEXT:    b .LBB6_5
 ; CHECK-ARM8-NEXT:  .LBB6_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_xor_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI6_0
@@ -1264,36 +1354,38 @@ define i8 @test_xor_i8() {
 ; CHECK-ARM6-NEXT:  .LBB6_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB6_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    eor r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    eor r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI6_0
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB6_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB6_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB6_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB6_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB6_2
 ; CHECK-ARM6-NEXT:  .LBB6_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB6_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB6_1
 ; CHECK-ARM6-NEXT:    b .LBB6_5
 ; CHECK-ARM6-NEXT:  .LBB6_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI6_0:
@@ -1301,6 +1393,8 @@ define i8 @test_xor_i8() {
 ;
 ; CHECK-THUMB7-LABEL: test_xor_i8:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i8
@@ -1311,37 +1405,39 @@ define i8 @test_xor_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB6_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB6_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    eor r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    eor r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB6_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB6_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexb r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB6_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB6_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB6_2
 ; CHECK-THUMB7-NEXT:  .LBB6_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB6_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB6_1
 ; CHECK-THUMB7-NEXT:    b .LBB6_5
 ; CHECK-THUMB7-NEXT:  .LBB6_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_xor_i8:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -1358,8 +1454,8 @@ define i8 @test_xor_i8() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_xor_i8:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i8
@@ -1370,39 +1466,41 @@ define i8 @test_xor_i8() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB6_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB6_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mov r4, r1
-; CHECK-THUMB8BASE-NEXT:    eors r4, r0
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    eors r3, r2
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i8
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB6_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB6_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexb r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB6_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB6_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB6_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB6_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB6_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB6_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB6_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB6_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw xor ptr @atomic_i8, i8 1 monotonic
   ret i8 %0
@@ -1410,6 +1508,8 @@ entry:
 define i8 @test_max_i8() {
 ; CHECK-ARM8-LABEL: test_max_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -1420,43 +1520,47 @@ define i8 @test_max_i8() {
 ; CHECK-ARM8-NEXT:  .LBB7_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB7_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    sxtb r0, r1
-; CHECK-ARM8-NEXT:    cmp r0, #1
-; CHECK-ARM8-NEXT:    mov r12, #1
-; CHECK-ARM8-NEXT:    movgt r12, r1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    sxtb r2, r1
+; CHECK-ARM8-NEXT:    cmp r2, #1
+; CHECK-ARM8-NEXT:    mov r2, #1
+; CHECK-ARM8-NEXT:    movgt r2, r1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB7_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB7_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB7_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB7_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB7_2
 ; CHECK-ARM8-NEXT:  .LBB7_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB7_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB7_1
 ; CHECK-ARM8-NEXT:    b .LBB7_5
 ; CHECK-ARM8-NEXT:  .LBB7_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_max_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI7_0
@@ -1466,39 +1570,41 @@ define i8 @test_max_i8() {
 ; CHECK-ARM6-NEXT:  .LBB7_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB7_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    sxtb r0, r1
-; CHECK-ARM6-NEXT:    cmp r0, #1
-; CHECK-ARM6-NEXT:    mov r12, #1
-; CHECK-ARM6-NEXT:    movgt r12, r1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    sxtb r2, r1
+; CHECK-ARM6-NEXT:    cmp r2, #1
+; CHECK-ARM6-NEXT:    mov r2, #1
+; CHECK-ARM6-NEXT:    movgt r2, r1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI7_0
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB7_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB7_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB7_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB7_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB7_2
 ; CHECK-ARM6-NEXT:  .LBB7_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB7_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB7_1
 ; CHECK-ARM6-NEXT:    b .LBB7_5
 ; CHECK-ARM6-NEXT:  .LBB7_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI7_0:
@@ -1506,6 +1612,8 @@ define i8 @test_max_i8() {
 ;
 ; CHECK-THUMB7-LABEL: test_max_i8:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i8
@@ -1516,41 +1624,43 @@ define i8 @test_max_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB7_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB7_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    sxtb r0, r1
-; CHECK-THUMB7-NEXT:    cmp r0, #1
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    sxtb r2, r1
+; CHECK-THUMB7-NEXT:    cmp r2, #1
+; CHECK-THUMB7-NEXT:    mov.w r2, #1
 ; CHECK-THUMB7-NEXT:    it gt
-; CHECK-THUMB7-NEXT:    movgt r12, r1
+; CHECK-THUMB7-NEXT:    movgt r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB7_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB7_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexb r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB7_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB7_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB7_2
 ; CHECK-THUMB7-NEXT:  .LBB7_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB7_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB7_1
 ; CHECK-THUMB7-NEXT:    b .LBB7_5
 ; CHECK-THUMB7-NEXT:  .LBB7_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_max_i8:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -1580,43 +1690,46 @@ define i8 @test_max_i8() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB7_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    sxtb r1, r0
-; CHECK-THUMB8BASE-NEXT:    movs r2, #1
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    sxtb r2, r1
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r2, r1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bgt .LBB7_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB7_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB7_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB7_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    uxtb r2, r2
 ; CHECK-THUMB8BASE-NEXT:  .LBB7_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB7_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexb r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB7_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB7_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB7_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB7_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB7_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    uxtb r0, r2
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r0
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB7_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB7_7
@@ -1631,6 +1744,8 @@ entry:
 define i8 @test_min_i8() {
 ; CHECK-ARM8-LABEL: test_min_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -1641,43 +1756,47 @@ define i8 @test_min_i8() {
 ; CHECK-ARM8-NEXT:  .LBB8_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB8_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    sxtb r0, r1
-; CHECK-ARM8-NEXT:    cmp r0, #2
-; CHECK-ARM8-NEXT:    mov r12, #1
-; CHECK-ARM8-NEXT:    movlt r12, r1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    sxtb r2, r1
+; CHECK-ARM8-NEXT:    cmp r2, #2
+; CHECK-ARM8-NEXT:    mov r2, #1
+; CHECK-ARM8-NEXT:    movlt r2, r1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB8_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB8_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB8_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB8_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB8_2
 ; CHECK-ARM8-NEXT:  .LBB8_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB8_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxtb r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB8_1
 ; CHECK-ARM8-NEXT:    b .LBB8_5
 ; CHECK-ARM8-NEXT:  .LBB8_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_min_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI8_0
@@ -1687,39 +1806,41 @@ define i8 @test_min_i8() {
 ; CHECK-ARM6-NEXT:  .LBB8_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB8_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    sxtb r0, r1
-; CHECK-ARM6-NEXT:    cmp r0, #2
-; CHECK-ARM6-NEXT:    mov r12, #1
-; CHECK-ARM6-NEXT:    movlt r12, r1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    sxtb r2, r1
+; CHECK-ARM6-NEXT:    cmp r2, #2
+; CHECK-ARM6-NEXT:    mov r2, #1
+; CHECK-ARM6-NEXT:    movlt r2, r1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI8_0
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB8_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB8_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexb r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB8_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB8_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB8_2
 ; CHECK-ARM6-NEXT:  .LBB8_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB8_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxtb r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB8_1
 ; CHECK-ARM6-NEXT:    b .LBB8_5
 ; CHECK-ARM6-NEXT:  .LBB8_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI8_0:
@@ -1727,6 +1848,8 @@ define i8 @test_min_i8() {
 ;
 ; CHECK-THUMB7-LABEL: test_min_i8:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i8
@@ -1737,41 +1860,43 @@ define i8 @test_min_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB8_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB8_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    sxtb r0, r1
-; CHECK-THUMB7-NEXT:    cmp r0, #2
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    sxtb r2, r1
+; CHECK-THUMB7-NEXT:    cmp r2, #2
+; CHECK-THUMB7-NEXT:    mov.w r2, #1
 ; CHECK-THUMB7-NEXT:    it lt
-; CHECK-THUMB7-NEXT:    movlt r12, r1
+; CHECK-THUMB7-NEXT:    movlt r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB8_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB8_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexb r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB8_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB8_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB8_2
 ; CHECK-THUMB7-NEXT:  .LBB8_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB8_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxtb r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB8_1
 ; CHECK-THUMB7-NEXT:    b .LBB8_5
 ; CHECK-THUMB7-NEXT:  .LBB8_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_min_i8:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -1801,43 +1926,46 @@ define i8 @test_min_i8() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB8_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    sxtb r1, r0
-; CHECK-THUMB8BASE-NEXT:    movs r2, #1
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    sxtb r2, r1
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r2, #2
+; CHECK-THUMB8BASE-NEXT:    mov r2, r1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blt .LBB8_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB8_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB8_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB8_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    uxtb r2, r2
 ; CHECK-THUMB8BASE-NEXT:  .LBB8_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB8_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexb r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB8_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB8_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB8_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB8_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB8_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    uxtb r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    uxtb r0, r2
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r0
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB8_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB8_7
@@ -1852,8 +1980,8 @@ entry:
 define i8 @test_umax_i8() {
 ; CHECK-ARM8-LABEL: test_umax_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
-; CHECK-ARM8-NEXT:    .save {r11, lr}
-; CHECK-ARM8-NEXT:    push {r11, lr}
+; CHECK-ARM8-NEXT:    .save {r4, lr}
+; CHECK-ARM8-NEXT:    push {r4, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -1864,44 +1992,46 @@ define i8 @test_umax_i8() {
 ; CHECK-ARM8-NEXT:  .LBB9_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB9_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r12, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    uxtb r1, r12
-; CHECK-ARM8-NEXT:    cmp r1, #1
-; CHECK-ARM8-NEXT:    mov lr, #1
-; CHECK-ARM8-NEXT:    movhi lr, r12
-; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-ARM8-NEXT:    uxtb r12, r12
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    uxtb r2, r1
+; CHECK-ARM8-NEXT:    cmp r2, #1
+; CHECK-ARM8-NEXT:    mov r3, #1
+; CHECK-ARM8-NEXT:    movhi r3, r1
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i8
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i8
+; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB9_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB9_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r12
+; CHECK-ARM8-NEXT:    ldrexb lr, [r12]
+; CHECK-ARM8-NEXT:    cmp lr, r1
 ; CHECK-ARM8-NEXT:    bne .LBB9_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB9_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, lr, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb r4, r3, [r12]
+; CHECK-ARM8-NEXT:    cmp r4, #0
 ; CHECK-ARM8-NEXT:    bne .LBB9_2
 ; CHECK-ARM8-NEXT:  .LBB9_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB9_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, lr, r2
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, lr
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB9_1
 ; CHECK-ARM8-NEXT:    b .LBB9_5
 ; CHECK-ARM8-NEXT:  .LBB9_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    pop {r11, pc}
+; CHECK-ARM8-NEXT:    pop {r4, pc}
 ;
 ; CHECK-ARM6-LABEL: test_umax_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
-; CHECK-ARM6-NEXT:    .save {r11, lr}
-; CHECK-ARM6-NEXT:    push {r11, lr}
+; CHECK-ARM6-NEXT:    .save {r4, lr}
+; CHECK-ARM6-NEXT:    push {r4, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI9_0
@@ -1911,38 +2041,40 @@ define i8 @test_umax_i8() {
 ; CHECK-ARM6-NEXT:  .LBB9_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB9_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r12, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    uxtb r1, r12
-; CHECK-ARM6-NEXT:    cmp r1, #1
-; CHECK-ARM6-NEXT:    mov lr, #1
-; CHECK-ARM6-NEXT:    movhi lr, r12
-; CHECK-ARM6-NEXT:    ldr r3, .LCPI9_0
-; CHECK-ARM6-NEXT:    uxtb r12, r12
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    uxtb r2, r1
+; CHECK-ARM6-NEXT:    cmp r2, #1
+; CHECK-ARM6-NEXT:    mov r3, #1
+; CHECK-ARM6-NEXT:    movhi r3, r1
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI9_0
+; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB9_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB9_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r12
+; CHECK-ARM6-NEXT:    ldrexb lr, [r12]
+; CHECK-ARM6-NEXT:    cmp lr, r1
 ; CHECK-ARM6-NEXT:    bne .LBB9_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB9_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, lr, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb r4, r3, [r12]
+; CHECK-ARM6-NEXT:    cmp r4, #0
 ; CHECK-ARM6-NEXT:    bne .LBB9_2
 ; CHECK-ARM6-NEXT:  .LBB9_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB9_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, lr, r2
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, lr
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB9_1
 ; CHECK-ARM6-NEXT:    b .LBB9_5
 ; CHECK-ARM6-NEXT:  .LBB9_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    pop {r11, pc}
+; CHECK-ARM6-NEXT:    pop {r4, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI9_0:
@@ -1962,33 +2094,35 @@ define i8 @test_umax_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB9_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB9_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r4, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    uxtb r1, r4
-; CHECK-THUMB7-NEXT:    cmp r1, #1
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    uxtb r2, r1
+; CHECK-THUMB7-NEXT:    cmp r2, #1
+; CHECK-THUMB7-NEXT:    mov.w r3, #1
 ; CHECK-THUMB7-NEXT:    it hi
-; CHECK-THUMB7-NEXT:    movhi r12, r4
-; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-THUMB7-NEXT:    uxtb r4, r4
+; CHECK-THUMB7-NEXT:    movhi r3, r1
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i8
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i8
+; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB9_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB9_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r4
+; CHECK-THUMB7-NEXT:    ldrexb lr, [r12]
+; CHECK-THUMB7-NEXT:    cmp lr, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB9_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB9_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r3, [r12]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB9_2
 ; CHECK-THUMB7-NEXT:  .LBB9_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB9_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, lr, r2
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, lr
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB9_1
 ; CHECK-THUMB7-NEXT:    b .LBB9_5
@@ -2012,8 +2146,8 @@ define i8 @test_umax_i8() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_umax_i8:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #24
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #24
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i8
@@ -2025,51 +2159,54 @@ define i8 @test_umax_i8() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB9_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #20] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    uxtb r1, r0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    uxtb r2, r1
 ; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #12] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r4, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bhi .LBB9_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB9_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB9_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB9_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r5, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    uxtb r4, r4
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #16] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    uxtb r2, r2
 ; CHECK-THUMB8BASE-NEXT:  .LBB9_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB9_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r4
+; CHECK-THUMB8BASE-NEXT:    ldrexb r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB9_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB9_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r5, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB9_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB9_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB9_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r0
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB9_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB9_7
 ; CHECK-THUMB8BASE-NEXT:  .LBB9_7: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #24
-; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
 entry:
   %0 = atomicrmw umax ptr @atomic_i8, i8 1 monotonic
   ret i8 %0
@@ -2077,8 +2214,8 @@ entry:
 define i8 @test_umin_i8() {
 ; CHECK-ARM8-LABEL: test_umin_i8:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
-; CHECK-ARM8-NEXT:    .save {r11, lr}
-; CHECK-ARM8-NEXT:    push {r11, lr}
+; CHECK-ARM8-NEXT:    .save {r4, lr}
+; CHECK-ARM8-NEXT:    push {r4, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i8
@@ -2089,44 +2226,46 @@ define i8 @test_umin_i8() {
 ; CHECK-ARM8-NEXT:  .LBB10_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB10_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r12, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    uxtb r1, r12
-; CHECK-ARM8-NEXT:    cmp r1, #2
-; CHECK-ARM8-NEXT:    mov lr, #1
-; CHECK-ARM8-NEXT:    movlo lr, r12
-; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-ARM8-NEXT:    uxtb r12, r12
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    uxtb r2, r1
+; CHECK-ARM8-NEXT:    cmp r2, #2
+; CHECK-ARM8-NEXT:    mov r3, #1
+; CHECK-ARM8-NEXT:    movlo r3, r1
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i8
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i8
+; CHECK-ARM8-NEXT:    uxtb r1, r1
 ; CHECK-ARM8-NEXT:  .LBB10_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB10_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r12
+; CHECK-ARM8-NEXT:    ldrexb lr, [r12]
+; CHECK-ARM8-NEXT:    cmp lr, r1
 ; CHECK-ARM8-NEXT:    bne .LBB10_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB10_2 Depth=2
-; CHECK-ARM8-NEXT:    strexb r2, lr, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexb r4, r3, [r12]
+; CHECK-ARM8-NEXT:    cmp r4, #0
 ; CHECK-ARM8-NEXT:    bne .LBB10_2
 ; CHECK-ARM8-NEXT:  .LBB10_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB10_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, lr, r2
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, lr
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB10_1
 ; CHECK-ARM8-NEXT:    b .LBB10_5
 ; CHECK-ARM8-NEXT:  .LBB10_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    pop {r11, pc}
+; CHECK-ARM8-NEXT:    pop {r4, pc}
 ;
 ; CHECK-ARM6-LABEL: test_umin_i8:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
-; CHECK-ARM6-NEXT:    .save {r11, lr}
-; CHECK-ARM6-NEXT:    push {r11, lr}
+; CHECK-ARM6-NEXT:    .save {r4, lr}
+; CHECK-ARM6-NEXT:    push {r4, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI10_0
@@ -2136,38 +2275,40 @@ define i8 @test_umin_i8() {
 ; CHECK-ARM6-NEXT:  .LBB10_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB10_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r12, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    uxtb r1, r12
-; CHECK-ARM6-NEXT:    cmp r1, #2
-; CHECK-ARM6-NEXT:    mov lr, #1
-; CHECK-ARM6-NEXT:    movlo lr, r12
-; CHECK-ARM6-NEXT:    ldr r3, .LCPI10_0
-; CHECK-ARM6-NEXT:    uxtb r12, r12
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    uxtb r2, r1
+; CHECK-ARM6-NEXT:    cmp r2, #2
+; CHECK-ARM6-NEXT:    mov r3, #1
+; CHECK-ARM6-NEXT:    movlo r3, r1
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI10_0
+; CHECK-ARM6-NEXT:    uxtb r1, r1
 ; CHECK-ARM6-NEXT:  .LBB10_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB10_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexb r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r12
+; CHECK-ARM6-NEXT:    ldrexb lr, [r12]
+; CHECK-ARM6-NEXT:    cmp lr, r1
 ; CHECK-ARM6-NEXT:    bne .LBB10_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB10_2 Depth=2
-; CHECK-ARM6-NEXT:    strexb r2, lr, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexb r4, r3, [r12]
+; CHECK-ARM6-NEXT:    cmp r4, #0
 ; CHECK-ARM6-NEXT:    bne .LBB10_2
 ; CHECK-ARM6-NEXT:  .LBB10_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB10_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, lr, r2
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, lr
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB10_1
 ; CHECK-ARM6-NEXT:    b .LBB10_5
 ; CHECK-ARM6-NEXT:  .LBB10_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    pop {r11, pc}
+; CHECK-ARM6-NEXT:    pop {r4, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI10_0:
@@ -2187,33 +2328,35 @@ define i8 @test_umin_i8() {
 ; CHECK-THUMB7-NEXT:  .LBB10_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB10_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r4, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    uxtb r1, r4
-; CHECK-THUMB7-NEXT:    cmp r1, #2
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    uxtb r2, r1
+; CHECK-THUMB7-NEXT:    cmp r2, #2
+; CHECK-THUMB7-NEXT:    mov.w r3, #1
 ; CHECK-THUMB7-NEXT:    it lo
-; CHECK-THUMB7-NEXT:    movlo r12, r4
-; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-THUMB7-NEXT:    uxtb r4, r4
+; CHECK-THUMB7-NEXT:    movlo r3, r1
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i8
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i8
+; CHECK-THUMB7-NEXT:    uxtb r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB10_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB10_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r4
+; CHECK-THUMB7-NEXT:    ldrexb lr, [r12]
+; CHECK-THUMB7-NEXT:    cmp lr, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB10_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB10_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexb r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexb r4, r3, [r12]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB10_2
 ; CHECK-THUMB7-NEXT:  .LBB10_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB10_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, lr, r2
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, lr
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB10_1
 ; CHECK-THUMB7-NEXT:    b .LBB10_5
@@ -2237,8 +2380,8 @@ define i8 @test_umin_i8() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_umin_i8:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #24
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #24
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i8
@@ -2250,51 +2393,54 @@ define i8 @test_umin_i8() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB10_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #20] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    uxtb r1, r0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    uxtb r2, r1
 ; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #12] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r2, #2
+; CHECK-THUMB8BASE-NEXT:    mov r4, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blo .LBB10_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB10_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB10_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB10_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r5, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i8
-; CHECK-THUMB8BASE-NEXT:    uxtb r4, r4
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i8
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #16] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    uxtb r2, r2
 ; CHECK-THUMB8BASE-NEXT:  .LBB10_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB10_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexb r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r4
+; CHECK-THUMB8BASE-NEXT:    ldrexb r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB10_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB10_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexb r2, r5, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexb r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB10_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB10_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB10_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r0
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB10_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB10_7
 ; CHECK-THUMB8BASE-NEXT:  .LBB10_7: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #24
-; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
 entry:
   %0 = atomicrmw umin ptr @atomic_i8, i8 1 monotonic
   ret i8 %0
@@ -2304,6 +2450,8 @@ entry:
 define i16 @test_xchg_i16() {
 ; CHECK-ARM8-LABEL: test_xchg_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -2314,40 +2462,44 @@ define i16 @test_xchg_i16() {
 ; CHECK-ARM8-NEXT:  .LBB11_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB11_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-ARM8-NEXT:    mov r12, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    movw r2, :lower16:atomic_i16
+; CHECK-ARM8-NEXT:    movt r2, :upper16:atomic_i16
+; CHECK-ARM8-NEXT:    mov r3, #1
 ; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB11_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB11_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexh r12, [r2]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB11_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB11_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh lr, r3, [r2]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB11_2
 ; CHECK-ARM8-NEXT:  .LBB11_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB11_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxth r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB11_1
 ; CHECK-ARM8-NEXT:    b .LBB11_5
 ; CHECK-ARM8-NEXT:  .LBB11_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_xchg_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI11_0
@@ -2357,36 +2509,38 @@ define i16 @test_xchg_i16() {
 ; CHECK-ARM6-NEXT:  .LBB11_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB11_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r3, .LCPI11_0
-; CHECK-ARM6-NEXT:    mov r12, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, .LCPI11_0
+; CHECK-ARM6-NEXT:    mov r3, #1
 ; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB11_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB11_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexh r12, [r2]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB11_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB11_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh lr, r3, [r2]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB11_2
 ; CHECK-ARM6-NEXT:  .LBB11_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB11_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxth r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB11_1
 ; CHECK-ARM6-NEXT:    b .LBB11_5
 ; CHECK-ARM6-NEXT:  .LBB11_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI11_0:
@@ -2394,6 +2548,8 @@ define i16 @test_xchg_i16() {
 ;
 ; CHECK-THUMB7-LABEL: test_xchg_i16:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i16
@@ -2404,37 +2560,39 @@ define i16 @test_xchg_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB11_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB11_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    movw r2, :lower16:atomic_i16
+; CHECK-THUMB7-NEXT:    movt r2, :upper16:atomic_i16
+; CHECK-THUMB7-NEXT:    movs r3, #1
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB11_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB11_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexh r12, [r2]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB11_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB11_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r3, [r2]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB11_2
 ; CHECK-THUMB7-NEXT:  .LBB11_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB11_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB11_1
 ; CHECK-THUMB7-NEXT:    b .LBB11_5
 ; CHECK-THUMB7-NEXT:  .LBB11_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_xchg_i16:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -2451,8 +2609,8 @@ define i16 @test_xchg_i16() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_xchg_i16:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i16
@@ -2463,37 +2621,39 @@ define i16 @test_xchg_i16() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB11_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB11_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    movs r4, #1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB11_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB11_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexh r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB11_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB11_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB11_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB11_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB11_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB11_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB11_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB11_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw xchg ptr @atomic_i16, i16 1 monotonic
   ret i16 %0
@@ -2501,6 +2661,8 @@ entry:
 define i16 @test_add_i16() {
 ; CHECK-ARM8-LABEL: test_add_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -2511,40 +2673,44 @@ define i16 @test_add_i16() {
 ; CHECK-ARM8-NEXT:  .LBB12_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB12_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    add r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    add r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB12_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB12_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB12_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB12_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB12_2
 ; CHECK-ARM8-NEXT:  .LBB12_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB12_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxth r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB12_1
 ; CHECK-ARM8-NEXT:    b .LBB12_5
 ; CHECK-ARM8-NEXT:  .LBB12_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_add_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI12_0
@@ -2554,36 +2720,38 @@ define i16 @test_add_i16() {
 ; CHECK-ARM6-NEXT:  .LBB12_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB12_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    add r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    add r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI12_0
 ; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB12_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB12_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB12_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB12_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB12_2
 ; CHECK-ARM6-NEXT:  .LBB12_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB12_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxth r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB12_1
 ; CHECK-ARM6-NEXT:    b .LBB12_5
 ; CHECK-ARM6-NEXT:  .LBB12_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI12_0:
@@ -2591,6 +2759,8 @@ define i16 @test_add_i16() {
 ;
 ; CHECK-THUMB7-LABEL: test_add_i16:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i16
@@ -2601,37 +2771,39 @@ define i16 @test_add_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB12_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB12_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    add.w r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    adds r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB12_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB12_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexh r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB12_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB12_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB12_2
 ; CHECK-THUMB7-NEXT:  .LBB12_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB12_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB12_1
 ; CHECK-THUMB7-NEXT:    b .LBB12_5
 ; CHECK-THUMB7-NEXT:  .LBB12_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_add_i16:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -2648,8 +2820,8 @@ define i16 @test_add_i16() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_add_i16:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i16
@@ -2660,37 +2832,39 @@ define i16 @test_add_i16() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB12_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB12_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    adds r4, r1, #1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    adds r2, r1, #1
 ; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB12_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB12_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexh r4, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB12_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB12_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r5, r2, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB12_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB12_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB12_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB12_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB12_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB12_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw add ptr @atomic_i16, i16 1 monotonic
   ret i16 %0
@@ -2698,6 +2872,8 @@ entry:
 define i16 @test_sub_i16() {
 ; CHECK-ARM8-LABEL: test_sub_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -2708,40 +2884,44 @@ define i16 @test_sub_i16() {
 ; CHECK-ARM8-NEXT:  .LBB13_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB13_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    sub r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    sub r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB13_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB13_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB13_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB13_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB13_2
 ; CHECK-ARM8-NEXT:  .LBB13_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB13_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxth r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB13_1
 ; CHECK-ARM8-NEXT:    b .LBB13_5
 ; CHECK-ARM8-NEXT:  .LBB13_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_sub_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI13_0
@@ -2751,36 +2931,38 @@ define i16 @test_sub_i16() {
 ; CHECK-ARM6-NEXT:  .LBB13_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB13_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    sub r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    sub r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI13_0
 ; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB13_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB13_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB13_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB13_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB13_2
 ; CHECK-ARM6-NEXT:  .LBB13_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB13_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxth r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB13_1
 ; CHECK-ARM6-NEXT:    b .LBB13_5
 ; CHECK-ARM6-NEXT:  .LBB13_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI13_0:
@@ -2788,6 +2970,8 @@ define i16 @test_sub_i16() {
 ;
 ; CHECK-THUMB7-LABEL: test_sub_i16:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i16
@@ -2798,37 +2982,39 @@ define i16 @test_sub_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB13_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB13_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    sub.w r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    subs r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB13_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB13_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexh r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB13_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB13_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB13_2
 ; CHECK-THUMB7-NEXT:  .LBB13_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB13_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB13_1
 ; CHECK-THUMB7-NEXT:    b .LBB13_5
 ; CHECK-THUMB7-NEXT:  .LBB13_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_sub_i16:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -2845,8 +3031,8 @@ define i16 @test_sub_i16() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_sub_i16:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i16
@@ -2857,37 +3043,39 @@ define i16 @test_sub_i16() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB13_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB13_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    subs r4, r1, #1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    subs r2, r1, #1
 ; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB13_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB13_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexh r4, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB13_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB13_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r5, r2, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB13_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB13_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB13_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB13_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB13_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB13_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw sub ptr @atomic_i16, i16 1 monotonic
   ret i16 %0
@@ -2895,6 +3083,8 @@ entry:
 define i16 @test_and_i16() {
 ; CHECK-ARM8-LABEL: test_and_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -2905,40 +3095,44 @@ define i16 @test_and_i16() {
 ; CHECK-ARM8-NEXT:  .LBB14_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB14_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    and r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    and r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB14_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB14_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB14_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB14_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB14_2
 ; CHECK-ARM8-NEXT:  .LBB14_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB14_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxth r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB14_1
 ; CHECK-ARM8-NEXT:    b .LBB14_5
 ; CHECK-ARM8-NEXT:  .LBB14_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_and_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI14_0
@@ -2948,36 +3142,38 @@ define i16 @test_and_i16() {
 ; CHECK-ARM6-NEXT:  .LBB14_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB14_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    and r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    and r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI14_0
 ; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB14_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB14_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB14_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB14_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB14_2
 ; CHECK-ARM6-NEXT:  .LBB14_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB14_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxth r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB14_1
 ; CHECK-ARM6-NEXT:    b .LBB14_5
 ; CHECK-ARM6-NEXT:  .LBB14_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI14_0:
@@ -2985,6 +3181,8 @@ define i16 @test_and_i16() {
 ;
 ; CHECK-THUMB7-LABEL: test_and_i16:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i16
@@ -2995,37 +3193,39 @@ define i16 @test_and_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB14_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB14_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    and r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    and r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB14_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB14_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexh r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB14_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB14_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB14_2
 ; CHECK-THUMB7-NEXT:  .LBB14_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB14_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB14_1
 ; CHECK-THUMB7-NEXT:    b .LBB14_5
 ; CHECK-THUMB7-NEXT:  .LBB14_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_and_i16:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -3042,8 +3242,8 @@ define i16 @test_and_i16() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_and_i16:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i16
@@ -3054,39 +3254,41 @@ define i16 @test_and_i16() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB14_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB14_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mov r4, r1
-; CHECK-THUMB8BASE-NEXT:    ands r4, r0
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    ands r3, r2
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i16
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB14_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB14_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexh r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB14_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB14_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB14_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB14_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB14_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB14_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB14_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB14_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw and ptr @atomic_i16, i16 1 monotonic
   ret i16 %0
@@ -3094,6 +3296,8 @@ entry:
 define i16 @test_nand_i16() {
 ; CHECK-ARM8-LABEL: test_nand_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -3104,42 +3308,46 @@ define i16 @test_nand_i16() {
 ; CHECK-ARM8-NEXT:  .LBB15_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB15_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mvn r0, r1
-; CHECK-ARM8-NEXT:    mvn r2, #1
-; CHECK-ARM8-NEXT:    orr r12, r0, r2
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    mvn r2, r1
+; CHECK-ARM8-NEXT:    mvn r3, #1
+; CHECK-ARM8-NEXT:    orr r2, r2, r3
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB15_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB15_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB15_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB15_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB15_2
 ; CHECK-ARM8-NEXT:  .LBB15_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB15_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxth r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB15_1
 ; CHECK-ARM8-NEXT:    b .LBB15_5
 ; CHECK-ARM8-NEXT:  .LBB15_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_nand_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI15_0
@@ -3149,38 +3357,40 @@ define i16 @test_nand_i16() {
 ; CHECK-ARM6-NEXT:  .LBB15_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB15_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mvn r0, r1
-; CHECK-ARM6-NEXT:    mvn r2, #1
-; CHECK-ARM6-NEXT:    orr r12, r0, r2
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    mvn r2, r1
+; CHECK-ARM6-NEXT:    mvn r3, #1
+; CHECK-ARM6-NEXT:    orr r2, r2, r3
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI15_0
 ; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB15_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB15_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB15_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB15_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB15_2
 ; CHECK-ARM6-NEXT:  .LBB15_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB15_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxth r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB15_1
 ; CHECK-ARM6-NEXT:    b .LBB15_5
 ; CHECK-ARM6-NEXT:  .LBB15_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI15_0:
@@ -3188,6 +3398,8 @@ define i16 @test_nand_i16() {
 ;
 ; CHECK-THUMB7-LABEL: test_nand_i16:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i16
@@ -3198,38 +3410,40 @@ define i16 @test_nand_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB15_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB15_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    mvn r0, #1
-; CHECK-THUMB7-NEXT:    orn r12, r0, r1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    mvn r2, #1
+; CHECK-THUMB7-NEXT:    orn r2, r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB15_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB15_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexh r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB15_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB15_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB15_2
 ; CHECK-THUMB7-NEXT:  .LBB15_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB15_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB15_1
 ; CHECK-THUMB7-NEXT:    b .LBB15_5
 ; CHECK-THUMB7-NEXT:  .LBB15_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_nand_i16:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -3246,8 +3460,8 @@ define i16 @test_nand_i16() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_nand_i16:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i16
@@ -3258,40 +3472,42 @@ define i16 @test_nand_i16() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB15_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB15_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    mvns r4, r1
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mvns r0, r0
-; CHECK-THUMB8BASE-NEXT:    orrs r4, r0
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    mvns r2, r1
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    mvns r3, r3
+; CHECK-THUMB8BASE-NEXT:    orrs r2, r3
 ; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB15_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB15_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexh r4, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB15_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB15_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r5, r2, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB15_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB15_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB15_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB15_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB15_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB15_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw nand ptr @atomic_i16, i16 1 monotonic
   ret i16 %0
@@ -3299,6 +3515,8 @@ entry:
 define i16 @test_or_i16() {
 ; CHECK-ARM8-LABEL: test_or_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -3309,40 +3527,44 @@ define i16 @test_or_i16() {
 ; CHECK-ARM8-NEXT:  .LBB16_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB16_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    orr r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    orr r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB16_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB16_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB16_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB16_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB16_2
 ; CHECK-ARM8-NEXT:  .LBB16_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB16_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxth r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB16_1
 ; CHECK-ARM8-NEXT:    b .LBB16_5
 ; CHECK-ARM8-NEXT:  .LBB16_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_or_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI16_0
@@ -3352,36 +3574,38 @@ define i16 @test_or_i16() {
 ; CHECK-ARM6-NEXT:  .LBB16_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB16_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    orr r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    orr r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI16_0
 ; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB16_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB16_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB16_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB16_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB16_2
 ; CHECK-ARM6-NEXT:  .LBB16_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB16_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxth r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB16_1
 ; CHECK-ARM6-NEXT:    b .LBB16_5
 ; CHECK-ARM6-NEXT:  .LBB16_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI16_0:
@@ -3389,6 +3613,8 @@ define i16 @test_or_i16() {
 ;
 ; CHECK-THUMB7-LABEL: test_or_i16:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i16
@@ -3399,37 +3625,39 @@ define i16 @test_or_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB16_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB16_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    orr r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    orr r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB16_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB16_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexh r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB16_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB16_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB16_2
 ; CHECK-THUMB7-NEXT:  .LBB16_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB16_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB16_1
 ; CHECK-THUMB7-NEXT:    b .LBB16_5
 ; CHECK-THUMB7-NEXT:  .LBB16_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_or_i16:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -3446,8 +3674,8 @@ define i16 @test_or_i16() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_or_i16:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i16
@@ -3458,39 +3686,41 @@ define i16 @test_or_i16() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB16_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB16_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mov r4, r1
-; CHECK-THUMB8BASE-NEXT:    orrs r4, r0
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    orrs r3, r2
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i16
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB16_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB16_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexh r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB16_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB16_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB16_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB16_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB16_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB16_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB16_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB16_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw or ptr @atomic_i16, i16 1 monotonic
   ret i16 %0
@@ -3498,6 +3728,8 @@ entry:
 define i16 @test_xor_i16() {
 ; CHECK-ARM8-LABEL: test_xor_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -3508,40 +3740,44 @@ define i16 @test_xor_i16() {
 ; CHECK-ARM8-NEXT:  .LBB17_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB17_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    eor r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    eor r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB17_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB17_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB17_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB17_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB17_2
 ; CHECK-ARM8-NEXT:  .LBB17_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB17_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxth r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB17_1
 ; CHECK-ARM8-NEXT:    b .LBB17_5
 ; CHECK-ARM8-NEXT:  .LBB17_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_xor_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI17_0
@@ -3551,36 +3787,38 @@ define i16 @test_xor_i16() {
 ; CHECK-ARM6-NEXT:  .LBB17_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB17_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    eor r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    eor r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI17_0
 ; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB17_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB17_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB17_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB17_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB17_2
 ; CHECK-ARM6-NEXT:  .LBB17_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB17_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxth r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB17_1
 ; CHECK-ARM6-NEXT:    b .LBB17_5
 ; CHECK-ARM6-NEXT:  .LBB17_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI17_0:
@@ -3588,6 +3826,8 @@ define i16 @test_xor_i16() {
 ;
 ; CHECK-THUMB7-LABEL: test_xor_i16:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i16
@@ -3598,37 +3838,39 @@ define i16 @test_xor_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB17_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB17_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    eor r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    eor r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB17_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB17_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexh r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB17_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB17_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB17_2
 ; CHECK-THUMB7-NEXT:  .LBB17_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB17_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB17_1
 ; CHECK-THUMB7-NEXT:    b .LBB17_5
 ; CHECK-THUMB7-NEXT:  .LBB17_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_xor_i16:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -3645,8 +3887,8 @@ define i16 @test_xor_i16() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_xor_i16:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i16
@@ -3657,39 +3899,41 @@ define i16 @test_xor_i16() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB17_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB17_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mov r4, r1
-; CHECK-THUMB8BASE-NEXT:    eors r4, r0
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    eors r3, r2
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i16
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
 ; CHECK-THUMB8BASE-NEXT:  .LBB17_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB17_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexh r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB17_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB17_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB17_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB17_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB17_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB17_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB17_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB17_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw xor ptr @atomic_i16, i16 1 monotonic
   ret i16 %0
@@ -3697,6 +3941,8 @@ entry:
 define i16 @test_max_i16() {
 ; CHECK-ARM8-LABEL: test_max_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -3707,43 +3953,47 @@ define i16 @test_max_i16() {
 ; CHECK-ARM8-NEXT:  .LBB18_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB18_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    sxth r0, r1
-; CHECK-ARM8-NEXT:    cmp r0, #1
-; CHECK-ARM8-NEXT:    mov r12, #1
-; CHECK-ARM8-NEXT:    movgt r12, r1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    sxth r2, r1
+; CHECK-ARM8-NEXT:    cmp r2, #1
+; CHECK-ARM8-NEXT:    mov r2, #1
+; CHECK-ARM8-NEXT:    movgt r2, r1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB18_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB18_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB18_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB18_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB18_2
 ; CHECK-ARM8-NEXT:  .LBB18_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB18_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxth r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB18_1
 ; CHECK-ARM8-NEXT:    b .LBB18_5
 ; CHECK-ARM8-NEXT:  .LBB18_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_max_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI18_0
@@ -3753,39 +4003,41 @@ define i16 @test_max_i16() {
 ; CHECK-ARM6-NEXT:  .LBB18_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB18_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    sxth r0, r1
-; CHECK-ARM6-NEXT:    cmp r0, #1
-; CHECK-ARM6-NEXT:    mov r12, #1
-; CHECK-ARM6-NEXT:    movgt r12, r1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    sxth r2, r1
+; CHECK-ARM6-NEXT:    cmp r2, #1
+; CHECK-ARM6-NEXT:    mov r2, #1
+; CHECK-ARM6-NEXT:    movgt r2, r1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI18_0
 ; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB18_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB18_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB18_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB18_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB18_2
 ; CHECK-ARM6-NEXT:  .LBB18_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB18_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxth r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB18_1
 ; CHECK-ARM6-NEXT:    b .LBB18_5
 ; CHECK-ARM6-NEXT:  .LBB18_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI18_0:
@@ -3793,6 +4045,8 @@ define i16 @test_max_i16() {
 ;
 ; CHECK-THUMB7-LABEL: test_max_i16:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i16
@@ -3803,41 +4057,43 @@ define i16 @test_max_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB18_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB18_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    sxth r0, r1
-; CHECK-THUMB7-NEXT:    cmp r0, #1
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    sxth r2, r1
+; CHECK-THUMB7-NEXT:    cmp r2, #1
+; CHECK-THUMB7-NEXT:    mov.w r2, #1
 ; CHECK-THUMB7-NEXT:    it gt
-; CHECK-THUMB7-NEXT:    movgt r12, r1
+; CHECK-THUMB7-NEXT:    movgt r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB18_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB18_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexh r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB18_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB18_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB18_2
 ; CHECK-THUMB7-NEXT:  .LBB18_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB18_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB18_1
 ; CHECK-THUMB7-NEXT:    b .LBB18_5
 ; CHECK-THUMB7-NEXT:  .LBB18_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_max_i16:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -3867,43 +4123,46 @@ define i16 @test_max_i16() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB18_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    sxth r1, r0
-; CHECK-THUMB8BASE-NEXT:    movs r2, #1
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    sxth r2, r1
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r2, r1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bgt .LBB18_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB18_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB18_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB18_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    uxth r2, r2
 ; CHECK-THUMB8BASE-NEXT:  .LBB18_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB18_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexh r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB18_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB18_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB18_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB18_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB18_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    uxth r0, r2
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r0
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB18_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB18_7
@@ -3918,6 +4177,8 @@ entry:
 define i16 @test_min_i16() {
 ; CHECK-ARM8-LABEL: test_min_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -3928,43 +4189,47 @@ define i16 @test_min_i16() {
 ; CHECK-ARM8-NEXT:  .LBB19_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB19_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    sxth r0, r1
-; CHECK-ARM8-NEXT:    cmp r0, #2
-; CHECK-ARM8-NEXT:    mov r12, #1
-; CHECK-ARM8-NEXT:    movlt r12, r1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    sxth r2, r1
+; CHECK-ARM8-NEXT:    cmp r2, #2
+; CHECK-ARM8-NEXT:    mov r2, #1
+; CHECK-ARM8-NEXT:    movlt r2, r1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB19_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB19_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB19_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB19_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB19_2
 ; CHECK-ARM8-NEXT:  .LBB19_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB19_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    uxth r1, r1
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB19_1
 ; CHECK-ARM8-NEXT:    b .LBB19_5
 ; CHECK-ARM8-NEXT:  .LBB19_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_min_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI19_0
@@ -3974,39 +4239,41 @@ define i16 @test_min_i16() {
 ; CHECK-ARM6-NEXT:  .LBB19_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB19_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    sxth r0, r1
-; CHECK-ARM6-NEXT:    cmp r0, #2
-; CHECK-ARM6-NEXT:    mov r12, #1
-; CHECK-ARM6-NEXT:    movlt r12, r1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    sxth r2, r1
+; CHECK-ARM6-NEXT:    cmp r2, #2
+; CHECK-ARM6-NEXT:    mov r2, #1
+; CHECK-ARM6-NEXT:    movlt r2, r1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI19_0
 ; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB19_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB19_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrexh r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB19_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB19_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB19_2
 ; CHECK-ARM6-NEXT:  .LBB19_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB19_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    uxth r1, r1
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB19_1
 ; CHECK-ARM6-NEXT:    b .LBB19_5
 ; CHECK-ARM6-NEXT:  .LBB19_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI19_0:
@@ -4014,6 +4281,8 @@ define i16 @test_min_i16() {
 ;
 ; CHECK-THUMB7-LABEL: test_min_i16:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i16
@@ -4024,41 +4293,43 @@ define i16 @test_min_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB19_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB19_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    sxth r0, r1
-; CHECK-THUMB7-NEXT:    cmp r0, #2
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    sxth r2, r1
+; CHECK-THUMB7-NEXT:    cmp r2, #2
+; CHECK-THUMB7-NEXT:    mov.w r2, #1
 ; CHECK-THUMB7-NEXT:    it lt
-; CHECK-THUMB7-NEXT:    movlt r12, r1
+; CHECK-THUMB7-NEXT:    movlt r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB19_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB19_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrexh r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB19_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB19_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB19_2
 ; CHECK-THUMB7-NEXT:  .LBB19_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB19_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    uxth r1, r1
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB19_1
 ; CHECK-THUMB7-NEXT:    b .LBB19_5
 ; CHECK-THUMB7-NEXT:  .LBB19_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_min_i16:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -4088,43 +4359,46 @@ define i16 @test_min_i16() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB19_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    sxth r1, r0
-; CHECK-THUMB8BASE-NEXT:    movs r2, #1
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    sxth r2, r1
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r2, #2
+; CHECK-THUMB8BASE-NEXT:    mov r2, r1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blt .LBB19_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB19_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB19_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB19_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    uxth r2, r2
 ; CHECK-THUMB8BASE-NEXT:  .LBB19_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB19_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrexh r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB19_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB19_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB19_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB19_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB19_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    uxth r1, r1
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    uxth r0, r2
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r0
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB19_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB19_7
@@ -4139,8 +4413,8 @@ entry:
 define i16 @test_umax_i16() {
 ; CHECK-ARM8-LABEL: test_umax_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
-; CHECK-ARM8-NEXT:    .save {r11, lr}
-; CHECK-ARM8-NEXT:    push {r11, lr}
+; CHECK-ARM8-NEXT:    .save {r4, lr}
+; CHECK-ARM8-NEXT:    push {r4, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -4151,44 +4425,46 @@ define i16 @test_umax_i16() {
 ; CHECK-ARM8-NEXT:  .LBB20_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB20_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r12, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    uxth r1, r12
-; CHECK-ARM8-NEXT:    cmp r1, #1
-; CHECK-ARM8-NEXT:    mov lr, #1
-; CHECK-ARM8-NEXT:    movhi lr, r12
-; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-ARM8-NEXT:    uxth r12, r12
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    uxth r2, r1
+; CHECK-ARM8-NEXT:    cmp r2, #1
+; CHECK-ARM8-NEXT:    mov r3, #1
+; CHECK-ARM8-NEXT:    movhi r3, r1
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i16
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i16
+; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB20_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB20_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r12
+; CHECK-ARM8-NEXT:    ldrexh lr, [r12]
+; CHECK-ARM8-NEXT:    cmp lr, r1
 ; CHECK-ARM8-NEXT:    bne .LBB20_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB20_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, lr, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh r4, r3, [r12]
+; CHECK-ARM8-NEXT:    cmp r4, #0
 ; CHECK-ARM8-NEXT:    bne .LBB20_2
 ; CHECK-ARM8-NEXT:  .LBB20_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB20_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, lr, r2
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, lr
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB20_1
 ; CHECK-ARM8-NEXT:    b .LBB20_5
 ; CHECK-ARM8-NEXT:  .LBB20_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    pop {r11, pc}
+; CHECK-ARM8-NEXT:    pop {r4, pc}
 ;
 ; CHECK-ARM6-LABEL: test_umax_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
-; CHECK-ARM6-NEXT:    .save {r11, lr}
-; CHECK-ARM6-NEXT:    push {r11, lr}
+; CHECK-ARM6-NEXT:    .save {r4, lr}
+; CHECK-ARM6-NEXT:    push {r4, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI20_0
@@ -4198,38 +4474,40 @@ define i16 @test_umax_i16() {
 ; CHECK-ARM6-NEXT:  .LBB20_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB20_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r12, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    uxth r1, r12
-; CHECK-ARM6-NEXT:    cmp r1, #1
-; CHECK-ARM6-NEXT:    mov lr, #1
-; CHECK-ARM6-NEXT:    movhi lr, r12
-; CHECK-ARM6-NEXT:    ldr r3, .LCPI20_0
-; CHECK-ARM6-NEXT:    uxth r12, r12
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    uxth r2, r1
+; CHECK-ARM6-NEXT:    cmp r2, #1
+; CHECK-ARM6-NEXT:    mov r3, #1
+; CHECK-ARM6-NEXT:    movhi r3, r1
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI20_0
+; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB20_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB20_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r12
+; CHECK-ARM6-NEXT:    ldrexh lr, [r12]
+; CHECK-ARM6-NEXT:    cmp lr, r1
 ; CHECK-ARM6-NEXT:    bne .LBB20_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB20_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, lr, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh r4, r3, [r12]
+; CHECK-ARM6-NEXT:    cmp r4, #0
 ; CHECK-ARM6-NEXT:    bne .LBB20_2
 ; CHECK-ARM6-NEXT:  .LBB20_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB20_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, lr, r2
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, lr
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB20_1
 ; CHECK-ARM6-NEXT:    b .LBB20_5
 ; CHECK-ARM6-NEXT:  .LBB20_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    pop {r11, pc}
+; CHECK-ARM6-NEXT:    pop {r4, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI20_0:
@@ -4249,33 +4527,35 @@ define i16 @test_umax_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB20_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB20_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r4, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    uxth r1, r4
-; CHECK-THUMB7-NEXT:    cmp r1, #1
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    uxth r2, r1
+; CHECK-THUMB7-NEXT:    cmp r2, #1
+; CHECK-THUMB7-NEXT:    mov.w r3, #1
 ; CHECK-THUMB7-NEXT:    it hi
-; CHECK-THUMB7-NEXT:    movhi r12, r4
-; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-THUMB7-NEXT:    uxth r4, r4
+; CHECK-THUMB7-NEXT:    movhi r3, r1
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i16
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i16
+; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB20_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB20_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r4
+; CHECK-THUMB7-NEXT:    ldrexh lr, [r12]
+; CHECK-THUMB7-NEXT:    cmp lr, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB20_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB20_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r3, [r12]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB20_2
 ; CHECK-THUMB7-NEXT:  .LBB20_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB20_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, lr, r2
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, lr
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB20_1
 ; CHECK-THUMB7-NEXT:    b .LBB20_5
@@ -4299,8 +4579,8 @@ define i16 @test_umax_i16() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_umax_i16:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #24
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #24
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i16
@@ -4312,51 +4592,54 @@ define i16 @test_umax_i16() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB20_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #20] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    uxth r1, r0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    uxth r2, r1
 ; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #12] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r4, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bhi .LBB20_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB20_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB20_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB20_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r5, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    uxth r4, r4
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #16] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    uxth r2, r2
 ; CHECK-THUMB8BASE-NEXT:  .LBB20_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB20_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r4
+; CHECK-THUMB8BASE-NEXT:    ldrexh r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB20_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB20_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r5, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB20_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB20_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB20_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r0
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB20_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB20_7
 ; CHECK-THUMB8BASE-NEXT:  .LBB20_7: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #24
-; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
 entry:
   %0 = atomicrmw umax ptr @atomic_i16, i16 1 monotonic
   ret i16 %0
@@ -4364,8 +4647,8 @@ entry:
 define i16 @test_umin_i16() {
 ; CHECK-ARM8-LABEL: test_umin_i16:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
-; CHECK-ARM8-NEXT:    .save {r11, lr}
-; CHECK-ARM8-NEXT:    push {r11, lr}
+; CHECK-ARM8-NEXT:    .save {r4, lr}
+; CHECK-ARM8-NEXT:    push {r4, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i16
@@ -4376,44 +4659,46 @@ define i16 @test_umin_i16() {
 ; CHECK-ARM8-NEXT:  .LBB21_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB21_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r12, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    uxth r1, r12
-; CHECK-ARM8-NEXT:    cmp r1, #2
-; CHECK-ARM8-NEXT:    mov lr, #1
-; CHECK-ARM8-NEXT:    movlo lr, r12
-; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-ARM8-NEXT:    uxth r12, r12
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    uxth r2, r1
+; CHECK-ARM8-NEXT:    cmp r2, #2
+; CHECK-ARM8-NEXT:    mov r3, #1
+; CHECK-ARM8-NEXT:    movlo r3, r1
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i16
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i16
+; CHECK-ARM8-NEXT:    uxth r1, r1
 ; CHECK-ARM8-NEXT:  .LBB21_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB21_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r12
+; CHECK-ARM8-NEXT:    ldrexh lr, [r12]
+; CHECK-ARM8-NEXT:    cmp lr, r1
 ; CHECK-ARM8-NEXT:    bne .LBB21_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB21_2 Depth=2
-; CHECK-ARM8-NEXT:    strexh r2, lr, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strexh r4, r3, [r12]
+; CHECK-ARM8-NEXT:    cmp r4, #0
 ; CHECK-ARM8-NEXT:    bne .LBB21_2
 ; CHECK-ARM8-NEXT:  .LBB21_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB21_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, lr, r2
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, lr
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB21_1
 ; CHECK-ARM8-NEXT:    b .LBB21_5
 ; CHECK-ARM8-NEXT:  .LBB21_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    pop {r11, pc}
+; CHECK-ARM8-NEXT:    pop {r4, pc}
 ;
 ; CHECK-ARM6-LABEL: test_umin_i16:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
-; CHECK-ARM6-NEXT:    .save {r11, lr}
-; CHECK-ARM6-NEXT:    push {r11, lr}
+; CHECK-ARM6-NEXT:    .save {r4, lr}
+; CHECK-ARM6-NEXT:    push {r4, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI21_0
@@ -4423,38 +4708,40 @@ define i16 @test_umin_i16() {
 ; CHECK-ARM6-NEXT:  .LBB21_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB21_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r12, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    uxth r1, r12
-; CHECK-ARM6-NEXT:    cmp r1, #2
-; CHECK-ARM6-NEXT:    mov lr, #1
-; CHECK-ARM6-NEXT:    movlo lr, r12
-; CHECK-ARM6-NEXT:    ldr r3, .LCPI21_0
-; CHECK-ARM6-NEXT:    uxth r12, r12
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    uxth r2, r1
+; CHECK-ARM6-NEXT:    cmp r2, #2
+; CHECK-ARM6-NEXT:    mov r3, #1
+; CHECK-ARM6-NEXT:    movlo r3, r1
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI21_0
+; CHECK-ARM6-NEXT:    uxth r1, r1
 ; CHECK-ARM6-NEXT:  .LBB21_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB21_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexh r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r12
+; CHECK-ARM6-NEXT:    ldrexh lr, [r12]
+; CHECK-ARM6-NEXT:    cmp lr, r1
 ; CHECK-ARM6-NEXT:    bne .LBB21_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB21_2 Depth=2
-; CHECK-ARM6-NEXT:    strexh r2, lr, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strexh r4, r3, [r12]
+; CHECK-ARM6-NEXT:    cmp r4, #0
 ; CHECK-ARM6-NEXT:    bne .LBB21_2
 ; CHECK-ARM6-NEXT:  .LBB21_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB21_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, lr, r2
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, lr
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB21_1
 ; CHECK-ARM6-NEXT:    b .LBB21_5
 ; CHECK-ARM6-NEXT:  .LBB21_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    pop {r11, pc}
+; CHECK-ARM6-NEXT:    pop {r4, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI21_0:
@@ -4474,33 +4761,35 @@ define i16 @test_umin_i16() {
 ; CHECK-THUMB7-NEXT:  .LBB21_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB21_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r4, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    uxth r1, r4
-; CHECK-THUMB7-NEXT:    cmp r1, #2
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    uxth r2, r1
+; CHECK-THUMB7-NEXT:    cmp r2, #2
+; CHECK-THUMB7-NEXT:    mov.w r3, #1
 ; CHECK-THUMB7-NEXT:    it lo
-; CHECK-THUMB7-NEXT:    movlo r12, r4
-; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-THUMB7-NEXT:    uxth r4, r4
+; CHECK-THUMB7-NEXT:    movlo r3, r1
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i16
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i16
+; CHECK-THUMB7-NEXT:    uxth r1, r1
 ; CHECK-THUMB7-NEXT:  .LBB21_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB21_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r4
+; CHECK-THUMB7-NEXT:    ldrexh lr, [r12]
+; CHECK-THUMB7-NEXT:    cmp lr, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB21_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB21_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexh r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strexh r4, r3, [r12]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB21_2
 ; CHECK-THUMB7-NEXT:  .LBB21_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB21_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, lr, r2
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, lr
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB21_1
 ; CHECK-THUMB7-NEXT:    b .LBB21_5
@@ -4524,8 +4813,8 @@ define i16 @test_umin_i16() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_umin_i16:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #24
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #24
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i16
@@ -4537,51 +4826,54 @@ define i16 @test_umin_i16() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB21_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #20] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    uxth r1, r0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    uxth r2, r1
 ; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #12] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r2, #2
+; CHECK-THUMB8BASE-NEXT:    mov r4, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blo .LBB21_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB21_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB21_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB21_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r5, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i16
-; CHECK-THUMB8BASE-NEXT:    uxth r4, r4
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i16
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #16] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    uxth r2, r2
 ; CHECK-THUMB8BASE-NEXT:  .LBB21_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB21_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrexh r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r4
+; CHECK-THUMB8BASE-NEXT:    ldrexh r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB21_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB21_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strexh r2, r5, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strexh r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB21_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB21_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB21_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r0
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #20] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB21_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB21_7
 ; CHECK-THUMB8BASE-NEXT:  .LBB21_7: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #24
-; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
 entry:
   %0 = atomicrmw umin ptr @atomic_i16, i16 1 monotonic
   ret i16 %0
@@ -4591,6 +4883,8 @@ entry:
 define i32 @test_xchg_i32() {
 ; CHECK-ARM8-LABEL: test_xchg_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -4601,38 +4895,42 @@ define i32 @test_xchg_i32() {
 ; CHECK-ARM8-NEXT:  .LBB22_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB22_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
-; CHECK-ARM8-NEXT:    mov r12, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    movw r2, :lower16:atomic_i32
+; CHECK-ARM8-NEXT:    movt r2, :upper16:atomic_i32
+; CHECK-ARM8-NEXT:    mov r3, #1
 ; CHECK-ARM8-NEXT:  .LBB22_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB22_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r2]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB22_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB22_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r3, [r2]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB22_2
 ; CHECK-ARM8-NEXT:  .LBB22_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB22_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB22_1
 ; CHECK-ARM8-NEXT:    b .LBB22_5
 ; CHECK-ARM8-NEXT:  .LBB22_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_xchg_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI22_0
@@ -4642,34 +4940,36 @@ define i32 @test_xchg_i32() {
 ; CHECK-ARM6-NEXT:  .LBB22_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB22_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r3, .LCPI22_0
-; CHECK-ARM6-NEXT:    mov r12, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, .LCPI22_0
+; CHECK-ARM6-NEXT:    mov r3, #1
 ; CHECK-ARM6-NEXT:  .LBB22_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB22_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r2]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB22_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB22_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r3, [r2]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB22_2
 ; CHECK-ARM6-NEXT:  .LBB22_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB22_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB22_1
 ; CHECK-ARM6-NEXT:    b .LBB22_5
 ; CHECK-ARM6-NEXT:  .LBB22_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI22_0:
@@ -4677,6 +4977,8 @@ define i32 @test_xchg_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_xchg_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -4687,35 +4989,37 @@ define i32 @test_xchg_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB22_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB22_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    movw r2, :lower16:atomic_i32
+; CHECK-THUMB7-NEXT:    movt r2, :upper16:atomic_i32
+; CHECK-THUMB7-NEXT:    movs r3, #1
 ; CHECK-THUMB7-NEXT:  .LBB22_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB22_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r2]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB22_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB22_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r3, [r2]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB22_2
 ; CHECK-THUMB7-NEXT:  .LBB22_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB22_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB22_1
 ; CHECK-THUMB7-NEXT:    b .LBB22_5
 ; CHECK-THUMB7-NEXT:  .LBB22_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_xchg_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -4732,8 +5036,8 @@ define i32 @test_xchg_i32() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_xchg_i32:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i32
@@ -4744,35 +5048,37 @@ define i32 @test_xchg_i32() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB22_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB22_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
-; CHECK-THUMB8BASE-NEXT:    movs r4, #1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
 ; CHECK-THUMB8BASE-NEXT:  .LBB22_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB22_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB22_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB22_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB22_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB22_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB22_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB22_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB22_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB22_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw xchg ptr @atomic_i32, i32 1 monotonic
   ret i32 %0
@@ -4780,6 +5086,8 @@ entry:
 define i32 @test_add_i32() {
 ; CHECK-ARM8-LABEL: test_add_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -4790,38 +5098,42 @@ define i32 @test_add_i32() {
 ; CHECK-ARM8-NEXT:  .LBB23_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB23_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    add r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    add r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB23_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB23_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB23_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB23_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB23_2
 ; CHECK-ARM8-NEXT:  .LBB23_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB23_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB23_1
 ; CHECK-ARM8-NEXT:    b .LBB23_5
 ; CHECK-ARM8-NEXT:  .LBB23_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_add_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI23_0
@@ -4831,34 +5143,36 @@ define i32 @test_add_i32() {
 ; CHECK-ARM6-NEXT:  .LBB23_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB23_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    add r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    add r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI23_0
 ; CHECK-ARM6-NEXT:  .LBB23_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB23_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB23_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB23_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB23_2
 ; CHECK-ARM6-NEXT:  .LBB23_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB23_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB23_1
 ; CHECK-ARM6-NEXT:    b .LBB23_5
 ; CHECK-ARM6-NEXT:  .LBB23_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI23_0:
@@ -4866,6 +5180,8 @@ define i32 @test_add_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_add_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -4876,35 +5192,37 @@ define i32 @test_add_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB23_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB23_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    add.w r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    adds r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB23_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB23_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB23_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB23_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB23_2
 ; CHECK-THUMB7-NEXT:  .LBB23_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB23_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB23_1
 ; CHECK-THUMB7-NEXT:    b .LBB23_5
 ; CHECK-THUMB7-NEXT:  .LBB23_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_add_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -4921,8 +5239,8 @@ define i32 @test_add_i32() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_add_i32:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i32
@@ -4933,35 +5251,37 @@ define i32 @test_add_i32() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB23_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB23_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    adds r4, r1, #1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    adds r2, r1, #1
 ; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB8BASE-NEXT:  .LBB23_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB23_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r4, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB23_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB23_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r5, r2, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB23_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB23_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB23_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB23_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB23_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB23_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw add ptr @atomic_i32, i32 1 monotonic
   ret i32 %0
@@ -4969,6 +5289,8 @@ entry:
 define i32 @test_sub_i32() {
 ; CHECK-ARM8-LABEL: test_sub_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -4979,38 +5301,42 @@ define i32 @test_sub_i32() {
 ; CHECK-ARM8-NEXT:  .LBB24_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB24_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    sub r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    sub r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB24_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB24_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB24_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB24_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB24_2
 ; CHECK-ARM8-NEXT:  .LBB24_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB24_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB24_1
 ; CHECK-ARM8-NEXT:    b .LBB24_5
 ; CHECK-ARM8-NEXT:  .LBB24_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_sub_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI24_0
@@ -5020,34 +5346,36 @@ define i32 @test_sub_i32() {
 ; CHECK-ARM6-NEXT:  .LBB24_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB24_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    sub r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    sub r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI24_0
 ; CHECK-ARM6-NEXT:  .LBB24_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB24_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB24_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB24_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB24_2
 ; CHECK-ARM6-NEXT:  .LBB24_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB24_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB24_1
 ; CHECK-ARM6-NEXT:    b .LBB24_5
 ; CHECK-ARM6-NEXT:  .LBB24_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI24_0:
@@ -5055,6 +5383,8 @@ define i32 @test_sub_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_sub_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -5065,35 +5395,37 @@ define i32 @test_sub_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB24_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB24_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    sub.w r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    subs r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB24_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB24_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB24_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB24_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB24_2
 ; CHECK-THUMB7-NEXT:  .LBB24_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB24_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB24_1
 ; CHECK-THUMB7-NEXT:    b .LBB24_5
 ; CHECK-THUMB7-NEXT:  .LBB24_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_sub_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -5110,8 +5442,8 @@ define i32 @test_sub_i32() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_sub_i32:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i32
@@ -5122,35 +5454,37 @@ define i32 @test_sub_i32() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB24_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB24_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    subs r4, r1, #1
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    subs r2, r1, #1
 ; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB8BASE-NEXT:  .LBB24_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB24_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r4, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB24_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB24_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r5, r2, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB24_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB24_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB24_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB24_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB24_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB24_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw sub ptr @atomic_i32, i32 1 monotonic
   ret i32 %0
@@ -5158,6 +5492,8 @@ entry:
 define i32 @test_and_i32() {
 ; CHECK-ARM8-LABEL: test_and_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -5168,38 +5504,42 @@ define i32 @test_and_i32() {
 ; CHECK-ARM8-NEXT:  .LBB25_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB25_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    and r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    and r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB25_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB25_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB25_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB25_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB25_2
 ; CHECK-ARM8-NEXT:  .LBB25_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB25_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB25_1
 ; CHECK-ARM8-NEXT:    b .LBB25_5
 ; CHECK-ARM8-NEXT:  .LBB25_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_and_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI25_0
@@ -5209,34 +5549,36 @@ define i32 @test_and_i32() {
 ; CHECK-ARM6-NEXT:  .LBB25_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB25_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    and r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    and r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI25_0
 ; CHECK-ARM6-NEXT:  .LBB25_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB25_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB25_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB25_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB25_2
 ; CHECK-ARM6-NEXT:  .LBB25_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB25_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB25_1
 ; CHECK-ARM6-NEXT:    b .LBB25_5
 ; CHECK-ARM6-NEXT:  .LBB25_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI25_0:
@@ -5244,6 +5586,8 @@ define i32 @test_and_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_and_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -5254,35 +5598,37 @@ define i32 @test_and_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB25_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB25_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    and r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    and r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB25_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB25_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB25_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB25_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB25_2
 ; CHECK-THUMB7-NEXT:  .LBB25_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB25_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB25_1
 ; CHECK-THUMB7-NEXT:    b .LBB25_5
 ; CHECK-THUMB7-NEXT:  .LBB25_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_and_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -5299,8 +5645,8 @@ define i32 @test_and_i32() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_and_i32:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i32
@@ -5311,37 +5657,39 @@ define i32 @test_and_i32() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB25_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB25_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mov r4, r1
-; CHECK-THUMB8BASE-NEXT:    ands r4, r0
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    ands r3, r2
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i32
 ; CHECK-THUMB8BASE-NEXT:  .LBB25_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB25_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB25_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB25_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB25_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB25_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB25_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB25_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB25_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB25_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw and ptr @atomic_i32, i32 1 monotonic
   ret i32 %0
@@ -5349,6 +5697,8 @@ entry:
 define i32 @test_nand_i32() {
 ; CHECK-ARM8-LABEL: test_nand_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -5359,40 +5709,44 @@ define i32 @test_nand_i32() {
 ; CHECK-ARM8-NEXT:  .LBB26_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB26_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mvn r0, r1
-; CHECK-ARM8-NEXT:    mvn r2, #1
-; CHECK-ARM8-NEXT:    orr r12, r0, r2
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    mvn r2, r1
+; CHECK-ARM8-NEXT:    mvn r3, #1
+; CHECK-ARM8-NEXT:    orr r2, r2, r3
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB26_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB26_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB26_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB26_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB26_2
 ; CHECK-ARM8-NEXT:  .LBB26_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB26_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB26_1
 ; CHECK-ARM8-NEXT:    b .LBB26_5
 ; CHECK-ARM8-NEXT:  .LBB26_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_nand_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI26_0
@@ -5402,36 +5756,38 @@ define i32 @test_nand_i32() {
 ; CHECK-ARM6-NEXT:  .LBB26_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB26_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mvn r0, r1
-; CHECK-ARM6-NEXT:    mvn r2, #1
-; CHECK-ARM6-NEXT:    orr r12, r0, r2
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    mvn r2, r1
+; CHECK-ARM6-NEXT:    mvn r3, #1
+; CHECK-ARM6-NEXT:    orr r2, r2, r3
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI26_0
 ; CHECK-ARM6-NEXT:  .LBB26_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB26_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB26_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB26_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB26_2
 ; CHECK-ARM6-NEXT:  .LBB26_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB26_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB26_1
 ; CHECK-ARM6-NEXT:    b .LBB26_5
 ; CHECK-ARM6-NEXT:  .LBB26_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI26_0:
@@ -5439,6 +5795,8 @@ define i32 @test_nand_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_nand_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -5449,36 +5807,38 @@ define i32 @test_nand_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB26_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB26_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    mvn r0, #1
-; CHECK-THUMB7-NEXT:    orn r12, r0, r1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    mvn r2, #1
+; CHECK-THUMB7-NEXT:    orn r2, r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB26_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB26_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB26_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB26_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB26_2
 ; CHECK-THUMB7-NEXT:  .LBB26_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB26_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB26_1
 ; CHECK-THUMB7-NEXT:    b .LBB26_5
 ; CHECK-THUMB7-NEXT:  .LBB26_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_nand_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -5495,8 +5855,8 @@ define i32 @test_nand_i32() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_nand_i32:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i32
@@ -5507,38 +5867,40 @@ define i32 @test_nand_i32() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB26_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB26_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    mvns r4, r1
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mvns r0, r0
-; CHECK-THUMB8BASE-NEXT:    orrs r4, r0
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    mvns r2, r1
+; CHECK-THUMB8BASE-NEXT:    movs r3, #1
+; CHECK-THUMB8BASE-NEXT:    mvns r3, r3
+; CHECK-THUMB8BASE-NEXT:    orrs r2, r3
 ; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB8BASE-NEXT:  .LBB26_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB26_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r4, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB26_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB26_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r5, r2, [r3]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB26_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB26_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB26_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB26_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB26_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB26_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw nand ptr @atomic_i32, i32 1 monotonic
   ret i32 %0
@@ -5546,6 +5908,8 @@ entry:
 define i32 @test_or_i32() {
 ; CHECK-ARM8-LABEL: test_or_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -5556,38 +5920,42 @@ define i32 @test_or_i32() {
 ; CHECK-ARM8-NEXT:  .LBB27_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB27_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    orr r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    orr r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB27_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB27_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB27_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB27_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB27_2
 ; CHECK-ARM8-NEXT:  .LBB27_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB27_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB27_1
 ; CHECK-ARM8-NEXT:    b .LBB27_5
 ; CHECK-ARM8-NEXT:  .LBB27_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_or_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI27_0
@@ -5597,34 +5965,36 @@ define i32 @test_or_i32() {
 ; CHECK-ARM6-NEXT:  .LBB27_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB27_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    orr r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    orr r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI27_0
 ; CHECK-ARM6-NEXT:  .LBB27_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB27_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB27_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB27_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB27_2
 ; CHECK-ARM6-NEXT:  .LBB27_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB27_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB27_1
 ; CHECK-ARM6-NEXT:    b .LBB27_5
 ; CHECK-ARM6-NEXT:  .LBB27_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI27_0:
@@ -5632,6 +6002,8 @@ define i32 @test_or_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_or_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -5642,35 +6014,37 @@ define i32 @test_or_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB27_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB27_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    orr r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    orr r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB27_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB27_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB27_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB27_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB27_2
 ; CHECK-THUMB7-NEXT:  .LBB27_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB27_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB27_1
 ; CHECK-THUMB7-NEXT:    b .LBB27_5
 ; CHECK-THUMB7-NEXT:  .LBB27_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_or_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -5687,8 +6061,8 @@ define i32 @test_or_i32() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_or_i32:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i32
@@ -5699,37 +6073,39 @@ define i32 @test_or_i32() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB27_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB27_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mov r4, r1
-; CHECK-THUMB8BASE-NEXT:    orrs r4, r0
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    orrs r3, r2
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i32
 ; CHECK-THUMB8BASE-NEXT:  .LBB27_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB27_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB27_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB27_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB27_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB27_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB27_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB27_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB27_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB27_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw or ptr @atomic_i32, i32 1 monotonic
   ret i32 %0
@@ -5737,6 +6113,8 @@ entry:
 define i32 @test_xor_i32() {
 ; CHECK-ARM8-LABEL: test_xor_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -5747,38 +6125,42 @@ define i32 @test_xor_i32() {
 ; CHECK-ARM8-NEXT:  .LBB28_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB28_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    eor r12, r1, #1
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    eor r2, r1, #1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB28_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB28_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB28_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB28_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB28_2
 ; CHECK-ARM8-NEXT:  .LBB28_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB28_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB28_1
 ; CHECK-ARM8-NEXT:    b .LBB28_5
 ; CHECK-ARM8-NEXT:  .LBB28_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_xor_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI28_0
@@ -5788,34 +6170,36 @@ define i32 @test_xor_i32() {
 ; CHECK-ARM6-NEXT:  .LBB28_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB28_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    eor r12, r1, #1
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    eor r2, r1, #1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI28_0
 ; CHECK-ARM6-NEXT:  .LBB28_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB28_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB28_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB28_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB28_2
 ; CHECK-ARM6-NEXT:  .LBB28_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB28_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB28_1
 ; CHECK-ARM6-NEXT:    b .LBB28_5
 ; CHECK-ARM6-NEXT:  .LBB28_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI28_0:
@@ -5823,6 +6207,8 @@ define i32 @test_xor_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_xor_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -5833,35 +6219,37 @@ define i32 @test_xor_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB28_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB28_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    eor r12, r1, #1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    eor r2, r1, #1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB28_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB28_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB28_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB28_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB28_2
 ; CHECK-THUMB7-NEXT:  .LBB28_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB28_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB28_1
 ; CHECK-THUMB7-NEXT:    b .LBB28_5
 ; CHECK-THUMB7-NEXT:  .LBB28_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_xor_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -5878,8 +6266,8 @@ define i32 @test_xor_i32() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_xor_i32:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r7, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r7, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #8
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #8
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i32
@@ -5890,37 +6278,39 @@ define i32 @test_xor_i32() {
 ; CHECK-THUMB8BASE-NEXT:  .LBB28_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB28_2 Depth 2
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    mov r4, r1
-; CHECK-THUMB8BASE-NEXT:    eors r4, r0
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    eors r3, r2
+; CHECK-THUMB8BASE-NEXT:    movw r2, :lower16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    movt r2, :upper16:atomic_i32
 ; CHECK-THUMB8BASE-NEXT:  .LBB28_2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB28_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r4, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, r1
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB28_4
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB28_2 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r5, r3, [r2]
+; CHECK-THUMB8BASE-NEXT:    cmp r5, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB28_2
 ; CHECK-THUMB8BASE-NEXT:  .LBB28_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB28_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r1, r4, r1
 ; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
 ; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
 ; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r4
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB28_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB28_5
 ; CHECK-THUMB8BASE-NEXT:  .LBB28_5: @ %atomicrmw.end
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #8
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = atomicrmw xor ptr @atomic_i32, i32 1 monotonic
   ret i32 %0
@@ -5928,6 +6318,8 @@ entry:
 define i32 @test_max_i32() {
 ; CHECK-ARM8-LABEL: test_max_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -5938,40 +6330,44 @@ define i32 @test_max_i32() {
 ; CHECK-ARM8-NEXT:  .LBB29_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB29_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
 ; CHECK-ARM8-NEXT:    cmp r1, #1
-; CHECK-ARM8-NEXT:    mov r12, #1
-; CHECK-ARM8-NEXT:    movgt r12, r1
+; CHECK-ARM8-NEXT:    mov r2, #1
+; CHECK-ARM8-NEXT:    movgt r2, r1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB29_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB29_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB29_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB29_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB29_2
 ; CHECK-ARM8-NEXT:  .LBB29_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB29_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB29_1
 ; CHECK-ARM8-NEXT:    b .LBB29_5
 ; CHECK-ARM8-NEXT:  .LBB29_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_max_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI29_0
@@ -5981,36 +6377,38 @@ define i32 @test_max_i32() {
 ; CHECK-ARM6-NEXT:  .LBB29_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB29_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
 ; CHECK-ARM6-NEXT:    cmp r1, #1
-; CHECK-ARM6-NEXT:    mov r12, #1
-; CHECK-ARM6-NEXT:    movgt r12, r1
+; CHECK-ARM6-NEXT:    mov r2, #1
+; CHECK-ARM6-NEXT:    movgt r2, r1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI29_0
 ; CHECK-ARM6-NEXT:  .LBB29_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB29_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB29_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB29_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB29_2
 ; CHECK-ARM6-NEXT:  .LBB29_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB29_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB29_1
 ; CHECK-ARM6-NEXT:    b .LBB29_5
 ; CHECK-ARM6-NEXT:  .LBB29_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI29_0:
@@ -6018,6 +6416,8 @@ define i32 @test_max_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_max_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -6028,38 +6428,40 @@ define i32 @test_max_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB29_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB29_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    mov.w r2, #1
 ; CHECK-THUMB7-NEXT:    it gt
-; CHECK-THUMB7-NEXT:    movgt r12, r1
+; CHECK-THUMB7-NEXT:    movgt r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB29_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB29_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB29_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB29_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB29_2
 ; CHECK-THUMB7-NEXT:  .LBB29_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB29_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB29_1
 ; CHECK-THUMB7-NEXT:    b .LBB29_5
 ; CHECK-THUMB7-NEXT:  .LBB29_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_max_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -6089,40 +6491,43 @@ define i32 @test_max_i32() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB29_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r1, #1
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bgt .LBB29_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB29_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB29_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB29_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:  .LBB29_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB29_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB29_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB29_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB29_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB29_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB29_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r2
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB29_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB29_7
@@ -6137,6 +6542,8 @@ entry:
 define i32 @test_min_i32() {
 ; CHECK-ARM8-LABEL: test_min_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -6147,40 +6554,44 @@ define i32 @test_min_i32() {
 ; CHECK-ARM8-NEXT:  .LBB30_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB30_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
 ; CHECK-ARM8-NEXT:    cmp r1, #2
-; CHECK-ARM8-NEXT:    mov r12, #1
-; CHECK-ARM8-NEXT:    movlt r12, r1
+; CHECK-ARM8-NEXT:    mov r2, #1
+; CHECK-ARM8-NEXT:    movlt r2, r1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB30_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB30_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB30_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB30_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB30_2
 ; CHECK-ARM8-NEXT:  .LBB30_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB30_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB30_1
 ; CHECK-ARM8-NEXT:    b .LBB30_5
 ; CHECK-ARM8-NEXT:  .LBB30_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_min_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI30_0
@@ -6190,36 +6601,38 @@ define i32 @test_min_i32() {
 ; CHECK-ARM6-NEXT:  .LBB30_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB30_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
 ; CHECK-ARM6-NEXT:    cmp r1, #2
-; CHECK-ARM6-NEXT:    mov r12, #1
-; CHECK-ARM6-NEXT:    movlt r12, r1
+; CHECK-ARM6-NEXT:    mov r2, #1
+; CHECK-ARM6-NEXT:    movlt r2, r1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI30_0
 ; CHECK-ARM6-NEXT:  .LBB30_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB30_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB30_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB30_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB30_2
 ; CHECK-ARM6-NEXT:  .LBB30_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB30_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB30_1
 ; CHECK-ARM6-NEXT:    b .LBB30_5
 ; CHECK-ARM6-NEXT:  .LBB30_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI30_0:
@@ -6227,6 +6640,8 @@ define i32 @test_min_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_min_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -6237,38 +6652,40 @@ define i32 @test_min_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB30_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB30_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
 ; CHECK-THUMB7-NEXT:    cmp r1, #2
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    mov.w r2, #1
 ; CHECK-THUMB7-NEXT:    it lt
-; CHECK-THUMB7-NEXT:    movlt r12, r1
+; CHECK-THUMB7-NEXT:    movlt r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB30_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB30_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB30_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB30_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB30_2
 ; CHECK-THUMB7-NEXT:  .LBB30_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB30_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB30_1
 ; CHECK-THUMB7-NEXT:    b .LBB30_5
 ; CHECK-THUMB7-NEXT:  .LBB30_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_min_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -6298,40 +6715,43 @@ define i32 @test_min_i32() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB30_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r1, #1
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r0, #2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r1, #2
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blt .LBB30_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB30_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB30_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB30_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:  .LBB30_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB30_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB30_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB30_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB30_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB30_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB30_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r2
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB30_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB30_7
@@ -6346,6 +6766,8 @@ entry:
 define i32 @test_umax_i32() {
 ; CHECK-ARM8-LABEL: test_umax_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -6356,40 +6778,44 @@ define i32 @test_umax_i32() {
 ; CHECK-ARM8-NEXT:  .LBB31_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB31_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
 ; CHECK-ARM8-NEXT:    cmp r1, #1
-; CHECK-ARM8-NEXT:    mov r12, #1
-; CHECK-ARM8-NEXT:    movhi r12, r1
+; CHECK-ARM8-NEXT:    mov r2, #1
+; CHECK-ARM8-NEXT:    movhi r2, r1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB31_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB31_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB31_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB31_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB31_2
 ; CHECK-ARM8-NEXT:  .LBB31_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB31_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB31_1
 ; CHECK-ARM8-NEXT:    b .LBB31_5
 ; CHECK-ARM8-NEXT:  .LBB31_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_umax_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI31_0
@@ -6399,36 +6825,38 @@ define i32 @test_umax_i32() {
 ; CHECK-ARM6-NEXT:  .LBB31_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB31_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
 ; CHECK-ARM6-NEXT:    cmp r1, #1
-; CHECK-ARM6-NEXT:    mov r12, #1
-; CHECK-ARM6-NEXT:    movhi r12, r1
+; CHECK-ARM6-NEXT:    mov r2, #1
+; CHECK-ARM6-NEXT:    movhi r2, r1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI31_0
 ; CHECK-ARM6-NEXT:  .LBB31_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB31_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB31_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB31_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB31_2
 ; CHECK-ARM6-NEXT:  .LBB31_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB31_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB31_1
 ; CHECK-ARM6-NEXT:    b .LBB31_5
 ; CHECK-ARM6-NEXT:  .LBB31_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI31_0:
@@ -6436,6 +6864,8 @@ define i32 @test_umax_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_umax_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -6446,38 +6876,40 @@ define i32 @test_umax_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB31_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB31_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    mov.w r2, #1
 ; CHECK-THUMB7-NEXT:    it hi
-; CHECK-THUMB7-NEXT:    movhi r12, r1
+; CHECK-THUMB7-NEXT:    movhi r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB31_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB31_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB31_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB31_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB31_2
 ; CHECK-THUMB7-NEXT:  .LBB31_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB31_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB31_1
 ; CHECK-THUMB7-NEXT:    b .LBB31_5
 ; CHECK-THUMB7-NEXT:  .LBB31_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_umax_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -6507,40 +6939,43 @@ define i32 @test_umax_i32() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB31_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r1, #1
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bhi .LBB31_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB31_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB31_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB31_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:  .LBB31_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB31_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB31_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB31_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB31_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB31_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB31_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r2
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB31_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB31_7
@@ -6555,6 +6990,8 @@ entry:
 define i32 @test_umin_i32() {
 ; CHECK-ARM8-LABEL: test_umin_i32:
 ; CHECK-ARM8:       @ %bb.0: @ %entry
+; CHECK-ARM8-NEXT:    .save {r11, lr}
+; CHECK-ARM8-NEXT:    push {r11, lr}
 ; CHECK-ARM8-NEXT:    .pad #8
 ; CHECK-ARM8-NEXT:    sub sp, sp, #8
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i32
@@ -6565,40 +7002,44 @@ define i32 @test_umin_i32() {
 ; CHECK-ARM8-NEXT:  .LBB32_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB32_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
 ; CHECK-ARM8-NEXT:    cmp r1, #2
-; CHECK-ARM8-NEXT:    mov r12, #1
-; CHECK-ARM8-NEXT:    movlo r12, r1
+; CHECK-ARM8-NEXT:    mov r2, #1
+; CHECK-ARM8-NEXT:    movlo r2, r1
 ; CHECK-ARM8-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-ARM8-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-ARM8-NEXT:  .LBB32_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB32_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrex r0, [r3]
-; CHECK-ARM8-NEXT:    cmp r0, r1
+; CHECK-ARM8-NEXT:    ldrex r12, [r3]
+; CHECK-ARM8-NEXT:    cmp r12, r1
 ; CHECK-ARM8-NEXT:    bne .LBB32_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB32_2 Depth=2
-; CHECK-ARM8-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM8-NEXT:    cmp r2, #0
+; CHECK-ARM8-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM8-NEXT:    cmp lr, #0
 ; CHECK-ARM8-NEXT:    bne .LBB32_2
 ; CHECK-ARM8-NEXT:  .LBB32_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB32_1 Depth=1
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    sub r1, r0, r1
+; CHECK-ARM8-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    sub r1, r12, r1
 ; CHECK-ARM8-NEXT:    clz r1, r1
 ; CHECK-ARM8-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM8-NEXT:    cmp r1, #1
+; CHECK-ARM8-NEXT:    mov r0, r12
 ; CHECK-ARM8-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB32_1
 ; CHECK-ARM8-NEXT:    b .LBB32_5
 ; CHECK-ARM8-NEXT:  .LBB32_5: @ %atomicrmw.end
 ; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #8
-; CHECK-ARM8-NEXT:    bx lr
+; CHECK-ARM8-NEXT:    pop {r11, pc}
 ;
 ; CHECK-ARM6-LABEL: test_umin_i32:
 ; CHECK-ARM6:       @ %bb.0: @ %entry
+; CHECK-ARM6-NEXT:    .save {r11, lr}
+; CHECK-ARM6-NEXT:    push {r11, lr}
 ; CHECK-ARM6-NEXT:    .pad #8
 ; CHECK-ARM6-NEXT:    sub sp, sp, #8
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI32_0
@@ -6608,36 +7049,38 @@ define i32 @test_umin_i32() {
 ; CHECK-ARM6-NEXT:  .LBB32_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB32_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
 ; CHECK-ARM6-NEXT:    cmp r1, #2
-; CHECK-ARM6-NEXT:    mov r12, #1
-; CHECK-ARM6-NEXT:    movlo r12, r1
+; CHECK-ARM6-NEXT:    mov r2, #1
+; CHECK-ARM6-NEXT:    movlo r2, r1
 ; CHECK-ARM6-NEXT:    ldr r3, .LCPI32_0
 ; CHECK-ARM6-NEXT:  .LBB32_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB32_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrex r0, [r3]
-; CHECK-ARM6-NEXT:    cmp r0, r1
+; CHECK-ARM6-NEXT:    ldrex r12, [r3]
+; CHECK-ARM6-NEXT:    cmp r12, r1
 ; CHECK-ARM6-NEXT:    bne .LBB32_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB32_2 Depth=2
-; CHECK-ARM6-NEXT:    strex r2, r12, [r3]
-; CHECK-ARM6-NEXT:    cmp r2, #0
+; CHECK-ARM6-NEXT:    strex lr, r2, [r3]
+; CHECK-ARM6-NEXT:    cmp lr, #0
 ; CHECK-ARM6-NEXT:    bne .LBB32_2
 ; CHECK-ARM6-NEXT:  .LBB32_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB32_1 Depth=1
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    sub r1, r0, r1
+; CHECK-ARM6-NEXT:    str r12, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    sub r1, r12, r1
 ; CHECK-ARM6-NEXT:    clz r1, r1
 ; CHECK-ARM6-NEXT:    lsr r1, r1, #5
 ; CHECK-ARM6-NEXT:    cmp r1, #1
+; CHECK-ARM6-NEXT:    mov r0, r12
 ; CHECK-ARM6-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB32_1
 ; CHECK-ARM6-NEXT:    b .LBB32_5
 ; CHECK-ARM6-NEXT:  .LBB32_5: @ %atomicrmw.end
 ; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #8
-; CHECK-ARM6-NEXT:    bx lr
+; CHECK-ARM6-NEXT:    pop {r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
 ; CHECK-ARM6-NEXT:  @ %bb.6:
 ; CHECK-ARM6-NEXT:  .LCPI32_0:
@@ -6645,6 +7088,8 @@ define i32 @test_umin_i32() {
 ;
 ; CHECK-THUMB7-LABEL: test_umin_i32:
 ; CHECK-THUMB7:       @ %bb.0: @ %entry
+; CHECK-THUMB7-NEXT:    .save {r4, lr}
+; CHECK-THUMB7-NEXT:    push {r4, lr}
 ; CHECK-THUMB7-NEXT:    .pad #8
 ; CHECK-THUMB7-NEXT:    sub sp, #8
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i32
@@ -6655,38 +7100,40 @@ define i32 @test_umin_i32() {
 ; CHECK-THUMB7-NEXT:  .LBB32_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB32_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
 ; CHECK-THUMB7-NEXT:    cmp r1, #2
-; CHECK-THUMB7-NEXT:    mov.w r12, #1
+; CHECK-THUMB7-NEXT:    mov.w r2, #1
 ; CHECK-THUMB7-NEXT:    it lo
-; CHECK-THUMB7-NEXT:    movlo r12, r1
+; CHECK-THUMB7-NEXT:    movlo r2, r1
 ; CHECK-THUMB7-NEXT:    movw r3, :lower16:atomic_i32
 ; CHECK-THUMB7-NEXT:    movt r3, :upper16:atomic_i32
 ; CHECK-THUMB7-NEXT:  .LBB32_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB32_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB7-NEXT:    cmp r0, r1
+; CHECK-THUMB7-NEXT:    ldrex r12, [r3]
+; CHECK-THUMB7-NEXT:    cmp r12, r1
 ; CHECK-THUMB7-NEXT:    bne .LBB32_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB32_2 Depth=2
-; CHECK-THUMB7-NEXT:    strex r2, r12, [r3]
-; CHECK-THUMB7-NEXT:    cmp r2, #0
+; CHECK-THUMB7-NEXT:    strex r4, r2, [r3]
+; CHECK-THUMB7-NEXT:    cmp r4, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB32_2
 ; CHECK-THUMB7-NEXT:  .LBB32_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB32_1 Depth=1
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    subs r1, r0, r1
+; CHECK-THUMB7-NEXT:    str.w r12, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    sub.w r1, r12, r1
 ; CHECK-THUMB7-NEXT:    clz r1, r1
 ; CHECK-THUMB7-NEXT:    lsrs r1, r1, #5
 ; CHECK-THUMB7-NEXT:    cmp r1, #1
+; CHECK-THUMB7-NEXT:    mov r0, r12
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB32_1
 ; CHECK-THUMB7-NEXT:    b .LBB32_5
 ; CHECK-THUMB7-NEXT:  .LBB32_5: @ %atomicrmw.end
 ; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #8
-; CHECK-THUMB7-NEXT:    bx lr
+; CHECK-THUMB7-NEXT:    pop {r4, pc}
 ;
 ; CHECK-THUMB6-LABEL: test_umin_i32:
 ; CHECK-THUMB6:       @ %bb.0: @ %entry
@@ -6716,40 +7163,43 @@ define i32 @test_umin_i32() {
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ Child Loop BB32_4 Depth 2
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r1, #1
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r0, #2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r2, #1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #8] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r1, #2
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blo .LBB32_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB32_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB32_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB32_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    movw r3, :lower16:atomic_i32
-; CHECK-THUMB8BASE-NEXT:    movt r3, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    movw r1, :lower16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    movt r1, :upper16:atomic_i32
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:  .LBB32_4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ Parent Loop BB32_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB8BASE-NEXT:    ldrex r0, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r0, r1
+; CHECK-THUMB8BASE-NEXT:    ldrex r3, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r3, r2
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB32_6
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB32_4 Depth=2
-; CHECK-THUMB8BASE-NEXT:    strex r2, r4, [r3]
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
+; CHECK-THUMB8BASE-NEXT:    strex r4, r0, [r1]
+; CHECK-THUMB8BASE-NEXT:    cmp r4, #0
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB32_4
 ; CHECK-THUMB8BASE-NEXT:  .LBB32_6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB32_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r1, r0, r1
-; CHECK-THUMB8BASE-NEXT:    rsbs r2, r1, #0
-; CHECK-THUMB8BASE-NEXT:    adcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    cmp r1, #1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r0, r3, r2
+; CHECK-THUMB8BASE-NEXT:    rsbs r1, r0, #0
+; CHECK-THUMB8BASE-NEXT:    adcs r0, r1
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #1
+; CHECK-THUMB8BASE-NEXT:    mov r0, r3
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #16] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    bne .LBB32_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB32_7
@@ -6771,59 +7221,63 @@ define i64 @test_xchg_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB33_1
 ; CHECK-ARM8-NEXT:  .LBB33_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB33_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    mov r0, #0
-; CHECK-ARM8-NEXT:    mov r10, #1
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r4
+; CHECK-ARM8-NEXT:    mov r4, r12
+; CHECK-ARM8-NEXT:    mov r5, lr
+; CHECK-ARM8-NEXT:    mov r6, r3
+; CHECK-ARM8-NEXT:    mov r7, r1
+; CHECK-ARM8-NEXT:    mov r12, #0
+; CHECK-ARM8-NEXT:    mov lr, #1
+; CHECK-ARM8-NEXT:    mov r8, lr
+; CHECK-ARM8-NEXT:    mov r9, r12
 ; CHECK-ARM8-NEXT:  .LBB33_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB33_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r4]
+; CHECK-ARM8-NEXT:    cmp r10, r6
+; CHECK-ARM8-NEXT:    cmpeq r11, r7
 ; CHECK-ARM8-NEXT:    bne .LBB33_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB33_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r5, r8, r9, [r4]
+; CHECK-ARM8-NEXT:    cmp r5, #0
 ; CHECK-ARM8-NEXT:    bne .LBB33_2
 ; CHECK-ARM8-NEXT:  .LBB33_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB33_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB33_1
 ; CHECK-ARM8-NEXT:    b .LBB33_5
 ; CHECK-ARM8-NEXT:  .LBB33_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -6834,57 +7288,61 @@ define i64 @test_xchg_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI33_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB33_1
 ; CHECK-ARM6-NEXT:  .LBB33_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB33_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI33_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    mov r0, #0
-; CHECK-ARM6-NEXT:    mov r10, #1
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI33_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r4
+; CHECK-ARM6-NEXT:    mov r4, r12
+; CHECK-ARM6-NEXT:    mov r5, lr
+; CHECK-ARM6-NEXT:    mov r6, r3
+; CHECK-ARM6-NEXT:    mov r7, r1
+; CHECK-ARM6-NEXT:    mov r12, #0
+; CHECK-ARM6-NEXT:    mov lr, #1
+; CHECK-ARM6-NEXT:    mov r8, lr
+; CHECK-ARM6-NEXT:    mov r9, r12
 ; CHECK-ARM6-NEXT:  .LBB33_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB33_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r4]
+; CHECK-ARM6-NEXT:    cmp r10, r6
+; CHECK-ARM6-NEXT:    cmpeq r11, r7
 ; CHECK-ARM6-NEXT:    bne .LBB33_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB33_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r5, r8, r9, [r4]
+; CHECK-ARM6-NEXT:    cmp r5, #0
 ; CHECK-ARM6-NEXT:    bne .LBB33_2
 ; CHECK-ARM6-NEXT:  .LBB33_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB33_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB33_1
 ; CHECK-ARM6-NEXT:    b .LBB33_5
 ; CHECK-ARM6-NEXT:  .LBB33_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -6900,58 +7358,62 @@ define i64 @test_xchg_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB33_1
 ; CHECK-THUMB7-NEXT:  .LBB33_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB33_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    movs r0, #0
-; CHECK-THUMB7-NEXT:    mov.w r10, #1
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r0
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r4
+; CHECK-THUMB7-NEXT:    mov r4, r12
+; CHECK-THUMB7-NEXT:    mov r5, lr
+; CHECK-THUMB7-NEXT:    mov r6, r3
+; CHECK-THUMB7-NEXT:    mov r7, r1
+; CHECK-THUMB7-NEXT:    mov.w r12, #0
+; CHECK-THUMB7-NEXT:    mov.w lr, #1
+; CHECK-THUMB7-NEXT:    mov r8, lr
+; CHECK-THUMB7-NEXT:    mov r9, r12
 ; CHECK-THUMB7-NEXT:  .LBB33_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB33_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r4]
+; CHECK-THUMB7-NEXT:    cmp r10, r6
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r7
 ; CHECK-THUMB7-NEXT:    bne .LBB33_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB33_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r5, r8, r9, [r4]
+; CHECK-THUMB7-NEXT:    cmp r5, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB33_2
 ; CHECK-THUMB7-NEXT:  .LBB33_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB33_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB33_1
 ; CHECK-THUMB7-NEXT:    b .LBB33_5
 ; CHECK-THUMB7-NEXT:  .LBB33_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -6996,59 +7458,63 @@ define i64 @test_add_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB34_1
 ; CHECK-ARM8-NEXT:  .LBB34_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB34_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    adds r10, r2, #1
-; CHECK-ARM8-NEXT:    adc r0, r1, #0
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r0
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    mov r4, r3
+; CHECK-ARM8-NEXT:    mov r5, r1
+; CHECK-ARM8-NEXT:    adds r12, r3, #1
+; CHECK-ARM8-NEXT:    adc lr, r1, #0
+; CHECK-ARM8-NEXT:    mov r6, r12
+; CHECK-ARM8-NEXT:    mov r7, lr
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB34_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB34_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r4
+; CHECK-ARM8-NEXT:    cmpeq r11, r5
 ; CHECK-ARM8-NEXT:    bne .LBB34_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB34_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB34_2
 ; CHECK-ARM8-NEXT:  .LBB34_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB34_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB34_1
 ; CHECK-ARM8-NEXT:    b .LBB34_5
 ; CHECK-ARM8-NEXT:  .LBB34_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -7059,57 +7525,61 @@ define i64 @test_add_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI34_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB34_1
 ; CHECK-ARM6-NEXT:  .LBB34_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB34_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    adds r10, r2, #1
-; CHECK-ARM6-NEXT:    adc r0, r1, #0
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r0
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI34_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    mov r4, r3
+; CHECK-ARM6-NEXT:    mov r5, r1
+; CHECK-ARM6-NEXT:    adds r12, r3, #1
+; CHECK-ARM6-NEXT:    adc lr, r1, #0
+; CHECK-ARM6-NEXT:    mov r6, r12
+; CHECK-ARM6-NEXT:    mov r7, lr
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI34_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB34_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB34_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r4
+; CHECK-ARM6-NEXT:    cmpeq r11, r5
 ; CHECK-ARM6-NEXT:    bne .LBB34_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB34_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB34_2
 ; CHECK-ARM6-NEXT:  .LBB34_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB34_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB34_1
 ; CHECK-ARM6-NEXT:    b .LBB34_5
 ; CHECK-ARM6-NEXT:  .LBB34_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -7125,58 +7595,62 @@ define i64 @test_add_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB34_1
 ; CHECK-THUMB7-NEXT:  .LBB34_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB34_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    adds.w r10, r2, #1
-; CHECK-THUMB7-NEXT:    adc r0, r1, #0
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r0
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    mov r4, r3
+; CHECK-THUMB7-NEXT:    mov r5, r1
+; CHECK-THUMB7-NEXT:    adds.w r12, r3, #1
+; CHECK-THUMB7-NEXT:    adc lr, r1, #0
+; CHECK-THUMB7-NEXT:    mov r6, r12
+; CHECK-THUMB7-NEXT:    mov r7, lr
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB34_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB34_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r4
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r5
 ; CHECK-THUMB7-NEXT:    bne .LBB34_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB34_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB34_2
 ; CHECK-THUMB7-NEXT:  .LBB34_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB34_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB34_1
 ; CHECK-THUMB7-NEXT:    b .LBB34_5
 ; CHECK-THUMB7-NEXT:  .LBB34_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -7221,59 +7695,63 @@ define i64 @test_sub_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB35_1
 ; CHECK-ARM8-NEXT:  .LBB35_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB35_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    subs r10, r2, #1
-; CHECK-ARM8-NEXT:    sbc r0, r1, #0
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r0
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    mov r4, r3
+; CHECK-ARM8-NEXT:    mov r5, r1
+; CHECK-ARM8-NEXT:    subs r12, r3, #1
+; CHECK-ARM8-NEXT:    sbc lr, r1, #0
+; CHECK-ARM8-NEXT:    mov r6, r12
+; CHECK-ARM8-NEXT:    mov r7, lr
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB35_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB35_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r4
+; CHECK-ARM8-NEXT:    cmpeq r11, r5
 ; CHECK-ARM8-NEXT:    bne .LBB35_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB35_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB35_2
 ; CHECK-ARM8-NEXT:  .LBB35_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB35_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB35_1
 ; CHECK-ARM8-NEXT:    b .LBB35_5
 ; CHECK-ARM8-NEXT:  .LBB35_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -7284,57 +7762,61 @@ define i64 @test_sub_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI35_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB35_1
 ; CHECK-ARM6-NEXT:  .LBB35_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB35_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    subs r10, r2, #1
-; CHECK-ARM6-NEXT:    sbc r0, r1, #0
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r0
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI35_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    mov r4, r3
+; CHECK-ARM6-NEXT:    mov r5, r1
+; CHECK-ARM6-NEXT:    subs r12, r3, #1
+; CHECK-ARM6-NEXT:    sbc lr, r1, #0
+; CHECK-ARM6-NEXT:    mov r6, r12
+; CHECK-ARM6-NEXT:    mov r7, lr
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI35_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB35_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB35_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r4
+; CHECK-ARM6-NEXT:    cmpeq r11, r5
 ; CHECK-ARM6-NEXT:    bne .LBB35_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB35_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB35_2
 ; CHECK-ARM6-NEXT:  .LBB35_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB35_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB35_1
 ; CHECK-ARM6-NEXT:    b .LBB35_5
 ; CHECK-ARM6-NEXT:  .LBB35_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -7350,58 +7832,62 @@ define i64 @test_sub_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB35_1
 ; CHECK-THUMB7-NEXT:  .LBB35_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB35_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    subs.w r10, r2, #1
-; CHECK-THUMB7-NEXT:    sbc r0, r1, #0
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r0
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    mov r4, r3
+; CHECK-THUMB7-NEXT:    mov r5, r1
+; CHECK-THUMB7-NEXT:    subs.w r12, r3, #1
+; CHECK-THUMB7-NEXT:    sbc lr, r1, #0
+; CHECK-THUMB7-NEXT:    mov r6, r12
+; CHECK-THUMB7-NEXT:    mov r7, lr
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB35_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB35_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r4
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r5
 ; CHECK-THUMB7-NEXT:    bne .LBB35_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB35_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB35_2
 ; CHECK-THUMB7-NEXT:  .LBB35_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB35_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB35_1
 ; CHECK-THUMB7-NEXT:    b .LBB35_5
 ; CHECK-THUMB7-NEXT:  .LBB35_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -7446,59 +7932,63 @@ define i64 @test_and_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB36_1
 ; CHECK-ARM8-NEXT:  .LBB36_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB36_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    and r10, r2, #1
-; CHECK-ARM8-NEXT:    mov r0, #0
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r0
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    and r12, r3, #1
+; CHECK-ARM8-NEXT:    mov lr, #0
+; CHECK-ARM8-NEXT:    mov r4, r12
+; CHECK-ARM8-NEXT:    mov r5, lr
+; CHECK-ARM8-NEXT:    mov r6, r3
+; CHECK-ARM8-NEXT:    mov r7, r1
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB36_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB36_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r6
+; CHECK-ARM8-NEXT:    cmpeq r11, r7
 ; CHECK-ARM8-NEXT:    bne .LBB36_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB36_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r4, r5, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB36_2
 ; CHECK-ARM8-NEXT:  .LBB36_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB36_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB36_1
 ; CHECK-ARM8-NEXT:    b .LBB36_5
 ; CHECK-ARM8-NEXT:  .LBB36_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -7509,57 +7999,61 @@ define i64 @test_and_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI36_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB36_1
 ; CHECK-ARM6-NEXT:  .LBB36_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB36_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    and r10, r2, #1
-; CHECK-ARM6-NEXT:    mov r0, #0
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r0
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI36_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    and r12, r3, #1
+; CHECK-ARM6-NEXT:    mov lr, #0
+; CHECK-ARM6-NEXT:    mov r4, r12
+; CHECK-ARM6-NEXT:    mov r5, lr
+; CHECK-ARM6-NEXT:    mov r6, r3
+; CHECK-ARM6-NEXT:    mov r7, r1
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI36_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB36_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB36_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r6
+; CHECK-ARM6-NEXT:    cmpeq r11, r7
 ; CHECK-ARM6-NEXT:    bne .LBB36_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB36_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r4, r5, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB36_2
 ; CHECK-ARM6-NEXT:  .LBB36_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB36_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB36_1
 ; CHECK-ARM6-NEXT:    b .LBB36_5
 ; CHECK-ARM6-NEXT:  .LBB36_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -7575,58 +8069,62 @@ define i64 @test_and_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB36_1
 ; CHECK-THUMB7-NEXT:  .LBB36_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB36_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    and r10, r2, #1
-; CHECK-THUMB7-NEXT:    movs r0, #0
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r0
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    and r12, r3, #1
+; CHECK-THUMB7-NEXT:    mov.w lr, #0
+; CHECK-THUMB7-NEXT:    mov r4, r12
+; CHECK-THUMB7-NEXT:    mov r5, lr
+; CHECK-THUMB7-NEXT:    mov r6, r3
+; CHECK-THUMB7-NEXT:    mov r7, r1
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB36_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB36_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r6
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r7
 ; CHECK-THUMB7-NEXT:    bne .LBB36_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB36_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r4, r5, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB36_2
 ; CHECK-THUMB7-NEXT:  .LBB36_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB36_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB36_1
 ; CHECK-THUMB7-NEXT:    b .LBB36_5
 ; CHECK-THUMB7-NEXT:  .LBB36_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -7671,61 +8169,65 @@ define i64 @test_nand_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB37_1
 ; CHECK-ARM8-NEXT:  .LBB37_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB37_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    mvn r0, r2
-; CHECK-ARM8-NEXT:    mvn r3, #1
-; CHECK-ARM8-NEXT:    orr r10, r0, r3
-; CHECK-ARM8-NEXT:    mvn r0, #0
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r0
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    mov r4, r3
+; CHECK-ARM8-NEXT:    mov r5, r1
+; CHECK-ARM8-NEXT:    mvn r12, r3
+; CHECK-ARM8-NEXT:    mvn lr, #1
+; CHECK-ARM8-NEXT:    orr r12, r12, lr
+; CHECK-ARM8-NEXT:    mvn lr, #0
+; CHECK-ARM8-NEXT:    mov r6, r12
+; CHECK-ARM8-NEXT:    mov r7, lr
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB37_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB37_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r4
+; CHECK-ARM8-NEXT:    cmpeq r11, r5
 ; CHECK-ARM8-NEXT:    bne .LBB37_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB37_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB37_2
 ; CHECK-ARM8-NEXT:  .LBB37_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB37_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB37_1
 ; CHECK-ARM8-NEXT:    b .LBB37_5
 ; CHECK-ARM8-NEXT:  .LBB37_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -7736,59 +8238,63 @@ define i64 @test_nand_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI37_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB37_1
 ; CHECK-ARM6-NEXT:  .LBB37_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB37_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    mvn r0, r2
-; CHECK-ARM6-NEXT:    mvn r3, #1
-; CHECK-ARM6-NEXT:    orr r10, r0, r3
-; CHECK-ARM6-NEXT:    mvn r0, #0
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r0
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI37_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    mov r4, r3
+; CHECK-ARM6-NEXT:    mov r5, r1
+; CHECK-ARM6-NEXT:    mvn r12, r3
+; CHECK-ARM6-NEXT:    mvn lr, #1
+; CHECK-ARM6-NEXT:    orr r12, r12, lr
+; CHECK-ARM6-NEXT:    mvn lr, #0
+; CHECK-ARM6-NEXT:    mov r6, r12
+; CHECK-ARM6-NEXT:    mov r7, lr
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI37_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB37_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB37_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r4
+; CHECK-ARM6-NEXT:    cmpeq r11, r5
 ; CHECK-ARM6-NEXT:    bne .LBB37_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB37_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB37_2
 ; CHECK-ARM6-NEXT:  .LBB37_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB37_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB37_1
 ; CHECK-ARM6-NEXT:    b .LBB37_5
 ; CHECK-ARM6-NEXT:  .LBB37_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -7804,59 +8310,63 @@ define i64 @test_nand_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB37_1
 ; CHECK-THUMB7-NEXT:  .LBB37_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB37_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    mvn r0, #1
-; CHECK-THUMB7-NEXT:    orn r10, r0, r2
-; CHECK-THUMB7-NEXT:    mov.w r0, #-1
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r0
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    mov r4, r3
+; CHECK-THUMB7-NEXT:    mov r5, r1
+; CHECK-THUMB7-NEXT:    mvn r12, #1
+; CHECK-THUMB7-NEXT:    orn r12, r12, r3
+; CHECK-THUMB7-NEXT:    mov.w lr, #-1
+; CHECK-THUMB7-NEXT:    mov r6, r12
+; CHECK-THUMB7-NEXT:    mov r7, lr
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB37_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB37_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r4
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r5
 ; CHECK-THUMB7-NEXT:    bne .LBB37_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB37_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB37_2
 ; CHECK-THUMB7-NEXT:  .LBB37_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB37_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB37_1
 ; CHECK-THUMB7-NEXT:    b .LBB37_5
 ; CHECK-THUMB7-NEXT:  .LBB37_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -7901,58 +8411,62 @@ define i64 @test_or_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB38_1
 ; CHECK-ARM8-NEXT:  .LBB38_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB38_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    orr r10, r2, #1
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r1
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    orr r12, r3, #1
+; CHECK-ARM8-NEXT:    mov r4, r12
+; CHECK-ARM8-NEXT:    mov r5, r1
+; CHECK-ARM8-NEXT:    mov r6, r3
+; CHECK-ARM8-NEXT:    mov r7, r1
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB38_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB38_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r6
+; CHECK-ARM8-NEXT:    cmpeq r11, r7
 ; CHECK-ARM8-NEXT:    bne .LBB38_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB38_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r4, r5, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB38_2
 ; CHECK-ARM8-NEXT:  .LBB38_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB38_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB38_1
 ; CHECK-ARM8-NEXT:    b .LBB38_5
 ; CHECK-ARM8-NEXT:  .LBB38_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -7963,56 +8477,60 @@ define i64 @test_or_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI38_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB38_1
 ; CHECK-ARM6-NEXT:  .LBB38_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB38_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    orr r10, r2, #1
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r1
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI38_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    orr r12, r3, #1
+; CHECK-ARM6-NEXT:    mov r4, r12
+; CHECK-ARM6-NEXT:    mov r5, r1
+; CHECK-ARM6-NEXT:    mov r6, r3
+; CHECK-ARM6-NEXT:    mov r7, r1
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI38_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB38_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB38_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r6
+; CHECK-ARM6-NEXT:    cmpeq r11, r7
 ; CHECK-ARM6-NEXT:    bne .LBB38_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB38_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r4, r5, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB38_2
 ; CHECK-ARM6-NEXT:  .LBB38_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB38_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB38_1
 ; CHECK-ARM6-NEXT:    b .LBB38_5
 ; CHECK-ARM6-NEXT:  .LBB38_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -8028,57 +8546,61 @@ define i64 @test_or_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB38_1
 ; CHECK-THUMB7-NEXT:  .LBB38_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB38_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    orr r10, r2, #1
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r1
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    orr r12, r3, #1
+; CHECK-THUMB7-NEXT:    mov r4, r12
+; CHECK-THUMB7-NEXT:    mov r5, r1
+; CHECK-THUMB7-NEXT:    mov r6, r3
+; CHECK-THUMB7-NEXT:    mov r7, r1
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB38_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB38_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r6
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r7
 ; CHECK-THUMB7-NEXT:    bne .LBB38_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB38_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r4, r5, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB38_2
 ; CHECK-THUMB7-NEXT:  .LBB38_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB38_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB38_1
 ; CHECK-THUMB7-NEXT:    b .LBB38_5
 ; CHECK-THUMB7-NEXT:  .LBB38_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -8123,58 +8645,62 @@ define i64 @test_xor_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB39_1
 ; CHECK-ARM8-NEXT:  .LBB39_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB39_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    eor r10, r2, #1
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r1
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    eor r12, r3, #1
+; CHECK-ARM8-NEXT:    mov r4, r12
+; CHECK-ARM8-NEXT:    mov r5, r1
+; CHECK-ARM8-NEXT:    mov r6, r3
+; CHECK-ARM8-NEXT:    mov r7, r1
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB39_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB39_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r6
+; CHECK-ARM8-NEXT:    cmpeq r11, r7
 ; CHECK-ARM8-NEXT:    bne .LBB39_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB39_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r4, r5, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB39_2
 ; CHECK-ARM8-NEXT:  .LBB39_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB39_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB39_1
 ; CHECK-ARM8-NEXT:    b .LBB39_5
 ; CHECK-ARM8-NEXT:  .LBB39_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -8185,56 +8711,60 @@ define i64 @test_xor_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI39_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB39_1
 ; CHECK-ARM6-NEXT:  .LBB39_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB39_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    eor r10, r2, #1
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r1
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI39_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    eor r12, r3, #1
+; CHECK-ARM6-NEXT:    mov r4, r12
+; CHECK-ARM6-NEXT:    mov r5, r1
+; CHECK-ARM6-NEXT:    mov r6, r3
+; CHECK-ARM6-NEXT:    mov r7, r1
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI39_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB39_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB39_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r6
+; CHECK-ARM6-NEXT:    cmpeq r11, r7
 ; CHECK-ARM6-NEXT:    bne .LBB39_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB39_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r4, r5, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB39_2
 ; CHECK-ARM6-NEXT:  .LBB39_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB39_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB39_1
 ; CHECK-ARM6-NEXT:    b .LBB39_5
 ; CHECK-ARM6-NEXT:  .LBB39_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -8250,57 +8780,61 @@ define i64 @test_xor_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB39_1
 ; CHECK-THUMB7-NEXT:  .LBB39_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB39_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    eor r10, r2, #1
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r1
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    eor r12, r3, #1
+; CHECK-THUMB7-NEXT:    mov r4, r12
+; CHECK-THUMB7-NEXT:    mov r5, r1
+; CHECK-THUMB7-NEXT:    mov r6, r3
+; CHECK-THUMB7-NEXT:    mov r7, r1
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB39_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB39_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r6
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r7
 ; CHECK-THUMB7-NEXT:    bne .LBB39_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB39_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r4, r5, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB39_2
 ; CHECK-THUMB7-NEXT:  .LBB39_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB39_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB39_1
 ; CHECK-THUMB7-NEXT:    b .LBB39_5
 ; CHECK-THUMB7-NEXT:  .LBB39_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -8346,65 +8880,69 @@ define i64 @test_max_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB40_1
 ; CHECK-ARM8-NEXT:  .LBB40_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB40_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    rsbs r0, r2, #1
-; CHECK-ARM8-NEXT:    rscs r0, r1, #0
-; CHECK-ARM8-NEXT:    mov r0, #0
-; CHECK-ARM8-NEXT:    movwlt r0, #1
-; CHECK-ARM8-NEXT:    mov r10, #1
-; CHECK-ARM8-NEXT:    movlt r10, r2
-; CHECK-ARM8-NEXT:    cmp r0, #0
-; CHECK-ARM8-NEXT:    movne r0, r1
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r0
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    mov r4, r3
+; CHECK-ARM8-NEXT:    mov r5, r1
+; CHECK-ARM8-NEXT:    rsbs r12, r3, #1
+; CHECK-ARM8-NEXT:    rscs r12, r1, #0
+; CHECK-ARM8-NEXT:    mov r12, #0
+; CHECK-ARM8-NEXT:    movwlt r12, #1
+; CHECK-ARM8-NEXT:    mov lr, #1
+; CHECK-ARM8-NEXT:    movlt lr, r3
+; CHECK-ARM8-NEXT:    cmp r12, #0
+; CHECK-ARM8-NEXT:    movne r12, r1
+; CHECK-ARM8-NEXT:    mov r6, lr
+; CHECK-ARM8-NEXT:    mov r7, r12
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB40_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB40_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r4
+; CHECK-ARM8-NEXT:    cmpeq r11, r5
 ; CHECK-ARM8-NEXT:    bne .LBB40_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB40_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB40_2
 ; CHECK-ARM8-NEXT:  .LBB40_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB40_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB40_1
 ; CHECK-ARM8-NEXT:    b .LBB40_5
 ; CHECK-ARM8-NEXT:  .LBB40_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -8415,63 +8953,67 @@ define i64 @test_max_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI40_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB40_1
 ; CHECK-ARM6-NEXT:  .LBB40_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB40_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    rsbs r0, r2, #1
-; CHECK-ARM6-NEXT:    rscs r0, r1, #0
-; CHECK-ARM6-NEXT:    mov r0, #0
-; CHECK-ARM6-NEXT:    movlt r0, #1
-; CHECK-ARM6-NEXT:    mov r10, #1
-; CHECK-ARM6-NEXT:    movlt r10, r2
-; CHECK-ARM6-NEXT:    cmp r0, #0
-; CHECK-ARM6-NEXT:    movne r0, r1
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r0
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI40_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    mov r4, r3
+; CHECK-ARM6-NEXT:    mov r5, r1
+; CHECK-ARM6-NEXT:    rsbs r12, r3, #1
+; CHECK-ARM6-NEXT:    rscs r12, r1, #0
+; CHECK-ARM6-NEXT:    mov r12, #0
+; CHECK-ARM6-NEXT:    movlt r12, #1
+; CHECK-ARM6-NEXT:    mov lr, #1
+; CHECK-ARM6-NEXT:    movlt lr, r3
+; CHECK-ARM6-NEXT:    cmp r12, #0
+; CHECK-ARM6-NEXT:    movne r12, r1
+; CHECK-ARM6-NEXT:    mov r6, lr
+; CHECK-ARM6-NEXT:    mov r7, r12
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI40_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB40_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB40_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r4
+; CHECK-ARM6-NEXT:    cmpeq r11, r5
 ; CHECK-ARM6-NEXT:    bne .LBB40_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB40_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB40_2
 ; CHECK-ARM6-NEXT:  .LBB40_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB40_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB40_1
 ; CHECK-ARM6-NEXT:    b .LBB40_5
 ; CHECK-ARM6-NEXT:  .LBB40_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -8487,67 +9029,71 @@ define i64 @test_max_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB40_1
 ; CHECK-THUMB7-NEXT:  .LBB40_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB40_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    rsbs.w r0, r2, #1
-; CHECK-THUMB7-NEXT:    mov.w r0, #0
-; CHECK-THUMB7-NEXT:    sbcs.w r3, r0, r1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    rsbs.w r12, r3, #1
+; CHECK-THUMB7-NEXT:    mov.w r12, #0
+; CHECK-THUMB7-NEXT:    sbcs.w lr, r12, r1
 ; CHECK-THUMB7-NEXT:    it lt
-; CHECK-THUMB7-NEXT:    movlt r0, #1
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    mov.w r10, #1
+; CHECK-THUMB7-NEXT:    movlt.w r12, #1
+; CHECK-THUMB7-NEXT:    mov r4, r3
+; CHECK-THUMB7-NEXT:    mov r5, r1
+; CHECK-THUMB7-NEXT:    mov.w lr, #1
 ; CHECK-THUMB7-NEXT:    it lt
-; CHECK-THUMB7-NEXT:    movlt r10, r2
-; CHECK-THUMB7-NEXT:    cmp r0, #0
+; CHECK-THUMB7-NEXT:    movlt lr, r3
+; CHECK-THUMB7-NEXT:    cmp.w r12, #0
 ; CHECK-THUMB7-NEXT:    it ne
-; CHECK-THUMB7-NEXT:    movne r0, r1
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r0
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    movne r12, r1
+; CHECK-THUMB7-NEXT:    mov r6, lr
+; CHECK-THUMB7-NEXT:    mov r7, r12
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB40_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB40_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r4
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r5
 ; CHECK-THUMB7-NEXT:    bne .LBB40_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB40_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB40_2
 ; CHECK-THUMB7-NEXT:  .LBB40_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB40_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB40_1
 ; CHECK-THUMB7-NEXT:    b .LBB40_5
 ; CHECK-THUMB7-NEXT:  .LBB40_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -8567,88 +9113,98 @@ define i64 @test_max_i64() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_max_i64:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r6, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r6, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #72
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #72
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movt r0, :upper16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movs r1, #0
 ; CHECK-THUMB8BASE-NEXT:    bl __atomic_load_8
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #56] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #56] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    b .LBB40_1
 ; CHECK-THUMB8BASE-NEXT:  .LBB40_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Inner Loop Header: Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #56] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #56] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #52] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #60] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #36] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #40] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r1, #0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #44] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #48] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r3, r0, r3
-; CHECK-THUMB8BASE-NEXT:    sbcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r3, r2
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #48] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r4, #0
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #44] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r5, #1
+; CHECK-THUMB8BASE-NEXT:    str r5, [sp, #40] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r6, r5, r3
+; CHECK-THUMB8BASE-NEXT:    mov r6, r4
+; CHECK-THUMB8BASE-NEXT:    sbcs r6, r1
+; CHECK-THUMB8BASE-NEXT:    mov r6, r5
+; CHECK-THUMB8BASE-NEXT:    str r6, [sp, #36] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blt .LBB40_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB40_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #44] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #36] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB40_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB40_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #52] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #28] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #36] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #32] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #48] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r2, r1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #28] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blt .LBB40_5
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB40_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #48] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #32] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r2, r0
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #28] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB40_5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB40_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #36] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #28] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #32] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #20] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #24] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cbnz r1, .LBB40_7
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #28] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #24] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #32] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #52] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #20] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cbnz r0, .LBB40_7
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB40_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #28] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #24] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #32] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r0
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #20] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB40_7: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB40_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #20] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #20] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #48] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #52] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #68]
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #44] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #36] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #40] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #24] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #64]
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #68]
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4]
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp]
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movt r0, :upper16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    add r1, sp, #64
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #24] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    bl __atomic_compare_exchange_8
-; CHECK-THUMB8BASE-NEXT:    mov r2, r0
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #68]
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #68]
 ; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #56] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #0
+; CHECK-THUMB8BASE-NEXT:    mov r0, r2
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #56] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    beq .LBB40_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB40_8
 ; CHECK-THUMB8BASE-NEXT:  .LBB40_8: @ %atomicrmw.end
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #16] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #72
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r6, pc}
 entry:
   %0 = atomicrmw max ptr @atomic_i64, i64 1 monotonic
   ret i64 %0
@@ -8662,65 +9218,69 @@ define i64 @test_min_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB41_1
 ; CHECK-ARM8-NEXT:  .LBB41_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB41_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    subs r0, r2, #2
-; CHECK-ARM8-NEXT:    sbcs r0, r1, #0
-; CHECK-ARM8-NEXT:    mov r0, #0
-; CHECK-ARM8-NEXT:    movwlt r0, #1
-; CHECK-ARM8-NEXT:    mov r10, #1
-; CHECK-ARM8-NEXT:    movlt r10, r2
-; CHECK-ARM8-NEXT:    cmp r0, #0
-; CHECK-ARM8-NEXT:    movne r0, r1
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r0
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    mov r4, r3
+; CHECK-ARM8-NEXT:    mov r5, r1
+; CHECK-ARM8-NEXT:    subs r12, r3, #2
+; CHECK-ARM8-NEXT:    sbcs r12, r1, #0
+; CHECK-ARM8-NEXT:    mov r12, #0
+; CHECK-ARM8-NEXT:    movwlt r12, #1
+; CHECK-ARM8-NEXT:    mov lr, #1
+; CHECK-ARM8-NEXT:    movlt lr, r3
+; CHECK-ARM8-NEXT:    cmp r12, #0
+; CHECK-ARM8-NEXT:    movne r12, r1
+; CHECK-ARM8-NEXT:    mov r6, lr
+; CHECK-ARM8-NEXT:    mov r7, r12
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB41_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB41_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r4
+; CHECK-ARM8-NEXT:    cmpeq r11, r5
 ; CHECK-ARM8-NEXT:    bne .LBB41_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB41_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB41_2
 ; CHECK-ARM8-NEXT:  .LBB41_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB41_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB41_1
 ; CHECK-ARM8-NEXT:    b .LBB41_5
 ; CHECK-ARM8-NEXT:  .LBB41_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -8731,63 +9291,67 @@ define i64 @test_min_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI41_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB41_1
 ; CHECK-ARM6-NEXT:  .LBB41_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB41_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    subs r0, r2, #2
-; CHECK-ARM6-NEXT:    sbcs r0, r1, #0
-; CHECK-ARM6-NEXT:    mov r0, #0
-; CHECK-ARM6-NEXT:    movlt r0, #1
-; CHECK-ARM6-NEXT:    mov r10, #1
-; CHECK-ARM6-NEXT:    movlt r10, r2
-; CHECK-ARM6-NEXT:    cmp r0, #0
-; CHECK-ARM6-NEXT:    movne r0, r1
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r0
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI41_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    mov r4, r3
+; CHECK-ARM6-NEXT:    mov r5, r1
+; CHECK-ARM6-NEXT:    subs r12, r3, #2
+; CHECK-ARM6-NEXT:    sbcs r12, r1, #0
+; CHECK-ARM6-NEXT:    mov r12, #0
+; CHECK-ARM6-NEXT:    movlt r12, #1
+; CHECK-ARM6-NEXT:    mov lr, #1
+; CHECK-ARM6-NEXT:    movlt lr, r3
+; CHECK-ARM6-NEXT:    cmp r12, #0
+; CHECK-ARM6-NEXT:    movne r12, r1
+; CHECK-ARM6-NEXT:    mov r6, lr
+; CHECK-ARM6-NEXT:    mov r7, r12
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI41_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB41_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB41_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r4
+; CHECK-ARM6-NEXT:    cmpeq r11, r5
 ; CHECK-ARM6-NEXT:    bne .LBB41_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB41_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB41_2
 ; CHECK-ARM6-NEXT:  .LBB41_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB41_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB41_1
 ; CHECK-ARM6-NEXT:    b .LBB41_5
 ; CHECK-ARM6-NEXT:  .LBB41_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -8803,67 +9367,71 @@ define i64 @test_min_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB41_1
 ; CHECK-THUMB7-NEXT:  .LBB41_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB41_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    subs r0, r2, #2
-; CHECK-THUMB7-NEXT:    sbcs r0, r1, #0
-; CHECK-THUMB7-NEXT:    mov.w r0, #0
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    mov r4, r3
+; CHECK-THUMB7-NEXT:    mov r5, r1
+; CHECK-THUMB7-NEXT:    subs.w r12, r3, #2
+; CHECK-THUMB7-NEXT:    sbcs r12, r1, #0
+; CHECK-THUMB7-NEXT:    mov.w r12, #0
 ; CHECK-THUMB7-NEXT:    it lt
-; CHECK-THUMB7-NEXT:    movlt r0, #1
-; CHECK-THUMB7-NEXT:    mov.w r10, #1
+; CHECK-THUMB7-NEXT:    movlt.w r12, #1
+; CHECK-THUMB7-NEXT:    mov.w lr, #1
 ; CHECK-THUMB7-NEXT:    it lt
-; CHECK-THUMB7-NEXT:    movlt r10, r2
-; CHECK-THUMB7-NEXT:    cmp r0, #0
+; CHECK-THUMB7-NEXT:    movlt lr, r3
+; CHECK-THUMB7-NEXT:    cmp.w r12, #0
 ; CHECK-THUMB7-NEXT:    it ne
-; CHECK-THUMB7-NEXT:    movne r0, r1
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r0
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    movne r12, r1
+; CHECK-THUMB7-NEXT:    mov r6, lr
+; CHECK-THUMB7-NEXT:    mov r7, r12
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB41_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB41_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r4
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r5
 ; CHECK-THUMB7-NEXT:    bne .LBB41_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB41_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB41_2
 ; CHECK-THUMB7-NEXT:  .LBB41_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB41_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB41_1
 ; CHECK-THUMB7-NEXT:    b .LBB41_5
 ; CHECK-THUMB7-NEXT:  .LBB41_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -8883,88 +9451,98 @@ define i64 @test_min_i64() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_min_i64:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r6, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r6, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #72
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #72
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movt r0, :upper16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movs r1, #0
 ; CHECK-THUMB8BASE-NEXT:    bl __atomic_load_8
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #56] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #56] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    b .LBB41_1
 ; CHECK-THUMB8BASE-NEXT:  .LBB41_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Inner Loop Header: Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #56] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #60] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #36] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #40] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #44] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r2, #0
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #48] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r3, r3, #2
-; CHECK-THUMB8BASE-NEXT:    sbcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #56] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #60] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r2
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #48] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r4, #1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #44] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r5, #0
+; CHECK-THUMB8BASE-NEXT:    str r5, [sp, #40] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r6, r3, #2
+; CHECK-THUMB8BASE-NEXT:    mov r6, r1
+; CHECK-THUMB8BASE-NEXT:    sbcs r6, r5
+; CHECK-THUMB8BASE-NEXT:    mov r6, r4
+; CHECK-THUMB8BASE-NEXT:    str r6, [sp, #36] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blt .LBB41_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB41_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #48] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #36] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB41_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB41_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #52] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #28] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #36] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #32] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #48] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r2, r1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #28] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blt .LBB41_5
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB41_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #44] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #32] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r2, r0
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #28] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB41_5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB41_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #36] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #28] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #32] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #20] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #24] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cbnz r1, .LBB41_7
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #28] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #24] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #32] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #52] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #20] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cbnz r0, .LBB41_7
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB41_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #28] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #24] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #32] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r0
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #20] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB41_7: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB41_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #20] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #20] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #48] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #36] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #40] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #24] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #64]
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #68]
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #52] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #68]
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4]
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp]
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movt r0, :upper16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    add r1, sp, #64
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #24] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    bl __atomic_compare_exchange_8
-; CHECK-THUMB8BASE-NEXT:    mov r2, r0
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #68]
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #68]
 ; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #56] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #0
+; CHECK-THUMB8BASE-NEXT:    mov r0, r2
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #56] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    beq .LBB41_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB41_8
 ; CHECK-THUMB8BASE-NEXT:  .LBB41_8: @ %atomicrmw.end
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #16] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #72
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r6, pc}
 entry:
   %0 = atomicrmw min ptr @atomic_i64, i64 1 monotonic
   ret i64 %0
@@ -8978,65 +9556,69 @@ define i64 @test_umax_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB42_1
 ; CHECK-ARM8-NEXT:  .LBB42_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB42_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    rsbs r0, r2, #1
-; CHECK-ARM8-NEXT:    rscs r0, r1, #0
-; CHECK-ARM8-NEXT:    mov r0, #0
-; CHECK-ARM8-NEXT:    movwlo r0, #1
-; CHECK-ARM8-NEXT:    mov r10, #1
-; CHECK-ARM8-NEXT:    movlo r10, r2
-; CHECK-ARM8-NEXT:    cmp r0, #0
-; CHECK-ARM8-NEXT:    movne r0, r1
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r0
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    mov r4, r3
+; CHECK-ARM8-NEXT:    mov r5, r1
+; CHECK-ARM8-NEXT:    rsbs r12, r3, #1
+; CHECK-ARM8-NEXT:    rscs r12, r1, #0
+; CHECK-ARM8-NEXT:    mov r12, #0
+; CHECK-ARM8-NEXT:    movwlo r12, #1
+; CHECK-ARM8-NEXT:    mov lr, #1
+; CHECK-ARM8-NEXT:    movlo lr, r3
+; CHECK-ARM8-NEXT:    cmp r12, #0
+; CHECK-ARM8-NEXT:    movne r12, r1
+; CHECK-ARM8-NEXT:    mov r6, lr
+; CHECK-ARM8-NEXT:    mov r7, r12
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB42_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB42_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r4
+; CHECK-ARM8-NEXT:    cmpeq r11, r5
 ; CHECK-ARM8-NEXT:    bne .LBB42_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB42_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB42_2
 ; CHECK-ARM8-NEXT:  .LBB42_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB42_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB42_1
 ; CHECK-ARM8-NEXT:    b .LBB42_5
 ; CHECK-ARM8-NEXT:  .LBB42_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -9047,63 +9629,67 @@ define i64 @test_umax_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI42_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB42_1
 ; CHECK-ARM6-NEXT:  .LBB42_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB42_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    rsbs r0, r2, #1
-; CHECK-ARM6-NEXT:    rscs r0, r1, #0
-; CHECK-ARM6-NEXT:    mov r0, #0
-; CHECK-ARM6-NEXT:    movlo r0, #1
-; CHECK-ARM6-NEXT:    mov r10, #1
-; CHECK-ARM6-NEXT:    movlo r10, r2
-; CHECK-ARM6-NEXT:    cmp r0, #0
-; CHECK-ARM6-NEXT:    movne r0, r1
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r0
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI42_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    mov r4, r3
+; CHECK-ARM6-NEXT:    mov r5, r1
+; CHECK-ARM6-NEXT:    rsbs r12, r3, #1
+; CHECK-ARM6-NEXT:    rscs r12, r1, #0
+; CHECK-ARM6-NEXT:    mov r12, #0
+; CHECK-ARM6-NEXT:    movlo r12, #1
+; CHECK-ARM6-NEXT:    mov lr, #1
+; CHECK-ARM6-NEXT:    movlo lr, r3
+; CHECK-ARM6-NEXT:    cmp r12, #0
+; CHECK-ARM6-NEXT:    movne r12, r1
+; CHECK-ARM6-NEXT:    mov r6, lr
+; CHECK-ARM6-NEXT:    mov r7, r12
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI42_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB42_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB42_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r4
+; CHECK-ARM6-NEXT:    cmpeq r11, r5
 ; CHECK-ARM6-NEXT:    bne .LBB42_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB42_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB42_2
 ; CHECK-ARM6-NEXT:  .LBB42_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB42_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB42_1
 ; CHECK-ARM6-NEXT:    b .LBB42_5
 ; CHECK-ARM6-NEXT:  .LBB42_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -9119,67 +9705,71 @@ define i64 @test_umax_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB42_1
 ; CHECK-THUMB7-NEXT:  .LBB42_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB42_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    rsbs.w r0, r2, #1
-; CHECK-THUMB7-NEXT:    mov.w r0, #0
-; CHECK-THUMB7-NEXT:    sbcs.w r3, r0, r1
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    rsbs.w r12, r3, #1
+; CHECK-THUMB7-NEXT:    mov.w r12, #0
+; CHECK-THUMB7-NEXT:    sbcs.w lr, r12, r1
 ; CHECK-THUMB7-NEXT:    it lo
-; CHECK-THUMB7-NEXT:    movlo r0, #1
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    mov.w r10, #1
+; CHECK-THUMB7-NEXT:    movlo.w r12, #1
+; CHECK-THUMB7-NEXT:    mov r4, r3
+; CHECK-THUMB7-NEXT:    mov r5, r1
+; CHECK-THUMB7-NEXT:    mov.w lr, #1
 ; CHECK-THUMB7-NEXT:    it lo
-; CHECK-THUMB7-NEXT:    movlo r10, r2
-; CHECK-THUMB7-NEXT:    cmp r0, #0
+; CHECK-THUMB7-NEXT:    movlo lr, r3
+; CHECK-THUMB7-NEXT:    cmp.w r12, #0
 ; CHECK-THUMB7-NEXT:    it ne
-; CHECK-THUMB7-NEXT:    movne r0, r1
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r0
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    movne r12, r1
+; CHECK-THUMB7-NEXT:    mov r6, lr
+; CHECK-THUMB7-NEXT:    mov r7, r12
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB42_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB42_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r4
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r5
 ; CHECK-THUMB7-NEXT:    bne .LBB42_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB42_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB42_2
 ; CHECK-THUMB7-NEXT:  .LBB42_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB42_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB42_1
 ; CHECK-THUMB7-NEXT:    b .LBB42_5
 ; CHECK-THUMB7-NEXT:  .LBB42_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -9199,88 +9789,98 @@ define i64 @test_umax_i64() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_umax_i64:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r6, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r6, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #72
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #72
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movt r0, :upper16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movs r1, #0
 ; CHECK-THUMB8BASE-NEXT:    bl __atomic_load_8
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #56] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #56] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    b .LBB42_1
 ; CHECK-THUMB8BASE-NEXT:  .LBB42_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Inner Loop Header: Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #56] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #56] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #52] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #60] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #36] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #40] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r1, #0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #44] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #48] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r3, r0, r3
-; CHECK-THUMB8BASE-NEXT:    sbcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r3, r2
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #48] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r4, #0
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #44] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r5, #1
+; CHECK-THUMB8BASE-NEXT:    str r5, [sp, #40] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r6, r5, r3
+; CHECK-THUMB8BASE-NEXT:    mov r6, r4
+; CHECK-THUMB8BASE-NEXT:    sbcs r6, r1
+; CHECK-THUMB8BASE-NEXT:    mov r6, r5
+; CHECK-THUMB8BASE-NEXT:    str r6, [sp, #36] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blo .LBB42_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB42_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #44] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #36] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB42_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB42_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #52] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #28] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #36] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #32] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #48] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r2, r1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #28] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blo .LBB42_5
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB42_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #48] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #32] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r2, r0
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #28] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB42_5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB42_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #36] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #28] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #32] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #20] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #24] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cbnz r1, .LBB42_7
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #28] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #24] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #32] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #52] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #20] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cbnz r0, .LBB42_7
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB42_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #28] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #24] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #32] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r0
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #20] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB42_7: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB42_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #20] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #20] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #48] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #52] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #68]
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #44] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #36] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #40] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #24] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #64]
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #68]
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4]
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp]
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movt r0, :upper16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    add r1, sp, #64
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #24] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    bl __atomic_compare_exchange_8
-; CHECK-THUMB8BASE-NEXT:    mov r2, r0
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #68]
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #68]
 ; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #56] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #0
+; CHECK-THUMB8BASE-NEXT:    mov r0, r2
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #56] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    beq .LBB42_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB42_8
 ; CHECK-THUMB8BASE-NEXT:  .LBB42_8: @ %atomicrmw.end
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #16] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #72
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r6, pc}
 entry:
   %0 = atomicrmw umax ptr @atomic_i64, i64 1 monotonic
   ret i64 %0
@@ -9294,65 +9894,69 @@ define i64 @test_umin_i64() {
 ; CHECK-ARM8-NEXT:    sub sp, sp, #16
 ; CHECK-ARM8-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-ARM8-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM8-NEXT:    mov r0, r3
-; CHECK-ARM8-NEXT:    mov r1, r2
+; CHECK-ARM8-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM8-NEXT:    mov r2, r1
+; CHECK-ARM8-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM8-NEXT:    clrex
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    b .LBB43_1
 ; CHECK-ARM8-NEXT:  .LBB43_1: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM8-NEXT:    @ Child Loop BB43_2 Depth 2
-; CHECK-ARM8-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    mov r8, r2
-; CHECK-ARM8-NEXT:    mov r9, r1
-; CHECK-ARM8-NEXT:    subs r0, r2, #2
-; CHECK-ARM8-NEXT:    sbcs r0, r1, #0
-; CHECK-ARM8-NEXT:    mov r0, #0
-; CHECK-ARM8-NEXT:    movwlo r0, #1
-; CHECK-ARM8-NEXT:    mov r10, #1
-; CHECK-ARM8-NEXT:    movlo r10, r2
-; CHECK-ARM8-NEXT:    cmp r0, #0
-; CHECK-ARM8-NEXT:    movne r0, r1
-; CHECK-ARM8-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM8-NEXT:    mov r11, r0
-; CHECK-ARM8-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-ARM8-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-ARM8-NEXT:    @ implicit-def: $r0
-; CHECK-ARM8-NEXT:    @ implicit-def: $r3
-; CHECK-ARM8-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM8-NEXT:    mov r7, r0
+; CHECK-ARM8-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r1, r0
+; CHECK-ARM8-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    mov r3, r2
+; CHECK-ARM8-NEXT:    mov r4, r3
+; CHECK-ARM8-NEXT:    mov r5, r1
+; CHECK-ARM8-NEXT:    subs r12, r3, #2
+; CHECK-ARM8-NEXT:    sbcs r12, r1, #0
+; CHECK-ARM8-NEXT:    mov r12, #0
+; CHECK-ARM8-NEXT:    movwlo r12, #1
+; CHECK-ARM8-NEXT:    mov lr, #1
+; CHECK-ARM8-NEXT:    movlo lr, r3
+; CHECK-ARM8-NEXT:    cmp r12, #0
+; CHECK-ARM8-NEXT:    movne r12, r1
+; CHECK-ARM8-NEXT:    mov r6, lr
+; CHECK-ARM8-NEXT:    mov r7, r12
+; CHECK-ARM8-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-ARM8-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-ARM8-NEXT:    @ implicit-def: $lr
+; CHECK-ARM8-NEXT:    @ implicit-def: $r8
+; CHECK-ARM8-NEXT:    mov r8, r12
+; CHECK-ARM8-NEXT:    mov r9, lr
 ; CHECK-ARM8-NEXT:  .LBB43_2: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ Parent Loop BB43_1 Depth=1
 ; CHECK-ARM8-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM8-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM8-NEXT:    cmp r4, r8
-; CHECK-ARM8-NEXT:    cmpeq r5, r9
+; CHECK-ARM8-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM8-NEXT:    cmp r10, r4
+; CHECK-ARM8-NEXT:    cmpeq r11, r5
 ; CHECK-ARM8-NEXT:    bne .LBB43_4
 ; CHECK-ARM8-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB43_2 Depth=2
-; CHECK-ARM8-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM8-NEXT:    cmp r7, #0
+; CHECK-ARM8-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM8-NEXT:    cmp r9, #0
 ; CHECK-ARM8-NEXT:    bne .LBB43_2
 ; CHECK-ARM8-NEXT:  .LBB43_4: @ %atomicrmw.start
 ; CHECK-ARM8-NEXT:    @ in Loop: Header=BB43_1 Depth=1
-; CHECK-ARM8-NEXT:    mov r0, r5
-; CHECK-ARM8-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r3, r0, r1
-; CHECK-ARM8-NEXT:    mov r1, r4
-; CHECK-ARM8-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    eor r2, r1, r2
-; CHECK-ARM8-NEXT:    orr r2, r2, r3
-; CHECK-ARM8-NEXT:    cmp r2, #0
-; CHECK-ARM8-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM8-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r12, r11
+; CHECK-ARM8-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r1, r12, r1
+; CHECK-ARM8-NEXT:    mov lr, r10
+; CHECK-ARM8-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    eor r3, lr, r3
+; CHECK-ARM8-NEXT:    orr r1, r3, r1
+; CHECK-ARM8-NEXT:    cmp r1, #0
+; CHECK-ARM8-NEXT:    mov r2, lr
+; CHECK-ARM8-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM8-NEXT:    mov r0, r12
+; CHECK-ARM8-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM8-NEXT:    bne .LBB43_1
 ; CHECK-ARM8-NEXT:    b .LBB43_5
 ; CHECK-ARM8-NEXT:  .LBB43_5: @ %atomicrmw.end
-; CHECK-ARM8-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM8-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM8-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM8-NEXT:    add sp, sp, #16
 ; CHECK-ARM8-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -9363,63 +9967,67 @@ define i64 @test_umin_i64() {
 ; CHECK-ARM6-NEXT:    .pad #16
 ; CHECK-ARM6-NEXT:    sub sp, sp, #16
 ; CHECK-ARM6-NEXT:    ldr r0, .LCPI43_0
-; CHECK-ARM6-NEXT:    ldrexd r2, r3, [r0]
-; CHECK-ARM6-NEXT:    mov r0, r3
-; CHECK-ARM6-NEXT:    mov r1, r2
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    ldrexd r0, r1, [r0]
+; CHECK-ARM6-NEXT:    mov r2, r1
+; CHECK-ARM6-NEXT:    @ kill: def $r0 killed $r0 killed $r0_r1
 ; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    str r2, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    b .LBB43_1
 ; CHECK-ARM6-NEXT:  .LBB43_1: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-ARM6-NEXT:    @ Child Loop BB43_2 Depth 2
-; CHECK-ARM6-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    mov r8, r2
-; CHECK-ARM6-NEXT:    mov r9, r1
-; CHECK-ARM6-NEXT:    subs r0, r2, #2
-; CHECK-ARM6-NEXT:    sbcs r0, r1, #0
-; CHECK-ARM6-NEXT:    mov r0, #0
-; CHECK-ARM6-NEXT:    movlo r0, #1
-; CHECK-ARM6-NEXT:    mov r10, #1
-; CHECK-ARM6-NEXT:    movlo r10, r2
-; CHECK-ARM6-NEXT:    cmp r0, #0
-; CHECK-ARM6-NEXT:    movne r0, r1
-; CHECK-ARM6-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-ARM6-NEXT:    mov r11, r0
-; CHECK-ARM6-NEXT:    ldr r6, .LCPI43_0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r0
-; CHECK-ARM6-NEXT:    @ implicit-def: $r3
-; CHECK-ARM6-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-ARM6-NEXT:    mov r7, r0
+; CHECK-ARM6-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r1, r0
+; CHECK-ARM6-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    mov r3, r2
+; CHECK-ARM6-NEXT:    mov r4, r3
+; CHECK-ARM6-NEXT:    mov r5, r1
+; CHECK-ARM6-NEXT:    subs r12, r3, #2
+; CHECK-ARM6-NEXT:    sbcs r12, r1, #0
+; CHECK-ARM6-NEXT:    mov r12, #0
+; CHECK-ARM6-NEXT:    movlo r12, #1
+; CHECK-ARM6-NEXT:    mov lr, #1
+; CHECK-ARM6-NEXT:    movlo lr, r3
+; CHECK-ARM6-NEXT:    cmp r12, #0
+; CHECK-ARM6-NEXT:    movne r12, r1
+; CHECK-ARM6-NEXT:    mov r6, lr
+; CHECK-ARM6-NEXT:    mov r7, r12
+; CHECK-ARM6-NEXT:    ldr r12, .LCPI43_0
+; CHECK-ARM6-NEXT:    @ implicit-def: $lr
+; CHECK-ARM6-NEXT:    @ implicit-def: $r8
+; CHECK-ARM6-NEXT:    mov r8, r12
+; CHECK-ARM6-NEXT:    mov r9, lr
 ; CHECK-ARM6-NEXT:  .LBB43_2: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ Parent Loop BB43_1 Depth=1
 ; CHECK-ARM6-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-ARM6-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-ARM6-NEXT:    cmp r4, r8
-; CHECK-ARM6-NEXT:    cmpeq r5, r9
+; CHECK-ARM6-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-ARM6-NEXT:    cmp r10, r4
+; CHECK-ARM6-NEXT:    cmpeq r11, r5
 ; CHECK-ARM6-NEXT:    bne .LBB43_4
 ; CHECK-ARM6-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB43_2 Depth=2
-; CHECK-ARM6-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-ARM6-NEXT:    cmp r7, #0
+; CHECK-ARM6-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-ARM6-NEXT:    cmp r9, #0
 ; CHECK-ARM6-NEXT:    bne .LBB43_2
 ; CHECK-ARM6-NEXT:  .LBB43_4: @ %atomicrmw.start
 ; CHECK-ARM6-NEXT:    @ in Loop: Header=BB43_1 Depth=1
-; CHECK-ARM6-NEXT:    mov r0, r5
-; CHECK-ARM6-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r3, r0, r1
-; CHECK-ARM6-NEXT:    mov r1, r4
-; CHECK-ARM6-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    eor r2, r1, r2
-; CHECK-ARM6-NEXT:    orr r2, r2, r3
-; CHECK-ARM6-NEXT:    cmp r2, #0
-; CHECK-ARM6-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-ARM6-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r12, r11
+; CHECK-ARM6-NEXT:    str r12, [sp, #4] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r1, r12, r1
+; CHECK-ARM6-NEXT:    mov lr, r10
+; CHECK-ARM6-NEXT:    str lr, [sp] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    eor r3, lr, r3
+; CHECK-ARM6-NEXT:    orr r1, r3, r1
+; CHECK-ARM6-NEXT:    cmp r1, #0
+; CHECK-ARM6-NEXT:    mov r2, lr
+; CHECK-ARM6-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-ARM6-NEXT:    mov r0, r12
+; CHECK-ARM6-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-ARM6-NEXT:    bne .LBB43_1
 ; CHECK-ARM6-NEXT:    b .LBB43_5
 ; CHECK-ARM6-NEXT:  .LBB43_5: @ %atomicrmw.end
-; CHECK-ARM6-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-ARM6-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-ARM6-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-ARM6-NEXT:    add sp, sp, #16
 ; CHECK-ARM6-NEXT:    pop {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ; CHECK-ARM6-NEXT:    .p2align 2
@@ -9435,67 +10043,71 @@ define i64 @test_umin_i64() {
 ; CHECK-THUMB7-NEXT:    sub sp, #16
 ; CHECK-THUMB7-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB7-NEXT:    movt r0, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    ldrexd r1, r0, [r0]
+; CHECK-THUMB7-NEXT:    ldrexd r0, r1, [r0]
 ; CHECK-THUMB7-NEXT:    clrex
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    b .LBB43_1
 ; CHECK-THUMB7-NEXT:  .LBB43_1: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ =>This Loop Header: Depth=1
 ; CHECK-THUMB7-NEXT:    @ Child Loop BB43_2 Depth 2
-; CHECK-THUMB7-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r2, [sp, #8] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    mov r8, r2
-; CHECK-THUMB7-NEXT:    mov r9, r1
-; CHECK-THUMB7-NEXT:    subs r0, r2, #2
-; CHECK-THUMB7-NEXT:    sbcs r0, r1, #0
-; CHECK-THUMB7-NEXT:    mov.w r0, #0
+; CHECK-THUMB7-NEXT:    ldr r0, [sp, #8] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r1, r0
+; CHECK-THUMB7-NEXT:    ldr r2, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    mov r3, r2
+; CHECK-THUMB7-NEXT:    mov r4, r3
+; CHECK-THUMB7-NEXT:    mov r5, r1
+; CHECK-THUMB7-NEXT:    subs.w r12, r3, #2
+; CHECK-THUMB7-NEXT:    sbcs r12, r1, #0
+; CHECK-THUMB7-NEXT:    mov.w r12, #0
 ; CHECK-THUMB7-NEXT:    it lo
-; CHECK-THUMB7-NEXT:    movlo r0, #1
-; CHECK-THUMB7-NEXT:    mov.w r10, #1
+; CHECK-THUMB7-NEXT:    movlo.w r12, #1
+; CHECK-THUMB7-NEXT:    mov.w lr, #1
 ; CHECK-THUMB7-NEXT:    it lo
-; CHECK-THUMB7-NEXT:    movlo r10, r2
-; CHECK-THUMB7-NEXT:    cmp r0, #0
+; CHECK-THUMB7-NEXT:    movlo lr, r3
+; CHECK-THUMB7-NEXT:    cmp.w r12, #0
 ; CHECK-THUMB7-NEXT:    it ne
-; CHECK-THUMB7-NEXT:    movne r0, r1
-; CHECK-THUMB7-NEXT:    @ kill: def $r10 killed $r10 def $r10_r11
-; CHECK-THUMB7-NEXT:    mov r11, r0
-; CHECK-THUMB7-NEXT:    movw r6, :lower16:atomic_i64
-; CHECK-THUMB7-NEXT:    movt r6, :upper16:atomic_i64
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r0
-; CHECK-THUMB7-NEXT:    @ implicit-def: $r3
-; CHECK-THUMB7-NEXT:    @ kill: def $r6 killed $r6 def $r6_r7
-; CHECK-THUMB7-NEXT:    mov r7, r0
+; CHECK-THUMB7-NEXT:    movne r12, r1
+; CHECK-THUMB7-NEXT:    mov r6, lr
+; CHECK-THUMB7-NEXT:    mov r7, r12
+; CHECK-THUMB7-NEXT:    movw r12, :lower16:atomic_i64
+; CHECK-THUMB7-NEXT:    movt r12, :upper16:atomic_i64
+; CHECK-THUMB7-NEXT:    @ implicit-def: $lr
+; CHECK-THUMB7-NEXT:    @ implicit-def: $r8
+; CHECK-THUMB7-NEXT:    mov r8, r12
+; CHECK-THUMB7-NEXT:    mov r9, lr
 ; CHECK-THUMB7-NEXT:  .LBB43_2: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ Parent Loop BB43_1 Depth=1
 ; CHECK-THUMB7-NEXT:    @ => This Inner Loop Header: Depth=2
-; CHECK-THUMB7-NEXT:    ldrexd r4, r5, [r6]
-; CHECK-THUMB7-NEXT:    cmp r4, r8
+; CHECK-THUMB7-NEXT:    ldrexd r10, r11, [r8]
+; CHECK-THUMB7-NEXT:    cmp r10, r4
 ; CHECK-THUMB7-NEXT:    it eq
-; CHECK-THUMB7-NEXT:    cmpeq r5, r9
+; CHECK-THUMB7-NEXT:    cmpeq r11, r5
 ; CHECK-THUMB7-NEXT:    bne .LBB43_4
 ; CHECK-THUMB7-NEXT:  @ %bb.3: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB43_2 Depth=2
-; CHECK-THUMB7-NEXT:    strexd r7, r10, r11, [r6]
-; CHECK-THUMB7-NEXT:    cmp r7, #0
+; CHECK-THUMB7-NEXT:    strexd r9, r6, r7, [r8]
+; CHECK-THUMB7-NEXT:    cmp.w r9, #0
 ; CHECK-THUMB7-NEXT:    bne .LBB43_2
 ; CHECK-THUMB7-NEXT:  .LBB43_4: @ %atomicrmw.start
 ; CHECK-THUMB7-NEXT:    @ in Loop: Header=BB43_1 Depth=1
-; CHECK-THUMB7-NEXT:    mov r0, r5
-; CHECK-THUMB7-NEXT:    str r0, [sp] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eor.w r3, r0, r1
-; CHECK-THUMB7-NEXT:    mov r1, r4
-; CHECK-THUMB7-NEXT:    str r1, [sp, #4] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    eors r2, r1
-; CHECK-THUMB7-NEXT:    orrs r2, r3
-; CHECK-THUMB7-NEXT:    cmp r2, #0
-; CHECK-THUMB7-NEXT:    str r1, [sp, #8] @ 4-byte Spill
-; CHECK-THUMB7-NEXT:    str r0, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r12, r11
+; CHECK-THUMB7-NEXT:    str.w r12, [sp, #4] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r1, r1, r12
+; CHECK-THUMB7-NEXT:    mov lr, r10
+; CHECK-THUMB7-NEXT:    str.w lr, [sp] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    eor.w r3, r3, lr
+; CHECK-THUMB7-NEXT:    orrs r1, r3
+; CHECK-THUMB7-NEXT:    cmp r1, #0
+; CHECK-THUMB7-NEXT:    mov r2, lr
+; CHECK-THUMB7-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB7-NEXT:    mov r0, r12
+; CHECK-THUMB7-NEXT:    str r0, [sp, #8] @ 4-byte Spill
 ; CHECK-THUMB7-NEXT:    bne .LBB43_1
 ; CHECK-THUMB7-NEXT:    b .LBB43_5
 ; CHECK-THUMB7-NEXT:  .LBB43_5: @ %atomicrmw.end
-; CHECK-THUMB7-NEXT:    ldr r1, [sp] @ 4-byte Reload
-; CHECK-THUMB7-NEXT:    ldr r0, [sp, #4] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r0, [sp] @ 4-byte Reload
+; CHECK-THUMB7-NEXT:    ldr r1, [sp, #4] @ 4-byte Reload
 ; CHECK-THUMB7-NEXT:    add sp, #16
 ; CHECK-THUMB7-NEXT:    pop.w {r4, r5, r6, r7, r8, r9, r10, r11, pc}
 ;
@@ -9515,88 +10127,98 @@ define i64 @test_umin_i64() {
 ;
 ; CHECK-THUMB8BASE-LABEL: test_umin_i64:
 ; CHECK-THUMB8BASE:       @ %bb.0: @ %entry
-; CHECK-THUMB8BASE-NEXT:    .save {r4, lr}
-; CHECK-THUMB8BASE-NEXT:    push {r4, lr}
+; CHECK-THUMB8BASE-NEXT:    .save {r4, r5, r6, lr}
+; CHECK-THUMB8BASE-NEXT:    push {r4, r5, r6, lr}
 ; CHECK-THUMB8BASE-NEXT:    .pad #72
 ; CHECK-THUMB8BASE-NEXT:    sub sp, #72
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movt r0, :upper16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movs r1, #0
 ; CHECK-THUMB8BASE-NEXT:    bl __atomic_load_8
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #56] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #56] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    b .LBB43_1
 ; CHECK-THUMB8BASE-NEXT:  .LBB43_1: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ =>This Inner Loop Header: Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #56] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #60] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #36] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #40] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r0, #1
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #44] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    movs r2, #0
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #48] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    subs r3, r3, #2
-; CHECK-THUMB8BASE-NEXT:    sbcs r1, r2
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #56] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #60] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r2
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #48] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r4, #1
+; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #44] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    movs r5, #0
+; CHECK-THUMB8BASE-NEXT:    str r5, [sp, #40] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    subs r6, r3, #2
+; CHECK-THUMB8BASE-NEXT:    mov r6, r1
+; CHECK-THUMB8BASE-NEXT:    sbcs r6, r5
+; CHECK-THUMB8BASE-NEXT:    mov r6, r4
+; CHECK-THUMB8BASE-NEXT:    str r6, [sp, #36] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blo .LBB43_3
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.2: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB43_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #48] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #52] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r1, r0
+; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #36] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB43_3: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB43_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #52] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #28] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #36] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #32] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #48] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r2, r1
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #28] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    blo .LBB43_5
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.4: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB43_1 Depth=1
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #44] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #32] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r2, r0
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #28] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB43_5: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB43_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #36] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #28] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #32] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #20] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #24] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cbnz r1, .LBB43_7
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #28] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #24] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #32] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #52] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r1
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #20] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cbnz r0, .LBB43_7
 ; CHECK-THUMB8BASE-NEXT:  @ %bb.6: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB43_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #28] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #24] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #32] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    mov r3, r0
+; CHECK-THUMB8BASE-NEXT:    str r3, [sp, #20] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:  .LBB43_7: @ %atomicrmw.start
 ; CHECK-THUMB8BASE-NEXT:    @ in Loop: Header=BB43_1 Depth=1
-; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #20] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #20] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #48] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #36] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r4, [sp, #40] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r3, [sp, #24] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    str r4, [sp, #64]
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #68]
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #52] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #68]
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #40] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #4]
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp]
 ; CHECK-THUMB8BASE-NEXT:    movw r0, :lower16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    movt r0, :upper16:atomic_i64
 ; CHECK-THUMB8BASE-NEXT:    add r1, sp, #64
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #24] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    bl __atomic_compare_exchange_8
-; CHECK-THUMB8BASE-NEXT:    mov r2, r0
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #68]
-; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #12] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #68]
 ; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #16] @ 4-byte Spill
-; CHECK-THUMB8BASE-NEXT:    cmp r2, #0
-; CHECK-THUMB8BASE-NEXT:    str r1, [sp, #56] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    ldr r2, [sp, #64]
+; CHECK-THUMB8BASE-NEXT:    str r2, [sp, #12] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    cmp r0, #0
+; CHECK-THUMB8BASE-NEXT:    mov r0, r2
 ; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #60] @ 4-byte Spill
+; CHECK-THUMB8BASE-NEXT:    mov r0, r1
+; CHECK-THUMB8BASE-NEXT:    str r0, [sp, #56] @ 4-byte Spill
 ; CHECK-THUMB8BASE-NEXT:    beq .LBB43_1
 ; CHECK-THUMB8BASE-NEXT:    b .LBB43_8
 ; CHECK-THUMB8BASE-NEXT:  .LBB43_8: @ %atomicrmw.end
-; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #12] @ 4-byte Reload
-; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #16] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r0, [sp, #12] @ 4-byte Reload
+; CHECK-THUMB8BASE-NEXT:    ldr r1, [sp, #16] @ 4-byte Reload
 ; CHECK-THUMB8BASE-NEXT:    add sp, #72
-; CHECK-THUMB8BASE-NEXT:    pop {r4, pc}
+; CHECK-THUMB8BASE-NEXT:    pop {r4, r5, r6, pc}
 entry:
   %0 = atomicrmw umin ptr @atomic_i64, i64 1 monotonic
   ret i64 %0

@@ -12,11 +12,11 @@ define void @func1() nounwind {
 ; X86-LABEL: func1:
 ; X86:       ## %bb.0:
 ; X86-NEXT:    subl $12, %esp
-; X86-NEXT:    movl $2, %edx
+; X86-NEXT:    movl $2, %eax
 ; X86-NEXT:    xorl %ecx, %ecx
-; X86-NEXT:    movl %esp, %eax
-; X86-NEXT:    movl %edx, 4(%eax)
-; X86-NEXT:    movl %ecx, (%eax)
+; X86-NEXT:    movl %esp, %edx
+; X86-NEXT:    movl %eax, 4(%edx)
+; X86-NEXT:    movl %ecx, (%edx)
 ; X86-NEXT:    calll _func2
 ; X86-NEXT:    addl $12, %esp
 ; X86-NEXT:    retl

@@ -22,12 +22,14 @@ define amdgpu_ps float @bitop3_xor_and_or(i32 %wi, i32 %mul) {
 ;
 ; O0-LABEL: bitop3_xor_and_or:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v2, v1
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_mov_b32 s0, 0xaaaaaaaa
-; O0-NEXT:    v_xor_b32_e64 v3, v2, s0
-; O0-NEXT:    v_bitop3_b32 v1, v2, v2, s0 bitop3:0x48
-; O0-NEXT:    v_bitop3_b32 v0, v0, v3, v2 bitop3:0x78
-; O0-NEXT:    v_and_or_b32 v0, v0, v1, v2
+; O0-NEXT:    v_xor_b32_e64 v2, v1, s0
+; O0-NEXT:    v_bitop3_b32 v3, v1, v1, s0 bitop3:0x48
+; O0-NEXT:    v_bitop3_b32 v0, v0, v2, v1 bitop3:0x78
+; O0-NEXT:    v_and_or_b32 v0, v0, v3, v1
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %xor = xor i32 %mul, -1431655766
   %x = and i32 %xor, %mul
@@ -48,16 +50,16 @@ define amdgpu_ps float @bitop3_umax_and_not(i32 %v, i32 %salt, i32 %shl) {
 ;
 ; O0-LABEL: bitop3_umax_and_not:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_accvgpr_write_b32 a0, v2 ; Reload Reuse
-; O0-NEXT:    v_mov_b32_e32 v3, v1
-; O0-NEXT:    v_mov_b32_e32 v2, v0
-; O0-NEXT:    v_accvgpr_read_b32 v0, a0 ; Reload Reuse
-; O0-NEXT:    v_xnor_b32_e64 v1, v2, v3
-; O0-NEXT:    v_bitop3_b32 v0, v0, v2, v3 bitop3:0x90
+; O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; O0-NEXT:    v_xnor_b32_e64 v3, v0, v1
+; O0-NEXT:    v_bitop3_b32 v2, v2, v0, v1 bitop3:0x90
 ; O0-NEXT:    s_mov_b32 s0, 2
-; O0-NEXT:    v_max_u32_e64 v0, v0, s0
-; O0-NEXT:    v_bitop3_b32 v0, v0, v2, v3 bitop3:0x60
-; O0-NEXT:    v_and_b32_e64 v0, v0, v1
+; O0-NEXT:    v_max_u32_e64 v2, v2, s0
+; O0-NEXT:    v_bitop3_b32 v0, v2, v0, v1 bitop3:0x60
+; O0-NEXT:    v_and_b32_e64 v0, v0, v3
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %mix = xor i32 %v, %salt
   %not = xor i32 %mix, -1
@@ -83,13 +85,16 @@ define amdgpu_ps float @bitop3_umax_xor_and(i32 %v, i32 %salt) {
 ;
 ; O0-LABEL: bitop3_umax_xor_and:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_xor_b32_e64 v1, v0, v1
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; O0-NEXT:    v_xor_b32_e64 v0, v0, v1
 ; O0-NEXT:    s_mov_b32 s0, 8
-; O0-NEXT:    v_lshlrev_b32_e64 v0, s0, v1
-; O0-NEXT:    v_max_u32_e64 v0, v0, v1
-; O0-NEXT:    v_bitop3_b32 v0, v0, v0, v1 bitop3:0x48
+; O0-NEXT:    v_lshlrev_b32_e64 v1, s0, v0
+; O0-NEXT:    v_max_u32_e64 v1, v1, v0
+; O0-NEXT:    v_bitop3_b32 v0, v1, v1, v0 bitop3:0x48
 ; O0-NEXT:    s_mov_b32 s0, 31
 ; O0-NEXT:    v_ashrrev_i32_e64 v0, s0, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %mix = xor i32 %v, %salt
   %shl = shl i32 %mix, 8
@@ -113,13 +118,14 @@ define amdgpu_ps float @bitop3_xor_masked_and(i32 %tid) {
 ;
 ; O0-LABEL: bitop3_xor_masked_and:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v1, v0
-; O0-NEXT:    s_mov_b32 s1, 16
-; O0-NEXT:    v_xor_b32_e64 v0, v1, s1
-; O0-NEXT:    s_mov_b32 s0, 18
-; O0-NEXT:    v_mov_b32_e32 v2, s0
-; O0-NEXT:    v_bitop3_b32 v1, v1, s1, v2 bitop3:8
-; O0-NEXT:    v_bitop3_b32 v0, v0, v1, s0 bitop3:0x6c
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; O0-NEXT:    s_mov_b32 s0, 16
+; O0-NEXT:    v_xor_b32_e64 v1, v0, s0
+; O0-NEXT:    s_mov_b32 s1, 18
+; O0-NEXT:    v_mov_b32_e32 v2, s1
+; O0-NEXT:    v_bitop3_b32 v0, v0, s0, v2 bitop3:8
+; O0-NEXT:    v_bitop3_b32 v0, v1, v0, s1 bitop3:0x6c
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %a = xor i32 %tid, 16
   %masked = and i32 %a, 18
@@ -149,11 +155,13 @@ define amdgpu_ps float @bitop3_highbit_or_xor(i32 %v, i32 %salt) {
 ;
 ; O0-LABEL: bitop3_highbit_or_xor:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v2, v1
-; O0-NEXT:    v_bitop3_b32 v1, v0, v2, v0 bitop3:0xc
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; O0-NEXT:    v_bitop3_b32 v2, v0, v1, v0 bitop3:0xc
 ; O0-NEXT:    s_mov_b32 s0, 0x80000000
-; O0-NEXT:    v_bitop3_b32 v0, v0, s0, v2 bitop3:0xce
-; O0-NEXT:    v_xor_b32_e64 v0, v0, v1
+; O0-NEXT:    v_bitop3_b32 v0, v0, s0, v1 bitop3:0xce
+; O0-NEXT:    v_xor_b32_e64 v0, v0, v2
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %mix = xor i32 %v, %salt
   %and = and i32 %mix, %salt
@@ -174,13 +182,14 @@ define amdgpu_ps float @bitop3_or_xor_and(i32 %wi) {
 ;
 ; O0-LABEL: bitop3_or_xor_and:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v2, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_mov_b32 s0, 25
-; O0-NEXT:    v_add_u32_e64 v0, v2, s0
+; O0-NEXT:    v_add_u32_e64 v1, v0, s0
 ; O0-NEXT:    s_mov_b32 s0, 3
-; O0-NEXT:    v_or3_b32 v1, v2, s0, v0
-; O0-NEXT:    v_bitop3_b32 v0, v0, v2, s0 bitop3:0x10
-; O0-NEXT:    v_and_b32_e64 v0, v0, v1
+; O0-NEXT:    v_or3_b32 v2, v0, s0, v1
+; O0-NEXT:    v_bitop3_b32 v0, v1, v0, s0 bitop3:0x10
+; O0-NEXT:    v_and_b32_e64 v0, v0, v2
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %and = or i32 %wi, 3
   %and1 = add i32 %wi, 25
@@ -218,19 +227,20 @@ define amdgpu_ps float @bitop3_fshl_or_xor(i32 %v) {
 ;
 ; O0-LABEL: bitop3_fshl_or_xor:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v3, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_mov_b32 s0, 0x9e3779b9
-; O0-NEXT:    v_xor_b32_e64 v0, v3, s0
+; O0-NEXT:    v_xor_b32_e64 v1, v0, s0
 ; O0-NEXT:    s_mov_b32 s0, 24
-; O0-NEXT:    v_ashrrev_i32_e64 v2, s0, v0
-; O0-NEXT:    v_and_b32_e64 v0, v2, v3
-; O0-NEXT:    s_mov_b32 s1, -5
-; O0-NEXT:    s_mov_b32 s0, 0
-; O0-NEXT:    v_mov_b32_e32 v1, s1
-; O0-NEXT:    v_alignbit_b32 v0, v0, s0, v1
-; O0-NEXT:    v_bitop3_b32 v1, v0, v2, v3 bitop3:0x78
-; O0-NEXT:    v_bitop3_b32 v0, v0, v2, v3 bitop3:0xf8
-; O0-NEXT:    v_xor_b32_e64 v0, v0, v1
+; O0-NEXT:    v_ashrrev_i32_e64 v1, s0, v1
+; O0-NEXT:    v_and_b32_e64 v2, v1, v0
+; O0-NEXT:    s_mov_b32 s0, -5
+; O0-NEXT:    s_mov_b32 s1, 0
+; O0-NEXT:    v_mov_b32_e32 v3, s0
+; O0-NEXT:    v_alignbit_b32 v2, v2, s1, v3
+; O0-NEXT:    v_bitop3_b32 v3, v2, v1, v0 bitop3:0x78
+; O0-NEXT:    v_bitop3_b32 v0, v2, v1, v0 bitop3:0xf8
+; O0-NEXT:    v_xor_b32_e64 v0, v0, v3
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %mix = xor i32 %v, -1640531527
   %ashr = ashr i32 %mix, 24
@@ -263,11 +273,13 @@ define amdgpu_ps float @bitop3_and_xor_constant(i32 %wi, i32 %salt) {
 ;
 ; O0-LABEL: bitop3_and_xor_constant:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v2, v1
-; O0-NEXT:    v_bitop3_b32 v1, v0, v2, v0 bitop3:0xc
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; O0-NEXT:    v_bitop3_b32 v2, v0, v1, v0 bitop3:0xc
 ; O0-NEXT:    s_mov_b32 s0, 0x79ad5691
-; O0-NEXT:    v_bitop3_b32 v0, v0, s0, v2 bitop3:0xc6
-; O0-NEXT:    v_and_b32_e64 v0, v0, v1
+; O0-NEXT:    v_bitop3_b32 v0, v0, s0, v1 bitop3:0xc6
+; O0-NEXT:    v_and_b32_e64 v0, v0, v2
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %mix = xor i32 %wi, %salt
   %x = and i32 %mix, %salt
@@ -301,14 +313,15 @@ define amdgpu_ps float @bitop3_and_xor_identity(i32 %wi) {
 ;
 ; O0-LABEL: bitop3_and_xor_identity:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v1, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_mov_b32 s0, 32
-; O0-NEXT:    v_add_u32_e64 v0, v1, s0
-; O0-NEXT:    v_sub_u32_e64 v2, s0, v1
+; O0-NEXT:    v_add_u32_e64 v1, v0, s0
+; O0-NEXT:    v_sub_u32_e64 v0, s0, v0
 ; O0-NEXT:    s_mov_b32 s0, 9
-; O0-NEXT:    v_bitop3_b32 v1, v0, v2, s0 bitop3:0xc6
-; O0-NEXT:    v_bitop3_b32 v0, v0, v2, s0 bitop3:4
-; O0-NEXT:    v_xor_b32_e64 v0, v0, v1
+; O0-NEXT:    v_bitop3_b32 v2, v1, v0, s0 bitop3:0xc6
+; O0-NEXT:    v_bitop3_b32 v0, v1, v0, s0 bitop3:4
+; O0-NEXT:    v_xor_b32_e64 v0, v0, v2
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %same0 = add i32 %wi, 32
   %a = or i32 %same0, 9
@@ -331,17 +344,19 @@ define amdgpu_ps float @bitop3_umax_and_not_v2(i32 %wi, i32 %v) {
 ;
 ; O0-LABEL: bitop3_umax_and_not_v2:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v2, v1
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_mov_b32 s0, 0x9e3779b9
-; O0-NEXT:    v_mul_lo_u32 v3, v0, s0
-; O0-NEXT:    v_xnor_b32_e64 v1, v2, v3
+; O0-NEXT:    v_mul_lo_u32 v2, v0, s0
+; O0-NEXT:    v_xnor_b32_e64 v3, v1, v2
 ; O0-NEXT:    s_mov_b32 s0, 15
 ; O0-NEXT:    v_lshlrev_b32_e64 v0, s0, v0
-; O0-NEXT:    v_bitop3_b32 v0, v0, v2, v3 bitop3:0x90
+; O0-NEXT:    v_bitop3_b32 v0, v0, v1, v2 bitop3:0x90
 ; O0-NEXT:    s_mov_b32 s0, 2
 ; O0-NEXT:    v_max_u32_e64 v0, v0, s0
-; O0-NEXT:    v_bitop3_b32 v0, v0, v2, v3 bitop3:0x60
-; O0-NEXT:    v_and_b32_e64 v0, v0, v1
+; O0-NEXT:    v_bitop3_b32 v0, v0, v1, v2 bitop3:0x60
+; O0-NEXT:    v_and_b32_e64 v0, v0, v3
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %salt = mul i32 %wi, -1640531527
   %mix = xor i32 %v, %salt
@@ -385,21 +400,24 @@ define amdgpu_ps float @bitop3_fshl_select_shared(i32 %n, i32 %wi, i32 %sum) {
 ;
 ; O0-LABEL: bitop3_fshl_select_shared:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v3, v1
+; O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_mov_b32 s0, 18
-; O0-NEXT:    v_lshrrev_b32_e64 v4, s0, v0
+; O0-NEXT:    v_lshrrev_b32_e64 v3, s0, v0
 ; O0-NEXT:    s_mov_b32 s0, 14
-; O0-NEXT:    v_lshlrev_b32_e64 v1, s0, v0
-; O0-NEXT:    v_or_b32_e64 v0, v1, v4
+; O0-NEXT:    v_lshlrev_b32_e64 v0, s0, v0
+; O0-NEXT:    v_or_b32_e64 v4, v0, v3
 ; O0-NEXT:    s_mov_b32 s0, 32
-; O0-NEXT:    v_add_u32_e64 v3, v3, s0
-; O0-NEXT:    v_bitop3_b32 v1, v1, v3, v4 bitop3:0x37
-; O0-NEXT:    v_bitop3_b32 v0, v2, v0, v3 bitop3:0x87
-; O0-NEXT:    v_cmp_gt_i32_e64 s[0:1], v0, v1
-; O0-NEXT:    v_and_b32_e64 v0, v0, v1
+; O0-NEXT:    v_add_u32_e64 v1, v1, s0
+; O0-NEXT:    v_bitop3_b32 v0, v0, v1, v3 bitop3:0x37
+; O0-NEXT:    v_bitop3_b32 v1, v2, v4, v1 bitop3:0x87
+; O0-NEXT:    v_cmp_gt_i32_e64 s[0:1], v1, v0
+; O0-NEXT:    v_and_b32_e64 v0, v1, v0
 ; O0-NEXT:    s_mov_b32 s2, 0
 ; O0-NEXT:    v_mov_b32_e32 v1, s2
 ; O0-NEXT:    v_cndmask_b32_e64 v0, v0, v1, s[0:1]
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %fshl = call i32 @llvm.fshl.i32(i32 %n, i32 %n, i32 14)
   %mask = add i32 %wi, 32
@@ -434,12 +452,13 @@ define amdgpu_ps float @bitop3_sub_or_xor(i32 %n) {
 ;
 ; O0-LABEL: bitop3_sub_or_xor:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v1, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_mov_b32 s0, 1
-; O0-NEXT:    v_and_b32_e64 v0, v1, s0
+; O0-NEXT:    v_and_b32_e64 v1, v0, s0
 ; O0-NEXT:    s_mov_b32 s1, 0xefffc001
-; O0-NEXT:    v_sub_u32_e64 v0, s1, v0
-; O0-NEXT:    v_bitop3_b32 v0, v0, v1, s0 bitop3:0xf2
+; O0-NEXT:    v_sub_u32_e64 v1, s1, v1
+; O0-NEXT:    v_bitop3_b32 v0, v1, v0, s0 bitop3:0xf2
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %mask = and i32 %n, 1
   %add = sub nuw nsw i32 -268451839, %mask
@@ -477,6 +496,7 @@ define amdgpu_ps float @bitop3_ctlz_shl_or(i32 %n) {
 ;
 ; O0-LABEL: bitop3_ctlz_shl_or:
 ; O0:       ; %bb.0:
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_mov_b32 s0, 31
 ; O0-NEXT:    v_lshlrev_b32_e64 v0, s0, v0
 ; O0-NEXT:    v_ffbh_u32_e64 v0, v0
@@ -485,10 +505,11 @@ define amdgpu_ps float @bitop3_ctlz_shl_or(i32 %n) {
 ; O0-NEXT:    s_mov_b32 s0, 0
 ; O0-NEXT:    v_cmp_ne_u32_e64 s[0:1], v0, s0
 ; O0-NEXT:    s_nop 1
-; O0-NEXT:    v_cndmask_b32_e64 v1, 0, 1, s[0:1]
+; O0-NEXT:    v_cndmask_b32_e64 v0, 0, 1, s[0:1]
 ; O0-NEXT:    s_mov_b32 s0, 0xefffc000
-; O0-NEXT:    v_add_u32_e64 v0, v1, s0
-; O0-NEXT:    v_or_b32_e64 v0, v0, v1
+; O0-NEXT:    v_add_u32_e64 v1, v0, s0
+; O0-NEXT:    v_or_b32_e64 v0, v1, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %shl.n = shl i32 %n, 31
   %ctlz = call i32 @llvm.ctlz.i32(i32 %shl.n, i1 false)
@@ -521,10 +542,13 @@ define amdgpu_ps float @bitop3_bxort_or_t_and_not_t(i32 %a, i32 %b, i32 %c) {
 ;
 ; O0-LABEL: bitop3_bxort_or_t_and_not_t:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v3, v0
-; O0-NEXT:    v_and_b32_e64 v0, v2, v3
-; O0-NEXT:    v_bitop3_b32 v1, v1, v2, v3 bitop3:0xf8
-; O0-NEXT:    v_bfi_b32 v0, v0, 0, v1
+; O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; O0-NEXT:    v_and_b32_e64 v3, v2, v0
+; O0-NEXT:    v_bitop3_b32 v0, v1, v2, v0 bitop3:0xf8
+; O0-NEXT:    v_bfi_b32 v0, v3, 0, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %t  = and i32 %c, %a
   %u  = xor i32 %b, %t
@@ -553,11 +577,13 @@ define amdgpu_ps float @bitop3_t1t2_and_xor_or(i32 %a, i32 %b, i32 %c) {
 ;
 ; O0-LABEL: bitop3_t1t2_and_xor_or:
 ; O0:       ; %bb.0:
-; O0-NEXT:    v_mov_b32_e32 v3, v1
-; O0-NEXT:    v_mov_b32_e32 v1, v0
-; O0-NEXT:    v_bitop3_b32 v0, v1, v2, v3 bitop3:0xa0
-; O0-NEXT:    v_bitop3_b32 v1, v1, v2, v3 bitop3:0xfc
-; O0-NEXT:    v_xor_b32_e64 v0, v0, v1
+; O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; O0-NEXT:    v_bitop3_b32 v3, v0, v2, v1 bitop3:0xa0
+; O0-NEXT:    v_bitop3_b32 v0, v0, v2, v1 bitop3:0xfc
+; O0-NEXT:    v_xor_b32_e64 v0, v3, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    ; return to shader part epilog
   %t1  = and i32 %a, %b
   %t2  = or  i32 %a, %c
@@ -581,12 +607,14 @@ define i32 @bitop3_bandt_or_t_and_not_t(i32 %a, i32 %b, i32 %c) {
 ;
 ; O0-LABEL: bitop3_bandt_or_t_and_not_t:
 ; O0:       ; %bb.0:
+; O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; O0-NEXT:    v_mov_b32_e32 v3, v2
-; O0-NEXT:    v_mov_b32_e32 v2, v0
-; O0-NEXT:    v_and_b32_e64 v0, v2, v3
-; O0-NEXT:    v_bitop3_b32 v1, v1, v2, v3 bitop3:0x88
-; O0-NEXT:    v_bfi_b32 v0, v0, 0, v1
+; O0-NEXT:    v_and_b32_e64 v3, v0, v2
+; O0-NEXT:    v_bitop3_b32 v0, v1, v0, v2 bitop3:0x88
+; O0-NEXT:    v_bfi_b32 v0, v3, 0, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_setpc_b64 s[30:31]
   %t  = and i32 %a, %c
   %u  = and i32 %b, %t
@@ -609,11 +637,14 @@ define i32 @bitop3_absorb_xor_not_or(i32 %a, i32 %b, i32 %c) {
 ;
 ; O0-LABEL: bitop3_absorb_xor_not_or:
 ; O0:       ; %bb.0:
-; O0:         s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; O0-NEXT:    v_mov_b32_e32 v3, v0
-; O0-NEXT:    v_bitop3_b32 v0, v2, v1, v3 bitop3:0x3c
-; O0-NEXT:    v_bitop3_b32 v1, v2, v1, v3 bitop3:0xff
-; O0-NEXT:    v_xor_b32_e64 v0, v0, v1
+; O0-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; O0-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
+; O0-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
+; O0-NEXT:    v_bitop3_b32 v3, v2, v1, v0 bitop3:0x3c
+; O0-NEXT:    v_bitop3_b32 v0, v2, v1, v0 bitop3:0xff
+; O0-NEXT:    v_xor_b32_e64 v0, v3, v0
+; O0-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; O0-NEXT:    s_setpc_b64 s[30:31]
   %t  = xor i32 %c, %b
   %ta = or  i32 %t, %a

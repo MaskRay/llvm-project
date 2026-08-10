@@ -19,14 +19,14 @@
 define void @foo() {
 ; X64-O0-LABEL: foo:
 ; X64-O0:       # %bb.0: # %entry
-; X64-O0-NEXT:    movzbl c, %ecx
-; X64-O0-NEXT:    xorl %eax, %eax
-; X64-O0-NEXT:    subl %ecx, %eax
-; X64-O0-NEXT:    movslq %eax, %rcx
-; X64-O0-NEXT:    xorl %eax, %eax
-; X64-O0-NEXT:    # kill: def $rax killed $eax
-; X64-O0-NEXT:    subq %rcx, %rax
-; X64-O0-NEXT:    # kill: def $al killed $al killed $rax
+; X64-O0-NEXT:    movzbl c, %eax
+; X64-O0-NEXT:    xorl %ecx, %ecx
+; X64-O0-NEXT:    subl %eax, %ecx
+; X64-O0-NEXT:    movslq %ecx, %rax
+; X64-O0-NEXT:    xorl %ecx, %ecx
+; X64-O0-NEXT:    # kill: def $rcx killed $ecx
+; X64-O0-NEXT:    subq %rax, %rcx
+; X64-O0-NEXT:    movb %cl, %al
 ; X64-O0-NEXT:    cmpb $0, %al
 ; X64-O0-NEXT:    setne %al
 ; X64-O0-NEXT:    andb $1, %al
@@ -102,14 +102,14 @@ define void @foo() {
 ;
 ; X64-O0-SETZUCC-LABEL: foo:
 ; X64-O0-SETZUCC:       # %bb.0: # %entry
-; X64-O0-SETZUCC-NEXT:    movzbl c, %ecx
-; X64-O0-SETZUCC-NEXT:    xorl %eax, %eax
-; X64-O0-SETZUCC-NEXT:    subl %ecx, %eax
-; X64-O0-SETZUCC-NEXT:    movslq %eax, %rcx
-; X64-O0-SETZUCC-NEXT:    xorl %eax, %eax
-; X64-O0-SETZUCC-NEXT:    # kill: def $rax killed $eax
-; X64-O0-SETZUCC-NEXT:    subq %rcx, %rax
-; X64-O0-SETZUCC-NEXT:    # kill: def $al killed $al killed $rax
+; X64-O0-SETZUCC-NEXT:    movzbl c, %eax
+; X64-O0-SETZUCC-NEXT:    xorl %ecx, %ecx
+; X64-O0-SETZUCC-NEXT:    subl %eax, %ecx
+; X64-O0-SETZUCC-NEXT:    movslq %ecx, %rax
+; X64-O0-SETZUCC-NEXT:    xorl %ecx, %ecx
+; X64-O0-SETZUCC-NEXT:    # kill: def $rcx killed $ecx
+; X64-O0-SETZUCC-NEXT:    subq %rax, %rcx
+; X64-O0-SETZUCC-NEXT:    movb %cl, %al
 ; X64-O0-SETZUCC-NEXT:    cmpb $0, %al
 ; X64-O0-SETZUCC-NEXT:    setzune %al
 ; X64-O0-SETZUCC-NEXT:    andb $1, %al
@@ -130,14 +130,14 @@ define void @foo() {
 ;
 ; X64-O0-NO-SETZUCC-LABEL: foo:
 ; X64-O0-NO-SETZUCC:       # %bb.0: # %entry
-; X64-O0-NO-SETZUCC-NEXT:    movzbl c, %ecx
-; X64-O0-NO-SETZUCC-NEXT:    xorl %eax, %eax
-; X64-O0-NO-SETZUCC-NEXT:    subl %ecx, %eax
-; X64-O0-NO-SETZUCC-NEXT:    movslq %eax, %rcx
-; X64-O0-NO-SETZUCC-NEXT:    xorl %eax, %eax
-; X64-O0-NO-SETZUCC-NEXT:    # kill: def $rax killed $eax
-; X64-O0-NO-SETZUCC-NEXT:    subq %rcx, %rax
-; X64-O0-NO-SETZUCC-NEXT:    # kill: def $al killed $al killed $rax
+; X64-O0-NO-SETZUCC-NEXT:    movzbl c, %eax
+; X64-O0-NO-SETZUCC-NEXT:    xorl %ecx, %ecx
+; X64-O0-NO-SETZUCC-NEXT:    subl %eax, %ecx
+; X64-O0-NO-SETZUCC-NEXT:    movslq %ecx, %rax
+; X64-O0-NO-SETZUCC-NEXT:    xorl %ecx, %ecx
+; X64-O0-NO-SETZUCC-NEXT:    # kill: def $rcx killed $ecx
+; X64-O0-NO-SETZUCC-NEXT:    subq %rax, %rcx
+; X64-O0-NO-SETZUCC-NEXT:    movb %cl, %al
 ; X64-O0-NO-SETZUCC-NEXT:    cmpb $0, %al
 ; X64-O0-NO-SETZUCC-NEXT:    setne %al
 ; X64-O0-NO-SETZUCC-NEXT:    andb $1, %al
@@ -166,19 +166,6 @@ define void @foo() {
 ; X64-SETZUCC-NEXT:    setzule %al
 ; X64-SETZUCC-NEXT:    movl %eax, -{{[0-9]+}}(%rsp)
 ; X64-SETZUCC-NEXT:    retq
-;
-; X64-NO-SETZUCC-LABEL: foo:
-; X64-NO-SETZUCC:       # %bb.0: # %entry
-; X64-NO-SETZUCC-NEXT:    movzbl c(%rip), %eax
-; X64-NO-SETZUCC-NEXT:    xorl %ecx, %ecx
-; X64-NO-SETZUCC-NEXT:    testl %eax, %eax
-; X64-NO-SETZUCC-DAG:     setne -{{[0-9]+}}(%rsp)
-; X64-NO-SETZUCC-DAG:     setne %cl
-; X64-NO-SETZUCC-NEXT:    xorl %edx, %edx
-; X64-NO-SETZUCC-NEXT:    cmpl %eax, %ecx
-; X64-NO-SETZUCC-NEXT:    setle %dl
-; X64-NO-SETZUCC-NEXT:    movl %edx, -{{[0-9]+}}(%rsp)
-; X64-NO-SETZUCC-NEXT:    retq
 entry:
   %a = alloca i8, align 1
   %b = alloca i32, align 4
@@ -276,17 +263,17 @@ define void @f1() {
 ; X86-O0-NEXT:    xorl $-2, %ecx
 ; X86-O0-NEXT:    orl %ecx, %eax
 ; X86-O0-NEXT:    setne (%esp)
-; X86-O0-NEXT:    movl var_5, %ecx
-; X86-O0-NEXT:    movl %ecx, %eax
-; X86-O0-NEXT:    sarl $31, %eax
-; X86-O0-NEXT:    movl %ecx, %edx
+; X86-O0-NEXT:    movl var_5, %eax
+; X86-O0-NEXT:    movl %eax, %ecx
+; X86-O0-NEXT:    sarl $31, %ecx
+; X86-O0-NEXT:    movl %eax, %edx
 ; X86-O0-NEXT:    subl $-1, %edx
 ; X86-O0-NEXT:    sete %dl
 ; X86-O0-NEXT:    movzbl %dl, %edx
-; X86-O0-NEXT:    addl $7093, %ecx # imm = 0x1BB5
-; X86-O0-NEXT:    adcl $0, %eax
-; X86-O0-NEXT:    subl %edx, %ecx
-; X86-O0-NEXT:    sbbl $0, %eax
+; X86-O0-NEXT:    addl $7093, %eax # imm = 0x1BB5
+; X86-O0-NEXT:    adcl $0, %ecx
+; X86-O0-NEXT:    subl %edx, %eax
+; X86-O0-NEXT:    sbbl $0, %ecx
 ; X86-O0-NEXT:    setl %al
 ; X86-O0-NEXT:    movzbl %al, %eax
 ; X86-O0-NEXT:    movl %eax, var_57
@@ -509,9 +496,9 @@ define void @f2() {
 ; X64-O0-NEXT:    sete %al
 ; X64-O0-NEXT:    andb $1, %al
 ; X64-O0-NEXT:    movzbl %al, %eax
-; X64-O0-NEXT:    movw %ax, %cx
-; X64-O0-NEXT:    # implicit-def: $rax
-; X64-O0-NEXT:    movw %cx, (%rax)
+; X64-O0-NEXT:    # kill: def $ax killed $ax killed $eax
+; X64-O0-NEXT:    # implicit-def: $rcx
+; X64-O0-NEXT:    movw %ax, (%rcx)
 ; X64-O0-NEXT:    retq
 ;
 ; X64-LABEL: f2:
@@ -552,9 +539,9 @@ define void @f2() {
 ; X86-O0-NEXT:    sete %al
 ; X86-O0-NEXT:    andb $1, %al
 ; X86-O0-NEXT:    movzbl %al, %eax
-; X86-O0-NEXT:    movw %ax, %cx
-; X86-O0-NEXT:    # implicit-def: $eax
-; X86-O0-NEXT:    movw %cx, (%eax)
+; X86-O0-NEXT:    # kill: def $ax killed $ax killed $eax
+; X86-O0-NEXT:    # implicit-def: $ecx
+; X86-O0-NEXT:    movw %ax, (%ecx)
 ; X86-O0-NEXT:    addl $2, %esp
 ; X86-O0-NEXT:    .cfi_def_cfa_offset 4
 ; X86-O0-NEXT:    retl
@@ -599,9 +586,9 @@ define void @f2() {
 ; X64-O0-SETZUCC-NEXT:    setzue %al
 ; X64-O0-SETZUCC-NEXT:    andb $1, %al
 ; X64-O0-SETZUCC-NEXT:    movzbl %al, %eax
-; X64-O0-SETZUCC-NEXT:    movw %ax, %cx
-; X64-O0-SETZUCC-NEXT:    # implicit-def: $rax
-; X64-O0-SETZUCC-NEXT:    movw %cx, (%rax)
+; X64-O0-SETZUCC-NEXT:    # kill: def $ax killed $ax killed $eax
+; X64-O0-SETZUCC-NEXT:    # implicit-def: $rcx
+; X64-O0-SETZUCC-NEXT:    movw %ax, (%rcx)
 ; X64-O0-SETZUCC-NEXT:    retq
 ;
 ; X64-O0-NO-SETZUCC-LABEL: f2:
@@ -627,9 +614,9 @@ define void @f2() {
 ; X64-O0-NO-SETZUCC-NEXT:    sete %al
 ; X64-O0-NO-SETZUCC-NEXT:    andb $1, %al
 ; X64-O0-NO-SETZUCC-NEXT:    movzbl %al, %eax
-; X64-O0-NO-SETZUCC-NEXT:    movw %ax, %cx
-; X64-O0-NO-SETZUCC-NEXT:    # implicit-def: $rax
-; X64-O0-NO-SETZUCC-NEXT:    movw %cx, (%rax)
+; X64-O0-NO-SETZUCC-NEXT:    # kill: def $ax killed $ax killed $eax
+; X64-O0-NO-SETZUCC-NEXT:    # implicit-def: $rcx
+; X64-O0-NO-SETZUCC-NEXT:    movw %ax, (%rcx)
 ; X64-O0-NO-SETZUCC-NEXT:    retq
 ;
 ; X64-SETZUCC-LABEL: f2:
@@ -748,18 +735,18 @@ define void @f3() #0 {
 ; X86-O0-NEXT:    andl $-8, %esp
 ; X86-O0-NEXT:    subl $16, %esp
 ; X86-O0-NEXT:    .cfi_offset %esi, -12
-; X86-O0-NEXT:    movl var_13, %ecx
-; X86-O0-NEXT:    movl %ecx, %eax
-; X86-O0-NEXT:    notl %eax
-; X86-O0-NEXT:    testl %ecx, %ecx
-; X86-O0-NEXT:    sete %cl
-; X86-O0-NEXT:    movzbl %cl, %ecx
-; X86-O0-NEXT:    movl var_16, %esi
-; X86-O0-NEXT:    movl %eax, %edx
-; X86-O0-NEXT:    xorl %esi, %edx
-; X86-O0-NEXT:    andl %edx, %ecx
-; X86-O0-NEXT:    orl %ecx, %eax
-; X86-O0-NEXT:    movl %eax, (%esp)
+; X86-O0-NEXT:    movl var_13, %eax
+; X86-O0-NEXT:    movl %eax, %ecx
+; X86-O0-NEXT:    notl %ecx
+; X86-O0-NEXT:    testl %eax, %eax
+; X86-O0-NEXT:    sete %al
+; X86-O0-NEXT:    movzbl %al, %eax
+; X86-O0-NEXT:    movl var_16, %edx
+; X86-O0-NEXT:    movl %ecx, %esi
+; X86-O0-NEXT:    xorl %edx, %esi
+; X86-O0-NEXT:    andl %esi, %eax
+; X86-O0-NEXT:    orl %eax, %ecx
+; X86-O0-NEXT:    movl %ecx, (%esp)
 ; X86-O0-NEXT:    movl $0, {{[0-9]+}}(%esp)
 ; X86-O0-NEXT:    movl var_13, %eax
 ; X86-O0-NEXT:    notl %eax

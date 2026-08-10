@@ -27,17 +27,19 @@
 define void @fshl_scalar_const_shift0(ptr addrspace(1) %out, i32 %x) {
 ; CHECK-LABEL: fshl_scalar_const_shift0:
 ; CHECK:       ; %bb.0:
+; CHECK-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; CHECK-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; CHECK-NEXT:    v_mov_b32_e32 v3, v1
-; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; CHECK-NEXT:    v_mov_b32_e32 v1, v3
-; CHECK-NEXT:    v_readfirstlane_b32 s4, v2
-; CHECK-NEXT:    s_mov_b32 s3, 1
-; CHECK-NEXT:    s_lshr_b32 s2, s4, s3
-; CHECK-NEXT:    s_mov_b32 s0, 0x5040305
-; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 def $sgpr0_sgpr1
-; CHECK-NEXT:    s_mov_b32 s1, s4
-; CHECK-NEXT:    s_lshr_b64 s[0:1], s[0:1], s3
+; CHECK-NEXT:    v_mov_b32_e32 v4, v0
+; CHECK-NEXT:    v_mov_b32_e32 v5, v1
+; CHECK-NEXT:    v_readfirstlane_b32 s0, v2
+; CHECK-NEXT:    s_mov_b32 s1, 1
+; CHECK-NEXT:    s_lshr_b32 s2, s0, s1
+; CHECK-NEXT:    s_mov_b32 s3, 0x5040305
+; CHECK-NEXT:    s_mov_b32 s4, s3
+; CHECK-NEXT:    s_mov_b32 s5, s0
+; CHECK-NEXT:    s_lshr_b64 s[0:1], s[4:5], s1
 ; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 killed $sgpr0_sgpr1
 ; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 def $sgpr0_sgpr1
 ; CHECK-NEXT:    s_mov_b32 s1, s2
@@ -45,8 +47,8 @@ define void @fshl_scalar_const_shift0(ptr addrspace(1) %out, i32 %x) {
 ; CHECK-NEXT:    s_and_b32 s2, s2, 31
 ; CHECK-NEXT:    s_lshr_b64 s[0:1], s[0:1], s2
 ; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 killed $sgpr0_sgpr1
-; CHECK-NEXT:    v_mov_b32_e32 v2, s0
-; CHECK-NEXT:    global_store_dword v[0:1], v2, off
+; CHECK-NEXT:    v_mov_b32_e32 v0, s0
+; CHECK-NEXT:    global_store_dword v[4:5], v0, off
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    s_setpc_b64 s[30:31]
   %scalar = call i32 @llvm.amdgcn.readfirstlane(i32 %x)
@@ -61,20 +63,22 @@ define void @fshl_scalar_const_shift0(ptr addrspace(1) %out, i32 %x) {
 define void @fshl_scalar_const_shift1(ptr addrspace(1) %out, i32 %x) {
 ; CHECK-LABEL: fshl_scalar_const_shift1:
 ; CHECK:       ; %bb.0:
+; CHECK-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; CHECK-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; CHECK-NEXT:    v_mov_b32_e32 v3, v1
-; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; CHECK-NEXT:    v_mov_b32_e32 v1, v3
-; CHECK-NEXT:    v_readfirstlane_b32 s2, v2
-; CHECK-NEXT:    s_mov_b32 s0, 0xf2f2f2f2
-; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 def $sgpr0_sgpr1
-; CHECK-NEXT:    s_mov_b32 s1, s2
-; CHECK-NEXT:    s_mov_b32 s2, -1
-; CHECK-NEXT:    s_and_b32 s2, s2, 31
-; CHECK-NEXT:    s_lshr_b64 s[0:1], s[0:1], s2
+; CHECK-NEXT:    v_mov_b32_e32 v4, v0
+; CHECK-NEXT:    v_mov_b32_e32 v5, v1
+; CHECK-NEXT:    v_readfirstlane_b32 s0, v2
+; CHECK-NEXT:    s_mov_b32 s1, 0xf2f2f2f2
+; CHECK-NEXT:    s_mov_b32 s2, s1
+; CHECK-NEXT:    s_mov_b32 s3, s0
+; CHECK-NEXT:    s_mov_b32 s0, -1
+; CHECK-NEXT:    s_and_b32 s0, s0, 31
+; CHECK-NEXT:    s_lshr_b64 s[0:1], s[2:3], s0
 ; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 killed $sgpr0_sgpr1
-; CHECK-NEXT:    v_mov_b32_e32 v2, s0
-; CHECK-NEXT:    global_store_dword v[0:1], v2, off
+; CHECK-NEXT:    v_mov_b32_e32 v0, s0
+; CHECK-NEXT:    global_store_dword v[4:5], v0, off
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    s_setpc_b64 s[30:31]
   %scalar = call i32 @llvm.amdgcn.readfirstlane(i32 %x)
@@ -88,20 +92,22 @@ define void @fshl_scalar_const_shift1(ptr addrspace(1) %out, i32 %x) {
 define void @fshl_scalar_const_shift16(ptr addrspace(1) %out, i32 %x) {
 ; CHECK-LABEL: fshl_scalar_const_shift16:
 ; CHECK:       ; %bb.0:
+; CHECK-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; CHECK-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; CHECK-NEXT:    v_mov_b32_e32 v3, v1
-; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; CHECK-NEXT:    v_mov_b32_e32 v1, v3
-; CHECK-NEXT:    v_readfirstlane_b32 s2, v2
-; CHECK-NEXT:    s_mov_b32 s0, 0xf2f2f2f2
-; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 def $sgpr0_sgpr1
-; CHECK-NEXT:    s_mov_b32 s1, s2
-; CHECK-NEXT:    s_mov_b32 s2, -16
-; CHECK-NEXT:    s_and_b32 s2, s2, 31
-; CHECK-NEXT:    s_lshr_b64 s[0:1], s[0:1], s2
+; CHECK-NEXT:    v_mov_b32_e32 v4, v0
+; CHECK-NEXT:    v_mov_b32_e32 v5, v1
+; CHECK-NEXT:    v_readfirstlane_b32 s0, v2
+; CHECK-NEXT:    s_mov_b32 s1, 0xf2f2f2f2
+; CHECK-NEXT:    s_mov_b32 s2, s1
+; CHECK-NEXT:    s_mov_b32 s3, s0
+; CHECK-NEXT:    s_mov_b32 s0, -16
+; CHECK-NEXT:    s_and_b32 s0, s0, 31
+; CHECK-NEXT:    s_lshr_b64 s[0:1], s[2:3], s0
 ; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 killed $sgpr0_sgpr1
-; CHECK-NEXT:    v_mov_b32_e32 v2, s0
-; CHECK-NEXT:    global_store_dword v[0:1], v2, off
+; CHECK-NEXT:    v_mov_b32_e32 v0, s0
+; CHECK-NEXT:    global_store_dword v[4:5], v0, off
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    s_setpc_b64 s[30:31]
   %scalar = call i32 @llvm.amdgcn.readfirstlane(i32 %x)
@@ -115,20 +121,23 @@ define void @fshl_scalar_const_shift16(ptr addrspace(1) %out, i32 %x) {
 define void @fshl_scalar_scalar_shift8(ptr addrspace(1) %out, i32 %x, i32 %y) {
 ; CHECK-LABEL: fshl_scalar_scalar_shift8:
 ; CHECK:       ; %bb.0:
+; CHECK-NEXT:    ; kill: def $vgpr3 killed $vgpr3 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr2 killed $vgpr2 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr1 killed $vgpr1 killed $exec
+; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 killed $exec
 ; CHECK-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; CHECK-NEXT:    v_mov_b32_e32 v4, v1
-; CHECK-NEXT:    ; kill: def $vgpr0 killed $vgpr0 def $vgpr0_vgpr1 killed $exec
-; CHECK-NEXT:    v_mov_b32_e32 v1, v4
-; CHECK-NEXT:    v_readfirstlane_b32 s2, v2
-; CHECK-NEXT:    v_readfirstlane_b32 s0, v3
-; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 def $sgpr0_sgpr1
-; CHECK-NEXT:    s_mov_b32 s1, s2
-; CHECK-NEXT:    s_mov_b32 s2, -8
-; CHECK-NEXT:    s_and_b32 s2, s2, 31
-; CHECK-NEXT:    s_lshr_b64 s[0:1], s[0:1], s2
+; CHECK-NEXT:    v_mov_b32_e32 v4, v0
+; CHECK-NEXT:    v_mov_b32_e32 v5, v1
+; CHECK-NEXT:    v_readfirstlane_b32 s0, v2
+; CHECK-NEXT:    v_readfirstlane_b32 s1, v3
+; CHECK-NEXT:    s_mov_b32 s2, s1
+; CHECK-NEXT:    s_mov_b32 s3, s0
+; CHECK-NEXT:    s_mov_b32 s0, -8
+; CHECK-NEXT:    s_and_b32 s0, s0, 31
+; CHECK-NEXT:    s_lshr_b64 s[0:1], s[2:3], s0
 ; CHECK-NEXT:    ; kill: def $sgpr0 killed $sgpr0 killed $sgpr0_sgpr1
-; CHECK-NEXT:    v_mov_b32_e32 v2, s0
-; CHECK-NEXT:    global_store_dword v[0:1], v2, off
+; CHECK-NEXT:    v_mov_b32_e32 v0, s0
+; CHECK-NEXT:    global_store_dword v[4:5], v0, off
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    s_setpc_b64 s[30:31]
   %sx = call i32 @llvm.amdgcn.readfirstlane(i32 %x)
