@@ -418,17 +418,17 @@ define float @foo_loop(ptr swifterror %error_ptr_ref, i32 %cc, float %cc2) {
 ;
 ; CHECK-O0-LABEL: foo_loop:
 ; CHECK-O0:       ## %bb.0: ## %entry
-; CHECK-O0-NEXT:    subq $40, %rsp
-; CHECK-O0-NEXT:    .cfi_def_cfa_offset 48
-; CHECK-O0-NEXT:    movss %xmm0, {{[-0-9]+}}(%r{{[sb]}}p) ## 4-byte Spill
+; CHECK-O0-NEXT:    subq $24, %rsp
+; CHECK-O0-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-O0-NEXT:    movss %xmm0, (%rsp) ## 4-byte Spill
 ; CHECK-O0-NEXT:    movl %edi, {{[-0-9]+}}(%r{{[sb]}}p) ## 4-byte Spill
 ; CHECK-O0-NEXT:    movq %r12, {{[-0-9]+}}(%r{{[sb]}}p) ## 8-byte Spill
 ; CHECK-O0-NEXT:    jmp LBB4_1
 ; CHECK-O0-NEXT:  LBB4_1: ## %bb_loop
 ; CHECK-O0-NEXT:    ## =>This Inner Loop Header: Depth=1
-; CHECK-O0-NEXT:    movl {{[-0-9]+}}(%r{{[sb]}}p), %ecx ## 4-byte Reload
+; CHECK-O0-NEXT:    movl {{[-0-9]+}}(%r{{[sb]}}p), %eax ## 4-byte Reload
+; CHECK-O0-NEXT:    cmpl $0, %eax
 ; CHECK-O0-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rax ## 8-byte Reload
-; CHECK-O0-NEXT:    cmpl $0, %ecx
 ; CHECK-O0-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) ## 8-byte Spill
 ; CHECK-O0-NEXT:    je LBB4_3
 ; CHECK-O0-NEXT:  ## %bb.2: ## %gen_error
@@ -436,22 +436,22 @@ define float @foo_loop(ptr swifterror %error_ptr_ref, i32 %cc, float %cc2) {
 ; CHECK-O0-NEXT:    movl $16, %edi
 ; CHECK-O0-NEXT:    callq _malloc
 ; CHECK-O0-NEXT:    movq %rax, %rcx
-; CHECK-O0-NEXT:    movb $1, 8(%rcx)
-; CHECK-O0-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) ## 8-byte Spill
+; CHECK-O0-NEXT:    movq %rcx, %rax
+; CHECK-O0-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) ## 8-byte Spill
+; CHECK-O0-NEXT:    movb $1, 8(%rax)
 ; CHECK-O0-NEXT:  LBB4_3: ## %bb_cont
 ; CHECK-O0-NEXT:    ## in Loop: Header=BB4_1 Depth=1
-; CHECK-O0-NEXT:    movss {{[-0-9]+}}(%r{{[sb]}}p), %xmm0 ## 4-byte Reload
+; CHECK-O0-NEXT:    movss (%rsp), %xmm0 ## 4-byte Reload
 ; CHECK-O0-NEXT:    ## xmm0 = mem[0],zero,zero,zero
-; CHECK-O0-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rax ## 8-byte Reload
-; CHECK-O0-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) ## 8-byte Spill
 ; CHECK-O0-NEXT:    movss {{.*#+}} xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
 ; CHECK-O0-NEXT:    ucomiss %xmm1, %xmm0
+; CHECK-O0-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rax ## 8-byte Reload
 ; CHECK-O0-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) ## 8-byte Spill
 ; CHECK-O0-NEXT:    jbe LBB4_1
 ; CHECK-O0-NEXT:  ## %bb.4: ## %bb_end
 ; CHECK-O0-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %r12 ## 8-byte Reload
 ; CHECK-O0-NEXT:    xorps %xmm0, %xmm0
-; CHECK-O0-NEXT:    addq $40, %rsp
+; CHECK-O0-NEXT:    addq $24, %rsp
 ; CHECK-O0-NEXT:    retq
 ;
 ; CHECK-i386-LABEL: foo_loop:
@@ -953,20 +953,20 @@ define void @swifterror_isel(ptr) {
 ; CHECK-O0-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-O0-NEXT:    pushq %r12
 ; CHECK-O0-NEXT:    .cfi_def_cfa_offset 24
-; CHECK-O0-NEXT:    subq $40, %rsp
-; CHECK-O0-NEXT:    .cfi_def_cfa_offset 64
+; CHECK-O0-NEXT:    subq $56, %rsp
+; CHECK-O0-NEXT:    .cfi_def_cfa_offset 80
 ; CHECK-O0-NEXT:    .cfi_offset %r12, -24
 ; CHECK-O0-NEXT:    .cfi_offset %r13, -16
+; CHECK-O0-NEXT:    ## implicit-def: $rax
 ; CHECK-O0-NEXT:    movq %rdi, {{[-0-9]+}}(%r{{[sb]}}p) ## 8-byte Spill
+; CHECK-O0-NEXT:    ## implicit-def: $ax
 ; CHECK-O0-NEXT:    ## implicit-def: $al
 ; CHECK-O0-NEXT:    testb $1, %al
-; CHECK-O0-NEXT:    ## implicit-def: $ax
-; CHECK-O0-NEXT:    ## implicit-def: $r12
 ; CHECK-O0-NEXT:    jne LBB8_2
 ; CHECK-O0-NEXT:  LBB8_1: ## =>This Inner Loop Header: Depth=1
 ; CHECK-O0-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %r12 ## 8-byte Reload
-; CHECK-O0-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %ax ## 2-byte Reload
 ; CHECK-O0-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %r13 ## 8-byte Reload
+; CHECK-O0-NEXT:    movw {{[-0-9]+}}(%r{{[sb]}}p), %ax ## 2-byte Reload
 ; CHECK-O0-NEXT:    ## implicit-def: $edi
 ; CHECK-O0-NEXT:    movw %ax, %di
 ; CHECK-O0-NEXT:    ## implicit-def: $rax
@@ -977,7 +977,7 @@ define void @swifterror_isel(ptr) {
 ; CHECK-O0-NEXT:    movq %r12, {{[-0-9]+}}(%r{{[sb]}}p) ## 8-byte Spill
 ; CHECK-O0-NEXT:    jmp LBB8_1
 ; CHECK-O0-NEXT:  LBB8_2:
-; CHECK-O0-NEXT:    addq $40, %rsp
+; CHECK-O0-NEXT:    addq $56, %rsp
 ; CHECK-O0-NEXT:    popq %r12
 ; CHECK-O0-NEXT:    popq %r13
 ; CHECK-O0-NEXT:    retq

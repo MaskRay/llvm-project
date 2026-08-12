@@ -28,19 +28,23 @@ public:
   RegAllocFastPass(Options Opts = Options()) : Opts(std::move(Opts)) {}
 
   MachineFunctionProperties getRequiredProperties() const {
-    return MachineFunctionProperties().setNoPHIs();
-  }
-
-  MachineFunctionProperties getSetProperties() const {
-    if (Opts.ClearVRegs) {
-      return MachineFunctionProperties().setNoVRegs();
-    }
-
     return MachineFunctionProperties();
   }
 
+  MachineFunctionProperties getSetProperties() const {
+    MachineFunctionProperties P;
+    P.setNoPHIs();
+    P.setTiedOpsRewritten();
+    if (Opts.ClearVRegs)
+      P.setNoVRegs();
+    return P;
+  }
+
+  // IsSSA is deliberately not declared as cleared: cleared properties are
+  // applied before the pass runs, and the allocator reads IsSSA to detect
+  // SSA input. It is cleared via leaveSSA() while running.
   MachineFunctionProperties getClearedProperties() const {
-    return MachineFunctionProperties().setIsSSA();
+    return MachineFunctionProperties();
   }
 
   LLVM_ABI PreservedAnalyses run(MachineFunction &MF,

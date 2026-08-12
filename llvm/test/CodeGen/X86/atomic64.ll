@@ -114,10 +114,11 @@ define void @atomic_fetch_and64() nounwind {
 ; X64-NEXT:    andl $5, %ecx
 ; X64-NEXT:    # kill: def $rcx killed $ecx
 ; X64-NEXT:    lock cmpxchgq %rcx, sc64(%rip)
-; X64-NEXT:    sete %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; X64-NEXT:    testb $1, %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    movq %rax, %rcx
+; X64-NEXT:    sete %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    testb $1, %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; X64-NEXT:    jne .LBB2_2
 ; X64-NEXT:    jmp .LBB2_1
 ; X64-NEXT:  .LBB2_2: # %atomicrmw.end
@@ -167,10 +168,11 @@ define void @atomic_fetch_or64() nounwind {
 ; X64-NEXT:    movq %rax, %rcx
 ; X64-NEXT:    orq $5, %rcx
 ; X64-NEXT:    lock cmpxchgq %rcx, sc64(%rip)
-; X64-NEXT:    sete %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; X64-NEXT:    testb $1, %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    movq %rax, %rcx
+; X64-NEXT:    sete %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    testb $1, %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; X64-NEXT:    jne .LBB3_2
 ; X64-NEXT:    jmp .LBB3_1
 ; X64-NEXT:  .LBB3_2: # %atomicrmw.end
@@ -220,10 +222,11 @@ define void @atomic_fetch_xor64() nounwind {
 ; X64-NEXT:    movq %rax, %rcx
 ; X64-NEXT:    xorq $5, %rcx
 ; X64-NEXT:    lock cmpxchgq %rcx, sc64(%rip)
-; X64-NEXT:    sete %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
-; X64-NEXT:    testb $1, %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    movq %rax, %rcx
+; X64-NEXT:    sete %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    testb $1, %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; X64-NEXT:    jne .LBB4_2
 ; X64-NEXT:    jmp .LBB4_1
 ; X64-NEXT:  .LBB4_2: # %atomicrmw.end
@@ -275,9 +278,10 @@ define void @atomic_fetch_nand64(i64 %x) nounwind {
 ; X64-NEXT:    andq %rdx, %rcx
 ; X64-NEXT:    notq %rcx
 ; X64-NEXT:    lock cmpxchgq %rcx, sc64(%rip)
-; X64-NEXT:    sete %cl
-; X64-NEXT:    testb $1, %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    movq %rax, %rcx
+; X64-NEXT:    sete %al
+; X64-NEXT:    testb $1, %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; X64-NEXT:    jne .LBB5_2
 ; X64-NEXT:    jmp .LBB5_1
 ; X64-NEXT:  .LBB5_2: # %atomicrmw.end
@@ -314,9 +318,10 @@ define void @atomic_fetch_max64(i64 %x) nounwind {
 ; X64-NEXT:    subq %rcx, %rdx
 ; X64-NEXT:    cmovgq %rax, %rcx
 ; X64-NEXT:    lock cmpxchgq %rcx, sc64(%rip)
-; X64-NEXT:    sete %cl
-; X64-NEXT:    testb $1, %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    movq %rax, %rcx
+; X64-NEXT:    sete %al
+; X64-NEXT:    testb $1, %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; X64-NEXT:    jne .LBB6_2
 ; X64-NEXT:    jmp .LBB6_1
 ; X64-NEXT:  .LBB6_2: # %atomicrmw.end
@@ -334,35 +339,33 @@ define void @atomic_fetch_max64(i64 %x) nounwind {
 ; I486-NEXT:    movl 8(%ebp), %eax
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    movl sc64+4, %eax
-; I486-NEXT:    movl sc64, %ecx
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl sc64, %eax
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    jmp .LBB6_1
 ; I486-NEXT:  .LBB6_1: # %atomicrmw.start
 ; I486-NEXT:    # =>This Inner Loop Header: Depth=1
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %edx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    subl %esi, %edx
+; I486-NEXT:    sbbl %ecx, %eax
+; I486-NEXT:    movl %esi, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
-; I486-NEXT:    subl %ecx, %esi
-; I486-NEXT:    sbbl %eax, %edx
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
-; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    jl .LBB6_4
 ; I486-NEXT:  # %bb.3: # %atomicrmw.start
 ; I486-NEXT:    # in Loop: Header=BB6_1 Depth=1
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:  .LBB6_4: # %atomicrmw.start
 ; I486-NEXT:    # in Loop: Header=BB6_1 Depth=1
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %edx # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
 ; I486-NEXT:    movl %esi, {{[0-9]+}}(%esp)
 ; I486-NEXT:    movl %eax, {{[0-9]+}}(%esp)
 ; I486-NEXT:    movl %esp, %eax
@@ -374,12 +377,13 @@ define void @atomic_fetch_max64(i64 %x) nounwind {
 ; I486-NEXT:    movl $2, 16(%eax)
 ; I486-NEXT:    movl $sc64, (%eax)
 ; I486-NEXT:    calll __atomic_compare_exchange_8@PLT
-; I486-NEXT:    movb %al, %dl
 ; I486-NEXT:    movl {{[0-9]+}}(%esp), %ecx
-; I486-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; I486-NEXT:    testb %dl, %dl
 ; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; I486-NEXT:    testb %al, %al
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    je .LBB6_1
 ; I486-NEXT:    jmp .LBB6_2
 ; I486-NEXT:  .LBB6_2: # %atomicrmw.end
@@ -406,9 +410,10 @@ define void @atomic_fetch_min64(i64 %x) nounwind {
 ; X64-NEXT:    subq %rcx, %rdx
 ; X64-NEXT:    cmovleq %rax, %rcx
 ; X64-NEXT:    lock cmpxchgq %rcx, sc64(%rip)
-; X64-NEXT:    sete %cl
-; X64-NEXT:    testb $1, %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    movq %rax, %rcx
+; X64-NEXT:    sete %al
+; X64-NEXT:    testb $1, %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; X64-NEXT:    jne .LBB7_2
 ; X64-NEXT:    jmp .LBB7_1
 ; X64-NEXT:  .LBB7_2: # %atomicrmw.end
@@ -426,35 +431,33 @@ define void @atomic_fetch_min64(i64 %x) nounwind {
 ; I486-NEXT:    movl 8(%ebp), %eax
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    movl sc64+4, %eax
-; I486-NEXT:    movl sc64, %ecx
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl sc64, %eax
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    jmp .LBB7_1
 ; I486-NEXT:  .LBB7_1: # %atomicrmw.start
 ; I486-NEXT:    # =>This Inner Loop Header: Depth=1
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %edx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    subl %esi, %edx
+; I486-NEXT:    sbbl %ecx, %eax
+; I486-NEXT:    movl %esi, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
-; I486-NEXT:    subl %ecx, %esi
-; I486-NEXT:    sbbl %eax, %edx
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
-; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    jge .LBB7_4
 ; I486-NEXT:  # %bb.3: # %atomicrmw.start
 ; I486-NEXT:    # in Loop: Header=BB7_1 Depth=1
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:  .LBB7_4: # %atomicrmw.start
 ; I486-NEXT:    # in Loop: Header=BB7_1 Depth=1
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %edx # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
 ; I486-NEXT:    movl %esi, {{[0-9]+}}(%esp)
 ; I486-NEXT:    movl %eax, {{[0-9]+}}(%esp)
 ; I486-NEXT:    movl %esp, %eax
@@ -466,12 +469,13 @@ define void @atomic_fetch_min64(i64 %x) nounwind {
 ; I486-NEXT:    movl $2, 16(%eax)
 ; I486-NEXT:    movl $sc64, (%eax)
 ; I486-NEXT:    calll __atomic_compare_exchange_8@PLT
-; I486-NEXT:    movb %al, %dl
 ; I486-NEXT:    movl {{[0-9]+}}(%esp), %ecx
-; I486-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; I486-NEXT:    testb %dl, %dl
 ; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; I486-NEXT:    testb %al, %al
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    je .LBB7_1
 ; I486-NEXT:    jmp .LBB7_2
 ; I486-NEXT:  .LBB7_2: # %atomicrmw.end
@@ -498,9 +502,10 @@ define void @atomic_fetch_umax64(i64 %x) nounwind {
 ; X64-NEXT:    subq %rcx, %rdx
 ; X64-NEXT:    cmovaq %rax, %rcx
 ; X64-NEXT:    lock cmpxchgq %rcx, sc64(%rip)
-; X64-NEXT:    sete %cl
-; X64-NEXT:    testb $1, %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    movq %rax, %rcx
+; X64-NEXT:    sete %al
+; X64-NEXT:    testb $1, %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; X64-NEXT:    jne .LBB8_2
 ; X64-NEXT:    jmp .LBB8_1
 ; X64-NEXT:  .LBB8_2: # %atomicrmw.end
@@ -518,35 +523,33 @@ define void @atomic_fetch_umax64(i64 %x) nounwind {
 ; I486-NEXT:    movl 8(%ebp), %eax
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    movl sc64+4, %eax
-; I486-NEXT:    movl sc64, %ecx
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl sc64, %eax
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    jmp .LBB8_1
 ; I486-NEXT:  .LBB8_1: # %atomicrmw.start
 ; I486-NEXT:    # =>This Inner Loop Header: Depth=1
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %edx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    subl %esi, %edx
+; I486-NEXT:    sbbl %ecx, %eax
+; I486-NEXT:    movl %esi, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
-; I486-NEXT:    subl %ecx, %esi
-; I486-NEXT:    sbbl %eax, %edx
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
-; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    jb .LBB8_4
 ; I486-NEXT:  # %bb.3: # %atomicrmw.start
 ; I486-NEXT:    # in Loop: Header=BB8_1 Depth=1
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:  .LBB8_4: # %atomicrmw.start
 ; I486-NEXT:    # in Loop: Header=BB8_1 Depth=1
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %edx # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
 ; I486-NEXT:    movl %esi, {{[0-9]+}}(%esp)
 ; I486-NEXT:    movl %eax, {{[0-9]+}}(%esp)
 ; I486-NEXT:    movl %esp, %eax
@@ -558,12 +561,13 @@ define void @atomic_fetch_umax64(i64 %x) nounwind {
 ; I486-NEXT:    movl $2, 16(%eax)
 ; I486-NEXT:    movl $sc64, (%eax)
 ; I486-NEXT:    calll __atomic_compare_exchange_8@PLT
-; I486-NEXT:    movb %al, %dl
 ; I486-NEXT:    movl {{[0-9]+}}(%esp), %ecx
-; I486-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; I486-NEXT:    testb %dl, %dl
 ; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; I486-NEXT:    testb %al, %al
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    je .LBB8_1
 ; I486-NEXT:    jmp .LBB8_2
 ; I486-NEXT:  .LBB8_2: # %atomicrmw.end
@@ -590,9 +594,10 @@ define void @atomic_fetch_umin64(i64 %x) nounwind {
 ; X64-NEXT:    subq %rcx, %rdx
 ; X64-NEXT:    cmovbeq %rax, %rcx
 ; X64-NEXT:    lock cmpxchgq %rcx, sc64(%rip)
-; X64-NEXT:    sete %cl
-; X64-NEXT:    testb $1, %cl
-; X64-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
+; X64-NEXT:    movq %rax, %rcx
+; X64-NEXT:    sete %al
+; X64-NEXT:    testb $1, %al
+; X64-NEXT:    movq %rcx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; X64-NEXT:    jne .LBB9_2
 ; X64-NEXT:    jmp .LBB9_1
 ; X64-NEXT:  .LBB9_2: # %atomicrmw.end
@@ -610,35 +615,33 @@ define void @atomic_fetch_umin64(i64 %x) nounwind {
 ; I486-NEXT:    movl 8(%ebp), %eax
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    movl sc64+4, %eax
-; I486-NEXT:    movl sc64, %ecx
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl sc64, %eax
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    jmp .LBB9_1
 ; I486-NEXT:  .LBB9_1: # %atomicrmw.start
 ; I486-NEXT:    # =>This Inner Loop Header: Depth=1
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %edx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    subl %esi, %edx
+; I486-NEXT:    sbbl %ecx, %eax
+; I486-NEXT:    movl %esi, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
-; I486-NEXT:    subl %ecx, %esi
-; I486-NEXT:    sbbl %eax, %edx
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
-; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    jae .LBB9_4
 ; I486-NEXT:  # %bb.3: # %atomicrmw.start
 ; I486-NEXT:    # in Loop: Header=BB9_1 Depth=1
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
-; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:  .LBB9_4: # %atomicrmw.start
 ; I486-NEXT:    # in Loop: Header=BB9_1 Depth=1
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
-; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx # 4-byte Reload
 ; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %edx # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %esi # 4-byte Reload
 ; I486-NEXT:    movl %esi, {{[0-9]+}}(%esp)
 ; I486-NEXT:    movl %eax, {{[0-9]+}}(%esp)
 ; I486-NEXT:    movl %esp, %eax
@@ -650,12 +653,13 @@ define void @atomic_fetch_umin64(i64 %x) nounwind {
 ; I486-NEXT:    movl $2, 16(%eax)
 ; I486-NEXT:    movl $sc64, (%eax)
 ; I486-NEXT:    calll __atomic_compare_exchange_8@PLT
-; I486-NEXT:    movb %al, %dl
 ; I486-NEXT:    movl {{[0-9]+}}(%esp), %ecx
-; I486-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; I486-NEXT:    testb %dl, %dl
 ; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; I486-NEXT:    testb %al, %al
+; I486-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %eax # 4-byte Reload
 ; I486-NEXT:    movl %eax, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
+; I486-NEXT:    movl %ecx, {{[-0-9]+}}(%e{{[sb]}}p) # 4-byte Spill
 ; I486-NEXT:    je .LBB9_1
 ; I486-NEXT:    jmp .LBB9_2
 ; I486-NEXT:  .LBB9_2: # %atomicrmw.end

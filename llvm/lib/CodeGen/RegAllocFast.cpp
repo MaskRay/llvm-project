@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/RegAllocFast.h"
+#include "PHIEliminationUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IndexedMap.h"
@@ -228,6 +229,10 @@ private:
   /// that it is alive across blocks.
   BitVector MayLiveAcrossBlocks;
 
+  /// PHI sources (SSA input) whose only use is the PHI: their spill slot has
+  /// no reader besides the edge move.
+  BitVector PHIOnlySrc;
+
   /// State of a register unit.
   enum RegUnitState {
     /// A free register is not currently in use and can be allocated
@@ -331,10 +336,18 @@ private:
 public:
   bool ClearVirtRegs;
 
+  /// The input is SSA MachineIR (the pipeline did not run PHIElimination and
+  /// TwoAddressInstructionPass): lower PHIs and tied operands here.
+  /// Determined per function from the input's properties.
+  bool SSAInput = false;
+
   bool runOnMachineFunction(MachineFunction &MF);
 
 private:
   void allocateBasicBlock(MachineBasicBlock &MBB);
+  void sharePHISlots(MachineFunction &MF);
+  void lowerPHIEdgeMoves(MachineBasicBlock &MBB);
+  void expandSSAPseudo(MachineInstr &MI);
 
   void addRegClassDefCounts(MutableArrayRef<unsigned> RegClassDefCounts,
                             Register Reg) const;
@@ -421,21 +434,18 @@ public:
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
-  MachineFunctionProperties getRequiredProperties() const override {
-    return MachineFunctionProperties().setNoPHIs();
-  }
-
   MachineFunctionProperties getSetProperties() const override {
-    if (Impl.ClearVirtRegs) {
-      return MachineFunctionProperties().setNoVRegs();
-    }
-
-    return MachineFunctionProperties();
+    MachineFunctionProperties P;
+    P.setNoPHIs();
+    P.setTiedOpsRewritten();
+    if (Impl.ClearVirtRegs)
+      P.setNoVRegs();
+    return P;
   }
 
-  MachineFunctionProperties getClearedProperties() const override {
-    return MachineFunctionProperties().setIsSSA();
-  }
+  // IsSSA is deliberately not declared as cleared: the pass framework
+  // applies cleared properties before the pass runs, and the allocator reads
+  // IsSSA to detect SSA input. runOnMachineFunction clears it via leaveSSA().
 };
 
 } // end anonymous namespace
@@ -717,6 +727,10 @@ void RegAllocFastImpl::reloadAtBegin(MachineBasicBlock &MBB) {
   // of spilling here is deterministic, if arbitrary.
   MachineBasicBlock::iterator InsertBefore =
       getMBBBeginInsertionPoint(MBB, PrologLiveIns);
+  // Keep PHIs first: successor scans and PHI deletion rely on MBB.phis().
+  if (SSAInput)
+    while (InsertBefore != MBB.end() && InsertBefore->isPHI())
+      ++InsertBefore;
   for (const LiveReg &LR : LiveVirtRegs) {
     MCPhysReg PhysReg = LR.PhysReg;
     if (PhysReg == 0 || LR.Error)
@@ -733,7 +747,8 @@ void RegAllocFastImpl::reloadAtBegin(MachineBasicBlock &MBB) {
       // FIXME: Theoretically this should use an insert point skipping labels
       // but I'm not sure how labels should interact with prolog instruction
       // that need reloads.
-      reload(MBB.begin(), LR.VirtReg, PhysReg);
+      reload(SSAInput ? MBB.SkipPHIsAndLabels(MBB.begin()) : MBB.begin(),
+             LR.VirtReg, PhysReg);
     } else
       reload(InsertBefore, LR.VirtReg, PhysReg);
   }
@@ -888,34 +903,50 @@ void RegAllocFastImpl::assignVirtToPhysReg(MachineInstr &AtMI, LiveReg &LR,
   assignDanglingDebugValues(AtMI, VirtReg, PhysReg);
 }
 
-static bool isCoalescable(const MachineInstr &MI) { return MI.isFullCopy(); }
-
 Register RegAllocFastImpl::traceCopyChain(Register Reg) const {
   static const unsigned ChainLengthLimit = 3;
-  unsigned C = 0;
-  do {
+  for (unsigned C = 0; C <= ChainLengthLimit; ++C) {
     if (Reg.isPhysical())
       return Reg;
-    assert(Reg.isVirtual());
-
-    MachineInstr *VRegDef = MRI->getUniqueVRegDef(Reg);
-    if (!VRegDef || !isCoalescable(*VRegDef))
-      return 0;
-    Reg = VRegDef->getOperand(1).getReg();
-  } while (++C <= ChainLengthLimit);
-  return 0;
+    const MachineInstr *Def = MRI->getUniqueVRegDef(Reg);
+    if (!Def)
+      return {};
+    if (Def->isFullCopy()) {
+      Reg = Def->getOperand(1).getReg();
+      continue;
+    }
+    if (!SSAInput)
+      return {};
+    // In SSA form a two-address instruction's def and tied use end up in the
+    // same register, so the tie continues the chain.
+    const MachineOperand *DefMO = MRI->getOneDef(Reg);
+    if (!DefMO || !DefMO->isTied() || DefMO->getSubReg())
+      return {};
+    Reg = Def->getOperand(Def->findTiedOperandIdx(DefMO->getOperandNo()))
+              .getReg();
+  }
+  return {};
 }
 
 /// Check if any of \p VirtReg's definitions is a copy. If it is follow the
 /// chain of copies to check whether we reach a physical register we can
 /// coalesce with.
 Register RegAllocFastImpl::traceCopies(Register VirtReg) const {
+  if (SSAInput) {
+    // A single def: enter the chain past a copy so the walk keeps the same
+    // reach as the multi-def loop below.
+    const MachineInstr *Def = MRI->getUniqueVRegDef(VirtReg);
+    if (!Def)
+      return {};
+    return Def->isFullCopy() ? traceCopyChain(Def->getOperand(1).getReg())
+                             : traceCopyChain(VirtReg);
+  }
+
   static const unsigned DefLimit = 3;
   unsigned C = 0;
   for (const MachineInstr &MI : MRI->def_instructions(VirtReg)) {
-    if (isCoalescable(MI)) {
-      Register Reg = MI.getOperand(1).getReg();
-      Reg = traceCopyChain(Reg);
+    if (MI.isFullCopy()) {
+      Register Reg = traceCopyChain(MI.getOperand(1).getReg());
       if (Reg.isValid())
         return Reg;
     }
@@ -1178,8 +1209,51 @@ bool RegAllocFastImpl::useVirtReg(MachineInstr &MI, MachineOperand &MO,
     assert((!MO.isKill() || LRI->LastUse == &MI) && "Invalid kill flag");
   }
 
-  // If necessary allocate a register.
-  if (LRI->PhysReg == 0) {
+  // SSA two-address lowering: the tied use is a distinct value whose range
+  // ends here (the tied def's range ended at this instruction in the
+  // backward walk).
+  if (SSAInput && MO.isTied() && !MO.getSubReg() &&
+      MI.getOperand(MI.findTiedOperandIdx(MO.getOperandNo()))
+          .getReg()
+          .isPhysical()) {
+    unsigned DefIdx = MI.findTiedOperandIdx(MO.getOperandNo());
+    const MachineOperand &DefMO = MI.getOperand(DefIdx);
+    Register DefReg = DefMO.getReg();
+    if (LRI->PhysReg == 0) {
+      // Take over the def's register. A reserved register (e.g. the base
+      // pointer, tied to an inline asm operand) may not hold a virtual
+      // register. An early-clobber def that also reads this value through
+      // another operand needs that operand in a different register than the
+      // def. Both cases allocate elsewhere and copy below.
+      bool MustCopy = MRI->isReserved(DefReg);
+      if (DefMO.isEarlyClobber())
+        for (const MachineOperand &O : MI.operands())
+          if (&O != &MO && O.isReg() && O.isUse() && O.getReg() == VirtReg)
+            MustCopy = true;
+      if (!MustCopy) {
+        freePhysReg(DefReg.asMCReg());
+        assignVirtToPhysReg(MI, *LRI, DefReg.asMCReg());
+      } else {
+        allocVirtReg(MI, *LRI, 0, false);
+      }
+    }
+    if (Register(LRI->PhysReg) != DefReg) {
+      // The value lives in its own register (for other uses or code below);
+      // satisfy the tie the way TwoAddressInstructionPass does: copy it into
+      // the def's register right before the instruction and read it there.
+      BuildMI(*MBB, MI.getIterator(), MI.getDebugLoc(),
+              TII->get(TargetOpcode::COPY), DefReg)
+          .addReg(LRI->PhysReg);
+      LRI->LastUse = &MI;
+      markRegUsedInInstr(LRI->PhysReg);
+      MO.setReg(DefReg);
+      MO.setIsRenamable(true);
+      // The tied def's value range ends here; the "free def operands" step
+      // keeps tied defs for the same-vreg case, so release it explicitly.
+      freePhysReg(DefReg.asMCReg());
+      return false;
+    }
+  } else if (LRI->PhysReg == 0) {
     assert(!MO.isTied() && "tied op should be allocated");
     Register Hint;
     if (MI.isCopy() && MI.getOperand(1).getSubReg() == 0) {
@@ -1803,7 +1877,13 @@ void RegAllocFastImpl::allocateBasicBlock(MachineBasicBlock &MBB) {
   Coalesced.clear();
 
   // Traverse block in reverse order allocating instructions one by one.
-  for (MachineInstr &MI : reverse(MBB)) {
+  for (auto It = MBB.rbegin(), E = MBB.rend(); It != E;) {
+    MachineInstr &MI = *It;
+    ++It;
+    // PHIs become stack-slot moves on the incoming edges (lowerPHIEdgeMoves)
+    // and are deleted once all blocks are allocated.
+    if (SSAInput && MI.isPHI())
+      continue;
     LLVM_DEBUG(dbgs() << "\n>> " << MI << "Regs:"; dumpState());
 
     // Special handling for debug values. Note that they are not allowed to
@@ -1847,7 +1927,304 @@ void RegAllocFastImpl::allocateBasicBlock(MachineBasicBlock &MBB) {
   }
   DanglingDbgValues.clear();
 
+  // Must run after the block's allocation: scratch registers are chosen
+  // against the final instruction list.
+  if (SSAInput)
+    lowerPHIEdgeMoves(MBB);
+
   LLVM_DEBUG(MBB.dump());
+}
+
+/// Expand REG_SEQUENCE and INSERT_SUBREG into subregister COPYs: the
+/// lowering TwoAddressInstructionPass performs when it runs before
+/// allocation, plus the base-value copy its tie-processing provides.
+void RegAllocFastImpl::expandSSAPseudo(MachineInstr &MI) {
+  MachineBasicBlock &MBB = *MI.getParent();
+  const DebugLoc &DL = MI.getDebugLoc();
+  if (MI.isInsertSubreg()) {
+    // %d = INSERT_SUBREG %base, %sub, idx  ->  %d = COPY %base
+    //                                          %d.idx = COPY %sub
+    Register Dst = MI.getOperand(0).getReg();
+    MachineOperand BaseMO = MI.getOperand(1);
+    unsigned SubIdx = MI.getOperand(3).getImm();
+    if (!BaseMO.isUndef())
+      BuildMI(MBB, MI.getIterator(), DL, TII->get(TargetOpcode::COPY), Dst)
+          .addReg(BaseMO.getReg(), RegState::NoFlags, BaseMO.getSubReg());
+    if (MI.getOperand(1).isTied())
+      MI.untieRegOperand(1);
+    MI.removeOperand(3);
+    assert(MI.getOperand(0).getSubReg() == 0 && "Unexpected subreg idx");
+    MI.getOperand(0).setSubReg(SubIdx);
+    MI.getOperand(0).setIsUndef(BaseMO.isUndef());
+    MI.removeOperand(1);
+    MI.setDesc(TII->get(TargetOpcode::COPY));
+    return;
+  }
+
+  // %d = REG_SEQUENCE %s1, idx1, ...  ->  undef %d.idx1 = COPY %s1
+  //                                       %d.idx2 = COPY %s2 ...
+  assert(MI.isRegSequence());
+  Register Dst = MI.getOperand(0).getReg();
+  bool DefEmitted = false;
+  for (unsigned I = 1, E = MI.getNumOperands(); I + 1 < E; I += 2) {
+    MachineOperand &SrcMO = MI.getOperand(I);
+    unsigned SubIdx = MI.getOperand(I + 1).getImm();
+    BuildMI(MBB, MI.getIterator(), DL, TII->get(TargetOpcode::COPY))
+        .addReg(Dst, RegState::Define | getUndefRegState(!DefEmitted), SubIdx)
+        .addReg(SrcMO.getReg(), RegState::NoFlags, SrcMO.getSubReg());
+    DefEmitted = true;
+  }
+  MI.eraseFromParent();
+}
+
+/// Redirect the stack slot of each PHI source that is defined in the
+/// incoming predecessor and dies there to the PHI destination's slot: the
+/// source's spill at its def then is the edge transfer, and
+/// lowerPHIEdgeMoves has nothing left to do. Restricted to forward edges so
+/// a shared slot is never overwritten while an earlier web member is still
+/// live; loop-carried values keep their own slot and get an explicit edge
+/// move.
+void RegAllocFastImpl::sharePHISlots(MachineFunction &MF) {
+  SmallVector<unsigned, 0> LayoutIdx(MF.getNumBlockIDs(), 0);
+  unsigned Order = 0;
+  for (MachineBasicBlock &MBB : MF)
+    LayoutIdx[MBB.getNumber()] = Order++;
+
+  for (MachineBasicBlock &MBB : MF) {
+    for (MachineInstr &PHI : MBB.phis()) {
+      Register Dst = PHI.getOperand(0).getReg();
+      for (unsigned I = 1, E = PHI.getNumOperands(); I != E; I += 2) {
+        const MachineOperand &SrcMO = PHI.getOperand(I);
+        Register Src = SrcMO.getReg();
+        if (!Src.isVirtual() || SrcMO.getSubReg())
+          continue;
+        // A single-use source's slot has no reader besides its edge move:
+        // once lowerPHIEdgeMoves stores the value from a register, the
+        // feeding spill is dead. PHI defs are excluded so no other value
+        // can share the slot.
+        if (MRI->hasOneNonDBGUse(Src)) {
+          const MachineInstr *SrcDef = MRI->getUniqueVRegDef(Src);
+          if (SrcDef && !SrcDef->isPHI())
+            PHIOnlySrc.set(Src.virtRegIndex());
+        }
+        MachineBasicBlock *Pred = PHI.getOperand(I + 1).getMBB();
+        if (LayoutIdx[Pred->getNumber()] >= LayoutIdx[MBB.getNumber()])
+          continue;
+        const MachineInstr *Def = MRI->getUniqueVRegDef(Src);
+        if (!Def || Def->getParent() != Pred)
+          continue;
+        // All other uses must be within the predecessor (use-list walk in
+        // the manner of mayLiveOut).
+        bool DiesInPred = true;
+        unsigned C = 0;
+        for (const MachineInstr &UseMI : MRI->use_nodbg_instructions(Src)) {
+          if (++C > 8 || (&UseMI != &PHI &&
+                          (UseMI.getParent() != Pred || UseMI.isPHI()))) {
+            DiesInPred = false;
+            break;
+          }
+        }
+        if (!DiesInPred)
+          continue;
+        if (StackSlotForVirtReg[Src] != -1 ||
+            MRI->getRegClass(Src) != MRI->getRegClass(Dst))
+          continue;
+        StackSlotForVirtReg[Src] = getStackSpaceFor(Dst);
+      }
+    }
+  }
+}
+
+/// Lower successor PHIs for the edges leaving \p MBB: parallel stack-slot to
+/// stack-slot moves through scratch registers. Cross-block values are in
+/// their dedicated slots at the block boundary, so each PHI becomes a
+/// slot-to-slot copy on its incoming edge; writes to a destination slot on a
+/// not-taken edge are harmless because slots are dedicated. Runs after the
+/// block's allocation completes, so scratch registers can be chosen against
+/// the final instructions.
+void RegAllocFastImpl::lowerPHIEdgeMoves(MachineBasicBlock &MBB) {
+  struct SlotMove {
+    int SrcSlot, DstSlot;
+    Register SrcVReg, DstVReg;
+  };
+  SmallPtrSet<MachineBasicBlock *, 4> SeenSucc;
+  SmallVector<SlotMove, 4> Moves;
+  for (MachineBasicBlock *Succ : MBB.successors()) {
+    if (!SeenSucc.insert(Succ).second)
+      continue;
+    Moves.clear();
+    for (MachineInstr &PHI : Succ->phis()) {
+      Register DstReg = PHI.getOperand(0).getReg();
+      for (unsigned I = 1, E = PHI.getNumOperands(); I != E; I += 2) {
+        if (PHI.getOperand(I + 1).getMBB() != &MBB)
+          continue;
+        Register SrcReg = PHI.getOperand(I).getReg();
+        int SrcSlot = getStackSpaceFor(SrcReg);
+        int DstSlot = getStackSpaceFor(DstReg);
+        if (SrcSlot != DstSlot)
+          Moves.push_back({SrcSlot, DstSlot, SrcReg, DstReg});
+      }
+    }
+    if (Moves.empty())
+      continue;
+
+    MachineBasicBlock::iterator IP =
+        findPHICopyInsertPoint(&MBB, Succ, Moves.front().SrcVReg);
+
+    // Registers unavailable as scratch: anything referenced from the
+    // insertion point to the end of the block (call arguments for EH edges,
+    // terminator operands).
+    BitVector Blocked(TRI->getNumRegUnits());
+    for (auto It = IP; It != MBB.end(); ++It)
+      for (const MachineOperand &MO : It->operands())
+        if (MO.isReg() && MO.getReg().isPhysical())
+          for (MCRegUnit Unit : TRI->regunits(MO.getReg().asMCReg()))
+            Blocked.set(static_cast<unsigned>(Unit));
+
+    auto PickScratch = [&](const TargetRegisterClass &RC,
+                           MCPhysReg Avoid) -> MCPhysReg {
+      for (MCPhysReg R : RegClassInfo.getOrder(&RC)) {
+        if (Avoid && TRI->regsOverlap(R, Avoid))
+          continue;
+        bool Free = true;
+        for (MCRegUnit Unit : TRI->regunits(R))
+          if (Blocked.test(static_cast<unsigned>(Unit)))
+            Free = false;
+        if (Free)
+          return R;
+      }
+      // Report and keep going with an invalid assignment, as allocVirtReg
+      // does when the allocation order is exhausted.
+      MachineFunction &MF = *MBB.getParent();
+      if (!MF.getProperties().hasFailedRegAlloc()) {
+        MF.getProperties().setFailedRegAlloc();
+        const Function &Fn = MF.getFunction();
+        Fn.getContext().diagnose(DiagnosticInfoRegAllocFailure(
+            "no scratch register available to lower a PHI", Fn,
+            IP != MBB.end() ? IP->getDebugLoc() : DebugLoc()));
+      }
+      ArrayRef<MCPhysReg> RawRegs = RC.getRegisters();
+      assert(!RawRegs.empty() && "register classes cannot have no registers");
+      return RawRegs.front();
+    };
+
+    // The slot's value is commonly still in the register that last spilled
+    // or reloaded it (the source is often defined right above the edge);
+    // find that register by scanning back from the insertion point so the
+    // move becomes a single store.
+    BitVector Clobbered(TRI->getNumRegUnits());
+    auto findValueReg = [&](int Slot, const TargetRegisterClass &RC,
+                            MachineBasicBlock::iterator &Store) -> MCPhysReg {
+      Clobbered.reset();
+      Store = MBB.end();
+      unsigned Budget = 30;
+      for (MachineBasicBlock::iterator It = IP; It != MBB.begin() && Budget;) {
+        MachineInstr &MI = *--It;
+        if (MI.isDebugInstr())
+          continue;
+        --Budget;
+        int FI;
+        bool IsStore = false;
+        Register R = TII->isStoreToStackSlot(MI, FI);
+        if (R)
+          IsStore = true;
+        else
+          R = TII->isLoadFromStackSlot(MI, FI);
+        if (R && FI == Slot) {
+          if (!R.isPhysical() || !RC.contains(R))
+            return 0;
+          for (MCRegUnit Unit : TRI->regunits(R.asMCReg()))
+            if (Clobbered.test(static_cast<unsigned>(Unit)))
+              return 0;
+          // The register stays live up to the new store.
+          for (MachineBasicBlock::iterator Fw = It; Fw != IP; ++Fw)
+            for (MachineOperand &MO : Fw->operands())
+              if (MO.isReg() && MO.isUse() && MO.isKill() &&
+                  MO.getReg().isPhysical() && TRI->regsOverlap(MO.getReg(), R))
+                MO.setIsKill(false);
+          if (IsStore)
+            Store = It;
+          return R;
+        }
+        for (const MachineOperand &MO : MI.operands()) {
+          if (MO.isRegMask())
+            return 0;
+          if (MO.isReg() && MO.isDef() && MO.getReg().isPhysical())
+            for (MCRegUnit Unit : TRI->regunits(MO.getReg().asMCReg()))
+              Clobbered.set(static_cast<unsigned>(Unit));
+        }
+      }
+      return 0;
+    };
+
+    auto EmitMove = [&](const SlotMove &M, MCPhysReg Avoid) {
+      const TargetRegisterClass &RC = *MRI->getRegClass(M.DstVReg);
+      MachineBasicBlock::iterator Store;
+      if (MCPhysReg R = findValueReg(M.SrcSlot, RC, Store)) {
+        // The register may have uses after the insertion point; no kill.
+        TII->storeRegToStackSlot(MBB, IP, R, /*isKill=*/false, M.DstSlot, &RC,
+                                 M.DstVReg);
+        ++NumStores;
+        // A single-use source's slot had no reader but this move; the spill
+        // that fed it is dead. The edge then costs one store, matching the
+        // standard pipeline's lowered PHI copy.
+        if (Store != MBB.end() && PHIOnlySrc.test(M.SrcVReg.virtRegIndex()))
+          Store->eraseFromParent();
+        return;
+      }
+      MCPhysReg Scratch = PickScratch(RC, Avoid);
+      TII->loadRegFromStackSlot(MBB, IP, Scratch, M.SrcSlot, &RC, M.SrcVReg);
+      ++NumLoads;
+      TII->storeRegToStackSlot(MBB, IP, Scratch, /*isKill=*/true, M.DstSlot,
+                               &RC, M.DstVReg);
+      ++NumStores;
+    };
+
+    // Parallel-move resolution: a destination slot may only be written once
+    // no other pending move reads it; cycles park one value in a held
+    // scratch register.
+    SmallDenseMap<int, unsigned, 8> SrcCount;
+    for (const SlotMove &M : Moves)
+      ++SrcCount[M.SrcSlot];
+    MCPhysReg Held = 0;
+    int HeldDstSlot = 0;
+    Register HeldDstVReg;
+    while (!Moves.empty() || Held) {
+      if (Held && !SrcCount.lookup(HeldDstSlot)) {
+        const TargetRegisterClass &RC = *MRI->getRegClass(HeldDstVReg);
+        TII->storeRegToStackSlot(MBB, IP, Held, /*isKill=*/true, HeldDstSlot,
+                                 &RC, HeldDstVReg);
+        ++NumStores;
+        Held = 0;
+        continue;
+      }
+      bool Progress = false;
+      for (unsigned I = 0; I != Moves.size(); ++I) {
+        if (SrcCount.lookup(Moves[I].DstSlot))
+          continue;
+        EmitMove(Moves[I], Held);
+        if (!--SrcCount[Moves[I].SrcSlot])
+          SrcCount.erase(Moves[I].SrcSlot);
+        Moves.erase(Moves.begin() + I);
+        Progress = true;
+        break;
+      }
+      if (Progress || Moves.empty())
+        continue;
+      // Cycle: park the first move's source value.
+      assert(!Held && "one held value must break every cycle");
+      const SlotMove &M = Moves.front();
+      const TargetRegisterClass &RC = *MRI->getRegClass(M.DstVReg);
+      Held = PickScratch(RC, 0);
+      HeldDstSlot = M.DstSlot;
+      HeldDstVReg = M.DstVReg;
+      TII->loadRegFromStackSlot(MBB, IP, Held, M.SrcSlot, &RC, M.SrcVReg);
+      ++NumLoads;
+      if (!--SrcCount[M.SrcSlot])
+        SrcCount.erase(M.SrcSlot);
+      Moves.erase(Moves.begin());
+    }
+  }
 }
 
 bool RegAllocFastImpl::runOnMachineFunction(MachineFunction &MF) {
@@ -1872,9 +2249,32 @@ bool RegAllocFastImpl::runOnMachineFunction(MachineFunction &MF) {
   MayLiveAcrossBlocks.clear();
   MayLiveAcrossBlocks.resize(NumVirtRegs);
 
+  // SSA input has not been through PHIElimination and
+  // TwoAddressInstructionPass (which clear IsSSA); lowering PHIs and tied
+  // operands is then this pass's job. Parsed MIR carries IsSSA explicitly,
+  // so partial pipelines keep their expected path.
+  SSAInput = MF.getProperties().hasIsSSA();
+  if (SSAInput) {
+    MRI->leaveSSA();
+    PHIOnlySrc.clear();
+    PHIOnlySrc.resize(NumVirtRegs);
+    sharePHISlots(MF);
+    for (MachineBasicBlock &MBB : MF)
+      for (MachineInstr &MI : make_early_inc_range(MBB))
+        if (MI.isRegSequence() || MI.isInsertSubreg())
+          expandSSAPseudo(MI);
+  }
+
   // Loop over all of the basic blocks, eliminating virtual register references
   for (MachineBasicBlock &MBB : MF)
     allocateBasicBlock(MBB);
+
+  // PHIs were lowered to stack-slot moves on the incoming edges.
+  if (SSAInput)
+    for (MachineBasicBlock &MBB : MF)
+      for (MachineInstr &MI : make_early_inc_range(MBB))
+        if (MI.isPHI())
+          MI.eraseFromParent();
 
   if (ClearVirtRegs) {
     // All machine operands and other references to virtual registers have been

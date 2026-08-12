@@ -366,6 +366,8 @@ public:
     return getTM<X86TargetMachine>();
   }
 
+  bool enableSSAFastRegAlloc() const override { return true; }
+
   void addIRPasses() override;
   bool addInstSelector() override;
   bool addIRTranslator() override;

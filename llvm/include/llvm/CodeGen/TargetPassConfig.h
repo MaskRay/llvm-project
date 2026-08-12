@@ -390,6 +390,13 @@ protected:
   /// are required for fast register allocation.
   virtual void addFastRegAlloc();
 
+  /// Return true if the fast register allocator should consume SSA MachineIR
+  /// directly, lowering PHIs and tied operands itself instead of running
+  /// PHIElimination and TwoAddressInstructionPass. Targets that insert
+  /// passes anchored on those pass IDs (or otherwise depend on their timing)
+  /// must keep this false. Overridable with -fast-ra-ssa.
+  virtual bool enableSSAFastRegAlloc() const { return false; }
+
   /// addOptimizedRegAlloc - Add passes related to register allocation.
   /// CodeGenTargetMachineImpl provides standard regalloc passes for most
   /// targets.

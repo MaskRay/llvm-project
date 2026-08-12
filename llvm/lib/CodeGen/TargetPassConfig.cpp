@@ -57,6 +57,14 @@
 
 using namespace llvm;
 
+static cl::opt<cl::boolOrDefault> EnableFastRASSA(
+    "fast-ra-ssa",
+    cl::desc("Have the fast register allocator consume SSA MachineIR, "
+             "lowering PHIs and tied operands itself instead of running "
+             "PHIElimination and TwoAddressInstructionPass (overrides the "
+             "target's default)"),
+    cl::Hidden);
+
 static cl::opt<bool>
     EnableIPRA("enable-ipra", cl::init(false), cl::Hidden,
                cl::desc("Enable interprocedural register allocation "
@@ -1467,8 +1475,22 @@ bool TargetPassConfig::usingDefaultRegAlloc() const {
 /// Add the minimum set of target-independent passes that are required for
 /// register allocation. No coalescing or scheduling.
 void TargetPassConfig::addFastRegAlloc() {
-  addPass(&PHIEliminationID);
-  addPass(&TwoAddressInstructionPassID);
+  // When the fast allocator consumes SSA MachineIR, it lowers PHIs and tied
+  // operands itself; it detects the input form per function from the IsSSA
+  // property.
+  bool SSAFastRegAlloc = EnableFastRASSA == cl::boolOrDefault::BOU_UNSET
+                             ? enableSSAFastRegAlloc()
+                             : EnableFastRASSA == cl::boolOrDefault::BOU_TRUE;
+  // The SSA path supports what unoptimized instruction selection emits.
+  // Optimized ISel reaches this pipeline via -regalloc=fast and can
+  // produce shapes the fast allocator does not lower (e.g. subregister
+  // ties); keep the classic lowering passes there.
+  if (TM->getOptLevel() != CodeGenOptLevel::None)
+    SSAFastRegAlloc = false;
+  if (!SSAFastRegAlloc) {
+    addPass(&PHIEliminationID);
+    addPass(&TwoAddressInstructionPassID);
+  }
 
   addRegAssignAndRewriteFast();
 }

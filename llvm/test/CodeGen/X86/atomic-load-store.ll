@@ -980,7 +980,7 @@ define void @store_atomic_vec4_half(ptr %x, <4 x half> %v) nounwind {
 ; CHECK-SSE2-O0-NEXT:    movaps %xmm3, %xmm2
 ; CHECK-SSE2-O0-NEXT:    psrlq $48, %xmm2
 ; CHECK-SSE2-O0-NEXT:    movaps %xmm3, %xmm1
-; CHECK-SSE2-O0-NEXT:    shufps {{.*#+}} xmm1 = xmm1[1,1,1,1]
+; CHECK-SSE2-O0-NEXT:    shufps {{.*#+}} xmm1 = xmm1[1,1],xmm3[1,1]
 ; CHECK-SSE2-O0-NEXT:    psrld $16, %xmm3
 ; CHECK-SSE2-O0-NEXT:    punpcklwd {{.*#+}} xmm0 = xmm0[0],xmm3[0],xmm0[1],xmm3[1],xmm0[2],xmm3[2],xmm0[3],xmm3[3]
 ; CHECK-SSE2-O0-NEXT:    punpcklwd {{.*#+}} xmm1 = xmm1[0],xmm2[0],xmm1[1],xmm2[1],xmm1[2],xmm2[2],xmm1[3],xmm2[3]
@@ -1215,8 +1215,8 @@ define void @store_atomic_vec4_float_align(ptr %x, <4 x float> %v) nounwind {
 ; CHECK-SSE4-O0-NEXT:    movaps %xmm0, {{[-0-9]+}}(%r{{[sb]}}p) # 16-byte Spill
 ; CHECK-SSE4-O0-NEXT:  .LBB41_1: # %atomicrmw.start
 ; CHECK-SSE4-O0-NEXT:    # =>This Inner Loop Header: Depth=1
-; CHECK-SSE4-O0-NEXT:    movaps {{[-0-9]+}}(%r{{[sb]}}p), %xmm0 # 16-byte Reload
 ; CHECK-SSE4-O0-NEXT:    movq {{[-0-9]+}}(%r{{[sb]}}p), %rsi # 8-byte Reload
+; CHECK-SSE4-O0-NEXT:    movaps {{[-0-9]+}}(%r{{[sb]}}p), %xmm0 # 16-byte Reload
 ; CHECK-SSE4-O0-NEXT:    movaps {{[-0-9]+}}(%r{{[sb]}}p), %xmm1 # 16-byte Reload
 ; CHECK-SSE4-O0-NEXT:    pextrq $1, %xmm1, %rcx
 ; CHECK-SSE4-O0-NEXT:    movq %xmm1, %rbx

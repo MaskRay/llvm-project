@@ -547,36 +547,32 @@ define float @foo_loop(ptr swifterror %error_ptr_ref, i32 %cc, float %cc2) {
 ; CHECK-O0-AARCH64-NEXT:    .cfi_def_cfa w29, 16
 ; CHECK-O0-AARCH64-NEXT:    .cfi_offset w30, -8
 ; CHECK-O0-AARCH64-NEXT:    .cfi_offset w29, -16
-; CHECK-O0-AARCH64-NEXT:    str s0, [sp, #16] ; 4-byte Spill
-; CHECK-O0-AARCH64-NEXT:    stur w0, [x29, #-12] ; 4-byte Folded Spill
+; CHECK-O0-AARCH64-NEXT:    str s0, [sp, #8] ; 4-byte Spill
+; CHECK-O0-AARCH64-NEXT:    str w0, [sp, #12] ; 4-byte Spill
 ; CHECK-O0-AARCH64-NEXT:    stur x21, [x29, #-8] ; 8-byte Folded Spill
 ; CHECK-O0-AARCH64-NEXT:    b LBB4_1
 ; CHECK-O0-AARCH64-NEXT:  LBB4_1: ; %bb_loop
 ; CHECK-O0-AARCH64-NEXT:    ; =>This Inner Loop Header: Depth=1
-; CHECK-O0-AARCH64-NEXT:    ldur w8, [x29, #-12] ; 4-byte Folded Reload
-; CHECK-O0-AARCH64-NEXT:    ldur x0, [x29, #-8] ; 8-byte Folded Reload
-; CHECK-O0-AARCH64-NEXT:    str x0, [sp, #8] ; 8-byte Spill
+; CHECK-O0-AARCH64-NEXT:    ldr w8, [sp, #12] ; 4-byte Reload
 ; CHECK-O0-AARCH64-NEXT:    cbz w8, LBB4_3
 ; CHECK-O0-AARCH64-NEXT:  ; %bb.2: ; %gen_error
 ; CHECK-O0-AARCH64-NEXT:    ; in Loop: Header=BB4_1 Depth=1
 ; CHECK-O0-AARCH64-NEXT:    mov w8, #16 ; =0x10
 ; CHECK-O0-AARCH64-NEXT:    mov w0, w8
 ; CHECK-O0-AARCH64-NEXT:    bl _malloc
-; CHECK-O0-AARCH64-NEXT:    mov x9, x0
+; CHECK-O0-AARCH64-NEXT:    mov x1, x0
+; CHECK-O0-AARCH64-NEXT:    mov x0, x1
+; CHECK-O0-AARCH64-NEXT:    stur x1, [x29, #-8] ; 8-byte Folded Spill
 ; CHECK-O0-AARCH64-NEXT:    mov w8, #1 ; =0x1
-; CHECK-O0-AARCH64-NEXT:    strb w8, [x9, #8]
-; CHECK-O0-AARCH64-NEXT:    str x0, [sp, #8] ; 8-byte Spill
+; CHECK-O0-AARCH64-NEXT:    strb w8, [x0, #8]
 ; CHECK-O0-AARCH64-NEXT:  LBB4_3: ; %bb_cont
 ; CHECK-O0-AARCH64-NEXT:    ; in Loop: Header=BB4_1 Depth=1
-; CHECK-O0-AARCH64-NEXT:    ldr s0, [sp, #16] ; 4-byte Reload
-; CHECK-O0-AARCH64-NEXT:    ldr x0, [sp, #8] ; 8-byte Reload
-; CHECK-O0-AARCH64-NEXT:    str x0, [sp] ; 8-byte Spill
+; CHECK-O0-AARCH64-NEXT:    ldr s0, [sp, #8] ; 4-byte Reload
 ; CHECK-O0-AARCH64-NEXT:    fmov s1, #1.00000000
 ; CHECK-O0-AARCH64-NEXT:    fcmp s0, s1
-; CHECK-O0-AARCH64-NEXT:    stur x0, [x29, #-8] ; 8-byte Folded Spill
 ; CHECK-O0-AARCH64-NEXT:    b.le LBB4_1
 ; CHECK-O0-AARCH64-NEXT:  ; %bb.4: ; %bb_end
-; CHECK-O0-AARCH64-NEXT:    ldr x21, [sp] ; 8-byte Reload
+; CHECK-O0-AARCH64-NEXT:    ldur x21, [x29, #-8] ; 8-byte Folded Reload
 ; CHECK-O0-AARCH64-NEXT:    movi d0, #0000000000000000
 ; CHECK-O0-AARCH64-NEXT:    ldp x29, x30, [sp, #32] ; 16-byte Folded Reload
 ; CHECK-O0-AARCH64-NEXT:    add sp, sp, #48
@@ -588,37 +584,31 @@ define float @foo_loop(ptr swifterror %error_ptr_ref, i32 %cc, float %cc2) {
 ; CHECK-O0-ARM64_32-NEXT:    str x30, [sp, #32] ; 8-byte Spill
 ; CHECK-O0-ARM64_32-NEXT:    .cfi_def_cfa_offset 48
 ; CHECK-O0-ARM64_32-NEXT:    .cfi_offset w30, -16
-; CHECK-O0-ARM64_32-NEXT:    str s0, [sp, #16] ; 4-byte Spill
-; CHECK-O0-ARM64_32-NEXT:    str w0, [sp, #20] ; 4-byte Spill
+; CHECK-O0-ARM64_32-NEXT:    str s0, [sp, #8] ; 4-byte Spill
+; CHECK-O0-ARM64_32-NEXT:    str w0, [sp, #12] ; 4-byte Spill
 ; CHECK-O0-ARM64_32-NEXT:    str x21, [sp, #24] ; 8-byte Spill
 ; CHECK-O0-ARM64_32-NEXT:    b LBB4_1
 ; CHECK-O0-ARM64_32-NEXT:  LBB4_1: ; %bb_loop
 ; CHECK-O0-ARM64_32-NEXT:    ; =>This Inner Loop Header: Depth=1
-; CHECK-O0-ARM64_32-NEXT:    ldr w8, [sp, #20] ; 4-byte Reload
-; CHECK-O0-ARM64_32-NEXT:    ldr x0, [sp, #24] ; 8-byte Reload
-; CHECK-O0-ARM64_32-NEXT:    str x0, [sp, #8] ; 8-byte Spill
+; CHECK-O0-ARM64_32-NEXT:    ldr w8, [sp, #12] ; 4-byte Reload
 ; CHECK-O0-ARM64_32-NEXT:    cbz w8, LBB4_3
 ; CHECK-O0-ARM64_32-NEXT:  ; %bb.2: ; %gen_error
 ; CHECK-O0-ARM64_32-NEXT:    ; in Loop: Header=BB4_1 Depth=1
 ; CHECK-O0-ARM64_32-NEXT:    mov w8, #16 ; =0x10
 ; CHECK-O0-ARM64_32-NEXT:    mov w0, w8
 ; CHECK-O0-ARM64_32-NEXT:    bl _malloc
-; CHECK-O0-ARM64_32-NEXT:    mov x9, x0
-; CHECK-O0-ARM64_32-NEXT:    mov x0, x9
+; CHECK-O0-ARM64_32-NEXT:    mov x1, x0
+; CHECK-O0-ARM64_32-NEXT:    str x1, [sp, #24] ; 8-byte Spill
 ; CHECK-O0-ARM64_32-NEXT:    mov w8, #1 ; =0x1
-; CHECK-O0-ARM64_32-NEXT:    strb w8, [x9, #8]
-; CHECK-O0-ARM64_32-NEXT:    str x0, [sp, #8] ; 8-byte Spill
+; CHECK-O0-ARM64_32-NEXT:    strb w8, [x0, #8]
 ; CHECK-O0-ARM64_32-NEXT:  LBB4_3: ; %bb_cont
 ; CHECK-O0-ARM64_32-NEXT:    ; in Loop: Header=BB4_1 Depth=1
-; CHECK-O0-ARM64_32-NEXT:    ldr s0, [sp, #16] ; 4-byte Reload
-; CHECK-O0-ARM64_32-NEXT:    ldr x0, [sp, #8] ; 8-byte Reload
-; CHECK-O0-ARM64_32-NEXT:    str x0, [sp] ; 8-byte Spill
+; CHECK-O0-ARM64_32-NEXT:    ldr s0, [sp, #8] ; 4-byte Reload
 ; CHECK-O0-ARM64_32-NEXT:    fmov s1, #1.00000000
 ; CHECK-O0-ARM64_32-NEXT:    fcmp s0, s1
-; CHECK-O0-ARM64_32-NEXT:    str x0, [sp, #24] ; 8-byte Spill
 ; CHECK-O0-ARM64_32-NEXT:    b.le LBB4_1
 ; CHECK-O0-ARM64_32-NEXT:  ; %bb.4: ; %bb_end
-; CHECK-O0-ARM64_32-NEXT:    ldr x21, [sp] ; 8-byte Reload
+; CHECK-O0-ARM64_32-NEXT:    ldr x21, [sp, #24] ; 8-byte Reload
 ; CHECK-O0-ARM64_32-NEXT:    movi d0, #0000000000000000
 ; CHECK-O0-ARM64_32-NEXT:    ldr x30, [sp, #32] ; 8-byte Reload
 ; CHECK-O0-ARM64_32-NEXT:    add sp, sp, #48

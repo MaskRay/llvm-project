@@ -589,6 +589,8 @@ public:
     return getTM<AArch64TargetMachine>();
   }
 
+  bool enableSSAFastRegAlloc() const override { return true; }
+
   void addIRPasses()  override;
   bool addPreISel() override;
   void addCodeGenPrepare() override;
