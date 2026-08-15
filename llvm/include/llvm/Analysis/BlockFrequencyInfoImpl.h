@@ -1295,8 +1295,6 @@ template <class BT>
 bool BlockFrequencyInfoImpl<BT>::needIterativeInference() const {
   if (!UseIterativeBFIInference)
     return false;
-  if (!F->getFunction().hasProfileData())
-    return false;
   // Apply iterative inference only if the function contains irreducible loops;
   // otherwise, computed block frequencies are reasonably correct.
   for (auto L = Loops.rbegin(), E = Loops.rend(); L != E; ++L) {
