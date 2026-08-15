@@ -52,7 +52,7 @@ cl::opt<bool> UseIterativeBFIInference(
     cl::desc("Apply an iterative post-processing to infer correct BFI counts"));
 
 cl::opt<unsigned> IterativeBFIMaxIterationsPerBlock(
-    "iterative-bfi-max-iterations-per-block", cl::init(1000), cl::Hidden,
+    "iterative-bfi-max-iterations-per-block", cl::init(64), cl::Hidden,
     cl::desc("Iterative inference: maximum number of update iterations "
              "per block"));
 
