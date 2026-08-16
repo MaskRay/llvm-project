@@ -528,8 +528,8 @@ define i32 @fetch_and_nand(ptr %p) #0 {
 ; CHECK-OUTLINE-O0-NEXT:    sub sp, sp, #48
 ; CHECK-OUTLINE-O0-NEXT:    stp x29, x30, [sp, #32] ; 16-byte Folded Spill
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB6_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB6_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -666,8 +666,8 @@ define i64 @fetch_and_nand_64(ptr %p) #0 {
 ; CHECK-OUTLINE-O0-NEXT:    sub sp, sp, #48
 ; CHECK-OUTLINE-O0-NEXT:    stp x29, x30, [sp, #32] ; 16-byte Folded Spill
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr x0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #24] ; 8-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr x8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str x8, [sp, #24] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB7_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB7_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -2806,8 +2806,8 @@ define i8 @atomicrmw_min_i8(ptr %ptr, i8 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldrb w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldrb w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB36_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB36_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -2924,8 +2924,8 @@ define i8 @atomicrmw_max_i8(ptr %ptr, i8 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldrb w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldrb w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB37_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB37_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -3044,8 +3044,8 @@ define i8 @atomicrmw_umin_i8(ptr %ptr, i8 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldrb w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldrb w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB38_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB38_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -3164,8 +3164,8 @@ define i8 @atomicrmw_umax_i8(ptr %ptr, i8 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldrb w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldrb w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB39_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB39_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -3853,8 +3853,8 @@ define i16 @atomicrmw_min_i16(ptr %ptr, i16 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldrh w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldrh w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB46_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB46_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -3974,8 +3974,8 @@ define i16 @atomicrmw_max_i16(ptr %ptr, i16 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldrh w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldrh w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB47_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB47_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -4097,8 +4097,8 @@ define i16 @atomicrmw_umin_i16(ptr %ptr, i16 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldrh w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldrh w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB48_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB48_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -4220,8 +4220,8 @@ define i16 @atomicrmw_umax_i16(ptr %ptr, i16 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldrh w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldrh w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB49_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB49_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -4902,8 +4902,8 @@ define i32 @atomicrmw_min_i32(ptr %ptr, i32 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB56_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB56_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -5017,8 +5017,8 @@ define i32 @atomicrmw_max_i32(ptr %ptr, i32 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB57_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB57_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -5132,8 +5132,8 @@ define i32 @atomicrmw_umin_i32(ptr %ptr, i32 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB58_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB58_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -5247,8 +5247,8 @@ define i32 @atomicrmw_umax_i32(ptr %ptr, i32 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #16] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str w1, [sp, #24] ; 4-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr w0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str w0, [sp, #28] ; 4-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr w8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str w8, [sp, #28] ; 4-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB59_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB59_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -5926,8 +5926,8 @@ define i64 @atomicrmw_min_i64(ptr %ptr, i64 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #24] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str x1, [sp, #32] ; 8-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr x0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #40] ; 8-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr x8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str x8, [sp, #40] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB66_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB66_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -6041,8 +6041,8 @@ define i64 @atomicrmw_max_i64(ptr %ptr, i64 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #24] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str x1, [sp, #32] ; 8-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr x0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #40] ; 8-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr x8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str x8, [sp, #40] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB67_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB67_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -6156,8 +6156,8 @@ define i64 @atomicrmw_umin_i64(ptr %ptr, i64 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #24] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str x1, [sp, #32] ; 8-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr x0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #40] ; 8-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr x8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str x8, [sp, #40] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB68_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB68_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -6271,8 +6271,8 @@ define i64 @atomicrmw_umax_i64(ptr %ptr, i64 %rhs) {
 ; CHECK-OUTLINE-O0-NEXT:    .cfi_offset w29, -16
 ; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #24] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    str x1, [sp, #32] ; 8-byte Spill
-; CHECK-OUTLINE-O0-NEXT:    ldr x0, [x0]
-; CHECK-OUTLINE-O0-NEXT:    str x0, [sp, #40] ; 8-byte Spill
+; CHECK-OUTLINE-O0-NEXT:    ldr x8, [x0]
+; CHECK-OUTLINE-O0-NEXT:    str x8, [sp, #40] ; 8-byte Spill
 ; CHECK-OUTLINE-O0-NEXT:    b LBB69_1
 ; CHECK-OUTLINE-O0-NEXT:  LBB69_1: ; %atomicrmw.start
 ; CHECK-OUTLINE-O0-NEXT:    ; =>This Inner Loop Header: Depth=1
