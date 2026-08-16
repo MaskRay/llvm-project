@@ -6,13 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-/// \file This register allocator allocates registers to a basic block at a
-/// time, attempting to keep values in registers and reusing registers as
-/// appropriate.
+// This register allocator allocates registers to a basic block at a time,
+// attempting to keep values in registers and reusing registers as appropriate.
+// A value living across a block boundary gets a stack slot of its own, spilled
+// at the end of a block and reloaded where next used.
+//
+// Where the target enables it, the input is SSA MachineIR: PHIElimination
+// and TwoAddressInstructionPass are left out of the pipeline and this pass
+// lowers PHIs and tied operands itself. A PHI becomes copies to and from a
+// virtual register carrying the value over every edge, as PHIElimination does.
 //
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/RegAllocFast.h"
+#include "PHIEliminationUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IndexedMap.h"
@@ -21,6 +28,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SparseSet.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/CodeGen/LiveRegUnits.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -34,6 +42,7 @@
 #include "llvm/CodeGen/RegisterClassInfo.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetOpcodes.h"
+#include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/InitializePasses.h"
@@ -53,6 +62,7 @@ using namespace llvm;
 STATISTIC(NumStores, "Number of stores added");
 STATISTIC(NumLoads, "Number of loads added");
 STATISTIC(NumCoalesced, "Number of copies coalesced");
+STATISTIC(NumPHIsViaVReg, "Number of PHIs lowered through a virtual register");
 
 // FIXME: Remove this switch when all testcases are fixed!
 static cl::opt<bool> IgnoreMissingDefs("rafast-ignore-missing-defs",
@@ -331,10 +341,17 @@ private:
 public:
   bool ClearVirtRegs;
 
+  /// The input is SSA MachineIR (the pipeline did not run PHIElimination and
+  /// TwoAddressInstructionPass): lower PHIs and tied operands here.
+  /// Determined per function from the input's properties.
+  bool SSAInput = false;
+
   bool runOnMachineFunction(MachineFunction &MF);
 
 private:
   void allocateBasicBlock(MachineBasicBlock &MBB);
+  void lowerPHIs(MachineFunction &MF);
+  void expandSSAPseudo(MachineInstr &MI);
 
   void addRegClassDefCounts(MutableArrayRef<unsigned> RegClassDefCounts,
                             Register Reg) const;
@@ -421,20 +438,13 @@ public:
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
-  MachineFunctionProperties getRequiredProperties() const override {
-    return MachineFunctionProperties().setNoPHIs();
-  }
-
   MachineFunctionProperties getSetProperties() const override {
-    if (Impl.ClearVirtRegs) {
-      return MachineFunctionProperties().setNoVRegs();
-    }
-
-    return MachineFunctionProperties();
-  }
-
-  MachineFunctionProperties getClearedProperties() const override {
-    return MachineFunctionProperties().setIsSSA();
+    MachineFunctionProperties P;
+    P.setNoPHIs();
+    P.setTiedOpsRewritten();
+    if (Impl.ClearVirtRegs)
+      P.setNoVRegs();
+    return P;
   }
 };
 
@@ -888,34 +898,51 @@ void RegAllocFastImpl::assignVirtToPhysReg(MachineInstr &AtMI, LiveReg &LR,
   assignDanglingDebugValues(AtMI, VirtReg, PhysReg);
 }
 
-static bool isCoalescable(const MachineInstr &MI) { return MI.isFullCopy(); }
-
 Register RegAllocFastImpl::traceCopyChain(Register Reg) const {
   static const unsigned ChainLengthLimit = 3;
-  unsigned C = 0;
-  do {
+  for (unsigned C = 0; C <= ChainLengthLimit; ++C) {
     if (Reg.isPhysical())
       return Reg;
-    assert(Reg.isVirtual());
-
-    MachineInstr *VRegDef = MRI->getUniqueVRegDef(Reg);
-    if (!VRegDef || !isCoalescable(*VRegDef))
-      return Register();
-    Reg = VRegDef->getOperand(1).getReg();
-  } while (++C <= ChainLengthLimit);
-  return Register();
+    const MachineOperand *DefMO = MRI->getOneDef(Reg);
+    if (!DefMO)
+      return {};
+    const MachineInstr *Def = DefMO->getParent();
+    if (Def->isFullCopy()) {
+      Reg = Def->getOperand(1).getReg();
+      continue;
+    }
+    if (!SSAInput)
+      return {};
+    // In SSA form a two-address instruction's def and tied use end up in the
+    // same register, so the tie continues the chain.
+    if (!DefMO->isTied() || DefMO->getSubReg())
+      return {};
+    Reg = Def->getOperand(Def->findTiedOperandIdx(DefMO->getOperandNo()))
+              .getReg();
+  }
+  return {};
 }
 
 /// Check if any of \p VirtReg's definitions is a copy. If it is follow the
 /// chain of copies to check whether we reach a physical register we can
 /// coalesce with.
 Register RegAllocFastImpl::traceCopies(Register VirtReg) const {
+  if (SSAInput) {
+    // A single def: enter the chain past a copy so the walk keeps the same
+    // reach as the multi-def loop below.
+    const MachineOperand *DefMO = MRI->getOneDef(VirtReg);
+    if (!DefMO)
+      return {};
+    const MachineInstr *Def = DefMO->getParent();
+    return Def->isFullCopy() ? traceCopyChain(Def->getOperand(1).getReg())
+                             : traceCopyChain(VirtReg);
+  }
+
   static const unsigned DefLimit = 3;
   unsigned C = 0;
   for (const MachineInstr &MI : MRI->def_instructions(VirtReg)) {
-    if (isCoalescable(MI)) {
-      Register Reg = MI.getOperand(1).getReg();
-      Reg = traceCopyChain(Reg);
+    if (MI.isFullCopy()) {
+      Register Reg = traceCopyChain(MI.getOperand(1).getReg());
       if (Reg.isValid())
         return Reg;
     }
@@ -1178,8 +1205,61 @@ bool RegAllocFastImpl::useVirtReg(MachineInstr &MI, MachineOperand &MO,
     assert((!MO.isKill() || LRI->LastUse == &MI) && "Invalid kill flag");
   }
 
-  // If necessary allocate a register.
-  if (!LRI->PhysReg) {
+  // SSA two-address lowering: the tied use is a distinct value whose range
+  // ends here (the tied def's range ended at this instruction in the
+  // backward walk).
+  const MachineOperand *TiedDefMO =
+      SSAInput && MO.isTied()
+          ? &MI.getOperand(MI.findTiedOperandIdx(MO.getOperandNo()))
+          : nullptr;
+  if (TiedDefMO && TiedDefMO->getReg().isPhysical()) {
+    const MachineOperand &DefMO = *TiedDefMO;
+    Register DefReg = DefMO.getReg();
+    unsigned SubReg = MO.getSubReg();
+    if (!LRI->PhysReg) {
+      // Take over the def's register. A register outside this operand's class
+      // cannot hold the value, as the def's class may be the wider one. A
+      // reserved register (e.g. the base pointer, tied to an inline asm
+      // operand) may not hold a virtual register. An early-clobber def that
+      // also reads this value through another operand needs that operand in a
+      // different register than the def. A subregister read is a truncation,
+      // so the value the def wants is a part of this one. All four allocate
+      // elsewhere and copy below.
+      bool MustCopy = SubReg || MRI->isReserved(DefReg) ||
+                      !MRI->getRegClass(VirtReg)->contains(DefReg);
+      if (DefMO.isEarlyClobber())
+        for (const MachineOperand &O : MI.operands())
+          if (&O != &MO && O.isReg() && O.isUse() && O.getReg() == VirtReg)
+            MustCopy = true;
+      if (!MustCopy) {
+        freePhysReg(DefReg.asMCReg());
+        assignVirtToPhysReg(MI, *LRI, DefReg.asMCReg());
+      } else {
+        allocVirtReg(MI, *LRI, Register(), false);
+      }
+    }
+    MCRegister SrcReg = LRI->PhysReg;
+    if (SubReg)
+      SrcReg = TRI->getSubReg(SrcReg, SubReg);
+    if (Register(SrcReg) != DefReg) {
+      // The value lives in its own register (for other uses or code below);
+      // satisfy the tie the way TwoAddressInstructionPass does: copy it into
+      // the def's register right before the instruction and read it there.
+      BuildMI(*MBB, MI.getIterator(), MI.getDebugLoc(),
+              TII->get(TargetOpcode::COPY), DefReg)
+          .addReg(SrcReg);
+      LRI->LastUse = &MI;
+      markRegUsedInInstr(LRI->PhysReg);
+      MO.setReg(DefReg);
+      MO.setSubReg(0);
+      // A reserved register may not be renamed.
+      MO.setIsRenamable(!MRI->isReserved(DefReg));
+      // The tied def's value range ends here; the "free def operands" step
+      // keeps tied defs for the same-vreg case, so release it explicitly.
+      freePhysReg(DefReg.asMCReg());
+      return false;
+    }
+  } else if (!LRI->PhysReg) {
     assert(!MO.isTied() && "tied op should be allocated");
     Register Hint;
     if (MI.isCopy() && MI.getOperand(1).getSubReg() == 0) {
@@ -1802,8 +1882,12 @@ void RegAllocFastImpl::allocateBasicBlock(MachineBasicBlock &MBB) {
 
   Coalesced.clear();
 
-  // Traverse block in reverse order allocating instructions one by one.
-  for (MachineInstr &MI : reverse(MBB)) {
+  // Traverse block in reverse order allocating instructions one by one. The
+  // iterator is advanced before the instruction is handled, since allocating
+  // it inserts copies and reloads ahead of it.
+  for (auto It = MBB.rbegin(), E = MBB.rend(); It != E;) {
+    MachineInstr &MI = *It;
+    ++It;
     LLVM_DEBUG(dbgs() << "\n>> " << MI << "Regs:"; dumpState());
 
     // Special handling for debug values. Note that they are not allowed to
@@ -1850,6 +1934,85 @@ void RegAllocFastImpl::allocateBasicBlock(MachineBasicBlock &MBB) {
   LLVM_DEBUG(MBB.dump());
 }
 
+/// Expand REG_SEQUENCE and INSERT_SUBREG into subregister COPYs: the
+/// lowering TwoAddressInstructionPass performs when it runs before
+/// allocation, plus the base-value copy its tie-processing provides.
+void RegAllocFastImpl::expandSSAPseudo(MachineInstr &MI) {
+  MachineBasicBlock &MBB = *MI.getParent();
+  const DebugLoc &DL = MI.getDebugLoc();
+  if (MI.isInsertSubreg()) {
+    // %d = INSERT_SUBREG %base, %sub, idx  ->  %d = COPY %base
+    //                                          %d.idx = COPY %sub
+    Register Dst = MI.getOperand(0).getReg();
+    const MachineOperand &BaseMO = MI.getOperand(1);
+    const MachineOperand &SubMO = MI.getOperand(2);
+    unsigned SubIdx = MI.getOperand(3).getImm();
+    assert(MI.getOperand(0).getSubReg() == 0 && "Unexpected subreg idx");
+    if (!BaseMO.isUndef())
+      BuildMI(MBB, MI.getIterator(), DL, TII->get(TargetOpcode::COPY), Dst)
+          .addReg(BaseMO.getReg(), RegState::NoFlags, BaseMO.getSubReg());
+    BuildMI(MBB, MI.getIterator(), DL, TII->get(TargetOpcode::COPY))
+        .addReg(Dst, RegState::Define | getUndefRegState(BaseMO.isUndef()),
+                SubIdx)
+        .addReg(SubMO.getReg(), getKillRegState(SubMO.isKill()),
+                SubMO.getSubReg());
+    MI.eraseFromParent();
+    return;
+  }
+
+  // %d = REG_SEQUENCE %s1, idx1, ...  ->  undef %d.idx1 = COPY %s1
+  //                                       %d.idx2 = COPY %s2 ...
+  assert(MI.isRegSequence());
+  Register Dst = MI.getOperand(0).getReg();
+  bool DefEmitted = false;
+  for (unsigned I = 1, E = MI.getNumOperands(); I + 1 < E; I += 2) {
+    MachineOperand &SrcMO = MI.getOperand(I);
+    unsigned SubIdx = MI.getOperand(I + 1).getImm();
+    BuildMI(MBB, MI.getIterator(), DL, TII->get(TargetOpcode::COPY))
+        .addReg(Dst, RegState::Define | getUndefRegState(!DefEmitted), SubIdx)
+        .addReg(SrcMO.getReg(), RegState::NoFlags, SrcMO.getSubReg());
+    DefEmitted = true;
+  }
+  MI.eraseFromParent();
+}
+
+/// Lower the PHIs of \p MF the way PHIElimination does: a fresh register
+/// carries the value over every edge, and a copy at the top of the block moves
+/// it to the destination. Read at that one place, it cannot be observed when
+/// written on a not-taken edge.
+///
+/// This destroys SSA: Incoming is defined once per predecessor. leaveSSA() has
+/// run and the allocator proper is built for multiple definitions, but nothing
+/// past this point may assume a unique def.
+void RegAllocFastImpl::lowerPHIs(MachineFunction &MF) {
+  SmallPtrSet<MachineBasicBlock *, 8> InsertedInto;
+  for (MachineBasicBlock &MBB : MF) {
+    // Not a range over MBB.phis(): the destination copy lands at the end of
+    // that range, and iterating it would walk into the copy.
+    while (!MBB.empty() && MBB.begin()->isPHI()) {
+      MachineInstr &PHI = *MBB.begin();
+      Register Dst = PHI.getOperand(0).getReg();
+      Register Incoming = MRI->createVirtualRegister(MRI->getRegClass(Dst));
+      TII->createPHIDestinationCopy(MBB, MBB.SkipPHIsAndLabels(MBB.begin()),
+                                    PHI.getDebugLoc(), Incoming, Dst);
+      InsertedInto.clear();
+      for (unsigned I = 1, E = PHI.getNumOperands(); I != E; I += 2) {
+        const MachineOperand &SrcMO = PHI.getOperand(I);
+        MachineBasicBlock &Pred = *PHI.getOperand(I + 1).getMBB();
+        // Duplicate predecessors carry the same value; one copy suffices.
+        if (!InsertedInto.insert(&Pred).second)
+          continue;
+        // No debug location: the copy lands in another block than the PHI.
+        TII->createPHISourceCopy(
+            Pred, findPHICopyInsertPoint(&Pred, &MBB, SrcMO.getReg()),
+            DebugLoc(), SrcMO.getReg(), SrcMO.getSubReg(), Incoming);
+      }
+      PHI.eraseFromParent();
+      ++NumPHIsViaVReg;
+    }
+  }
+}
+
 bool RegAllocFastImpl::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG(dbgs() << "********** FAST REGISTER ALLOCATION **********\n"
                     << "********** Function: " << MF.getName() << '\n');
@@ -1863,6 +2026,29 @@ bool RegAllocFastImpl::runOnMachineFunction(MachineFunction &MF) {
   unsigned NumRegUnits = TRI->getNumRegUnits();
   InstrGen = 0;
   UsedInInstr.assign(NumRegUnits, 0);
+
+  // For SSA input, lower PHI and tied operands ourselves, skipping the
+  // SSA-destroying PHIElimination and TwoAddressInstructionPass. We want to
+  // require SSAInput in the future. The currently hasIsSSA() supports partial
+  // pipelines (-run-pass, -start-before).
+  SSAInput =
+      MF.getProperties().hasIsSSA() && useSSAFastRegAlloc(MF.getTarget());
+  assert((SSAInput || none_of(MF,
+                              [](const MachineBasicBlock &MBB) {
+                                return !MBB.empty() && MBB.begin()->isPHI();
+                              })) &&
+         "PHIs in non-SSA input: PHIElimination did not run and this target "
+         "does not consume SSA MachineIR");
+  // A target that has not opted in may still be handed SSA MachineIR.
+  MRI->leaveSSA();
+
+  if (SSAInput) {
+    lowerPHIs(MF);
+    for (MachineBasicBlock &MBB : MF)
+      for (MachineInstr &MI : make_early_inc_range(MBB))
+        if (MI.isRegSequence() || MI.isInsertSubreg())
+          expandSSAPseudo(MI);
+  }
 
   // initialize the virtual->physical register map to have a 'null'
   // mapping for all virtual registers

@@ -843,8 +843,12 @@ CodeGenPassBuilder::addRegAssignAndRewriteOptimized(PassManagerWrapper &PMW) {
 /// Add the minimum set of target-independent passes that are required for
 /// register allocation. No coalescing or scheduling.
 Error CodeGenPassBuilder::addFastRegAlloc(PassManagerWrapper &PMW) {
-  addMachineFunctionPass(PHIEliminationPass(), PMW);
-  addMachineFunctionPass(TwoAddressInstructionPass(), PMW);
+  // When the fast allocator consumes SSA MachineIR it lowers PHIs and tied
+  // operands itself, detecting the input form per function from IsSSA.
+  if (!useSSAFastRegAlloc(TM)) {
+    addMachineFunctionPass(PHIEliminationPass(), PMW);
+    addMachineFunctionPass(TwoAddressInstructionPass(), PMW);
+  }
   return addRegAssignAndRewriteFast(PMW);
 }
 
