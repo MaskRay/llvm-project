@@ -474,6 +474,11 @@ protected:
 LLVM_ABI void registerCodeGenCallback(PassInstrumentationCallbacks &PIC,
                                       TargetMachine &);
 
+/// Whether the fast register allocator lowers tied operands itself for \p TM,
+/// resolving the target default against -regalloc-fast-tied. Shared by both
+/// codegen pipelines.
+LLVM_ABI bool useTiedFastRegAlloc(const TargetMachine &TM);
+
 } // end namespace llvm
 
 #endif // LLVM_CODEGEN_TARGETPASSCONFIG_H

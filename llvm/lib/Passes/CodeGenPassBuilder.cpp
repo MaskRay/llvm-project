@@ -844,7 +844,8 @@ CodeGenPassBuilder::addRegAssignAndRewriteOptimized(PassManagerWrapper &PMW) {
 /// register allocation. No coalescing or scheduling.
 Error CodeGenPassBuilder::addFastRegAlloc(PassManagerWrapper &PMW) {
   addMachineFunctionPass(PHIEliminationPass(), PMW);
-  addMachineFunctionPass(TwoAddressInstructionPass(), PMW);
+  if (!useTiedFastRegAlloc(TM))
+    addMachineFunctionPass(TwoAddressInstructionPass(), PMW);
   return addRegAssignAndRewriteFast(PMW);
 }
 

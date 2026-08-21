@@ -32,11 +32,11 @@ public:
   }
 
   MachineFunctionProperties getSetProperties() const {
-    if (Opts.ClearVRegs) {
-      return MachineFunctionProperties().setNoVRegs();
-    }
-
-    return MachineFunctionProperties();
+    MachineFunctionProperties P;
+    P.setTiedOpsRewritten();
+    if (Opts.ClearVRegs)
+      P.setNoVRegs();
+    return P;
   }
 
   MachineFunctionProperties getClearedProperties() const {
