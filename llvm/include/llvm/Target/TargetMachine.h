@@ -120,6 +120,7 @@ protected: // Can only create subclasses.
 
   unsigned RequireStructuredCFG : 1;
   unsigned O0WantsFastISel : 1;
+  unsigned EnableTiedFastRegAlloc : 1;
 
   // PGO related tunables.
   std::optional<PGOOptions> PGOOption;
@@ -269,6 +270,13 @@ public:
 
   bool requiresStructuredCFG() const { return RequireStructuredCFG; }
   void setRequiresStructuredCFG(bool Value) { RequireStructuredCFG = Value; }
+
+  /// Whether the fast register allocator lowers tied operands itself instead
+  /// of running TwoAddressInstructionPass.
+  /// TODO: AMDGPU inserts passes anchored on TwoAddressInstructionPassID, must
+  /// leave this false.
+  bool enableTiedFastRegAlloc() const { return EnableTiedFastRegAlloc; }
+  void setEnableTiedFastRegAlloc(bool Value) { EnableTiedFastRegAlloc = Value; }
 
   /// Returns the code generation relocation model. The choices are static, PIC,
   /// and dynamic-no-pic, and target default.

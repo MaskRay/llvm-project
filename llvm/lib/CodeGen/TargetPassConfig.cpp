@@ -57,6 +57,13 @@
 
 using namespace llvm;
 
+static cl::opt<cl::boolOrDefault> EnableRegAllocFastTied(
+    "regalloc-fast-tied",
+    cl::desc("Have the fast register allocator lower tied operands itself "
+             "instead of running TwoAddressInstructionPass (overrides the "
+             "target's default)"),
+    cl::Hidden);
+
 static cl::opt<bool>
     EnableIPRA("enable-ipra", cl::init(false), cl::Hidden,
                cl::desc("Enable interprocedural register allocation "
@@ -1468,9 +1475,17 @@ bool TargetPassConfig::usingDefaultRegAlloc() const {
 /// register allocation. No coalescing or scheduling.
 void TargetPassConfig::addFastRegAlloc() {
   addPass(&PHIEliminationID);
-  addPass(&TwoAddressInstructionPassID);
+  if (!useTiedFastRegAlloc(*TM))
+    addPass(&TwoAddressInstructionPassID);
 
   addRegAssignAndRewriteFast();
+}
+
+bool llvm::useTiedFastRegAlloc(const TargetMachine &TM) {
+  if (EnableRegAllocFastTied != cl::boolOrDefault::BOU_UNSET)
+    return EnableRegAllocFastTied == cl::boolOrDefault::BOU_TRUE;
+  // Otherwise, respect TargetMachine preference.
+  return TM.enableTiedFastRegAlloc();
 }
 
 /// Add standard target-independent passes that are tightly coupled with
