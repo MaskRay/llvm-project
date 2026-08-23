@@ -38,9 +38,8 @@ namespace llvm {
 ///      it, otherwise return the bucket it should be inserted into.
 ///   2. Given a node that has already been created, remove it from the set.
 ///
-/// This class is implemented as a single-link chained hash table, where the
-/// "buckets" are actually the nodes themselves (the next pointer is in the
-/// node).  The last node points back to the bucket to simplify node removal.
+/// The hash table is linear-probing open addressing with tombstone-free
+/// deletion, power-of-two capacity, and a 0.75 maximum load factor.
 ///
 /// Any node that is to be included in the folding set must be a subclass of
 /// FoldingSetNode.  The node class must also define a Profile method used to
@@ -183,7 +182,11 @@ public:
   // Compute a strong hash value used to lookup the node in the FoldingSetBase.
   // The hash value is not guaranteed to be deterministic across processes.
   unsigned ComputeHash() const {
-    return static_cast<unsigned>(hash_combine_range(Data, Data + Size));
+    unsigned Hash =
+        static_cast<unsigned>(hash_combine_range(Data, Data + Size));
+    // FoldingSetBase hands a hash back to the caller as a non-null InsertPos
+    // token, which on a 32-bit host leaves no encoding for UINT32_MAX.
+    return Hash == UINT32_MAX ? 0 : Hash;
   }
 
   // Compute a deterministic hash value across processes that is suitable for
@@ -290,23 +293,19 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-/// Implements the folding set functionality. The main structure is an array of
-/// buckets.  Each bucket is indexed by the hash of the nodes it contains. The
-/// bucket itself points to the nodes contained in the bucket via a singly
-/// linked list.  The last node in the list points back to the bucket to
-/// facilitate node removal.
-///
+/// Non-templated base class for FoldingSet and ContextualFoldingSet, holding
+/// the memory management and probing that does not depend on the node type.
 class FoldingSetBase : public DebugEpochBase {
 protected:
-  /// Array of bucket chains.
-  void **Buckets;
+  /// Array of node pointers; a null entry marks an empty slot. A parallel
+  /// array of 32-bit hashes shares the same allocation, see getHashes().
+  void **Buckets = nullptr;
 
   /// Length of the Buckets array.  Always a power of 2.
-  unsigned NumBuckets;
+  unsigned NumBuckets = 0;
 
-  /// Number of nodes in the folding set. Growth occurs when NumNodes
-  /// is greater than twice the number of buckets.
-  unsigned NumNodes;
+  /// Number of nodes in the folding set.
+  unsigned NumNodes = 0;
 
   LLVM_ABI explicit FoldingSetBase(unsigned Log2InitSize);
   LLVM_ABI FoldingSetBase(FoldingSetBase &&Arg);
@@ -315,19 +314,19 @@ protected:
 
 public:
   //===--------------------------------------------------------------------===//
-  /// This class is used to maintain the singly linked bucket list in
-  /// a folding set.
+  /// This class is used to maintain node state in a folding set.
   class Node {
   private:
-    // NextInFoldingSetBucket - next link in the bucket list.
-    void *NextInFoldingSetBucket = nullptr;
+    // Hash of the node's profile, cached so that growth and removal never
+    // re-run Profile().
+    uint32_t FoldingSetHash = 0;
 
   public:
     Node() = default;
 
     // Accessors
-    void *getNextInBucket() const { return NextInFoldingSetBucket; }
-    void SetNextInBucket(void *N) { NextInFoldingSetBucket = N; }
+    uint32_t getFoldingSetHash() const { return FoldingSetHash; }
+    void setFoldingSetHash(uint32_t Hash) { FoldingSetHash = Hash; }
   };
 
   /// Remove all nodes from the folding set.
@@ -338,14 +337,6 @@ public:
 
   /// Returns true if there are no nodes in the folding set.
   [[nodiscard]] bool empty() const { return NumNodes == 0; }
-
-  /// Returns the number of nodes permitted in the folding set
-  /// before a rebucket operation is performed.
-  unsigned capacity() const {
-    // We allow a load factor of up to 2.0,
-    // so that means our capacity is NumBuckets * 2
-    return NumBuckets * 2;
-  }
 
 protected:
   /// Functions provided by the derived class to compute folding properties.
@@ -370,17 +361,35 @@ protected:
   };
 
 private:
+  /// The hashes of the nodes in Buckets, in the same order. Only entries whose
+  /// bucket is non-null are live. Comparing these rejects mismatches before the
+  /// profile compare, so walking a probe chain touches no nodes.
+  uint32_t *getHashes() const {
+    return reinterpret_cast<uint32_t *>(Buckets + NumBuckets);
+  }
+
+  /// Insert \p N at the first empty slot following its home, without checking
+  /// capacity.
+  void insertImpl(Node *N, uint32_t Hash);
+
+  /// Compare \p N against \p ID. Kept out of line so that the scratch storage
+  /// (FoldingSetNodeID) stays off the probe loop's path.
+  static bool nodeEquals(const FoldingSetInfo &Info, const FoldingSetBase *Self,
+                         Node *N, const FoldingSetNodeID &ID, unsigned IDHash);
+
+  friend class FoldingSetIteratorImpl;
+
   /// Resize the hash table and rehash everything. \p NewBucketCount must be a
   /// power of two, and must be greater than the old bucket count.
-  void GrowBucketCount(unsigned NewBucketCount, const FoldingSetInfo &Info);
+  void GrowBucketCount(unsigned NewBucketCount);
 
 protected:
   // The below methods are protected to encourage subclasses to provide a more
   // type-safe API.
 
-  /// Grow the number of buckets so that we can hold at least \p EltCount
-  /// nodes before rebucketing. May allocate more space than requested.
-  LLVM_ABI void reserve(unsigned EltCount, const FoldingSetInfo &Info);
+  /// Grow the number of buckets so that we can hold at least \p N nodes
+  /// before rebucketing. May allocate more space than requested.
+  LLVM_ABI void reserve(unsigned N);
 
   /// Remove a node from the folding set, returning true if one
   /// was removed or false if the node was not in the folding set.
@@ -399,8 +408,7 @@ protected:
   /// Insert the specified node into the folding set, knowing that
   /// it is not already in the folding set.  InsertPos must be obtained from
   /// FindNodeOrInsertPos.
-  LLVM_ABI void InsertNode(Node *N, void *InsertPos,
-                           const FoldingSetInfo &Info);
+  LLVM_ABI void InsertNode(Node *N, void *InsertPos);
 };
 
 // Convenience type to hide the implementation of the folding set.
@@ -497,21 +505,17 @@ public:
 public:
   using iterator = FoldingSetIterator<T>;
 
-  iterator begin() { return iterator(this, Buckets); }
-  iterator end() { return iterator(this, Buckets + NumBuckets); }
+  iterator begin() { return iterator(this, 0); }
+  iterator end() { return iterator(this, NumBuckets); }
 
   using const_iterator = FoldingSetIterator<const T>;
 
-  const_iterator begin() const { return const_iterator(this, Buckets); }
-  const_iterator end() const {
-    return const_iterator(this, Buckets + NumBuckets);
-  }
+  const_iterator begin() const { return const_iterator(this, 0); }
+  const_iterator end() const { return const_iterator(this, NumBuckets); }
 
-  /// Grow the number of buckets so that we can hold at least \p EltCount
-  /// nodes before rebucketing. May allocate more space than requested.
-  void reserve(unsigned EltCount) {
-    FoldingSetBase::reserve(EltCount, getFoldingSetInfo());
-  }
+  /// Grow the number of buckets so that we can hold at least \p N nodes
+  /// before rebucketing. May allocate more space than requested.
+  void reserve(unsigned N) { FoldingSetBase::reserve(N); }
 
   /// Remove a node from the folding set, returning true if one
   /// was removed or false if the node was not in the folding set.
@@ -535,7 +539,7 @@ public:
   /// it is not already in the folding set.  InsertPos must be obtained from
   /// FindNodeOrInsertPos.
   void InsertNode(T *N, void *InsertPos) {
-    FoldingSetBase::InsertNode(N, InsertPos, getFoldingSetInfo());
+    FoldingSetBase::InsertNode(N, InsertPos);
   }
 
   /// Insert the specified node into the folding set, knowing that it is not
@@ -641,21 +645,22 @@ public:
 /// how to walk the folding set hash table.
 class FoldingSetIteratorImpl : DebugEpochBase::HandleBase {
 protected:
-  FoldingSetNode *NodePtr;
+  const FoldingSetBase *Set = nullptr;
+  unsigned Index = 0;
 
-  LLVM_ABI FoldingSetIteratorImpl(const DebugEpochBase *Epoch, void **Bucket);
+  LLVM_ABI FoldingSetIteratorImpl(const FoldingSetBase *Set, unsigned Index);
 
   LLVM_ABI void advance();
 
   FoldingSetNode *getNode() const {
     assert(isHandleInSync() && "invalid iterator access!");
-    return NodePtr;
+    return static_cast<FoldingSetNode *>(Set->Buckets[Index]);
   }
 
 public:
   bool operator==(const FoldingSetIteratorImpl &RHS) const {
     assert(isHandleInSync() && RHS.isHandleInSync() && "handle not in sync!");
-    return NodePtr == RHS.NodePtr;
+    return Index == RHS.Index;
   }
   bool operator!=(const FoldingSetIteratorImpl &RHS) const {
     return !(*this == RHS);
@@ -664,8 +669,8 @@ public:
 
 template <class T> class FoldingSetIterator : public FoldingSetIteratorImpl {
 public:
-  explicit FoldingSetIterator(const DebugEpochBase *Epoch, void **Bucket)
-      : FoldingSetIteratorImpl(Epoch, Bucket) {}
+  explicit FoldingSetIterator(const FoldingSetBase *Set, unsigned Index)
+      : FoldingSetIteratorImpl(Set, Index) {}
 
   T &operator*() const { return *static_cast<T *>(getNode()); }
 
