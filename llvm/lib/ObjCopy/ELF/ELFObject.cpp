@@ -38,107 +38,54 @@ using namespace llvm::support;
 
 namespace {
 
-class raw_elf_buffer_ostream : public raw_ostream {
-  char *Buffer;
-  [[maybe_unused]] uint64_t Capacity;
-  uint64_t Position = 0;
-
-  void write_impl(const char *Ptr, size_t Size) override {
-    assert(Size <= Capacity - Position && "write exceeds output buffer");
-    std::memcpy(Buffer + Position, Ptr, Size);
-    Position += Size;
-  }
-
-  uint64_t current_pos() const override { return Position; }
-
-public:
-  raw_elf_buffer_ostream(char *Buffer, uint64_t Capacity)
-      : Buffer(Buffer), Capacity(Capacity) {
-    SetUnbuffered();
-  }
-
-  ~raw_elf_buffer_ostream() override { flush(); }
-};
-
-class raw_elf_stream_ostream : public raw_ostream {
-  raw_fd_stream &Stream;
-  uint64_t Position = 0;
-
-  void write_impl(const char *Ptr, size_t Size) override {
-    if (!Stream.has_error())
-      Stream.write(Ptr, Size);
-    Position += Size;
-  }
-
-  uint64_t current_pos() const override { return Position; }
-
-public:
-  explicit raw_elf_stream_ostream(raw_fd_stream &Stream) : Stream(Stream) {
-    SetUnbuffered();
-  }
-
-  ~raw_elf_stream_ostream() override { flush(); }
-};
-
-class ELFBufferWriterOutput final : public ELFWriterOutput {
-  WritableMemoryBuffer &Buffer;
-
-public:
-  explicit ELFBufferWriterOutput(WritableMemoryBuffer &Buffer)
-      : Buffer(Buffer) {}
-
-  void writeAt(uint64_t Offset,
-               function_ref<void(raw_ostream &)> Write) override {
-    assert(Offset <= Buffer.getBufferSize() && "invalid output offset");
-    raw_elf_buffer_ostream Out(Buffer.getBufferStart() + Offset,
-                               Buffer.getBufferSize() - Offset);
-    Write(Out);
-  }
-
-  Error finalize() override { return Error::success(); }
-};
-
-class ELFStreamWriterOutput final : public ELFWriterOutput {
-  raw_fd_stream &Stream;
-  uint64_t StartOffset;
-
-public:
-  ELFStreamWriterOutput(raw_fd_stream &Stream, uint64_t StartOffset)
-      : Stream(Stream), StartOffset(StartOffset) {}
-
-  void writeAt(uint64_t Offset,
-               function_ref<void(raw_ostream &)> Write) override {
-    if (Stream.has_error())
-      return;
-
-    uint64_t Position = Stream.tell();
-    Stream.seek(StartOffset + Offset);
-    if (Stream.has_error())
-      return;
-
-    raw_elf_stream_ostream Out(Stream);
-    Write(Out);
-    Stream.flush();
-    if (Stream.has_error())
-      return;
-    Stream.seek(Position);
-  }
-
-  Error finalize() override { return Stream.takeError(); }
-};
-
 template <class T> void writeObject(raw_ostream &Out, const T &Value) {
   Out.write(reinterpret_cast<const char *>(&Value), sizeof(Value));
 }
 
 } // namespace
 
+Error ELFWriterOutput::reserve(uint64_t Size) {
+  auto *FD = dyn_cast<raw_fd_stream>(&Dest);
+  if (FD && FD->supportsSeeking() && FD->isRegularFile()) {
+    Start = FD->tell();
+    std::optional<uint64_t> Last = checkedAddUnsigned(Start, Size);
+    if (!Last)
+      return createStringError(errc::file_too_large,
+                               "output exceeds the addressable file range");
+    // Discard existing contents after the current position, then extend the
+    // file so unwritten ranges read as zero without materializing them.
+    if (Error E = FD->resize(Start))
+      return E;
+    if (Error E = FD->resize(*Last))
+      return E;
+    Stream = FD;
+    End = *Last;
+    return Error::success();
+  }
+
+  Buf = WritableMemoryBuffer::getNewMemBuffer(Size);
+  if (!Buf)
+    return createStringError(errc::not_enough_memory,
+                             "failed to allocate memory buffer of " +
+                                 Twine::utohexstr(Size) + " bytes");
+  BufStream.reset({Buf->getBufferStart(), Buf->getBufferSize()});
+  return Error::success();
+}
+
+raw_ostream &ELFWriterOutput::streamAt(uint64_t Offset) {
+  if (!Stream) {
+    BufStream.seek(Offset);
+    return BufStream;
+  }
+  if (!Stream->has_error())
+    Stream->seek(Start + Offset);
+  return *Stream;
+}
+
 void ELFWriterOutput::write(ArrayRef<uint8_t> Data, uint64_t Offset) {
-  if (Data.empty())
-    return;
-  writeAt(Offset, [&](raw_ostream &Out) {
-    Out.write(reinterpret_cast<const char *>(Data.data()), Data.size());
-  });
+  if (!Data.empty())
+    streamAt(Offset).write(reinterpret_cast<const char *>(Data.data()),
+                           Data.size());
 }
 
 void ELFWriterOutput::writeZeros(uint64_t Offset, uint64_t Size) {
@@ -147,13 +94,24 @@ void ELFWriterOutput::writeZeros(uint64_t Offset, uint64_t Size) {
   // raw_ostream::write_zeros writes in 16-byte units, which is too small for
   // section-sized runs. Fill from a scratch block instead.
   SmallVector<char, 0> Zeros(std::min<uint64_t>(Size, 64 * 1024));
-  writeAt(Offset, [&](raw_ostream &Out) {
-    while (Size) {
-      size_t Chunk = std::min<uint64_t>(Size, Zeros.size());
-      Out.write(Zeros.data(), Chunk);
-      Size -= Chunk;
-    }
-  });
+  raw_ostream &Out = streamAt(Offset);
+  while (Size) {
+    size_t Chunk = std::min<uint64_t>(Size, Zeros.size());
+    Out.write(Zeros.data(), Chunk);
+    Size -= Chunk;
+  }
+}
+
+Error ELFWriterOutput::finalize() {
+  if (!Stream) {
+    Dest.write(Buf->getBufferStart(), Buf->getBufferSize());
+    return Error::success();
+  }
+  // Leave the stream positioned past the object, as a writer that appended to
+  // it would.
+  if (!Stream->has_error())
+    Stream->seek(End);
+  return Stream->takeError();
 }
 
 template <class ELFT>
@@ -304,31 +262,6 @@ Error BinarySectionWriter::visit(const GnuDebugLinkSection &Sec) {
 Error BinarySectionWriter::visit(const GroupSection &Sec) {
   return createStringError(errc::operation_not_permitted,
                            "cannot write '" + Sec.Name + "' out to binary");
-}
-
-void BinarySectionWriter::writeSectionContents(ArrayRef<uint8_t> Data,
-                                               uint64_t Offset) {
-  llvm::copy(Data, Out.getBufferStart() + Offset);
-}
-
-template <class ELFT>
-void ELFSectionWriter<ELFT>::writeSectionContents(ArrayRef<uint8_t> Data,
-                                                  uint64_t Offset) {
-  Out.write(Data, Offset);
-}
-
-void BinarySectionWriter::writeSectionContents(
-    uint64_t Offset, function_ref<void(raw_ostream &)> Write) {
-  assert(Offset <= Out.getBufferSize() && "invalid output offset");
-  raw_elf_buffer_ostream Stream(Out.getBufferStart() + Offset,
-                                Out.getBufferSize() - Offset);
-  Write(Stream);
-}
-
-template <class ELFT>
-void ELFSectionWriter<ELFT>::writeSectionContents(
-    uint64_t Offset, function_ref<void(raw_ostream &)> Write) {
-  Out.writeAt(Offset, Write);
 }
 
 Error SectionWriter::visit(const Section &Sec) {
@@ -692,11 +625,10 @@ Error ELFSectionWriter<ELFT>::visit(const CompressedSection &Sec) {
   }
   Chdr.ch_size = Sec.DecompressedSize;
   Chdr.ch_addralign = Sec.DecompressedAlign;
-  writeSectionContents(Sec.Offset, [&](raw_ostream &Out) {
-    writeObject(Out, Chdr);
-    Out.write(reinterpret_cast<const char *>(Sec.CompressedData.data()),
-              Sec.CompressedData.size());
-  });
+  raw_ostream &Out = streamAt(Sec.Offset);
+  writeObject(Out, Chdr);
+  Out.write(reinterpret_cast<const char *>(Sec.CompressedData.data()),
+            Sec.CompressedData.size());
   return Error::success();
 }
 
@@ -744,8 +676,7 @@ void StringTableSection::prepareForLayout() {
 }
 
 Error SectionWriter::visit(const StringTableSection &Sec) {
-  writeSectionContents(Sec.Offset,
-                       [&](raw_ostream &Out) { Sec.StrTabBuilder.write(Out); });
+  Sec.StrTabBuilder.write(streamAt(Sec.Offset));
   return Error::success();
 }
 
@@ -759,9 +690,8 @@ Error StringTableSection::accept(MutableSectionVisitor &Visitor) {
 
 template <class ELFT>
 Error ELFSectionWriter<ELFT>::visit(const SectionIndexSection &Sec) {
-  writeSectionContents(Sec.Offset, [&](raw_ostream &Out) {
-    support::endian::write_array<uint32_t>(Out, Sec.Indexes, ELFT::Endianness);
-  });
+  support::endian::write_array<uint32_t>(streamAt(Sec.Offset), Sec.Indexes,
+                                         ELFT::Endianness);
   return Error::success();
 }
 
@@ -1007,19 +937,18 @@ Expected<Symbol *> SymbolTableSection::getSymbolByIndex(uint32_t Index) {
 
 template <class ELFT>
 Error ELFSectionWriter<ELFT>::visit(const SymbolTableSection &Sec) {
-  writeSectionContents(Sec.Offset, [&](raw_ostream &Out) {
-    for (const std::unique_ptr<Symbol> &Symbol : Sec.Symbols) {
-      Elf_Sym Sym = {};
-      Sym.st_name = Symbol->NameIndex;
-      Sym.st_value = Symbol->Value;
-      Sym.st_size = Symbol->Size;
-      Sym.st_other = Symbol->Visibility;
-      Sym.setBinding(Symbol->Binding);
-      Sym.setType(Symbol->Type);
-      Sym.st_shndx = Symbol->getShndx();
-      writeObject(Out, Sym);
-    }
-  });
+  raw_ostream &Out = streamAt(Sec.Offset);
+  for (const std::unique_ptr<Symbol> &Symbol : Sec.Symbols) {
+    Elf_Sym Sym = {};
+    Sym.st_name = Symbol->NameIndex;
+    Sym.st_value = Symbol->Value;
+    Sym.st_size = Symbol->Size;
+    Sym.st_other = Symbol->Visibility;
+    Sym.setBinding(Symbol->Binding);
+    Sym.setType(Symbol->Type);
+    Sym.st_shndx = Symbol->getShndx();
+    writeObject(Out, Sym);
+  }
   return Error::success();
 }
 
@@ -1140,12 +1069,11 @@ Error ELFSectionWriter<ELFT>::visit(const RelocationSection &Sec) {
         Sec.Offset);
     return Error::success();
   }
-  writeSectionContents(Sec.Offset, [&](raw_ostream &Out) {
-    if (Sec.Type == SHT_REL)
-      writeRel<Elf_Rel>(Out, Sec.Relocations, Sec.getObject().IsMips64EL);
-    else
-      writeRel<Elf_Rela>(Out, Sec.Relocations, Sec.getObject().IsMips64EL);
-  });
+  raw_ostream &Out = streamAt(Sec.Offset);
+  if (Sec.Type == SHT_REL)
+    writeRel<Elf_Rel>(Out, Sec.Relocations, Sec.getObject().IsMips64EL);
+  else
+    writeRel<Elf_Rela>(Out, Sec.Relocations, Sec.getObject().IsMips64EL);
   return Error::success();
 }
 
@@ -1330,11 +1258,10 @@ GnuDebugLinkSection::GnuDebugLinkSection(StringRef File,
 
 template <class ELFT>
 Error ELFSectionWriter<ELFT>::visit(const GnuDebugLinkSection &Sec) {
-  writeSectionContents(Sec.Offset, [&](raw_ostream &Out) {
-    Out << Sec.FileName;
-    Out.write_zeros(Sec.Size - Sec.FileName.size() - sizeof(Elf_Word));
-    support::endian::write<uint32_t>(Out, Sec.CRC32, ELFT::Endianness);
-  });
+  raw_ostream &Out = streamAt(Sec.Offset);
+  Out << Sec.FileName;
+  Out.write_zeros(Sec.Size - Sec.FileName.size() - sizeof(Elf_Word));
+  support::endian::write<uint32_t>(Out, Sec.CRC32, ELFT::Endianness);
   return Error::success();
 }
 
@@ -1348,12 +1275,10 @@ Error GnuDebugLinkSection::accept(MutableSectionVisitor &Visitor) {
 
 template <class ELFT>
 Error ELFSectionWriter<ELFT>::visit(const GroupSection &Sec) {
-  writeSectionContents(Sec.Offset, [&](raw_ostream &Out) {
-    support::endian::Writer W(Out, ELFT::Endianness);
-    W.write<ELF::Elf32_Word>(Sec.FlagWord);
-    for (SectionBase *S : Sec.GroupMembers)
-      W.write<ELF::Elf32_Word>(S->Index);
-  });
+  support::endian::Writer W(streamAt(Sec.Offset), ELFT::Endianness);
+  W.write<ELF::Elf32_Word>(Sec.FlagWord);
+  for (SectionBase *S : Sec.GroupMembers)
+    W.write<ELF::Elf32_Word>(S->Index);
   return Error::success();
 }
 
@@ -2226,35 +2151,32 @@ template <class ELFT> void ELFWriter<ELFT>::writeEhdr() {
     Ehdr.e_shnum = 0;
     Ehdr.e_shstrndx = 0;
   }
-  Output->write(
-      ArrayRef(reinterpret_cast<const uint8_t *>(&Ehdr), sizeof(Ehdr)), 0);
+  writeObject(Output->streamAt(0), Ehdr);
 }
 
 template <class ELFT> void ELFWriter<ELFT>::writePhdrs() {
   if (Obj.segments().empty())
     return;
-  Output->writeAt(Obj.ProgramHdrSegment.Offset, [&](raw_ostream &Out) {
-    for (const Segment &Seg : Obj.segments())
-      writePhdr(Out, Seg);
-  });
+  raw_ostream &Out = Output->streamAt(Obj.ProgramHdrSegment.Offset);
+  for (const Segment &Seg : Obj.segments())
+    writePhdr(Out, Seg);
 }
 
 template <class ELFT> void ELFWriter<ELFT>::writeShdrs() {
-  Output->writeAt(Obj.SHOff, [&](raw_ostream &Out) {
-    Elf_Shdr Shdr = {};
-    Shdr.sh_type = SHT_NULL;
-    // See writeEhdr for why we do this.
-    uint64_t Shnum = Obj.sections().size() + 1;
-    if (Shnum >= SHN_LORESERVE)
-      Shdr.sh_size = Shnum;
-    // See writeEhdr for why we do this.
-    if (Obj.SectionNames != nullptr && Obj.SectionNames->Index >= SHN_LORESERVE)
-      Shdr.sh_link = Obj.SectionNames->Index;
-    writeObject(Out, Shdr);
+  raw_ostream &Out = Output->streamAt(Obj.SHOff);
+  Elf_Shdr Shdr = {};
+  Shdr.sh_type = SHT_NULL;
+  // See writeEhdr for why we do this.
+  uint64_t Shnum = Obj.sections().size() + 1;
+  if (Shnum >= SHN_LORESERVE)
+    Shdr.sh_size = Shnum;
+  // See writeEhdr for why we do this.
+  if (Obj.SectionNames != nullptr && Obj.SectionNames->Index >= SHN_LORESERVE)
+    Shdr.sh_link = Obj.SectionNames->Index;
+  writeObject(Out, Shdr);
 
-    for (const SectionBase &Sec : Obj.sections())
-      writeShdr(Out, Sec);
-  });
+  for (const SectionBase &Sec : Obj.sections())
+    writeShdr(Out, Sec);
 }
 
 template <class ELFT> Error ELFWriter<ELFT>::writeSectionData() {
@@ -2704,12 +2626,7 @@ template <class ELFT> Error ELFWriter<ELFT>::write() {
   if (WriteSectionHeaders)
     writeShdrs();
 
-  if (Error E = Output->finalize())
-    return E;
-
-  if (Buf)
-    Out.write(Buf->getBufferStart(), Buf->getBufferSize());
-  return Error::success();
+  return Output->finalize();
 }
 
 static Error removeUnneededSections(Object &Obj) {
@@ -2836,37 +2753,9 @@ template <class ELFT> Error ELFWriter<ELFT>::finalize() {
     Sec.finalize();
   }
 
-  size_t TotalSize = totalSize();
-  auto *Stream = dyn_cast<raw_fd_stream>(&Out);
-  if (Stream && Stream->supportsSeeking() && Stream->isRegularFile()) {
-    uint64_t StartOffset = Stream->tell();
-    std::optional<uint64_t> EndOffset =
-        checkedAddUnsigned(StartOffset, static_cast<uint64_t>(TotalSize));
-    if (!EndOffset)
-      return createStringError(errc::file_too_large,
-                               "output exceeds the addressable file range");
-    // Discard existing contents after the current position, then extend the
-    // file so unwritten output ranges read as zero without materializing them.
-    if (Error E = Stream->resize(StartOffset))
-      return E;
-    if (TotalSize) {
-      if (Error E = Stream->resize(*EndOffset))
-        return E;
-    }
-    // raw_pwrite_stream only supports overwriting existing data, so advance
-    // the stream position before writing data out of order.
-    Stream->seek(*EndOffset);
-    if (Error E = Stream->takeError())
-      return E;
-    Output = std::make_unique<ELFStreamWriterOutput>(*Stream, StartOffset);
-  } else {
-    Buf = WritableMemoryBuffer::getNewMemBuffer(TotalSize);
-    if (!Buf)
-      return createStringError(errc::not_enough_memory,
-                               "failed to allocate memory buffer of " +
-                                   Twine::utohexstr(TotalSize) + " bytes");
-    Output = std::make_unique<ELFBufferWriterOutput>(*Buf);
-  }
+  Output.emplace(Out);
+  if (Error E = Output->reserve(totalSize()))
+    return E;
 
   SecWriter = std::make_unique<ELFSectionWriter<ELFT>>(*Output);
   return Error::success();

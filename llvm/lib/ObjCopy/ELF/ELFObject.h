@@ -19,16 +19,18 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileOutputBuffer.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <set>
 #include <vector>
 
 namespace llvm {
 enum class DebugCompressionType;
-class raw_fd_stream;
 namespace objcopy {
 namespace elf {
 
@@ -48,16 +50,58 @@ class Segment;
 class Object;
 struct Symbol;
 
-class ELFWriterOutput {
-public:
-  virtual ~ELFWriterOutput() = default;
+/// A raw_ostream over a fixed memory range that can be repositioned.
+class raw_range_ostream : public raw_ostream {
+  MutableArrayRef<char> Data;
+  uint64_t Position = 0;
 
-  virtual void writeAt(uint64_t Offset,
-                       function_ref<void(raw_ostream &)> Write) = 0;
-  virtual Error finalize() = 0;
+  void write_impl(const char *Ptr, size_t Size) override {
+    assert(Size <= Data.size() - Position && "write exceeds output range");
+    std::memcpy(Data.data() + Position, Ptr, Size);
+    Position += Size;
+  }
+
+  uint64_t current_pos() const override { return Position; }
+
+public:
+  raw_range_ostream() { SetUnbuffered(); }
+
+  void reset(MutableArrayRef<char> D) {
+    Data = D;
+    Position = 0;
+  }
+
+  void seek(uint64_t Offset) {
+    assert(Offset <= Data.size() && "invalid output offset");
+    Position = Offset;
+  }
+};
+
+/// Destination of the ELF writer's output. Ranges are written out of order, so
+/// the object is either built in a memory buffer that finalize() copies to
+/// Dest, or, when Dest is a seekable regular file, written to that file in
+/// place.
+class ELFWriterOutput {
+  raw_ostream &Dest;
+  std::unique_ptr<WritableMemoryBuffer> Buf;
+  raw_range_ostream BufStream;
+  raw_fd_stream *Stream = nullptr;
+  uint64_t Start = 0;
+  uint64_t End = 0;
+
+public:
+  explicit ELFWriterOutput(raw_ostream &Dest) : Dest(Dest) {}
+
+  /// Reserves Size bytes for the object. Unwritten ranges read as zero.
+  Error reserve(uint64_t Size);
+
+  /// Returns a stream positioned Offset bytes into the object. The previous
+  /// result is invalidated.
+  raw_ostream &streamAt(uint64_t Offset);
 
   void write(ArrayRef<uint8_t> Data, uint64_t Offset);
   void writeZeros(uint64_t Offset, uint64_t Size);
+  Error finalize();
 };
 
 class SectionTableRef {
@@ -119,11 +163,15 @@ public:
 
 class SectionWriter : public SectionVisitor {
 protected:
-  virtual void writeSectionContents(ArrayRef<uint8_t> Data,
-                                    uint64_t Offset) = 0;
-  virtual void
-  writeSectionContents(uint64_t Offset,
-                       function_ref<void(raw_ostream &)> Write) = 0;
+  /// Returns a stream positioned at Offset in the output. The previous result
+  /// is invalidated.
+  virtual raw_ostream &streamAt(uint64_t Offset) = 0;
+
+  void writeSectionContents(ArrayRef<uint8_t> Data, uint64_t Offset) {
+    if (!Data.empty())
+      streamAt(Offset).write(reinterpret_cast<const char *>(Data.data()),
+                             Data.size());
+  }
 
 public:
   ~SectionWriter() override = default;
@@ -149,9 +197,9 @@ private:
   using Elf_Sym = typename ELFT::Sym;
 
   ELFWriterOutput &Out;
-  void writeSectionContents(ArrayRef<uint8_t> Data, uint64_t Offset) override;
-  void writeSectionContents(uint64_t Offset,
-                            function_ref<void(raw_ostream &)> Write) override;
+  raw_ostream &streamAt(uint64_t Offset) override {
+    return Out.streamAt(Offset);
+  }
 
 public:
   ~ELFSectionWriter() override = default;
@@ -201,9 +249,11 @@ public:
 class BinarySectionWriter : public SectionWriter {
 protected:
   WritableMemoryBuffer &Out;
-  void writeSectionContents(ArrayRef<uint8_t> Data, uint64_t Offset) override;
-  void writeSectionContents(uint64_t Offset,
-                            function_ref<void(raw_ostream &)> Write) override;
+  raw_range_ostream Stream;
+  raw_ostream &streamAt(uint64_t Offset) override {
+    Stream.seek(Offset);
+    return Stream;
+  }
 
 public:
   ~BinarySectionWriter() override = default;
@@ -216,7 +266,9 @@ public:
   Error visit(const CompressedSection &Sec) override;
   Error visit(const DecompressedSection &Sec) override;
 
-  explicit BinarySectionWriter(WritableMemoryBuffer &Buf) : Out(Buf) {}
+  explicit BinarySectionWriter(WritableMemoryBuffer &Buf) : Out(Buf) {
+    Stream.reset({Buf.getBufferStart(), Buf.getBufferSize()});
+  }
 };
 
 using IHexLineData = SmallVector<char, 64>;
@@ -366,7 +418,7 @@ private:
 
   void assignOffsets();
 
-  std::unique_ptr<ELFWriterOutput> Output;
+  std::optional<ELFWriterOutput> Output;
   std::unique_ptr<ELFSectionWriter<ELFT>> SecWriter;
 
   size_t totalSize() const;
