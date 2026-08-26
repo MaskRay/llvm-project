@@ -60,23 +60,28 @@ public:
     const char *Usage;
   };
 
+  /// Values of options declared with TableGen `ValuesCode`: only the generated
+  /// code knows them, so they cannot go in the string table. The generated
+  /// table supplies getOptionValuesCode() for this.
+  using ValuesCodeFnTy = StringRef (*)(unsigned);
+
   /// Entry for a single option instance in the option data table.
   struct Info {
     unsigned PrefixesOffset;
     StringTable::Offset PrefixedNameOffset;
-    const char *HelpText;
+    StringTable::Offset HelpTextOffset;
     // Help text for specific visibilities. A list of pairs, where each pair
     // is a list of visibilities and a specific help string for those
     // visibilities. If no help text is found in this list for the visibility of
-    // the program, HelpText is used instead. This cannot use std::vector
+    // the program, HelpTextOffset is used instead. This cannot use std::vector
     // because OptTable is used in constexpr contexts. Increase the array sizes
     // here if you need more entries and adjust the constants in
     // OptionParserEmitter::EmitHelpTextsForVariants.
     std::array<std::pair<std::array<unsigned int, 2 /*MaxVisibilityPerHelp*/>,
-                         const char *>,
+                         StringTable::Offset>,
                1 /*MaxVisibilityHelp*/>
         HelpTextsForVariants;
-    const char *MetaVar;
+    StringTable::Offset MetaVarOffset;
     unsigned ID;
     unsigned char Kind;
     unsigned char Param;
@@ -84,8 +89,12 @@ public:
     unsigned int Visibility;
     unsigned short GroupID;
     unsigned short AliasID;
-    const char *AliasArgs;
-    const char *Values;
+    /// The alias arguments as a \0 separated list terminated by an empty
+    /// string, e.g. "foo\0bar\0".
+    StringTable::Offset AliasArgsOffset;
+    /// The possible values as a comma separated list, empty for an option whose
+    /// values only getOptionValuesCode() knows.
+    StringTable::Offset ValuesOffset;
     // Offset into OptTable's SubCommandIDsTable.
     unsigned SubCommandIDsOffset;
 
@@ -102,6 +111,11 @@ public:
                            : PrefixesTable.slice(PrefixesOffset + 1,
                                                  getNumPrefixes(PrefixesTable));
     }
+
+    /// Whether the .td supplied a help text. An explicitly empty one is not the
+    /// same as none: it marks the option as deliberately undocumented.
+    bool hasHelpText() const { return HelpTextOffset.value() != 0; }
+    bool hasAliasArgs() const { return AliasArgsOffset.value() != 0; }
 
     bool hasSubCommands() const { return SubCommandIDsOffset != 0; }
 
@@ -179,6 +193,8 @@ private:
   /// The subcommand IDs table.
   ArrayRef<unsigned> SubCommandIDsTable;
 
+  ValuesCodeFnTy ValuesCodeFn = nullptr;
+
   bool GroupedShortOptions = false;
   bool DashDashParsing = false;
   const char *EnvVar = nullptr;
@@ -205,6 +221,21 @@ private:
     return OptionInfos[id - 1];
   }
 
+  StringTable::Offset getHelpTextOffset(const Info &I,
+                                        Visibility VisibilityMask) const {
+    for (const auto &[Visibilities, TextOffset] : I.HelpTextsForVariants)
+      for (auto Vis : Visibilities)
+        if (VisibilityMask & Vis)
+          return TextOffset;
+    return I.HelpTextOffset;
+  }
+
+  StringRef getOptionValues(const Info &I) const {
+    if (StringRef Values = (*StrTable)[I.ValuesOffset]; !Values.empty())
+      return Values;
+    return ValuesCodeFn ? ValuesCodeFn(I.ID) : StringRef();
+  }
+
   std::unique_ptr<Arg> parseOneArgGrouped(InputArgList &Args,
                                           unsigned &Index) const;
 
@@ -216,6 +247,8 @@ protected:
            ArrayRef<Info> OptionInfos, bool IgnoreCase = false,
            ArrayRef<SubCommand> SubCommands = {},
            ArrayRef<unsigned> SubCommandIDsTable = {});
+
+  void setValuesCodeFn(ValuesCodeFnTy Fn) { ValuesCodeFn = Fn; }
 
   /// Build (or rebuild) the PrefixChars member.
   void buildPrefixChars();
@@ -276,27 +309,22 @@ public:
   }
 
   /// Get the help text to use to describe this option.
-  const char *getOptionHelpText(OptSpecifier id) const {
+  StringRef getOptionHelpText(OptSpecifier id) const {
     return getOptionHelpText(id, Visibility(0));
   }
 
   // Get the help text to use to describe this option.
   // If it has visibility specific help text and that visibility is in the
   // visibility mask, use that text instead of the generic text.
-  const char *getOptionHelpText(OptSpecifier id,
-                                Visibility VisibilityMask) const {
-    auto Info = getInfo(id);
-    for (auto [Visibilities, Text] : Info.HelpTextsForVariants)
-      for (auto Visibility : Visibilities)
-        if (VisibilityMask & Visibility)
-          return Text;
-    return Info.HelpText;
+  StringRef getOptionHelpText(OptSpecifier id,
+                              Visibility VisibilityMask) const {
+    return (*StrTable)[getHelpTextOffset(getInfo(id), VisibilityMask)];
   }
 
   /// Get the meta-variable name to use when describing
   /// this options values in the help text.
-  const char *getOptionMetaVar(OptSpecifier id) const {
-    return getInfo(id).MetaVar;
+  StringRef getOptionMetaVar(OptSpecifier id) const {
+    return (*StrTable)[getInfo(id).MetaVarOffset];
   }
 
   /// Specify the environment variable where initial options should be read.
