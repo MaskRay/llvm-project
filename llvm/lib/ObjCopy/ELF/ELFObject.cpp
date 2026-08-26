@@ -19,6 +19,7 @@
 #include "llvm/Support/CheckedArithmetic.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Endian.h"
+#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -759,10 +760,7 @@ Error StringTableSection::accept(MutableSectionVisitor &Visitor) {
 template <class ELFT>
 Error ELFSectionWriter<ELFT>::visit(const SectionIndexSection &Sec) {
   writeSectionContents(Sec.Offset, [&](raw_ostream &Out) {
-    for (uint32_t Index : Sec.Indexes) {
-      const Elf_Word Word{Index};
-      writeObject(Out, Word);
-    }
+    support::endian::write_array<uint32_t>(Out, Sec.Indexes, ELFT::Endianness);
   });
   return Error::success();
 }
@@ -1332,11 +1330,10 @@ GnuDebugLinkSection::GnuDebugLinkSection(StringRef File,
 
 template <class ELFT>
 Error ELFSectionWriter<ELFT>::visit(const GnuDebugLinkSection &Sec) {
-  const Elf_Word CRC{Sec.CRC32};
   writeSectionContents(Sec.Offset, [&](raw_ostream &Out) {
     Out << Sec.FileName;
-    Out.write_zeros(Sec.Size - Sec.FileName.size() - sizeof(CRC));
-    writeObject(Out, CRC);
+    Out.write_zeros(Sec.Size - Sec.FileName.size() - sizeof(Elf_Word));
+    support::endian::write<uint32_t>(Out, Sec.CRC32, ELFT::Endianness);
   });
   return Error::success();
 }
@@ -1352,13 +1349,10 @@ Error GnuDebugLinkSection::accept(MutableSectionVisitor &Visitor) {
 template <class ELFT>
 Error ELFSectionWriter<ELFT>::visit(const GroupSection &Sec) {
   writeSectionContents(Sec.Offset, [&](raw_ostream &Out) {
-    uint8_t Data[sizeof(ELF::Elf32_Word)];
-    endian::write32<ELFT::Endianness>(Data, Sec.FlagWord);
-    Out.write(reinterpret_cast<const char *>(Data), sizeof(Data));
-    for (SectionBase *S : Sec.GroupMembers) {
-      endian::write32<ELFT::Endianness>(Data, S->Index);
-      Out.write(reinterpret_cast<const char *>(Data), sizeof(Data));
-    }
+    support::endian::Writer W(Out, ELFT::Endianness);
+    W.write<ELF::Elf32_Word>(Sec.FlagWord);
+    for (SectionBase *S : Sec.GroupMembers)
+      W.write<ELF::Elf32_Word>(S->Index);
   });
   return Error::success();
 }
