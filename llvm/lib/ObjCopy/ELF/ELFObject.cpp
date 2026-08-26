@@ -143,16 +143,14 @@ void ELFWriterOutput::write(ArrayRef<uint8_t> Data, uint64_t Offset) {
 void ELFWriterOutput::writeZeros(uint64_t Offset, uint64_t Size) {
   if (!Size)
     return;
-
-  // raw_ostream::write_zeros accepts an unsigned count and is intended for
-  // small padding. ELF sections can be much larger, so write a reusable larger
-  // block while consuming the 64-bit section size.
-  static constexpr char Zeros[64 * 1024] = {};
+  // raw_ostream::write_zeros writes in 16-byte units, which is too small for
+  // section-sized runs. Fill from a scratch block instead.
+  SmallVector<char, 0> Zeros(std::min<uint64_t>(Size, 64 * 1024));
   writeAt(Offset, [&](raw_ostream &Out) {
     while (Size) {
-      size_t ChunkSize = std::min<uint64_t>(Size, sizeof(Zeros));
-      Out.write(Zeros, ChunkSize);
-      Size -= ChunkSize;
+      size_t Chunk = std::min<uint64_t>(Size, Zeros.size());
+      Out.write(Zeros.data(), Chunk);
+      Size -= Chunk;
     }
   });
 }
