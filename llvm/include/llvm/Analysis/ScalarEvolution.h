@@ -25,6 +25,7 @@
 #include "llvm/ADT/BitmaskEnum.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
@@ -252,13 +253,7 @@ struct CastInfo<SCEVUseT<ToSCEVPtrT>, const SCEVUse,
 /// This class represents an analyzed expression in the program.  These are
 /// opaque objects that the client is not allowed to do much with directly.
 ///
-class SCEV : public FoldingSetNode {
-  friend struct FoldingSetTrait<SCEV>;
-
-  /// A reference to an Interned FoldingSetNodeID for this node.  The
-  /// ScalarEvolution's BumpPtrAllocator holds the data.
-  FoldingSetNodeIDRef FastID;
-
+class SCEV {
   // The SCEV baseclass this node corresponds to
   const SCEVTypes SCEVType;
 
@@ -285,9 +280,8 @@ public:
   static constexpr auto FlagNSW = SCEVNoWrapFlags::FlagNSW;
   static constexpr auto NoWrapMask = SCEVNoWrapFlags::NoWrapMask;
 
-  explicit SCEV(const FoldingSetNodeIDRef ID, SCEVTypes SCEVTy,
-                unsigned short ExpressionSize, Type *Ty)
-      : FastID(ID), SCEVType(SCEVTy), ExpressionSize(ExpressionSize), Ty(Ty) {}
+  explicit SCEV(SCEVTypes SCEVTy, unsigned short ExpressionSize, Type *Ty)
+      : SCEVType(SCEVTy), ExpressionSize(ExpressionSize), Ty(Ty) {}
   SCEV(const SCEV &) = delete;
   SCEV &operator=(const SCEV &) = delete;
 
@@ -342,19 +336,28 @@ public:
   }
 };
 
-// Specialize FoldingSetTrait for SCEV to avoid needing to compute
-// temporary FoldingSetNodeID values.
-template <> struct FoldingSetTrait<SCEV> : DefaultFoldingSetTrait<SCEV> {
-  static void Profile(const SCEV &X, FoldingSetNodeID &ID) { ID = X.FastID; }
+/// Uniquing key for ScalarEvolution's SCEV pool.  \p Ops and \p Extra hold the
+/// parts that distinguish two nodes of kind \p T: the operand list and, for
+/// kinds that need one more component, the type, loop or IR value.  \p Ops may
+/// alias storage owned by the caller or by an existing node.
+struct SCEVUniquingKey {
+  SCEVTypes T;
+  ArrayRef<SCEVUse> Ops;
+  const void *Extra;
 
-  static bool Equals(const SCEV &X, const FoldingSetNodeID &ID, unsigned IDHash,
-                     FoldingSetNodeID &TempID) {
-    return ID == X.FastID;
-  }
+  SCEVUniquingKey(SCEVTypes T, ArrayRef<SCEVUse> Ops,
+                  const void *Extra = nullptr)
+      : T(T), Ops(Ops), Extra(Extra) {}
+};
 
-  static unsigned ComputeHash(const SCEV &X, FoldingSetNodeID &TempID) {
-    return X.FastID.ComputeHash();
-  }
+/// DenseSet traits for the SCEV pool.  Nodes are keyed by the same parts they
+/// were created from, read back out of the node itself, so nothing has to be
+/// stored alongside it.
+struct SCEVUniquingInfo {
+  LLVM_ABI static unsigned getHashValue(const SCEVUniquingKey &Key);
+  LLVM_ABI static unsigned getHashValue(const SCEV *S);
+  LLVM_ABI static bool isEqual(const SCEVUniquingKey &Key, const SCEV *S);
+  static bool isEqual(const SCEV *LHS, const SCEV *RHS) { return LHS == RHS; }
 };
 
 inline raw_ostream &operator<<(raw_ostream &OS, const SCEV &S) {
@@ -2552,6 +2555,10 @@ private:
   /// `UniqueSCEVs`.  Return if found, else nullptr.
   SCEV *findExistingSCEVInCache(SCEVTypes SCEVType, ArrayRef<SCEVUse> Ops);
 
+  /// Look up \p Key in `UniqueSCEVs`.  Return the node if present, else
+  /// nullptr.
+  SCEV *findUniquedSCEV(const SCEVUniquingKey &Key);
+
   /// Get reachable blocks in this function, making limited use of SCEV
   /// reasoning about conditions.
   void getReachableBlocks(SmallPtrSetImpl<BasicBlock *> &Reachable,
@@ -2561,7 +2568,7 @@ private:
   /// This preserves the origial nowrap flags.
   const SCEV *getWithOperands(const SCEV *S, SmallVectorImpl<SCEVUse> &NewOps);
 
-  FoldingSet<SCEV> UniqueSCEVs;
+  DenseSet<SCEV *, SCEVUniquingInfo> UniqueSCEVs;
   FoldingSet<SCEVPredicate> UniquePreds;
   BumpPtrAllocator SCEVAllocator;
 
