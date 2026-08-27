@@ -2775,6 +2775,9 @@ private:
   /// Maps to auto-CSE operations.
   std::vector<CondCodeSDNode*> CondCodeNodes;
 
+  /// Register nodes, keyed by the register number and the uniqued VT list.
+  DenseMap<std::pair<unsigned, const EVT *>, SDNode *> RegisterNodes;
+
   std::vector<SDNode*> ValueTypeNodes;
   std::map<EVT, SDNode*, EVT::compareRawBits> ExtendedValueTypeNodes;
   StringMap<SDNode*> ExternalSymbols;

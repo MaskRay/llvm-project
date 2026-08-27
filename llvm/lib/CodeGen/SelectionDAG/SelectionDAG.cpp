@@ -1303,6 +1303,11 @@ bool SelectionDAG::RemoveNodeFromCSEMaps(SDNode *N) {
     Erased = MCSymbols.erase(MCSN->getMCSymbol());
     break;
   }
+  case ISD::Register: {
+    auto *RN = cast<RegisterSDNode>(N);
+    Erased = RegisterNodes.erase({RN->getReg().id(), N->getVTList().VTs});
+    break;
+  }
   case ISD::VALUETYPE: {
     EVT VT = cast<VTSDNode>(N)->getVT();
     if (VT.isExtended()) {
@@ -1535,6 +1540,7 @@ void SelectionDAG::clear() {
   CSEMap.clear();
 
   ExtendedValueTypeNodes.clear();
+  RegisterNodes.clear();
   ExternalSymbols.clear();
   TargetExternalSymbols.clear();
   MCSymbols.clear();
@@ -2423,16 +2429,13 @@ SDValue SelectionDAG::getCommutedVectorShuffle(const ShuffleVectorSDNode &SV) {
 
 SDValue SelectionDAG::getRegister(Register Reg, EVT VT) {
   SDVTList VTs = getVTList(VT);
-  FoldingSetNodeID ID;
-  AddNodeIDNode(ID, ISD::Register, VTs, {});
-  ID.AddInteger(Reg.id());
-  void *IP = nullptr;
-  if (SDNode *E = FindNodeOrInsertPos(ID, IP))
-    return SDValue(E, 0);
+  auto [It, Inserted] = RegisterNodes.try_emplace({Reg.id(), VTs.VTs});
+  if (!Inserted)
+    return SDValue(It->second, 0);
 
   auto *N = newSDNode<RegisterSDNode>(Reg, VTs);
   N->SDNodeBits.IsDivergent = TLI->isSDNodeSourceOfDivergence(N, FLI, UA);
-  CSEMap.InsertNode(N, IP);
+  It->second = N;
   InsertNode(N);
   return SDValue(N, 0);
 }
