@@ -2053,76 +2053,76 @@ private:
                      WordType *Remainder);
 
   /// out-of-line slow case for inline constructor
-  LLVM_ABI void initSlowCase(uint64_t val, bool isSigned);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void initSlowCase(uint64_t val, bool isSigned);
 
   /// shared code between two array constructors
   void initFromArray(ArrayRef<uint64_t> array);
 
   /// out-of-line slow case for inline copy constructor
-  LLVM_ABI void initSlowCase(const APInt &that);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void initSlowCase(const APInt &that);
 
   /// out-of-line slow case for shl
-  LLVM_ABI void shlSlowCase(unsigned ShiftAmt);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void shlSlowCase(unsigned ShiftAmt);
 
   /// out-of-line slow case for lshr.
-  LLVM_ABI void lshrSlowCase(unsigned ShiftAmt);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void lshrSlowCase(unsigned ShiftAmt);
 
   /// out-of-line slow case for ashr.
-  LLVM_ABI void ashrSlowCase(unsigned ShiftAmt);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void ashrSlowCase(unsigned ShiftAmt);
 
   /// out-of-line slow case for operator=
-  LLVM_ABI void assignSlowCase(const APInt &RHS);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void assignSlowCase(const APInt &RHS);
 
   /// out-of-line slow case for operator==
-  LLVM_ABI bool equalSlowCase(const APInt &RHS) const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD bool equalSlowCase(const APInt &RHS) const LLVM_READONLY;
 
   /// out-of-line slow case for countLeadingZeros
-  LLVM_ABI unsigned countLeadingZerosSlowCase() const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD unsigned countLeadingZerosSlowCase() const LLVM_READONLY;
 
   /// out-of-line slow case for countLeadingOnes.
-  LLVM_ABI unsigned countLeadingOnesSlowCase() const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD unsigned countLeadingOnesSlowCase() const LLVM_READONLY;
 
   /// out-of-line slow case for countTrailingZeros.
-  LLVM_ABI unsigned countTrailingZerosSlowCase() const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD unsigned countTrailingZerosSlowCase() const LLVM_READONLY;
 
   /// out-of-line slow case for countTrailingOnes
-  LLVM_ABI unsigned countTrailingOnesSlowCase() const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD unsigned countTrailingOnesSlowCase() const LLVM_READONLY;
 
   /// out-of-line slow case for countPopulation
-  LLVM_ABI unsigned countPopulationSlowCase() const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD unsigned countPopulationSlowCase() const LLVM_READONLY;
 
   /// out-of-line slow case for isPowerOf2
-  LLVM_ABI bool isPowerOf2SlowCase() const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD bool isPowerOf2SlowCase() const LLVM_READONLY;
 
   /// out-of-line slow case for intersects.
-  LLVM_ABI bool intersectsSlowCase(const APInt &RHS) const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD bool intersectsSlowCase(const APInt &RHS) const LLVM_READONLY;
 
   /// out-of-line slow case for isSubsetOf.
-  LLVM_ABI bool isSubsetOfSlowCase(const APInt &RHS) const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD bool isSubsetOfSlowCase(const APInt &RHS) const LLVM_READONLY;
 
   /// out-of-line slow case for isInverseOf.
-  LLVM_ABI bool isInverseOfSlowCase(const APInt &RHS) const LLVM_READONLY;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD bool isInverseOfSlowCase(const APInt &RHS) const LLVM_READONLY;
 
   /// out-of-line slow case for setBits.
-  LLVM_ABI void setBitsSlowCase(unsigned loBit, unsigned hiBit);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void setBitsSlowCase(unsigned loBit, unsigned hiBit);
 
   /// out-of-line slow case for clearBits.
-  LLVM_ABI void clearBitsSlowCase(unsigned LoBit, unsigned HiBit);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void clearBitsSlowCase(unsigned LoBit, unsigned HiBit);
 
   /// out-of-line slow case for flipAllBits.
-  LLVM_ABI void flipAllBitsSlowCase();
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void flipAllBitsSlowCase();
 
   /// out-of-line slow case for concat.
-  LLVM_ABI APInt concatSlowCase(const APInt &NewLSB) const;
+  LLVM_ABI LLVM_ATTRIBUTE_COLD APInt concatSlowCase(const APInt &NewLSB) const;
 
   /// out-of-line slow case for operator&=.
-  LLVM_ABI void andAssignSlowCase(const APInt &RHS);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void andAssignSlowCase(const APInt &RHS);
 
   /// out-of-line slow case for operator|=.
-  LLVM_ABI void orAssignSlowCase(const APInt &RHS);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void orAssignSlowCase(const APInt &RHS);
 
   /// out-of-line slow case for operator^=.
-  LLVM_ABI void xorAssignSlowCase(const APInt &RHS);
+  LLVM_ABI LLVM_ATTRIBUTE_COLD void xorAssignSlowCase(const APInt &RHS);
 
   /// Unsigned comparison. Returns -1, 0, or 1 if this APInt is less than, equal
   /// to, or greater than RHS.

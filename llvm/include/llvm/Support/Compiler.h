@@ -344,6 +344,15 @@
 #define LLVM_UNLIKELY(EXPR) (EXPR)
 #endif
 
+/// Mark a function as rarely executed. Callers get a low static block frequency
+/// for the call, which steers block placement and usually keeps the caller's
+/// hot path free of the callee's spill and layout cost.
+#if __has_attribute(cold)
+#define LLVM_ATTRIBUTE_COLD __attribute__((cold))
+#else
+#define LLVM_ATTRIBUTE_COLD
+#endif
+
 /// LLVM_ATTRIBUTE_NOINLINE - On compilers where we have a directive to do so,
 /// mark a method "not for inlining".
 #if __has_attribute(noinline)
