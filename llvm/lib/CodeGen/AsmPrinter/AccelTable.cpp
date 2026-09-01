@@ -60,24 +60,24 @@ void AccelTableBase::finalize(AsmPrinter *Asm, StringRef Prefix) {
 
   // Compute bucket contents and final ordering.
   Buckets.resize(BucketCount);
-  for (auto &E : Entries) {
-    uint32_t Bucket = E.second.HashValue % BucketCount;
-    Buckets[Bucket].push_back(&E.second);
-    E.second.Sym = Asm->createTempSymbol(Prefix);
-  }
+  for (auto &E : Entries)
+    Buckets[E.second.HashValue % BucketCount].push_back(&E.second);
 
   // Sort the contents of the buckets by hash value so that hash collisions end
-  // up together. Entries is keyed by name, so ordering colliding hashes by name
-  // is a total order and makes the bucket contents independent of the order
-  // names were added in, which a parallel producer does not control.
-  for (auto &Bucket : Buckets)
+  // up together. Entries is keyed by name, so breaking ties by name yields a
+  // total order that does not depend on the order names were added in.
+  for (HashList &Bucket : Buckets)
     llvm::sort(Bucket, [](const HashData *LHS, const HashData *RHS) {
       if (LHS->HashValue != RHS->HashValue)
         return LHS->HashValue < RHS->HashValue;
-      assert((LHS == RHS || LHS->Name.getString() != RHS->Name.getString()) &&
-             "Colliding hashes must be ordered by a unique name");
       return LHS->Name.getString() < RHS->Name.getString();
     });
+
+  // Create the labels in emission order, so that they are independent of the
+  // order names were added in as well.
+  for (HashList &Bucket : Buckets)
+    for (HashData *Hash : Bucket)
+      Hash->Sym = Asm->createTempSymbol(Prefix);
 }
 
 namespace {

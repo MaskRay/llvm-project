@@ -2,6 +2,7 @@
 ; RUN: %llc_dwarf -accel-tables=Dwarf -filetype=obj -o %t < %s
 ; RUN: llvm-dwarfdump -debug-names %t | FileCheck %s
 ; RUN: llvm-dwarfdump -debug-names -verify %t | FileCheck --check-prefix=VERIFY %s
+; RUN: %llc_dwarf -accel-tables=Dwarf -filetype=asm -o - < %s | FileCheck --check-prefix=ASM %s
 
 ; Generated from the following C code using
 ; clang -S -emit-llvm -g col.c
@@ -58,6 +59,18 @@
 ; CHECK-NOT: String:
 ; CHECK:  Bucket 4
 ; CHECK-NEXT: EMPTY
+
+; Check that the labels are created in emission order.
+; ASM: names0:
+; ASM: names1:
+; ASM: names2:
+; ASM: names3:
+; ASM: names4:
+; ASM: names5:
+; ASM: names6:
+; ASM: names7:
+; ASM: names8:
+; ASM: names9:
 
 ; VERIFY: No errors.
 
