@@ -67,10 +67,16 @@ void AccelTableBase::finalize(AsmPrinter *Asm, StringRef Prefix) {
   }
 
   // Sort the contents of the buckets by hash value so that hash collisions end
-  // up together. Stable sort makes testing easier and doesn't cost much more.
+  // up together. Entries is keyed by name, so ordering colliding hashes by name
+  // is a total order and makes the bucket contents independent of the order
+  // names were added in, which a parallel producer does not control.
   for (auto &Bucket : Buckets)
-    llvm::stable_sort(Bucket, [](HashData *LHS, HashData *RHS) {
-      return LHS->HashValue < RHS->HashValue;
+    llvm::sort(Bucket, [](const HashData *LHS, const HashData *RHS) {
+      if (LHS->HashValue != RHS->HashValue)
+        return LHS->HashValue < RHS->HashValue;
+      assert((LHS == RHS || LHS->Name.getString() != RHS->Name.getString()) &&
+             "Colliding hashes must be ordered by a unique name");
+      return LHS->Name.getString() < RHS->Name.getString();
     });
 }
 

@@ -26,34 +26,35 @@
 ; CHECK: Bucket count: 5
 ; CHECK: Name count: 10
 
-; Check that all the names are present in the output
+; Check that all the names are present in the output. Names that share a hash
+; are ordered by name.
 ; CHECK: Bucket 0
 ; CHECK:     Hash: 0xF8CF70D
-; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZN4lldb7SBBlockaSERKS0_"
-; CHECK:     Hash: 0xF8CF70D
 ; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZN4lldb7SBBlockC1ERKS0_"
-; CHECK:     Hash: 0x135A482C
-; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZN4lldb7SBErroraSERKS0_"
+; CHECK:     Hash: 0xF8CF70D
+; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZN4lldb7SBBlockaSERKS0_"
 ; CHECK:     Hash: 0x135A482C
 ; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZN4lldb7SBErrorC1ERKS0_"
+; CHECK:     Hash: 0x135A482C
+; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZN4lldb7SBErroraSERKS0_"
 ; CHECK-NOT: String:
 ; CHECK: Bucket 1
 ; CHECK-NEXT: EMPTY
 ; CHECK: Bucket 2
 ; CHECK:     Hash: 0x2841B989
-; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZL11numCommutes"
-; CHECK:     Hash: 0x2841B989
 ; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZL11NumCommutes"
-; CHECK:     Hash: 0x3E190F5F
-; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZL9NumRemats"
+; CHECK:     Hash: 0x2841B989
+; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZL11numCommutes"
 ; CHECK:     Hash: 0x3E190F5F
 ; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZL9NumReMats"
+; CHECK:     Hash: 0x3E190F5F
+; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZL9NumRemats"
 ; CHECK-NOT: String:
 ; CHECK: Bucket 3
 ; CHECK:     Hash: 0x2642207F
-; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZN4lldb7SBValueaSERKS0_"
-; CHECK:     Hash: 0x2642207F
 ; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZN4lldb7SBValueC1ERKS0_"
+; CHECK:     Hash: 0x2642207F
+; CHECK-NEXT:String: 0x{{[0-9a-f]*}} "_ZN4lldb7SBValueaSERKS0_"
 ; CHECK-NOT: String:
 ; CHECK:  Bucket 4
 ; CHECK-NEXT: EMPTY
