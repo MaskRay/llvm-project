@@ -57,6 +57,9 @@ struct DenseMapPair : std::pair<KeyT, ValueT> {
   const ValueT &getSecond() const { return std::pair<KeyT, ValueT>::second; }
 };
 
+// Defined in DenseSet.h; named here only to recognize a set's bucket type.
+template <typename KeyT> class DenseSetPair;
+
 } // end namespace detail
 
 namespace densemap::detail {
@@ -103,6 +106,24 @@ template <typename BucketT> size_t allocBytes(unsigned Num) {
   return sizeof(BucketT) * static_cast<size_t>(Num) +
          usedWords(Num) * sizeof(UsedT);
 }
+
+/// The DenseMapInfo hashes that rehashTrivial can reproduce from a key stored
+/// at the start of a bucket. Mix64 covers pointers and 8-byte unsigned
+/// integers, Mul37At32 4-byte integers, Mul37At64 8-byte signed integers.
+enum class RehashKeyHash : uint8_t { Mix64, Mul37At32, Mul37At64 };
+
+/// Rehash the live buckets of \p Src into the empty \p Dst, which must have
+/// room for all of them. \p Src keeps the moved-from bytes for its owner to
+/// free.
+///
+/// A map's rehash depends on its types only through the key's hash and the
+/// bucket size, both passed here, so every value type of a given key type
+/// shares one copy of this loop. Requires a trivially relocatable bucket whose
+/// key is at offset 0.
+LLVM_ABI void rehashTrivial(char *Dst, UsedT *DstUsed, unsigned DstNumBuckets,
+                            const char *Src, const UsedT *SrcUsed,
+                            unsigned SrcNumBuckets, size_t BucketSize,
+                            RehashKeyHash Hash);
 
 } // namespace densemap::detail
 
@@ -505,6 +526,31 @@ protected:
     return NextPowerOf2(NumEntries * 4 / 3 + 1);
   }
 
+  // A foreign BucketT is excluded because rehashTrivial reads the key at
+  // offset 0, and a foreign KeyInfoT because it may not hash like DenseMapInfo.
+  static constexpr bool canShareRehash() {
+    return std::is_same_v<KeyInfoT, DenseMapInfo<KeyT>> &&
+           (std::is_pointer_v<KeyT> ||
+            (std::is_integral_v<KeyT> &&
+             (sizeof(KeyT) == 4 || sizeof(KeyT) == 8))) &&
+           std::is_trivially_copyable_v<ValueT> &&
+           std::is_trivially_destructible_v<ValueT> &&
+           (std::is_same_v<BucketT, llvm::detail::DenseMapPair<KeyT, ValueT>> ||
+            std::is_same_v<BucketT, llvm::detail::DenseSetPair<KeyT>>);
+  }
+
+  static constexpr llvm::densemap::detail::RehashKeyHash sharedRehashHash() {
+    using llvm::densemap::detail::RehashKeyHash;
+    if constexpr (std::is_pointer_v<KeyT>)
+      return RehashKeyHash::Mix64;
+    else if constexpr (sizeof(KeyT) == 4)
+      return RehashKeyHash::Mul37At32;
+    else if constexpr (std::is_unsigned_v<KeyT>)
+      return RehashKeyHash::Mix64;
+    else
+      return RehashKeyHash::Mul37At64;
+  }
+
   // Move key/value from Other to *this.
   // Other is left in a valid but empty state.
   LLVM_ATTRIBUTE_NOINLINE void moveFrom(DerivedT &Other) {
@@ -514,6 +560,15 @@ protected:
     const unsigned E = Other.getNumBuckets();
     UsedT *U = getUsed();
     BucketT *B = getBuckets();
+    if constexpr (canShareRehash()) {
+      llvm::densemap::detail::rehashTrivial(
+          reinterpret_cast<char *>(B), U, getNumBuckets(),
+          reinterpret_cast<const char *>(OtherB), OtherU, E, sizeof(BucketT),
+          sharedRehashHash());
+      setNumEntries(Other.getNumEntries());
+      Other.derived().kill();
+      return;
+    }
     const unsigned Mask = getNumBuckets() - 1;
     llvm::densemap::detail::forEachUsed(OtherU, E, [&](unsigned I) {
       // Find the first empty slot on this key's probe chain; there is no equal

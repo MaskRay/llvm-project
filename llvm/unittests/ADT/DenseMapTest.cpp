@@ -10,6 +10,7 @@
 #include "CountCopyAndMove.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseMapInfoVariant.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
@@ -17,6 +18,7 @@
 #include "gtest/gtest.h"
 #include <map>
 #include <optional>
+#include <random>
 #include <set>
 #include <utility>
 #include <variant>
@@ -1194,5 +1196,64 @@ TEST(DenseMapCustomTest, MoveAssignInvalidatesIterators) {
   EXPECT_DEATH((void)It->second, "invalid iterator access");
 }
 #endif
+
+// densemap::detail::rehashPointerKeyed reads the key from the start of the
+// bucket. Nothing in the type system enforces that, so check it here.
+template <typename BucketT> static size_t keyOffset() {
+  BucketT B{};
+  return reinterpret_cast<const char *>(&B.getFirst()) -
+         reinterpret_cast<const char *>(&B);
+}
+
+// rehashTrivial recomputes the hash from the key's bytes. If that ever stops
+// matching DenseMapInfo, lookups after a grow silently miss.
+template <typename T>
+static void expectSharedHashMatches(densemap::detail::RehashKeyHash Hash) {
+  std::mt19937_64 R(1);
+  for (unsigned I = 0; I != 4096; ++I) {
+    uint64_t Bits = I < 8 ? uint64_t(I) - 4 : R();
+    T Key;
+    std::memcpy(&Key, &Bits, sizeof(T));
+    uint64_t Wide = 0;
+    std::memcpy(&Wide, &Key, sizeof(T));
+    unsigned Shared;
+    switch (Hash) {
+    case densemap::detail::RehashKeyHash::Mix64:
+      Shared = unsigned(densemap::detail::mix(Wide));
+      break;
+    case densemap::detail::RehashKeyHash::Mul37At32:
+      Shared = uint32_t(Wide) * 37U;
+      break;
+    case densemap::detail::RehashKeyHash::Mul37At64:
+      Shared = unsigned(Wide * 37ULL);
+      break;
+    }
+    ASSERT_EQ(DenseMapInfo<T>::getHashValue(Key), Shared) << "bits " << Bits;
+  }
+}
+
+TEST(DenseMapCustomTest, KeyHashMatchesDenseMapInfo) {
+  using densemap::detail::RehashKeyHash;
+  expectSharedHashMatches<void *>(RehashKeyHash::Mix64);
+  expectSharedHashMatches<unsigned long long>(RehashKeyHash::Mix64);
+  expectSharedHashMatches<unsigned>(RehashKeyHash::Mul37At32);
+  expectSharedHashMatches<int>(RehashKeyHash::Mul37At32);
+  expectSharedHashMatches<long long>(RehashKeyHash::Mul37At64);
+}
+
+TEST(DenseMapCustomTest, KeyIsFirstInBucket) {
+  using PtrPtr = detail::DenseMapPair<void *, void *>;
+  using PtrUnsigned = detail::DenseMapPair<void *, unsigned>;
+  using PtrBool = detail::DenseMapPair<void *, bool>;
+  using PtrSet = detail::DenseSetPair<void *>;
+  using UIntUInt = detail::DenseMapPair<unsigned, unsigned>;
+  using UInt64Ptr = detail::DenseMapPair<uint64_t, void *>;
+  EXPECT_EQ(0u, keyOffset<PtrPtr>());
+  EXPECT_EQ(0u, keyOffset<PtrUnsigned>());
+  EXPECT_EQ(0u, keyOffset<PtrBool>());
+  EXPECT_EQ(0u, keyOffset<PtrSet>());
+  EXPECT_EQ(0u, keyOffset<UIntUInt>());
+  EXPECT_EQ(0u, keyOffset<UInt64Ptr>());
+}
 
 } // namespace
