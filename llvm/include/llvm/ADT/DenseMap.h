@@ -57,6 +57,9 @@ struct DenseMapPair : std::pair<KeyT, ValueT> {
   const ValueT &getSecond() const { return std::pair<KeyT, ValueT>::second; }
 };
 
+// Defined in DenseSet.h; named here only to recognize a set's bucket type.
+template <typename KeyT> class DenseSetPair;
+
 } // end namespace detail
 
 namespace densemap::detail {
@@ -103,6 +106,15 @@ template <typename BucketT> size_t allocBytes(unsigned Num) {
   return sizeof(BucketT) * static_cast<size_t>(Num) +
          usedWords(Num) * sizeof(UsedT);
 }
+
+/// Rehash the live buckets of \p Src into the empty \p Dst, which must have
+/// room for all of them; \p Src keeps the moved-from bytes for its owner to
+/// free. Requires a bucket that can be relocated by copying its bytes, with a
+/// pointer key at offset 0.
+LLVM_ABI void rehashPointerKeyed(char *Dst, UsedT *DstUsed,
+                                 unsigned DstNumBuckets, const char *Src,
+                                 const UsedT *SrcUsed, unsigned SrcNumBuckets,
+                                 size_t BucketSize);
 
 } // namespace densemap::detail
 
@@ -505,6 +517,17 @@ protected:
     return NextPowerOf2(NumEntries * 4 / 3 + 1);
   }
 
+  // A map may pair a key with the info for another type it converts to, as
+  // LazyValueInfo does, so require the stock DenseMapInfo; and only our own
+  // buckets are known to put the key where rehashPointerKeyed reads it.
+  static constexpr bool canShareRehash() {
+    return std::is_pointer_v<KeyT> &&
+           std::is_same_v<KeyInfoT, DenseMapInfo<KeyT>> &&
+           std::is_trivially_copyable_v<ValueT> &&
+           (std::is_same_v<BucketT, llvm::detail::DenseMapPair<KeyT, ValueT>> ||
+            std::is_same_v<BucketT, llvm::detail::DenseSetPair<KeyT>>);
+  }
+
   // Move key/value from Other to *this.
   // Other is left in a valid but empty state.
   LLVM_ATTRIBUTE_NOINLINE void moveFrom(DerivedT &Other) {
@@ -514,22 +537,29 @@ protected:
     const unsigned E = Other.getNumBuckets();
     UsedT *U = getUsed();
     BucketT *B = getBuckets();
-    const unsigned Mask = getNumBuckets() - 1;
-    llvm::densemap::detail::forEachUsed(OtherU, E, [&](unsigned I) {
-      // Find the first empty slot on this key's probe chain; there is no equal
-      // key in the destination, so nothing to compare against.
-      unsigned BucketNo = KeyInfoT::getHashValue(OtherB[I].getFirst()) & Mask;
-      while (llvm::densemap::detail::used(U, BucketNo))
-        BucketNo = (BucketNo + 1) & Mask;
-      BucketT *DestBucket = B + BucketNo;
-      ::new (&DestBucket->getFirst()) KeyT(std::move(OtherB[I].getFirst()));
-      ::new (&DestBucket->getSecond()) ValueT(std::move(OtherB[I].getSecond()));
-      llvm::densemap::detail::setUsed(U, BucketNo);
+    if constexpr (canShareRehash()) {
+      llvm::densemap::detail::rehashPointerKeyed(
+          reinterpret_cast<char *>(B), U, getNumBuckets(),
+          reinterpret_cast<const char *>(OtherB), OtherU, E, sizeof(BucketT));
+    } else {
+      const unsigned Mask = getNumBuckets() - 1;
+      llvm::densemap::detail::forEachUsed(OtherU, E, [&](unsigned I) {
+        // Find the first empty slot on this key's probe chain; there is no
+        // equal key in the destination, so nothing to compare against.
+        unsigned BucketNo = KeyInfoT::getHashValue(OtherB[I].getFirst()) & Mask;
+        while (llvm::densemap::detail::used(U, BucketNo))
+          BucketNo = (BucketNo + 1) & Mask;
+        BucketT *DestBucket = B + BucketNo;
+        ::new (&DestBucket->getFirst()) KeyT(std::move(OtherB[I].getFirst()));
+        ::new (&DestBucket->getSecond())
+            ValueT(std::move(OtherB[I].getSecond()));
+        llvm::densemap::detail::setUsed(U, BucketNo);
 
-      // Free the moved-out key/value.
-      OtherB[I].getSecond().~ValueT();
-      OtherB[I].getFirst().~KeyT();
-    });
+        // Free the moved-out key/value.
+        OtherB[I].getSecond().~ValueT();
+        OtherB[I].getFirst().~KeyT();
+      });
+    }
     setNumEntries(Other.getNumEntries());
     Other.derived().kill();
   }

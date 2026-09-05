@@ -10,6 +10,7 @@
 #include "CountCopyAndMove.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseMapInfoVariant.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
@@ -1194,5 +1195,66 @@ TEST(DenseMapCustomTest, MoveAssignInvalidatesIterators) {
   EXPECT_DEATH((void)It->second, "invalid iterator access");
 }
 #endif
+
+// A wrong bucket size, hash or key offset files entries where a later lookup
+// will not probe. The typed tests above already grow a 16-byte bucket; these
+// reach the larger sizes and the runtime-size fallback.
+template <unsigned NumWords> struct RehashValue {
+  uint64_t V[NumWords];
+  RehashValue(unsigned X = 0) : V{X} {}
+  bool operator==(const RehashValue &O) const { return V[0] == O.V[0]; }
+};
+
+static void *rehashTestKey(unsigned I) {
+  return reinterpret_cast<void *>(static_cast<uintptr_t>(I) * 4096 + 16);
+}
+
+template <typename ValueT> static void expectSurvivesRehash() {
+  DenseMap<void *, ValueT> M;
+  M[rehashTestKey(1)] = ValueT(11);
+  M[rehashTestKey(2)] = ValueT(22);
+  M.reserve(512); // Rehashes through moveFrom.
+  ASSERT_EQ(2u, M.size());
+  EXPECT_EQ(ValueT(11), M.lookup(rehashTestKey(1)));
+  EXPECT_EQ(ValueT(22), M.lookup(rehashTestKey(2)));
+  EXPECT_EQ(M.end(), M.find(rehashTestKey(3)));
+}
+
+TEST(DenseMapCustomTest, LookupSurvivesRehash) {
+  expectSurvivesRehash<unsigned>();       // 16-byte bucket
+  expectSurvivesRehash<RehashValue<2>>(); // 24
+  expectSurvivesRehash<RehashValue<3>>(); // 32
+  expectSurvivesRehash<RehashValue<4>>(); // 40
+  expectSurvivesRehash<RehashValue<5>>(); // 48
+  expectSurvivesRehash<RehashValue<7>>(); // 64, past the size switch
+
+  DenseSet<void *> S; // 8
+  S.insert(rehashTestKey(1));
+  S.reserve(512);
+  EXPECT_TRUE(S.contains(rehashTestKey(1)));
+  EXPECT_FALSE(S.contains(rehashTestKey(2)));
+}
+
+// Mirrors LazyValueInfo's DenseSet<LVIValueHandle, DenseMapInfo<Value *>>: the
+// info is for a type the key converts to, so the shared rehash must decline.
+struct RehashConvertibleKey {
+  // Leading bookkeeping, as ValueHandleBase has, so P is not what a rehash
+  // would read from the front of the bucket.
+  uint64_t Bookkeeping;
+  void *P;
+  RehashConvertibleKey(void *P = nullptr) : Bookkeeping(~0ULL), P(P) {}
+  operator void *() const { return P; }
+};
+
+TEST(DenseMapCustomTest, LookupSurvivesRehashWithForeignKeyInfo) {
+  DenseSet<RehashConvertibleKey, DenseMapInfo<void *>> S;
+  for (unsigned I = 1; I != 4; ++I)
+    S.insert(rehashTestKey(I));
+  S.reserve(512);
+  ASSERT_EQ(3u, S.size());
+  for (unsigned I = 1; I != 4; ++I)
+    EXPECT_TRUE(S.contains(rehashTestKey(I)));
+  EXPECT_FALSE(S.contains(rehashTestKey(9)));
+}
 
 } // namespace
