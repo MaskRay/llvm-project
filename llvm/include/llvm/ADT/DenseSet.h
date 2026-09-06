@@ -36,6 +36,9 @@ template <typename KeyT> class DenseSetPair : public DenseSetEmpty {
   KeyT key;
 
 public:
+  // See DenseMapPair.
+  using KeyAtFrontBucket = DenseSetPair<KeyT>;
+
   KeyT &getFirst() { return key; }
   const KeyT &getFirst() const { return key; }
   DenseSetEmpty &getSecond() { return *this; }

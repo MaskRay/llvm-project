@@ -56,6 +56,11 @@ template <typename T, typename Enable = void> struct DenseMapInfo {
 // Provide DenseMapInfo for all pointers. Avoid requiring T to be complete so
 // clients can instantiate DenseMap<T*, ...> with forward declared key types.
 template <typename T> struct DenseMapInfo<T *> {
+  // Lets DenseMap's shared rehash recognize an info that hashes a pointer by
+  // its address alone. Self-referential so that a full specialization deriving
+  // from this one, as the Attributor's does, cannot inherit the claim.
+  using AddressHashedPointerInfo = DenseMapInfo<T *>;
+
   static unsigned getHashValue(const T *PtrVal) {
     return densemap::detail::mix(reinterpret_cast<uintptr_t>(PtrVal));
   }

@@ -10,6 +10,7 @@
 #include "CountCopyAndMove.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseMapInfoVariant.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
@@ -1194,5 +1195,143 @@ TEST(DenseMapCustomTest, MoveAssignInvalidatesIterators) {
   EXPECT_DEATH((void)It->second, "invalid iterator access");
 }
 #endif
+
+// A wrong bucket size, hash or key offset files entries where a later lookup
+// will not probe. The typed tests above already grow a 16-byte bucket; these
+// reach the larger sizes and the runtime-size fallback.
+template <unsigned NumWords> struct RehashValue {
+  uint64_t V[NumWords];
+  RehashValue(unsigned X = 0) : V{X} {}
+  bool operator==(const RehashValue &O) const { return V[0] == O.V[0]; }
+};
+
+static void *rehashTestKey(unsigned I) {
+  return reinterpret_cast<void *>(static_cast<uintptr_t>(I) * 4096 + 16);
+}
+
+template <typename ValueT> static void expectSurvivesRehash() {
+  DenseMap<void *, ValueT> M;
+  M[rehashTestKey(1)] = ValueT(11);
+  M[rehashTestKey(2)] = ValueT(22);
+  M.reserve(512); // Rehashes through moveFrom.
+  ASSERT_EQ(2u, M.size());
+  EXPECT_EQ(ValueT(11), M.lookup(rehashTestKey(1)));
+  EXPECT_EQ(ValueT(22), M.lookup(rehashTestKey(2)));
+  EXPECT_EQ(M.end(), M.find(rehashTestKey(3)));
+}
+
+TEST(DenseMapCustomTest, LookupSurvivesRehash) {
+  expectSurvivesRehash<unsigned>();       // 16-byte bucket
+  expectSurvivesRehash<RehashValue<2>>(); // 24
+  expectSurvivesRehash<RehashValue<3>>(); // 32
+  expectSurvivesRehash<RehashValue<4>>(); // 40
+  expectSurvivesRehash<RehashValue<5>>(); // 48
+  expectSurvivesRehash<RehashValue<7>>(); // 64, past the size switch
+
+  DenseSet<void *> S; // 8
+  S.insert(rehashTestKey(1));
+  S.reserve(512);
+  EXPECT_TRUE(S.contains(rehashTestKey(1)));
+  EXPECT_FALSE(S.contains(rehashTestKey(2)));
+}
+
+// Mirrors LazyValueInfo's DenseSet<LVIValueHandle, DenseMapInfo<Value *>>: the
+// info is for a type the key converts to, so the shared rehash must decline.
+struct RehashConvertibleKey {
+  // Leading bookkeeping, as ValueHandleBase has, so P is not what a rehash
+  // would read from the front of the bucket.
+  uint64_t Bookkeeping;
+  void *P;
+  RehashConvertibleKey(void *P = nullptr) : Bookkeeping(~0ULL), P(P) {}
+  operator void *() const { return P; }
+};
+
+TEST(DenseMapCustomTest, LookupSurvivesRehashWithForeignKeyInfo) {
+  DenseSet<RehashConvertibleKey, DenseMapInfo<void *>> S;
+  for (unsigned I = 1; I != 4; ++I)
+    S.insert(rehashTestKey(I));
+  S.reserve(512);
+  ASSERT_EQ(3u, S.size());
+  for (unsigned I = 1; I != 4; ++I)
+    EXPECT_TRUE(S.contains(rehashTestKey(I)));
+  EXPECT_FALSE(S.contains(rehashTestKey(9)));
+}
+
+// A pointer key whose info hashes the pointee, as flang's SomeExpr * and the
+// Attributor's InstExclusionSetTy * do. Derived mirrors the Attributor, which
+// inherits DenseMapInfo<void *> and replaces only the hash.
+struct PointeeHashedKey {
+  unsigned Content;
+};
+struct DerivedPointeeHashedKey {
+  unsigned Content;
+};
+} // namespace
+
+namespace llvm {
+template <> struct DenseMapInfo<const PointeeHashedKey *> {
+  static unsigned getHashValue(const PointeeHashedKey *K) { return K->Content; }
+  static bool isEqual(const PointeeHashedKey *LHS,
+                      const PointeeHashedKey *RHS) {
+    return LHS == RHS || LHS->Content == RHS->Content;
+  }
+};
+
+template <>
+struct DenseMapInfo<const DerivedPointeeHashedKey *>
+    : public DenseMapInfo<void *> {
+  static unsigned getHashValue(const DerivedPointeeHashedKey *K) {
+    return K->Content;
+  }
+  static bool isEqual(const DerivedPointeeHashedKey *LHS,
+                      const DerivedPointeeHashedKey *RHS) {
+    return LHS == RHS || LHS->Content == RHS->Content;
+  }
+};
+} // namespace llvm
+
+namespace {
+template <typename KeyT> static void expectPointeeHashSurvivesRehash() {
+  std::vector<KeyT> Keys(64);
+  DenseMap<const KeyT *, unsigned> M;
+  for (unsigned I = 0; I != Keys.size(); ++I) {
+    Keys[I].Content = I;
+    M[&Keys[I]] = I;
+  }
+  ASSERT_EQ(Keys.size(), M.size());
+  for (unsigned I = 0; I != Keys.size(); ++I)
+    EXPECT_EQ(I, M.lookup(&Keys[I]));
+}
+
+TEST(DenseMapCustomTest, LookupSurvivesRehashWithPointeeHashedKey) {
+  expectPointeeHashSurvivesRehash<PointeeHashedKey>();
+  expectPointeeHashSurvivesRehash<DerivedPointeeHashedKey>();
+}
+
+// Mirrors clang::WeakInfo::DenseMapInfoByAliasOnly: a key whose own info
+// reaches DenseMapInfo through a private base. Naming an inaccessible member is
+// not a substitution failure on every compiler, so canShareRehash must not
+// probe an info it was handed.
+struct PrivatelyDerivedInfoKey {
+  const void *P;
+  struct Info : private DenseMapInfo<const void *> {
+    static unsigned getHashValue(const PrivatelyDerivedInfoKey &K) {
+      return DenseMapInfo::getHashValue(K.P);
+    }
+    static bool isEqual(const PrivatelyDerivedInfoKey &LHS,
+                        const PrivatelyDerivedInfoKey &RHS) {
+      return LHS.P == RHS.P;
+    }
+  };
+};
+
+TEST(DenseMapCustomTest, PrivatelyDerivedKeyInfo) {
+  SmallDenseSet<PrivatelyDerivedInfoKey, 2, PrivatelyDerivedInfoKey::Info> S;
+  for (uintptr_t I = 1; I != 64; ++I)
+    S.insert(PrivatelyDerivedInfoKey{reinterpret_cast<const void *>(I)});
+  EXPECT_EQ(63u, S.size());
+  const void *P7 = reinterpret_cast<const void *>(uintptr_t(7));
+  EXPECT_TRUE(S.contains(PrivatelyDerivedInfoKey{P7}));
+}
 
 } // namespace
