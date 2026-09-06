@@ -42,6 +42,13 @@ struct NonPOD {
 namespace hashing {
 namespace detail {
 template <> struct is_hashable_data<LargeTestInteger> : std::true_type {};
+
+// A specialization for T also covers const T, which is what an ArrayRef's
+// iterators yield.
+static_assert(is_hashable_data<const LargeTestInteger>::value);
+static_assert(!is_hashable_data<const NonPOD>::value);
+static_assert(is_hashable_data<const int>::value);
+static_assert(is_hashable_data<const int *>::value);
 } // namespace detail
 } // namespace hashing
 
