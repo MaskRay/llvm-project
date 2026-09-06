@@ -1624,7 +1624,14 @@ public:
   DenseMap<std::pair<ElementCount, APFloat>, std::unique_ptr<ConstantFP>>
       FPSplatConstants;
 
-  FoldingSet<AttributeImpl> AttrsSet;
+  /// Enum attributes carry no value, so there is at most one per kind.
+  EnumAttributeImpl *EnumAttrs[Attribute::NumEnumAttrKinds] = {};
+  UniquingSet<IntAttributeImpl> IntAttrs;
+  UniquingSet<StringAttributeImpl> StringAttrs;
+  UniquingSet<TypeAttributeImpl> TypeAttrs;
+  /// The two ConstantRange kinds key on APInts of arbitrary width, which a
+  /// typed key cannot hold without copying them.
+  FoldingSet<AttributeImpl> ConstantRangeAttrs;
   UniquingSet<AttributeListImpl> AttrsLists;
   UniquingSet<AttributeSetNode> AttrsSetNodes;
 
