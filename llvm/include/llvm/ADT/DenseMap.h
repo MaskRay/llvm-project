@@ -104,6 +104,9 @@ inline void setUsed(UsedT *U, size_t I) { U[I >> 5] |= UsedT(1) << (I & 31); }
 inline void unsetUsed(UsedT *U, size_t I) {
   U[I >> 5] &= ~(UsedT(1) << (I & 31));
 }
+inline void clearUsed(UsedT *U, unsigned Num) {
+  std::memset(U, 0, usedWords(Num) * sizeof(UsedT));
+}
 
 // Invoke Func(I) for each occupied bucket index I in [0, N). Set always_inline;
 // otherwise, for a heavy caller such as moveFrom's rehash, the inliner can
@@ -127,10 +130,73 @@ LLVM_ATTRIBUTE_ALWAYS_INLINE void forEachUsed(const UsedT *U, unsigned N,
 template <typename BucketT> constexpr size_t allocAlign() {
   return std::max(alignof(BucketT), alignof(UsedT));
 }
-template <typename BucketT> size_t allocBytes(unsigned Num) {
-  return sizeof(BucketT) * static_cast<size_t>(Num) +
-         usedWords(Num) * sizeof(UsedT);
+inline size_t allocBytes(size_t BucketSize, unsigned Num) {
+  return BucketSize * static_cast<size_t>(Num) + usedWords(Num) * sizeof(UsedT);
 }
+template <typename BucketT> size_t allocBytes(unsigned Num) {
+  return allocBytes(sizeof(BucketT), Num);
+}
+inline UsedT *usedFor(char *Buckets, size_t BucketSize, unsigned Num) {
+  assert(BucketSize * static_cast<size_t>(Num) % alignof(UsedT) == 0 &&
+         "used array would be misaligned");
+  return reinterpret_cast<UsedT *>(Buckets +
+                                   BucketSize * static_cast<size_t>(Num));
+}
+
+constexpr unsigned roundUpNumBuckets(unsigned MinNumBuckets) {
+  return std::max(64u, static_cast<unsigned>(NextPowerOf2(MinNumBuckets - 1)));
+}
+
+/// Hashes the key, which a bucket keeps at offset 0. Null asks for the pointer
+/// hash the loops below inline, sparing them a call per entry.
+using BucketHasher = unsigned (*)(const void *Key);
+
+template <typename KeyT, typename KeyInfoT>
+unsigned hashKeyAt(const void *Key) {
+  return KeyInfoT::getHashValue(*static_cast<const KeyT *>(Key));
+}
+
+template <typename KeyT, typename KeyInfoT> constexpr BucketHasher hasherFor() {
+  if constexpr (std::is_pointer_v<KeyT> &&
+                std::is_same_v<KeyInfoT, DenseMapInfo<KeyT>>)
+    return nullptr;
+  else
+    return hashKeyAt<KeyT, KeyInfoT>;
+}
+
+/// Relocating copy-constructs at the destination and runs no destructor at the
+/// source, so trivial assignment is not required -- and a std::pair value type
+/// lacks it.
+template <typename BucketT>
+inline constexpr bool isRelocatableBucket =
+    std::is_trivially_copy_constructible_v<BucketT> &&
+    std::is_trivially_destructible_v<BucketT>;
+
+/// Rehash the live buckets of \p Src into the empty \p Dst, which must have
+/// room for all of them; \p Src keeps the copied bytes for its owner to free.
+/// Buckets must satisfy isRelocatableBucket and keep the key at offset 0,
+/// where \p Hasher reads it.
+LLVM_ABI void rehashRelocatable(char *Dst, UsedT *DstUsed,
+                                unsigned DstNumBuckets, const char *Src,
+                                const UsedT *SrcUsed, unsigned SrcNumBuckets,
+                                size_t BucketSize, BucketHasher Hasher);
+
+struct BucketTraits {
+  uint32_t Size;
+  uint32_t Align;
+};
+
+struct TableRef {
+  char *Buckets;
+  unsigned NumBuckets;
+};
+
+/// Return a table of at least \p MinNumBuckets buckets holding the live entries
+/// of the \p OldNumBuckets buckets at \p OldBuckets, which it frees. Same
+/// requirements as rehashRelocatable.
+LLVM_ABI TableRef growRelocatable(char *OldBuckets, unsigned OldNumBuckets,
+                                  unsigned MinNumBuckets, BucketTraits Traits,
+                                  BucketHasher Hasher);
 
 } // namespace densemap::detail
 
@@ -221,9 +287,7 @@ public:
     }
 
     destroyAll();
-    std::memset(getUsed(), 0,
-                llvm::densemap::detail::usedWords(getNumBuckets()) *
-                    sizeof(UsedT));
+    llvm::densemap::detail::clearUsed(getUsed(), getNumBuckets());
     setNumEntries(0);
   }
 
@@ -528,11 +592,8 @@ protected:
 
     assert((getNumBuckets() & (getNumBuckets() - 1)) == 0 &&
            "# initial buckets must be a power of two!");
-    if (getNumBuckets()) {
-      std::memset(getUsed(), 0,
-                  llvm::densemap::detail::usedWords(getNumBuckets()) *
-                      sizeof(UsedT));
-    }
+    if (getNumBuckets())
+      llvm::densemap::detail::clearUsed(getUsed(), getNumBuckets());
   }
 
   /// Returns the number of buckets to allocate to ensure that the DenseMap can
@@ -546,6 +607,10 @@ protected:
     return NextPowerOf2(NumEntries * 4 / 3 + 1);
   }
 
+  static constexpr bool canShareRehash() {
+    return llvm::densemap::detail::isRelocatableBucket<BucketT>;
+  }
+
   // Move key/value from Other to *this.
   // Other is left in a valid but empty state.
   LLVM_ATTRIBUTE_NOINLINE void moveFrom(DerivedT &Other) {
@@ -555,22 +620,30 @@ protected:
     const unsigned E = Other.getNumBuckets();
     UsedT *U = getUsed();
     BucketT *B = getBuckets();
-    const unsigned Mask = getNumBuckets() - 1;
-    llvm::densemap::detail::forEachUsed(OtherU, E, [&](unsigned I) {
-      // Find the first empty slot on this key's probe chain; there is no equal
-      // key in the destination, so nothing to compare against.
-      unsigned BucketNo = KeyInfoT::getHashValue(OtherB[I].getFirst()) & Mask;
-      while (llvm::densemap::detail::used(U, BucketNo))
-        BucketNo = (BucketNo + 1) & Mask;
-      BucketT *DestBucket = B + BucketNo;
-      ::new (&DestBucket->getFirst()) KeyT(std::move(OtherB[I].getFirst()));
-      ::new (&DestBucket->getSecond()) ValueT(std::move(OtherB[I].getSecond()));
-      llvm::densemap::detail::setUsed(U, BucketNo);
+    if constexpr (canShareRehash()) {
+      llvm::densemap::detail::rehashRelocatable(
+          reinterpret_cast<char *>(B), U, getNumBuckets(),
+          reinterpret_cast<const char *>(OtherB), OtherU, E, sizeof(BucketT),
+          llvm::densemap::detail::hasherFor<KeyT, KeyInfoT>());
+    } else {
+      const unsigned Mask = getNumBuckets() - 1;
+      llvm::densemap::detail::forEachUsed(OtherU, E, [&](unsigned I) {
+        // Find the first empty slot on this key's probe chain; there is no
+        // equal key in the destination, so nothing to compare against.
+        unsigned BucketNo = KeyInfoT::getHashValue(OtherB[I].getFirst()) & Mask;
+        while (llvm::densemap::detail::used(U, BucketNo))
+          BucketNo = (BucketNo + 1) & Mask;
+        BucketT *DestBucket = B + BucketNo;
+        ::new (&DestBucket->getFirst()) KeyT(std::move(OtherB[I].getFirst()));
+        ::new (&DestBucket->getSecond())
+            ValueT(std::move(OtherB[I].getSecond()));
+        llvm::densemap::detail::setUsed(U, BucketNo);
 
-      // Free the moved-out key/value.
-      OtherB[I].getSecond().~ValueT();
-      OtherB[I].getFirst().~KeyT();
-    });
+        // Free the moved-out key/value.
+        OtherB[I].getSecond().~ValueT();
+        OtherB[I].getFirst().~KeyT();
+      });
+    }
     setNumEntries(Other.getNumEntries());
     Other.derived().kill();
   }
@@ -724,13 +797,19 @@ private:
   }
 
   LLVM_ATTRIBUTE_NOINLINE void grow(unsigned MinNumBuckets) {
-    unsigned NumBuckets = DerivedT::roundUpNumBuckets(MinNumBuckets);
-    DerivedT Tmp(NumBuckets, ExactBucketCount{});
-    Tmp.moveFrom(derived());
-    if (derived().maybeMoveFast(std::move(Tmp)))
-      return;
-    initWithExactBucketCount(NumBuckets);
-    moveFrom(Tmp);
+    // A plain heap table is just the three fields growRelocatable replaces, so
+    // it needs no temporary map.
+    if constexpr (canShareRehash() && DerivedT::HasPlainTable) {
+      derived().growShared(MinNumBuckets);
+    } else {
+      unsigned NumBuckets = DerivedT::roundUpNumBuckets(MinNumBuckets);
+      DerivedT Tmp(NumBuckets, ExactBucketCount{});
+      Tmp.moveFrom(derived());
+      if (derived().maybeMoveFast(std::move(Tmp)))
+        return;
+      initWithExactBucketCount(NumBuckets);
+      moveFrom(Tmp);
+    }
   }
 
   template <typename LookupKeyT>
@@ -944,6 +1023,19 @@ private:
 
   typename BaseT::Rep getRep() const { return {Buckets, Used, NumBuckets}; }
 
+  static constexpr bool HasPlainTable = true;
+
+  void growShared(unsigned MinNumBuckets) {
+    auto R = llvm::densemap::detail::growRelocatable(
+        reinterpret_cast<char *>(Buckets), NumBuckets, MinNumBuckets,
+        {sizeof(BucketT), llvm::densemap::detail::allocAlign<BucketT>()},
+        llvm::densemap::detail::hasherFor<KeyT, KeyInfoT>());
+    Buckets = reinterpret_cast<BucketT *>(R.Buckets);
+    NumBuckets = R.NumBuckets;
+    Used = llvm::densemap::detail::usedFor(R.Buckets, sizeof(BucketT),
+                                           R.NumBuckets);
+  }
+
   UsedT *getUsed() const { return Used; }
 
   unsigned getNumBuckets() const { return NumBuckets; }
@@ -971,11 +1063,8 @@ private:
         allocate_buffer(llvm::densemap::detail::allocBytes<BucketT>(NumBuckets),
                         llvm::densemap::detail::allocAlign<BucketT>()));
     Buckets = reinterpret_cast<BucketT *>(Storage);
-    // NumBuckets is a power of two >= 4 (getMinBucketToReserveForEntries(1) is
-    // 4), so the used array trailing the buckets is aligned.
-    assert(sizeof(BucketT) * NumBuckets % alignof(UsedT) == 0 &&
-           "used array would be misaligned");
-    Used = reinterpret_cast<UsedT *>(Storage + sizeof(BucketT) * NumBuckets);
+    Used =
+        llvm::densemap::detail::usedFor(Storage, sizeof(BucketT), NumBuckets);
     return true;
   }
 
@@ -984,8 +1073,7 @@ private:
   void kill() { deallocateBuckets(); }
 
   static unsigned roundUpNumBuckets(unsigned MinNumBuckets) {
-    return std::max(64u,
-                    static_cast<unsigned>(NextPowerOf2(MinNumBuckets - 1)));
+    return llvm::densemap::detail::roundUpNumBuckets(MinNumBuckets);
   }
 
   bool maybeMoveFast(DenseMap &&Other) {
@@ -1218,6 +1306,8 @@ private:
         const_cast<const SmallDenseMap *>(this)->getUsed());
   }
 
+  static constexpr bool HasPlainTable = false;
+
   unsigned getNumBuckets() const {
     return Small ? InlineBuckets : storage.Large.NumBuckets;
   }
@@ -1245,7 +1335,8 @@ private:
         allocate_buffer(llvm::densemap::detail::allocBytes<BucketT>(Num),
                         llvm::densemap::detail::allocAlign<BucketT>()));
     storage.Large.Buckets = reinterpret_cast<BucketT *>(S);
-    storage.Large.Used = reinterpret_cast<UsedT *>(S + sizeof(BucketT) * Num);
+    storage.Large.Used =
+        llvm::densemap::detail::usedFor(S, sizeof(BucketT), Num);
     storage.Large.NumBuckets = Num;
     return true;
   }
@@ -1260,8 +1351,7 @@ private:
   static unsigned roundUpNumBuckets(unsigned MinNumBuckets) {
     if (MinNumBuckets <= InlineBuckets)
       return InlineBuckets;
-    return std::max(64u,
-                    static_cast<unsigned>(NextPowerOf2(MinNumBuckets - 1)));
+    return llvm::densemap::detail::roundUpNumBuckets(MinNumBuckets);
   }
 
   bool maybeMoveFast(SmallDenseMap &&Other) {

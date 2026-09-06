@@ -10,6 +10,7 @@
 #include "CountCopyAndMove.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseMapInfoVariant.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
@@ -1247,5 +1248,70 @@ TEST(DenseMapCustomTest, MoveAssignInvalidatesIterators) {
   EXPECT_DEATH((void)It->second, "invalid iterator access");
 }
 #endif
+
+// A wrong bucket size or hash puts entries where a later lookup will not probe.
+template <unsigned NumWords> struct RehashValue {
+  uint64_t V[NumWords];
+  RehashValue(unsigned X = 0) : V{X} {}
+  bool operator==(const RehashValue &O) const { return V[0] == O.V[0]; }
+};
+
+static void *rehashTestKey(unsigned I) {
+  return reinterpret_cast<void *>(static_cast<uintptr_t>(I) * 4096 + 16);
+}
+
+// Enough entries that the destination probe walk runs.
+static constexpr unsigned NumRehashKeys = 200;
+
+template <typename MapT> static void expectSurvivesRehash() {
+  using ValueT = typename MapT::mapped_type;
+  MapT M;
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    M[rehashTestKey(I)] = ValueT(I);
+  M.reserve(1024);
+  ASSERT_EQ(NumRehashKeys, M.size());
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    EXPECT_EQ(ValueT(I), M.lookup(rehashTestKey(I)));
+  EXPECT_EQ(M.end(), M.find(rehashTestKey(NumRehashKeys + 1)));
+}
+
+// As LazyValueInfo's DenseSet<LVIValueHandle, DenseMapInfo<Value *>> does, hash
+// a key through an info for a type it converts to. The leading bookkeeping, as
+// ValueHandleBase has, is not what the info reads.
+struct RehashConvertibleKey {
+  uint64_t Bookkeeping;
+  void *P;
+  RehashConvertibleKey(void *P = nullptr) : Bookkeeping(~0ULL), P(P) {}
+  operator void *() const { return P; }
+};
+
+TEST(DenseMapCustomTest, LookupSurvivesRehash) {
+  expectSurvivesRehash<DenseMap<void *, unsigned>>();       // 16-byte bucket
+  expectSurvivesRehash<DenseMap<void *, RehashValue<2>>>(); // 24
+  expectSurvivesRehash<DenseMap<void *, RehashValue<3>>>(); // 32
+  expectSurvivesRehash<DenseMap<void *, RehashValue<4>>>(); // 40
+  expectSurvivesRehash<DenseMap<void *, RehashValue<5>>>(); // 48
+  expectSurvivesRehash<DenseMap<void *, RehashValue<7>>>(); // 64, runtime size
+  // Spilling the inline buffer rehashes through moveFrom instead.
+  expectSurvivesRehash<SmallDenseMap<void *, RehashValue<7>, 4>>();
+
+  DenseSet<void *> S; // 8
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    S.insert(rehashTestKey(I));
+  S.reserve(1024);
+  ASSERT_EQ(NumRehashKeys, S.size());
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    EXPECT_TRUE(S.contains(rehashTestKey(I)));
+  EXPECT_FALSE(S.contains(rehashTestKey(NumRehashKeys + 1)));
+
+  DenseSet<RehashConvertibleKey, DenseMapInfo<void *>> C;
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    C.insert(rehashTestKey(I));
+  C.reserve(1024);
+  ASSERT_EQ(NumRehashKeys, C.size());
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    EXPECT_TRUE(C.contains(rehashTestKey(I)));
+  EXPECT_FALSE(C.contains(rehashTestKey(NumRehashKeys + 1)));
+}
 
 } // namespace
