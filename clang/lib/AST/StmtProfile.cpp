@@ -1486,10 +1486,12 @@ void StmtProfiler::VisitIntegerLiteral(const IntegerLiteral *S) {
   if (Canonical)
     T = T.getCanonicalType();
   ID.AddInteger(T->getTypeClass());
-  if (auto BitIntT = T->getAs<BitIntType>())
-    BitIntT->Profile(ID);
-  else
+  if (auto BitIntT = T->getAs<BitIntType>()) {
+    ID.AddBoolean(BitIntT->isUnsigned());
+    ID.AddInteger(BitIntT->getNumBits());
+  } else {
     ID.AddInteger(T->castAs<BuiltinType>()->getKind());
+  }
 }
 
 void StmtProfiler::VisitFixedPointLiteral(const FixedPointLiteral *S) {
