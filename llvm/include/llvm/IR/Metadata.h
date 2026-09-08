@@ -395,12 +395,21 @@ public:
   using OwnerTy = MetadataTracking::OwnerTy;
 
 private:
-  uint64_t NextIndex = 0;
-  SmallDenseMap<void *, std::pair<OwnerTy, uint64_t>, 4> UseMap;
+  /// \a Ref is the address of the \a Metadata pointer holding this. \a Owner
+  /// is notified when it changes, and is null for a direct reference such as
+  /// \a TrackingMDRef.
+  struct UseEntry {
+    void *Ref = nullptr;
+    OwnerTy Owner = nullptr;
+  };
+
+  /// Uses of this, in the order they were added. RAUW visits them in that
+  /// order, so it is observable in the emitted debug info.
+  SmallVector<UseEntry, 4> UseList;
 
 protected:
   ~ReplaceableUses() {
-    assert(UseMap.empty() && "Cannot destroy in-use replaceable metadata");
+    assert(UseList.empty() && "Cannot destroy in-use replaceable metadata");
   }
 
 public:
@@ -424,9 +433,10 @@ public:
   /// is resolved.
   LLVM_ABI void resolveAllUses(bool ResolveUsers = true);
 
-  unsigned getNumUses() const { return UseMap.size(); }
+  unsigned getNumUses() const { return UseList.size(); }
 
 private:
+  UseEntry *findRef(void *Ref);
   void addRef(void *Ref, OwnerTy Owner);
   void dropRef(void *Ref);
   void moveRef(void *Ref, void *New, const Metadata &MD);
