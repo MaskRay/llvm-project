@@ -1079,13 +1079,15 @@ class MDNode : public Metadata {
   /// Explicity set alignment because bitfields by default have an
   /// alignment of 1 on z/OS.
   struct alignas(alignof(size_t)) Header {
+    static constexpr unsigned NumUnresolvedBits = 22;
+
     uint32_t IsResizable : 1;
     uint32_t IsLarge : 1;
     uint32_t SmallSize : 4;
     uint32_t SmallNumOps : 4;
+    uint32_t NumUnresolved : NumUnresolvedBits;
     uint32_t MetadataPrintID;
 
-    unsigned NumUnresolved = 0;
     using LargeStorageVector = SmallVector<MDOperand, 0>;
 
     static constexpr size_t NumOpsFitInVector =
@@ -1350,7 +1352,11 @@ protected:
 
   unsigned getNumUnresolved() const { return getHeader().NumUnresolved; }
 
-  void setNumUnresolved(unsigned N) { getHeader().NumUnresolved = N; }
+  void setNumUnresolved(unsigned N) {
+    assert(N < (1u << Header::NumUnresolvedBits) &&
+           "Too many unresolved operands");
+    getHeader().NumUnresolved = N;
+  }
   LLVM_ABI void storeDistinctInContext();
   template <class T, class StoreT>
   static T *storeImpl(T *N, StorageType Storage, StoreT &Store);

@@ -650,7 +650,7 @@ StringRef MDString::getString() const {
 void *MDNode::operator new(size_t Size, size_t NumOps, StorageType Storage) {
   // uint64_t is the most aligned type we need support (ensured by static_assert
   // above)
-  static_assert(sizeof(Header) == sizeof(size_t) + 2 * sizeof(uint32_t),
+  static_assert(sizeof(Header) == 2 * sizeof(uint32_t),
                 "MDNode header fields poorly packed");
   size_t AllocSize =
       alignTo(Header::getAllocSize(Storage, NumOps), alignof(uint64_t));
@@ -700,6 +700,7 @@ MDNode::Header::Header(size_t NumOps, StorageType Storage) {
   IsLarge = isLarge(NumOps);
   IsResizable = isResizable(Storage);
   SmallSize = getSmallSize(NumOps, IsResizable, IsLarge);
+  NumUnresolved = 0;
   if (IsLarge) {
     SmallNumOps = 0;
     new (getLargePtr()) LargeStorageVector();
