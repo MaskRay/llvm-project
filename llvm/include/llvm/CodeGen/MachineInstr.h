@@ -1522,6 +1522,13 @@ public:
     return findRegisterUseOperandIdx(Reg, TRI, false) != -1;
   }
 
+  /// Return true if an operand tied to a def that names another register, and
+  /// another operand, both read Reg with subregister index SubReg. Marking
+  /// such reads undef would drop the agreement that rewriting the tie needs.
+  /// Implicit operands count; reads through a different subregister index are
+  /// independent, and operands inside a bundle are not considered.
+  LLVM_ABI bool hasTiedAndOtherReadOf(Register Reg, unsigned SubReg) const;
+
   /// Return true if the MachineInstr reads the specified virtual register.
   /// Take into account that a partial define is a
   /// read-modify-write operation.
