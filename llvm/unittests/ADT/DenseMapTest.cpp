@@ -10,6 +10,7 @@
 #include "CountCopyAndMove.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseMapInfoVariant.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
@@ -959,6 +960,37 @@ struct B : public A {
 struct AlwaysEqType {
   bool operator==(const AlwaysEqType &RHS) const { return true; }
 };
+
+struct PointeeHashed {
+  unsigned V;
+};
+
+struct ExprKey {
+  unsigned V;
+};
+
+struct AliasedKey {
+  const unsigned *A;
+};
+
+// Shaped like clang::WeakInfo::DenseMapInfoByAliasOnly: an info that privately
+// inherits the pointer info, hiding the tag from a lookup through it.
+struct AliasedKeyInfo : private DenseMapInfo<const unsigned *> {
+  static unsigned getHashValue(const AliasedKey &K) {
+    return DenseMapInfo::getHashValue(K.A);
+  }
+  static bool isEqual(const AliasedKey &L, const AliasedKey &R) {
+    return DenseMapInfo::isEqual(L.A, R.A);
+  }
+};
+
+// Shaped like VPCSEDenseMapInfo: inherits the pointer info, hashes the pointee.
+struct ExprKeyTrait : DenseMapInfo<ExprKey *> {
+  static unsigned getHashValue(const ExprKey *P) { return P->V * 37; }
+  static bool isEqual(const ExprKey *LHS, const ExprKey *RHS) {
+    return LHS->V == RHS->V;
+  }
+};
 } // namespace
 
 namespace llvm {
@@ -975,6 +1007,15 @@ template <> struct DenseMapInfo<AlwaysEqType> {
   static unsigned getHashValue(const T &Val) { return 0; }
   static bool isEqual(const T &LHS, const T &RHS) {
     return false;
+  }
+};
+
+// Shaped like Attributor's InstExclusionSet: a specialization for one pointer
+// type that hashes the pointee.
+template <> struct DenseMapInfo<PointeeHashed *> {
+  static unsigned getHashValue(const PointeeHashed *P) { return P->V * 37; }
+  static bool isEqual(const PointeeHashed *LHS, const PointeeHashed *RHS) {
+    return LHS->V == RHS->V;
   }
 };
 } // namespace llvm
@@ -1255,5 +1296,134 @@ TEST(DenseMapCustomTest, MoveAssignInvalidatesIterators) {
   EXPECT_DEATH((void)It->second, "invalid iterator access");
 }
 #endif
+
+// A wrong bucket size or hash puts entries where a later lookup will not probe.
+template <unsigned NumWords> struct RehashValue {
+  uint64_t V[NumWords];
+  RehashValue(unsigned X = 0) : V{X} {}
+  bool operator==(const RehashValue &O) const { return V[0] == O.V[0]; }
+};
+
+static void *rehashTestKey(unsigned I) {
+  return reinterpret_cast<void *>(static_cast<uintptr_t>(I) * 4096 + 16);
+}
+
+// Enough entries that the destination probe walk runs.
+static constexpr unsigned NumRehashKeys = 200;
+
+template <typename MapT> static void expectSurvivesRehash() {
+  using ValueT = typename MapT::mapped_type;
+  MapT M;
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    M[rehashTestKey(I)] = ValueT(I);
+  M.reserve(1024);
+  ASSERT_EQ(NumRehashKeys, M.size());
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    EXPECT_EQ(ValueT(I), M.lookup(rehashTestKey(I)));
+  EXPECT_EQ(M.end(), M.find(rehashTestKey(NumRehashKeys + 1)));
+}
+
+// As LazyValueInfo's DenseSet<LVIValueHandle, DenseMapInfo<Value *>> does: an
+// info for a type the key converts to, with bookkeeping before the pointer.
+struct RehashConvertibleKey {
+  uint64_t Bookkeeping;
+  void *P;
+  RehashConvertibleKey(void *P = nullptr) : Bookkeeping(~0ULL), P(P) {}
+  operator void *() const { return P; }
+};
+
+TEST(DenseMapCustomTest, LookupSurvivesRehash) {
+  expectSurvivesRehash<DenseMap<void *, unsigned>>();       // 16-byte bucket
+  expectSurvivesRehash<DenseMap<void *, RehashValue<2>>>(); // 24
+  expectSurvivesRehash<DenseMap<void *, RehashValue<3>>>(); // 32
+  expectSurvivesRehash<DenseMap<void *, RehashValue<4>>>(); // 40
+  expectSurvivesRehash<DenseMap<void *, RehashValue<5>>>(); // 48
+  expectSurvivesRehash<DenseMap<void *, RehashValue<7>>>(); // 64, runtime size
+  // Spilling the inline buffer relocates the entries without the shared call.
+  expectSurvivesRehash<SmallDenseMap<void *, unsigned, 4>>();
+  expectSurvivesRehash<SmallDenseMap<void *, RehashValue<7>, 4>>();
+
+  DenseSet<void *> S; // 8
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    S.insert(rehashTestKey(I));
+  S.reserve(1024);
+  ASSERT_EQ(NumRehashKeys, S.size());
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    EXPECT_TRUE(S.contains(rehashTestKey(I)));
+  EXPECT_FALSE(S.contains(rehashTestKey(NumRehashKeys + 1)));
+
+  DenseSet<RehashConvertibleKey, DenseMapInfo<void *>> C;
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    C.insert(rehashTestKey(I));
+  C.reserve(1024);
+  ASSERT_EQ(NumRehashKeys, C.size());
+  for (unsigned I = 1; I <= NumRehashKeys; ++I)
+    EXPECT_TRUE(C.contains(rehashTestKey(I)));
+  EXPECT_FALSE(C.contains(rehashTestKey(NumRehashKeys + 1)));
+}
+
+// A pointer key can still be hashed by its pointee, by a specialization or by
+// inheriting the pointer info; hashing the pointer would lose these entries.
+TEST(DenseMapCustomTest, PointerKeyHashingPointee) {
+  PointeeHashed Specialized[NumRehashKeys];
+  ExprKey Inherited[NumRehashKeys];
+  for (unsigned I = 0; I != NumRehashKeys; ++I)
+    Specialized[I].V = Inherited[I].V = I + 1;
+
+  DenseMap<PointeeHashed *, unsigned> S;
+  for (auto &K : Specialized)
+    S[&K] = K.V;
+  S.reserve(1024);
+  ASSERT_EQ(NumRehashKeys, S.size());
+  for (auto &K : Specialized)
+    EXPECT_EQ(K.V, S.lookup(&K));
+
+  DenseMap<ExprKey *, unsigned, ExprKeyTrait> I;
+  for (auto &K : Inherited)
+    I[&K] = K.V;
+  I.reserve(1024);
+  ASSERT_EQ(NumRehashKeys, I.size());
+  for (auto &K : Inherited)
+    EXPECT_EQ(K.V, I.lookup(&K));
+}
+
+TEST(DenseMapCustomTest, PointerInfoAsPrivateBase) {
+  unsigned Keys[NumRehashKeys];
+  DenseMap<AliasedKey, unsigned, AliasedKeyInfo> M;
+  for (unsigned I = 0; I != NumRehashKeys; ++I) {
+    Keys[I] = I;
+    M[AliasedKey{&Keys[I]}] = I + 1;
+  }
+  M.reserve(1024);
+  ASSERT_EQ(NumRehashKeys, M.size());
+  for (unsigned I = 0; I != NumRehashKeys; ++I)
+    EXPECT_EQ(I + 1, M.lookup(AliasedKey{&Keys[I]}));
+}
+
+// remove_if rehashes the inline buckets in place. Five entries in eight buckets
+// leave clusters that wrap, so a survivor needs the probe chain walked.
+TEST(DenseMapCustomTest, SmallRemoveIf) {
+  for (unsigned Trial = 0; Trial != 200; ++Trial) {
+    SmallDenseMap<void *, unsigned, 8> Map;
+    const unsigned First = Trial * 5 + 1;
+    for (unsigned I = First; I != First + 5; ++I)
+      Map[rehashTestKey(I)] = I;
+    ASSERT_EQ(5u, Map.size());
+
+    EXPECT_TRUE(Map.remove_if([](const auto &E) { return E.second % 2 == 0; }));
+    for (unsigned I = First; I != First + 5; ++I) {
+      if (I % 2)
+        EXPECT_EQ(I, Map.lookup(rehashTestKey(I)));
+      else
+        EXPECT_FALSE(Map.contains(rehashTestKey(I)));
+    }
+
+    // Refilling past the inline buckets spills the compacted table.
+    for (unsigned I = 1; I <= NumRehashKeys; ++I)
+      Map[rehashTestKey(I)] = I;
+    for (unsigned I = 1; I <= NumRehashKeys; ++I)
+      EXPECT_EQ(I, Map.lookup(rehashTestKey(I)));
+  }
+}
 
 } // namespace
