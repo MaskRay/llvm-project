@@ -2021,21 +2021,15 @@ LLVMMetadataKind LLVMGetMetadataKind(LLVMMetadataRef Metadata) {
   }
 }
 
-AssignmentInstRange at::getAssignmentInsts(DIAssignID *ID) {
-  assert(ID && "Expected non-null ID");
-  LLVMContext &Ctx = ID->getContext();
-  auto &Map = Ctx.pImpl->AssignmentIDToInstrs;
-
-  auto MapIt = Map.find(ID);
-  if (MapIt == Map.end())
-    return make_range(nullptr, nullptr);
-
-  return make_range(MapIt->second.begin(), MapIt->second.end());
-}
 
 void at::deleteAssignmentMarkers(const Instruction *Inst) {
   for (auto *DVR : getDVRAssignmentMarkers(Inst))
     DVR->eraseFromParent();
+}
+
+SmallVector<DbgVariableRecord *> at::getAssignmentMarkers(DIAssignID *ID) {
+  // Reverse creation order, as the use list of a dbg.value intrinsic gave.
+  return SmallVector<DbgVariableRecord *>(llvm::reverse(ID->getRecords()));
 }
 
 void at::RAUW(DIAssignID *Old, DIAssignID *New) {
@@ -2048,7 +2042,9 @@ void at::RAUW(DIAssignID *Old, DIAssignID *New) {
   for (auto *I : InstVec)
     I->setMetadata(LLVMContext::MD_DIAssignID, New);
 
-  Old->replaceAllUsesWith(New);
+  SmallVector<DbgVariableRecord *> DVRs = getAssignmentMarkers(Old);
+  for (DbgVariableRecord *DVR : llvm::reverse(DVRs))
+    DVR->setAssignId(New);
 }
 
 void at::deleteAll(Function *F) {
