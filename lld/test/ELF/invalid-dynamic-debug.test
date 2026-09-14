@@ -49,7 +49,7 @@
 
 # REVERSE:      [[ERR_OR_WARN]]: undefined symbol: undef_no_dyndbg_inner
 # REVERSE-NEXT: >>> referenced by no-dyndbg.o:(.text.bar+0x1)
-# REVERSE-NEXT: >>> referenced by <internal>:(.debug_llvm_dyndbg+0x0)
+# REVERSE-NEXT: >>> referenced by foo.o:(.debug_llvm_dyndbg+0x0)
 # REVERSE-EMPTY:
 # REVERSE-NEXT: [[ERR_OR_NOIEXEC_WARN]]: undefined hidden symbol: undef_hidden
 # REVERSE-NEXT: >>> referenced by foo.o:(.debug_llvm_dyndbg+0x0)
