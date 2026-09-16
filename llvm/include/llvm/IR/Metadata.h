@@ -397,12 +397,30 @@ public:
   using OwnerTy = MetadataTracking::OwnerTy;
 
 private:
-  uint64_t NextIndex = 0;
-  SmallDenseMap<void *, std::pair<OwnerTy, uint64_t>, 4> UseMap;
+  /// \a Ref is the address of the \a Metadata pointer holding this. \a Owner
+  /// is notified when it changes, and is null for a direct reference such as
+  /// \a TrackingMDRef. \a Seq orders uses by the time they were added.
+  struct UseEntry {
+    void *Ref;
+    OwnerTy Owner;
+    uint64_t Seq;
+  };
+
+  /// Uses of this, unordered so that dropping one is a swap with the last.
+  /// RAUW visits uses in the order they were added, which is observable in the
+  /// emitted debug info; see getUsesInOrder().
+  SmallVector<UseEntry, 4> UseList;
+  uint64_t NextSeq = 0;
+
+  /// Ref -> index in UseList, built once UseList grows past IndexThreshold
+  /// entries and dropped once it shrinks to half that, so that a use of a
+  /// large list is found in constant time.
+  static constexpr unsigned IndexThreshold = 32;
+  std::unique_ptr<DenseMap<void *, unsigned>> Index;
 
 protected:
   ~ReplaceableUses() {
-    assert(UseMap.empty() && "Cannot destroy in-use replaceable metadata");
+    assert(UseList.empty() && "Cannot destroy in-use replaceable metadata");
   }
 
 public:
@@ -426,9 +444,11 @@ public:
   /// is resolved.
   LLVM_ABI void resolveAllUses(bool ResolveUsers = true);
 
-  unsigned getNumUses() const { return UseMap.size(); }
+  unsigned getNumUses() const { return UseList.size(); }
 
 private:
+  UseEntry *findRef(void *Ref);
+  SmallVector<UseEntry, 8> getUsesInOrder() const;
   void addRef(void *Ref, OwnerTy Owner);
   void dropRef(void *Ref);
   void moveRef(void *Ref, void *New, const Metadata &MD);
