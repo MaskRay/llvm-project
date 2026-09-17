@@ -85,6 +85,12 @@ private:
   /// Epoch of block numbers. (Could be shrinked to uint8_t if required.)
   unsigned BlockNumEpoch = 0;
 
+  // Instructions get their number from setParent when added to a function.
+  friend void Instruction::setParent(BasicBlock *);
+  unsigned NextInstNum = 0;
+  /// Epoch of instruction numbers.
+  unsigned InstNumEpoch = 0;
+
   mutable Argument *Arguments = nullptr;  ///< The formal arguments
   uint32_t NumArgs;
   MaybeAlign PreferredAlign;
@@ -825,6 +831,21 @@ public:
   /// assigned new numbers and previous uses of the numbers needs to be
   /// invalidated. This is solely intended as a debugging feature.
   unsigned getBlockNumberEpoch() const { return BlockNumEpoch; }
+
+  // Instruction number functions
+
+  /// Return a value larger than the largest instruction number, i.e. a bound
+  /// suitable for sizing a vector indexed by Instruction::getNumber().
+  unsigned getMaxInstNumber() const { return NextInstNum; }
+
+  /// Assign every instruction a dense number in [0, getMaxInstNumber()) in
+  /// program order and bump the instruction-number epoch. Analyses keyed on
+  /// instruction numbers must be recomputed or revalidated afterwards.
+  void renumberInstructions();
+
+  /// Return the epoch of the current instruction numbers; changes on every
+  /// renumbering. See getBlockNumberEpoch() for the intended use.
+  unsigned getInstNumberEpoch() const { return InstNumEpoch; }
 
 private:
   /// Assert that all blocks have unique numbers within 0..NextBlockNum. This

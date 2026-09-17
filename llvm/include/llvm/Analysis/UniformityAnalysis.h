@@ -14,12 +14,66 @@
 #ifndef LLVM_ANALYSIS_UNIFORMITYANALYSIS_H
 #define LLVM_ANALYSIS_UNIFORMITYANALYSIS_H
 
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/GenericUniformityInfo.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/IR/Argument.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/SSAContext.h"
 #include "llvm/Pass.h"
 
 namespace llvm {
+
+/// IR specialization: index instruction keys by Instruction::getNumber() (a
+/// BitVector) and keep arguments in a small pointer set. Because instruction
+/// numbers are not reused until a renumbering, a cached result stays safe when
+/// instructions are deleted after the analysis runs -- a would-be dangling
+/// pointer becomes a stale, unreused number that simply reads as "not uniform".
+template <> class UniformValueSet<SSAContext> {
+  BitVector InstUniform;
+  SmallPtrSet<const Argument *, 8> ArgUniform;
+
+public:
+  // Number \p F densely and size the instruction vector. Call before inserts.
+  void initialize(const Function &F) {
+    const_cast<Function &>(F).renumberInstructions();
+    InstUniform.clear();
+    InstUniform.resize(F.getMaxInstNumber());
+    ArgUniform.clear();
+  }
+  bool contains(const Value *V) const {
+    if (const auto *I = dyn_cast<Instruction>(V)) {
+      unsigned N = I->getNumber();
+      return N < InstUniform.size() && InstUniform[N];
+    }
+    if (const auto *A = dyn_cast<Argument>(V))
+      return ArgUniform.contains(A);
+    return false;
+  }
+  void insert(const Value *V) {
+    if (const auto *I = dyn_cast<Instruction>(V)) {
+      unsigned N = I->getNumber();
+      if (N < InstUniform.size())
+        InstUniform.set(N);
+    } else if (const auto *A = dyn_cast<Argument>(V))
+      ArgUniform.insert(A);
+  }
+  bool erase(const Value *V) {
+    if (const auto *I = dyn_cast<Instruction>(V)) {
+      unsigned N = I->getNumber();
+      if (N < InstUniform.size() && InstUniform.test(N)) {
+        InstUniform.reset(N);
+        return true;
+      }
+      return false;
+    }
+    if (const auto *A = dyn_cast<Argument>(V))
+      return ArgUniform.erase(A);
+    return false;
+  }
+};
 
 extern template class GenericUniformityInfo<SSAContext>;
 using UniformityInfo = GenericUniformityInfo<SSAContext>;

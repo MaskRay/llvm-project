@@ -111,13 +111,32 @@ private:
   /// O(1) local dominance checks between instructions.
   mutable unsigned Order = 0;
 
+  // Allow Function to renumber instructions and setParent to assign numbers.
+  friend class Function;
+  // Per-function unique number, assigned when the instruction enters a
+  // function. Function::renumberInstructions() makes these dense.
+  unsigned Number = ~0u;
+
   /// Optional marker recording the position for debugging information that
   /// takes effect immediately before this instruction. Null unless there is
   /// debugging information present.
   DbgMarker *DebugMarker = nullptr;
 
+  // Set the parent block, assigning a per-function number on entry. Hides the
+  // ilist mixin setParent so numbers track function membership.
+  void setParent(BasicBlock *P);
+
 public:
   DbgMarker *getDbgMarker() const { return DebugMarker; }
+
+  // Per-function unique number of this instruction. Valid only once numbered
+  // (Function::renumberInstructions()); stable across moves within a function,
+  // invalidated by a renumbering.
+  unsigned getNumber() const {
+    assert(getParent() && "only instructions in functions have valid numbers");
+    assert(Number != ~0u && "instruction has no number; renumber first");
+    return Number;
+  }
 
   /// Clone any debug-info attached to \p From onto this instruction. Used to
   /// copy debugging information from one block to another, when copying entire

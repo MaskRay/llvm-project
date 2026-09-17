@@ -442,7 +442,7 @@ protected:
   // Values known to be uniform. Populated in initialize() with all values,
   // then values are removed as divergence is propagated. After analysis,
   // values not in this set are conservatively treated as divergent.
-  DenseSet<ConstValueRefT> UniformValues;
+  UniformValueSet<ContextT> UniformValues;
 
   // Internal worklist for divergence propagation.
   std::vector<const InstructionT *> Worklist;

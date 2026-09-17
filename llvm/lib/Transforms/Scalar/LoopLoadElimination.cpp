@@ -241,13 +241,6 @@ public:
     return Candidates;
   }
 
-  /// Return the index of the instruction according to program order.
-  unsigned getInstrIndex(Instruction *Inst) {
-    auto I = InstOrder.find(Inst);
-    assert(I != InstOrder.end() && "No index for instruction");
-    return I->second;
-  }
-
   /// If a load has multiple candidates associated (i.e. different
   /// stores), it means that it could be forwarding from multiple stores
   /// depending on control flow.  Remove these candidates.
@@ -294,7 +287,7 @@ public:
             Cand.isDependenceDistanceOfOne(PSE, L, *DT) &&
             OtherCand->isDependenceDistanceOfOne(PSE, L, *DT)) {
           // They are in the same block, the later one will forward to the load.
-          if (getInstrIndex(OtherCand->Store) < getInstrIndex(Cand.Store))
+          if (OtherCand->Store->getNumber() < Cand.Store->getNumber())
             OtherCand = &Cand;
         } else
           OtherCand = nullptr;
@@ -357,16 +350,14 @@ public:
         llvm::max_element(Candidates,
                           [&](const StoreToLoadForwardingCandidate &A,
                               const StoreToLoadForwardingCandidate &B) {
-                            return getInstrIndex(A.Load) <
-                                   getInstrIndex(B.Load);
+                            return A.Load->getNumber() < B.Load->getNumber();
                           })
             ->Load;
     StoreInst *FirstStore =
         llvm::min_element(Candidates,
                           [&](const StoreToLoadForwardingCandidate &A,
                               const StoreToLoadForwardingCandidate &B) {
-                            return getInstrIndex(A.Store) <
-                                   getInstrIndex(B.Store);
+                            return A.Store->getNumber() < B.Store->getNumber();
                           })
             ->Store;
 
@@ -379,11 +370,15 @@ public:
       if (auto *S = dyn_cast<StoreInst>(I))
         PtrsWrittenOnFwdingPath.insert(S->getPointerOperand());
     };
+    // Memory instructions are in program order, so slice by instruction
+    // number: stores after FirstStore, then everything before LastLoad.
     const auto &MemInstrs = LAI.getDepChecker().getMemoryInstructions();
-    std::for_each(MemInstrs.begin() + getInstrIndex(FirstStore) + 1,
-                  MemInstrs.end(), InsertStorePtr);
-    std::for_each(MemInstrs.begin(), &MemInstrs[getInstrIndex(LastLoad)],
-                  InsertStorePtr);
+    for (Instruction *I : MemInstrs)
+      if (I->getNumber() > FirstStore->getNumber())
+        InsertStorePtr(I);
+    for (Instruction *I : MemInstrs)
+      if (I->getNumber() < LastLoad->getNumber())
+        InsertStorePtr(I);
 
     return PtrsWrittenOnFwdingPath;
   }
@@ -514,9 +509,9 @@ public:
     if (StoreToLoadDependences.empty())
       return false;
 
-    // Generate an index for each load and store according to the original
-    // program order.  This will be used later.
-    InstOrder = LAI.getDepChecker().generateInstructionOrderMap();
+    // Number instructions in program order so store/load positions can be
+    // compared by Instruction::getNumber() below.
+    L->getHeader()->getParent()->renumberInstructions();
 
     // To keep things simple for now, remove those where the load is potentially
     // fed by multiple stores.
@@ -631,10 +626,6 @@ public:
 
 private:
   Loop *L;
-
-  /// Maps the load/store instructions to their index according to
-  /// program order.
-  DenseMap<Instruction *, unsigned> InstOrder;
 
   // Analyses used.
   LoopInfo *LI;

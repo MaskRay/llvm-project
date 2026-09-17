@@ -9,12 +9,27 @@
 #ifndef LLVM_ADT_GENERICUNIFORMITYINFO_H
 #define LLVM_ADT_GENERICUNIFORMITYINFO_H
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/GenericCycleInfo.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace llvm {
 
 class TargetTransformInfo;
+
+/// Storage for the set of known-uniform values in the uniformity analysis.
+/// The primary template wraps a DenseSet; the IR specialization (in
+/// UniformityAnalysis.h) indexes instructions by Instruction::getNumber(), so
+/// the cached result stays reuse-safe if instructions are later deleted.
+template <typename ContextT> class UniformValueSet {
+  using ConstValueRefT = typename ContextT::ConstValueRefT;
+  DenseSet<ConstValueRefT> Set;
+
+public:
+  bool contains(ConstValueRefT V) const { return Set.contains(V); }
+  void insert(ConstValueRefT V) { Set.insert(V); }
+  bool erase(ConstValueRefT V) { return Set.erase(V); }
+};
 
 template <typename ContextT> class GenericUniformityAnalysisImpl;
 template <typename ImplT> struct GenericUniformityAnalysisImplDeleter {

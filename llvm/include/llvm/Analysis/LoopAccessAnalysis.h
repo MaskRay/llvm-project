@@ -301,17 +301,6 @@ public:
     return InstMap;
   }
 
-  /// Generate a mapping between the memory instructions and their
-  /// indices according to program order.
-  DenseMap<Instruction *, unsigned> generateInstructionOrderMap() const {
-    DenseMap<Instruction *, unsigned> OrderMap;
-
-    for (unsigned I = 0; I < InstMap.size(); ++I)
-      OrderMap[InstMap[I]] = I;
-
-    return OrderMap;
-  }
-
   /// Find the set of instructions that read or write via \p Ptr.
   LLVM_ABI SmallVector<Instruction *, 4>
   getInstructionsForAccess(Value *Ptr, bool isWrite) const;

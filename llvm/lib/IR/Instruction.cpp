@@ -16,6 +16,7 @@
 #include "llvm/IR/AttributeMask.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -90,6 +91,20 @@ const Function *Instruction::getFunction() const {
 
 const DataLayout &Instruction::getDataLayout() const {
   return getModule()->getDataLayout();
+}
+
+void Instruction::setParent(BasicBlock *P) {
+  // Assign a fresh number when entering a function, or moving to a different
+  // one. Numbers stay stable across moves within a function: same-function
+  // block-to-block moves relink the node without calling setParent (see
+  // SymbolTableListTraits::transferNodesFromList).
+  Function *OldF = getParent() ? getParent()->getParent() : nullptr;
+  if (Function *NewF = P ? P->getParent() : nullptr; NewF && NewF != OldF)
+    Number = NewF->NextInstNum++;
+  using Base =
+      ilist_node_with_parent<Instruction, BasicBlock, ilist_iterator_bits<true>,
+                             ilist_parent<BasicBlock>>;
+  Base::setParent(P);
 }
 
 void Instruction::removeFromParent() {

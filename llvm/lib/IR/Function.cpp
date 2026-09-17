@@ -86,6 +86,14 @@ void Function::validateBlockNumbers() const {
 #endif
 }
 
+void Function::renumberInstructions() {
+  NextInstNum = 0;
+  for (auto &BB : *this)
+    for (auto &I : BB)
+      I.Number = NextInstNum++;
+  InstNumEpoch++;
+}
+
 void Function::convertToNewDbgValues() {
   for (auto &BB : *this) {
     BB.convertToNewDbgValues();

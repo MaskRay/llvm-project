@@ -66,6 +66,8 @@ bool llvm::GenericUniformityAnalysisImpl<SSAContext>::printDivergentArgs(
 }
 
 template <> void llvm::GenericUniformityAnalysisImpl<SSAContext>::initialize() {
+  // Size the instruction-number-indexed uniform set for this function.
+  UniformValues.initialize(F);
   // Pre-populate UniformValues with uniform values, then seed divergence.
   // NeverUniform values are not inserted -- they are divergent by definition
   // and will be reported as such by isDivergent() (not in UniformValues).

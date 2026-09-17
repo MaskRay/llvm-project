@@ -9,6 +9,8 @@
 #include "llvm/IR/Function.h"
 #include "llvm-c/Core.h"
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/SourceMgr.h"
 #include "gtest/gtest.h"
@@ -576,6 +578,63 @@ TEST(FunctionTest, BasicBlockNumbers) {
   EXPECT_EQ(BB3->getNumber(), 5u);
   EXPECT_EQ(BB6->getNumber(), 6u);
   EXPECT_EQ(Func->getMaxBlockNumber(), 7u);
+}
+
+TEST(FunctionTest, InstructionNumbers) {
+  LLVMContext Context;
+  Type *VoidType = Type::getVoidTy(Context);
+  Type *I32 = Type::getInt32Ty(Context);
+  FunctionType *FuncType = FunctionType::get(VoidType, I32, false);
+  std::unique_ptr<Function> Func(
+      Function::Create(FuncType, GlobalValue::ExternalLinkage));
+  Argument *Arg = Func->getArg(0);
+
+  EXPECT_EQ(Func->getInstNumberEpoch(), 0u);
+  EXPECT_EQ(Func->getMaxInstNumber(), 0u);
+
+  BasicBlock *BB1 = BasicBlock::Create(Context, "bb1", Func.get());
+  BasicBlock *BB2 = BasicBlock::Create(Context, "bb2", Func.get());
+  IRBuilder<> B(BB1);
+
+  // Instructions get a monotonically increasing number on insertion. Build
+  // from the argument so the adds don't fold to constants.
+  auto *A0 = cast<Instruction>(B.CreateAdd(Arg, B.getInt32(2)));
+  auto *A1 = cast<Instruction>(B.CreateAdd(A0, B.getInt32(3)));
+  Instruction *Br = B.CreateBr(BB2);
+  EXPECT_EQ(A0->getNumber(), 0u);
+  EXPECT_EQ(A1->getNumber(), 1u);
+  EXPECT_EQ(Br->getNumber(), 2u);
+  EXPECT_EQ(Func->getMaxInstNumber(), 3u);
+
+  B.SetInsertPoint(BB2);
+  Instruction *Ret = B.CreateRetVoid();
+  EXPECT_EQ(Ret->getNumber(), 3u);
+  EXPECT_EQ(Func->getMaxInstNumber(), 4u);
+
+  // Erasing doesn't renumber; new instructions keep increasing.
+  A1->eraseFromParent();
+  EXPECT_EQ(A0->getNumber(), 0u);
+  EXPECT_EQ(Br->getNumber(), 2u);
+  B.SetInsertPoint(Br);
+  auto *A2 = cast<Instruction>(B.CreateAdd(A0, B.getInt32(4)));
+  EXPECT_EQ(A2->getNumber(), 4u);
+  EXPECT_EQ(Func->getMaxInstNumber(), 5u);
+
+  // Moving within the same function keeps the number stable.
+  A2->moveBefore(Ret->getIterator());
+  EXPECT_EQ(A2->getNumber(), 4u);
+  EXPECT_EQ(A0->getNumber(), 0u);
+
+  // Renumbering assigns dense numbers in program order and bumps the epoch.
+  EXPECT_EQ(Func->getInstNumberEpoch(), 0u);
+  Func->renumberInstructions();
+  EXPECT_EQ(Func->getInstNumberEpoch(), 1u);
+  // Program order now: bb1{A0, Br}, bb2{A2, Ret}.
+  EXPECT_EQ(A0->getNumber(), 0u);
+  EXPECT_EQ(Br->getNumber(), 1u);
+  EXPECT_EQ(A2->getNumber(), 2u);
+  EXPECT_EQ(Ret->getNumber(), 3u);
+  EXPECT_EQ(Func->getMaxInstNumber(), 4u);
 }
 
 TEST(FunctionTest, UWTable) {
