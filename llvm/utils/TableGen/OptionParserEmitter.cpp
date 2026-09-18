@@ -258,18 +258,17 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
   using SubCommandIDsT = std::map<SubCommandKeyT, unsigned>;
   SubCommandIDsT SubCommandIDs;
 
-  auto PrintSubCommandIdsOffset = [&SubCommandIDs, &OS](const Record &R) {
+  auto GetSubCommandIDsOffset = [&SubCommandIDs](const Record &R) {
     if (R.getValue("SubCommands") != nullptr) {
       std::vector<const Record *> SubCommands =
           R.getValueAsListOfDefs("SubCommands");
       SubCommandKeyT SubCommandKey;
       for (const auto &SubCommand : SubCommands)
         SubCommandKey.push_back(SubCommand->getName());
-      OS << SubCommandIDs[SubCommandKey];
-    } else {
-      // The option SubCommandIDsOffset (for default top level toolname is 0).
-      OS << '0';
+      return std::to_string(SubCommandIDs[SubCommandKey]);
     }
+    // The option SubCommandIDsOffset (for default top level toolname is 0).
+    return std::string("0");
   };
 
   SubCommandIDs.try_emplace(SubCommandKeyT(), 0);
@@ -452,6 +451,39 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
   }
   OS << "\n};\n\n";
 
+  // Dump the rarely set fields, in OptTable::InfoExtra order, sharing a row
+  // among options with the same values. Row 0 is all zero.
+  OS << "static constexpr llvm::opt::OptTable::InfoExtra "
+        "OptionInfoExtrasTable[] = {\n";
+  std::map<std::string, unsigned> ExtraRows;
+  ExtraRows.try_emplace("0, 0, 0, 0, 0", 0);
+  OS << "  {0, 0, 0, 0, 0},\n";
+  DenseMap<const Record *, unsigned> ExtraOffset;
+  auto GetExtraRow = [&](const Record &R) {
+    std::string Row;
+    raw_string_ostream RowOS(Row);
+    if (R.isSubClassOf("Option")) {
+      writeStrTableOffset(RowOS, Table, getOptionalString(R, "MetaVarName"));
+      RowOS << ", ";
+      writeStrTableOffset(RowOS, Table, getAliasArgsBlob(R));
+      RowOS << ", ";
+      writeStrTableOffset(RowOS, Table, getOptionalString(R, "Values"));
+      RowOS << ", " << HelpTextVariantsOffset.lookup(&R);
+    } else {
+      RowOS << "0, 0, 0, 0";
+    }
+    RowOS << ", " << GetSubCommandIDsOffset(R);
+    return Row;
+  };
+  for (const Record *R : concat<const Record *const>(Groups, Opts)) {
+    auto [It, Inserted] =
+        ExtraRows.try_emplace(GetExtraRow(*R), ExtraRows.size());
+    if (Inserted)
+      OS << "  {" << It->first << "},\n";
+    ExtraOffset[R] = It->second;
+  }
+  OS << "};\n\n";
+
   // Dump the option table in OptTable::Info field order.
   OS << "static constexpr llvm::opt::OptTable::Info OptionInfoTable[] = {\n";
   for (const Record &R : llvm::make_pointee_range(Groups)) {
@@ -460,9 +492,8 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
                         /*EmitComment=*/true);
     OS << ", ";
     writeStrTableOffset(OS, Table, getHelpText(R));
-    OS << ", 0, 0, 0, 0, 0, 0, " << GetRefID(R, "Group") << ", 0, 0, ";
-    PrintSubCommandIdsOffset(R);
-    OS << ", llvm::opt::Option::GroupClass, 0},\n";
+    OS << ", 0, 0, 0, " << GetRefID(R, "Group") << ", 0, "
+       << ExtraOffset.lookup(&R) << ", llvm::opt::Option::GroupClass, 0},\n";
   }
   for (const Record &R : llvm::make_pointee_range(Opts)) {
     OS << "  {";
@@ -470,19 +501,11 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
                         /*EmitComment=*/true);
     OS << ", ";
     writeStrTableOffset(OS, Table, getHelpText(R));
-    OS << ", ";
-    writeStrTableOffset(OS, Table, getOptionalString(R, "MetaVarName"));
-    OS << ", ";
-    writeStrTableOffset(OS, Table, getAliasArgsBlob(R));
-    OS << ", ";
-    writeStrTableOffset(OS, Table, getOptionalString(R, "Values"));
     OS << ", " << GetMask(R, "Flags") << ", " << GetMask(R, "Visibility");
     std::vector<StringRef> RPrefixes = R.getValueAsListOfStrings("Prefixes");
     OS << ", " << Prefixes[PrefixKeyT(RPrefixes.begin(), RPrefixes.end())];
     OS << ", " << GetRefID(R, "Group") << ", " << GetRefID(R, "Alias");
-    OS << ", " << HelpTextVariantsOffset.lookup(&R) << ", ";
-    PrintSubCommandIdsOffset(R);
-    OS << ", llvm::opt::Option::"
+    OS << ", " << ExtraOffset.lookup(&R) << ", llvm::opt::Option::"
        << R.getValueAsDef("Kind")->getValueAsString("Name") << "Class, "
        << R.getValueAsInt("NumArgs") << "},\n";
   }
@@ -492,7 +515,7 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
   OS << "    OptionStrTable, OptionPrefixesTable, "
      << (PrefixesUnion.empty() ? "{}" : "OptionPrefixesUnion")
      << ", OptionInfoTable,\n";
-  OS << "    OptionHelpTextVariantsTable, "
+  OS << "    OptionInfoExtrasTable, OptionHelpTextVariantsTable, "
      << (SubCommands.empty() ? "{}" : "OptionSubCommands")
      << ", OptionSubCommandIDsTable};\n";
   OS << "#endif // OPTTABLE_CODE\n\n";
@@ -569,8 +592,7 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
     OS << ", 0";
 
     // The option SubCommandIDsOffset.
-    OS << ", ";
-    PrintSubCommandIdsOffset(R);
+    OS << ", " << GetSubCommandIDsOffset(R);
     OS << ")\n";
   }
   OS << "\n";
@@ -636,8 +658,7 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
     writeStrTableOffset(OS, Table, getOptionalString(R, "Values"));
 
     // The option SubCommandIDsOffset.
-    OS << ", ";
-    PrintSubCommandIdsOffset(R);
+    OS << ", " << GetSubCommandIDsOffset(R);
   };
 
   auto IsMarshallingOption = [](const Record &R) {
