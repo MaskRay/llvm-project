@@ -15,6 +15,7 @@ set(LLVM_LINK_COMPONENTS
 set(ANALYSIS_TEST_SOURCES
   AliasAnalysisTest.cpp
   AliasSetTrackerTest.cpp
+  AnalysisOptionsTest.cpp
   AssumeBundleQueriesTest.cpp
   BasicAliasAnalysisTest.cpp
   BlockFrequencyInfoTest.cpp

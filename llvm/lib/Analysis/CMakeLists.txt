@@ -53,6 +53,7 @@ add_llvm_component_library(LLVMAnalysis
   AliasAnalysis.cpp
   AliasAnalysisEvaluator.cpp
   AliasSetTracker.cpp
+  AnalysisOptions.cpp
   Analysis.cpp
   AssumeBundleQueries.cpp
   AssumptionCache.cpp
@@ -193,6 +194,7 @@ add_llvm_component_library(LLVMAnalysis
   Core
   FrontendHLSL
   Object
+  Option
   ProfileData
   Support
   TargetParser

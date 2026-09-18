@@ -136,6 +136,9 @@ class Option<list<string> prefixes, string name, OptionKind kind,
   code Denormalizer = "";
   list<code> NormalizedValues = ?;
   list<SubCommand> SubCommands = subcommands;
+  // The parsed value's field in a TableGen'd options struct, see OPTION_VALUE.
+  code FieldType = ?;
+  code FieldName = ?;
 }
 
 // Helpers for defining options.
@@ -167,6 +170,11 @@ class JoinedAndSeparate<list<string> prefixes, string name,
 // Mix-ins for adding optional attributes.
 
 class Alias<Option alias> { Option Alias = alias; }
+class Field<code type, code name, code default = ""> {
+  code FieldType = type;
+  code FieldName = name;
+  code DefaultValue = default;
+}
 class AliasArgs<list<string> aliasargs> { list<string> AliasArgs = aliasargs; }
 class EnumName<string name> { string EnumName = name; }
 class Flags<list<OptionFlag> flags> { list<OptionFlag> Flags = flags; }

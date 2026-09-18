@@ -1532,6 +1532,15 @@ void CommandLineParser::ResetAllOptionOccurrences() {
   }
 }
 
+static SmallVector<cl::LibraryOptionsParser, 4> &libraryOptionsParsers() {
+  static SmallVector<cl::LibraryOptionsParser, 4> Parsers;
+  return Parsers;
+}
+
+void cl::addLibraryOptionsParser(LibraryOptionsParser P) {
+  libraryOptionsParsers().push_back(P);
+}
+
 bool CommandLineParser::ParseCommandLineOptions(
     int argc, const char *const *argv, StringRef Overview, raw_ostream *Errs,
     vfs::FileSystem *VFS, bool LongOptionsUseDoubleDash) {
@@ -1557,6 +1566,15 @@ bool CommandLineParser::ParseCommandLineOptions(
   if (Error Err = ECtx.expandResponseFiles(newArgv)) {
     *Errs << toString(std::move(Err)) << '\n';
     return false;
+  }
+  for (LibraryOptionsParser P : libraryOptionsParsers()) {
+    SmallVector<const char *, 20> Rest;
+    if (!P(newArgv, Rest)) {
+      if (!IgnoreErrors)
+        exit(1);
+      return false;
+    }
+    newArgv = std::move(Rest);
   }
   argv = &newArgv[0];
   argc = static_cast<int>(newArgv.size());

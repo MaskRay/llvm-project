@@ -675,7 +675,19 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
     if (IsMarshallingOption(R))
       OptsWithMarshalling.push_back(&R);
   }
-  OS << "#endif // OPTION\n";
+  OS << "#endif // OPTION\n\n";
+
+  // Dump the options that a TableGen'd struct stores.
+  OS << "#ifdef OPTION_VALUE\n";
+  for (const Record &R : llvm::make_pointee_range(Opts)) {
+    if (isa<UnsetInit>(R.getValueInit("FieldName")))
+      continue;
+    OS << "OPTION_VALUE(" << getOptionName(R) << ", "
+       << R.getValueAsString("FieldType") << ", "
+       << R.getValueAsString("FieldName") << ", "
+       << getOptionalString(R, "DefaultValue") << ")\n";
+  }
+  OS << "#endif // OPTION_VALUE\n";
 
   auto CmpMarshallingOpts = [](const Record *const *A, const Record *const *B) {
     unsigned AID = (*A)->getID();

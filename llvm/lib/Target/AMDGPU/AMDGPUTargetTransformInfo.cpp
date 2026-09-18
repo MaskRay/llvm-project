@@ -1691,9 +1691,11 @@ static unsigned adjustInliningThresholdUsingCallee(const CallBase *CB,
   // The penalty cost is computed relative to the cost of instructions and does
   // not model any storage costs.
   adjustThreshold += std::max(0, SGPRsInUse - NrOfSGPRUntilSpill) *
-                     ArgStackCost.getValue() * InlineConstants::getInstrCost();
+                     ArgStackCost.getValue() *
+                     InlineConstants::getInstrCost(CB->getContext());
   adjustThreshold += std::max(0, VGPRsInUse - NrOfVGPRUntilSpill) *
-                     ArgStackCost.getValue() * InlineConstants::getInstrCost();
+                     ArgStackCost.getValue() *
+                     InlineConstants::getInstrCost(CB->getContext());
   return adjustThreshold;
 }
 

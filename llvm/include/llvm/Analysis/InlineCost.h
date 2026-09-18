@@ -46,7 +46,7 @@ const int OptMinSizeThreshold = 5;
 const int OptAggressiveThreshold = 250;
 
 // Various magic constants used to adjust heuristics.
-LLVM_ABI int getInstrCost();
+LLVM_ABI int getInstrCost(const LLVMContext &Ctx);
 const int IndirectCallThreshold = 100;
 const int LoopPenalty = 25;
 const int ColdccPenalty = 2000;

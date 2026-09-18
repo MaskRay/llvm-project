@@ -63,6 +63,13 @@ namespace cl {
 // that give precedence to later occurrences.  If your program supports options
 // that give precedence to earlier occurrences, you will need to extend this
 // function to support it correctly.
+/// Parses the options a library keeps in a TableGen'd struct out of \p Args,
+/// appending what it does not own to \p Rest. Registered parsers run on every
+/// ParseCommandLineOptions call before cl:: sees the arguments.
+using LibraryOptionsParser = bool (*)(ArrayRef<const char *> Args,
+                                      SmallVectorImpl<const char *> &Rest);
+LLVM_ABI void addLibraryOptionsParser(LibraryOptionsParser P);
+
 LLVM_ABI bool ParseCommandLineOptions(int argc, const char *const *argv,
                                       StringRef Overview = "",
                                       raw_ostream *Errs = nullptr,

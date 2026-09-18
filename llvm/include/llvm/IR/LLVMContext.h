@@ -73,6 +73,18 @@ public:
   LLVMContext &operator=(const LLVMContext &) = delete;
   LLVM_ABI ~LLVMContext();
 
+  /// Libraries whose parsed option struct a tool may attach to a context; see
+  /// llvm/Analysis/AnalysisOptions.h.
+  enum class OptionsKind : unsigned { Analysis, NumKinds };
+
+  /// The options a tool attached with setOptions, or null.
+  template <class T> const T *getOptions() const {
+    return static_cast<const T *>(Options[unsigned(T::Kind)]);
+  }
+  template <class T> void setOptions(const T *O) {
+    Options[unsigned(T::Kind)] = O;
+  }
+
   // Pinned metadata names, which always have the same value.  This is a
   // compile-time performance optimization, not a correctness optimization.
   enum : unsigned {
@@ -363,6 +375,8 @@ private:
 
   /// removeModule - Unregister a module from this context.
   void removeModule(Module *);
+
+  const void *Options[unsigned(OptionsKind::NumKinds)] = {};
 };
 
 // Create wrappers for C Binding types (see CBindingWrapping.h).
