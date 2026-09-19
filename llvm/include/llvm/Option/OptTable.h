@@ -254,11 +254,10 @@ private:
                                           unsigned &Index) const;
 
 protected:
-  OptTable(const Tables &Tables, bool IgnoreCase = false);
-
   void setValuesCodeFn(ValuesCodeFnTy Fn) { ValuesCodeFn = Fn; }
 
 public:
+  OptTable(const Tables &Tables, bool IgnoreCase = false);
   virtual ~OptTable();
 
   /// Return the string table used for option names.
@@ -508,12 +507,19 @@ public:
                  unsigned FlagsToInclude, unsigned FlagsToExclude,
                  bool ShowAllAliases) const;
 
+  /// Print the option lists of printHelp, without its header.
+  LLVM_ABI void printHelpOptions(raw_ostream &OS, bool ShowHidden) const;
+
 private:
   void internalPrintHelp(raw_ostream &OS, const char *Usage, const char *Title,
                          StringRef SubCommand, bool ShowHidden,
                          bool ShowAllAliases,
                          std::function<bool(const Info &)> ExcludeOption,
                          Visibility VisibilityMask) const;
+  void printHelpOptions(raw_ostream &OS, StringRef SubCommand, bool ShowHidden,
+                        bool ShowAllAliases,
+                        std::function<bool(const Info &)> ExcludeOption,
+                        Visibility VisibilityMask) const;
 };
 
 } // end namespace opt

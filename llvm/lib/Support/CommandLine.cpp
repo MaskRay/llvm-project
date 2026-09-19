@@ -176,6 +176,9 @@ public:
   // This collects additional help to be printed.
   std::vector<StringRef> MoreHelp;
 
+  // Libraries whose options live in a struct rather than here.
+  SmallVector<const LibraryOptions *, 4> Libraries;
+
   // This collects Options added with the cl::DefaultOption flag. Since they can
   // be overridden, they are not added to the appropriate SubCommands until
   // ParseCommandLineOptions actually runs.
@@ -439,18 +442,12 @@ static CommandLineParser &globalParser() {
 
 template <typename T, T TrueVal, T FalseVal>
 static bool parseBool(Option &O, StringRef ArgName, StringRef Arg, T &Value) {
-  if (Arg == "" || Arg == "true" || Arg == "TRUE" || Arg == "True" ||
-      Arg == "1") {
-    Value = TrueVal;
-    return false;
-  }
-
-  if (Arg == "false" || Arg == "FALSE" || Arg == "False" || Arg == "0") {
-    Value = FalseVal;
-    return false;
-  }
-  return O.error("'" + Arg +
-                 "' is invalid value for boolean argument! Try 0 or 1");
+  bool B;
+  if (!to_bool(Arg, B))
+    return O.error("'" + Arg +
+                   "' is invalid value for boolean argument! Try 0 or 1");
+  Value = B ? TrueVal : FalseVal;
+  return false;
 }
 
 void cl::AddLiteralOption(Option &O, StringRef Name) {
@@ -1530,6 +1527,14 @@ void CommandLineParser::ResetAllOptionOccurrences() {
     if (SC->ConsumeAfterOpt)
       SC->ConsumeAfterOpt->reset();
   }
+  for (const LibraryOptions *L : Libraries)
+    L->Reset();
+}
+
+void cl::registerLibraryOptions(const LibraryOptions &L) {
+  auto &Libraries = globalParser().Libraries;
+  if (!is_contained(Libraries, &L))
+    Libraries.push_back(&L);
 }
 
 bool CommandLineParser::ParseCommandLineOptions(
@@ -1557,6 +1562,15 @@ bool CommandLineParser::ParseCommandLineOptions(
   if (Error Err = ECtx.expandResponseFiles(newArgv)) {
     *Errs << toString(std::move(Err)) << '\n';
     return false;
+  }
+  for (const LibraryOptions *L : Libraries) {
+    SmallVector<const char *, 20> Rest;
+    if (!L->Parse(newArgv, Rest, *Errs)) {
+      if (!IgnoreErrors)
+        exit(1);
+      return false;
+    }
+    newArgv = std::move(Rest);
   }
   argv = &newArgv[0];
   argc = static_cast<int>(newArgv.size());
@@ -2518,6 +2532,8 @@ public:
 
     outs() << "OPTIONS:\n";
     printOptions(Opts, MaxArgLen);
+    for (const LibraryOptions *L : globalParser().Libraries)
+      L->PrintHelp(outs(), ShowHidden);
 
     // Print any extra help the user has declared.
     for (const auto &I : globalParser().MoreHelp)

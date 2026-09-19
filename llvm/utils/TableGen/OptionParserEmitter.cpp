@@ -624,7 +624,8 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
 
   auto IsMarshallingOption = [](const Record &R) {
     return !isa<UnsetInit>(R.getValueInit("KeyPath")) &&
-           !R.getValueAsString("KeyPath").empty();
+           !R.getValueAsString("KeyPath").empty() &&
+           isa<UnsetInit>(R.getValueInit("FieldType"));
   };
 
   std::vector<const Record *> OptsWithMarshalling;
@@ -636,7 +637,35 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
     if (IsMarshallingOption(R))
       OptsWithMarshalling.push_back(&R);
   }
-  OS << "#endif // OPTION\n";
+  OS << "#endif // OPTION\n\n";
+
+  // Dump the options a struct stores: OPTION_VALUE(ID, TYPE, NAME, DEFAULT), or
+  // OPTION_ENUM_VALUE(ID, TYPE, NAME, DEFAULT, {spelling, value}...) for an
+  // enumeration with NormalizedValues.
+  OS << "#ifdef OPTION_VALUE\n";
+  for (const Record &R : llvm::make_pointee_range(Opts)) {
+    if (isa<UnsetInit>(R.getValueInit("FieldType")))
+      continue;
+    bool IsEnum = !isa<UnsetInit>(R.getValueInit("NormalizedValues"));
+    OS << (IsEnum ? "OPTION_ENUM_VALUE(" : "OPTION_VALUE(") << getOptionName(R)
+       << ", " << R.getValueAsString("FieldType") << ", "
+       << R.getValueAsString("KeyPath") << ", "
+       << getOptionalString(R, "DefaultValue");
+    if (IsEnum) {
+      SmallVector<StringRef> Values;
+      R.getValueAsString("Values").split(Values, ',');
+      StringRef Scope = R.getValueAsString("NormalizedValuesScope");
+      for (auto [Spelling, Value] :
+           zip_equal(Values, R.getValueAsListOfStrings("NormalizedValues"))) {
+        OS << ", {\"" << Spelling << "\", ";
+        if (!Scope.empty())
+          OS << Scope << "::";
+        OS << Value << '}';
+      }
+    }
+    OS << ")\n";
+  }
+  OS << "#endif // OPTION_VALUE\n";
 
   auto CmpMarshallingOpts = [](const Record *const *A, const Record *const *B) {
     unsigned AID = (*A)->getID();

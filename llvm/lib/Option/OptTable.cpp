@@ -746,10 +746,6 @@ void OptTable::internalPrintHelp(
     Visibility VisibilityMask) const {
   OS << "OVERVIEW: " << Title << "\n\n";
 
-  // Render help text into a map of group-name to a list of (option, help)
-  // pairs.
-  std::map<StringRef, std::vector<OptionInfo>> GroupedOptionHelp;
-
   auto ActiveSubCommand = llvm::find_if(
       SubCommands, [&](const auto &C) { return SubCommand == C.Name; });
   if (!SubCommand.empty()) {
@@ -767,6 +763,25 @@ void OptTable::internalPrintHelp(
       OS << "\n";
     }
   }
+  printHelpOptions(OS, SubCommand, ShowHidden, ShowAllAliases,
+                   std::move(ExcludeOption), VisibilityMask);
+}
+
+void OptTable::printHelpOptions(raw_ostream &OS, bool ShowHidden) const {
+  printHelpOptions(
+      OS, {}, ShowHidden, /*ShowAllAliases=*/false,
+      [](const Info &) { return false; }, Visibility());
+}
+
+void OptTable::printHelpOptions(raw_ostream &OS, StringRef SubCommand,
+                                bool ShowHidden, bool ShowAllAliases,
+                                std::function<bool(const Info &)> ExcludeOption,
+                                Visibility VisibilityMask) const {
+  // Render help text into a map of group-name to a list of (option, help)
+  // pairs.
+  std::map<StringRef, std::vector<OptionInfo>> GroupedOptionHelp;
+  auto ActiveSubCommand = llvm::find_if(
+      SubCommands, [&](const auto &C) { return SubCommand == C.Name; });
 
   auto DoesOptionBelongToSubcommand = [&](const Info &CandidateInfo) {
     // Retrieve the SubCommandIDs registered to the given current CandidateInfo

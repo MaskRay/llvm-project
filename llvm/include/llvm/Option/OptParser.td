@@ -136,6 +136,11 @@ class Option<list<string> prefixes, string name, OptionKind kind,
   code Denormalizer = "";
   list<code> NormalizedValues = ?;
   list<SubCommand> SubCommands = subcommands;
+  // With KeyPath, the type of the struct member that stores the option's
+  // value; -gen-opt-parser-defs then lists the option under OPTION_VALUE (or
+  // OPTION_ENUM_VALUE with NormalizedValues) rather than
+  // OPTION_WITH_MARSHALLING.
+  code FieldType = ?;
 }
 
 // Helpers for defining options.
@@ -167,6 +172,12 @@ class JoinedAndSeparate<list<string> prefixes, string name,
 // Mix-ins for adding optional attributes.
 
 class Alias<Option alias> { Option Alias = alias; }
+// Store the option's value in the struct member `name`.
+class Field<code type, code name, code default = ""> {
+  code FieldType = type;
+  code KeyPath = name;
+  code DefaultValue = default;
+}
 class AliasArgs<list<string> aliasargs> { list<string> AliasArgs = aliasargs; }
 class EnumName<string name> { string EnumName = name; }
 class Flags<list<OptionFlag> flags> { list<OptionFlag> Flags = flags; }

@@ -293,6 +293,19 @@ template <typename N> bool to_integer(StringRef S, N &Num, unsigned Base = 0) {
   return !S.getAsInteger(Base, Num);
 }
 
+/// Convert a command line boolean spelling to \p B: "true", "TRUE", "True" or
+/// "1", their false counterparts, or the empty string for true. Returns true
+/// if \p S was one of these.
+inline bool to_bool(StringRef S, bool &B) {
+  if (S == "" || S == "true" || S == "TRUE" || S == "True" || S == "1")
+    B = true;
+  else if (S == "false" || S == "FALSE" || S == "False" || S == "0")
+    B = false;
+  else
+    return false;
+  return true;
+}
+
 namespace detail {
 template <typename N>
 inline bool to_float(const Twine &T, N &Num, N (*StrTo)(const char *, char **)) {

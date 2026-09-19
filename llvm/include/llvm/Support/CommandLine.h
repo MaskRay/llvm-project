@@ -49,6 +49,22 @@ class ElementCount;
 /// It is intentionally a short name to make qualified usage concise.
 namespace cl {
 
+/// The command line interface of a library whose options live in a struct
+/// rather than in cl::opt globals. Once registered, the library parses ahead
+/// of cl:: in ParseCommandLineOptions, prints under --help, and resets in
+/// ResetAllOptionOccurrences.
+struct LibraryOptions {
+  /// Parses the library's options out of \p Args, appending every other
+  /// argument to \p Rest in order; reports errors to \p Errs and returns
+  /// false.
+  bool (*Parse)(ArrayRef<const char *> Args,
+                SmallVectorImpl<const char *> &Rest, raw_ostream &Errs);
+  void (*PrintHelp)(raw_ostream &OS, bool ShowHidden);
+  void (*Reset)();
+};
+/// Registers \p L once; \p L must outlive the parser.
+LLVM_ABI void registerLibraryOptions(const LibraryOptions &L);
+
 //===----------------------------------------------------------------------===//
 // Command line option processing entry point.
 //
