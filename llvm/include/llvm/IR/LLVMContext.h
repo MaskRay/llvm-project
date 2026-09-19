@@ -353,7 +353,23 @@ public:
   /// the global tracker.
   LLVM_ABI uint64_t incNextDILocationAtomGroup();
 
+  /// The command line options of a library, as code working on this context
+  /// reads them: what a tool attached with setOptions, else the instance
+  /// cl::ParseCommandLineOptions fills. T is a struct such as PassesOptions,
+  /// with static members slot(), a number from allocateOptionsSlot(), and
+  /// current().
+  template <class T> const T &getOptions() const {
+    if (const void *O = getOptions(T::slot()))
+      return *static_cast<const T *>(O);
+    return T::current();
+  }
+  template <class T> void setOptions(const T &O) { setOptions(T::slot(), &O); }
+  LLVM_ABI static unsigned allocateOptionsSlot();
+
 private:
+  LLVM_ABI const void *getOptions(unsigned Slot) const;
+  LLVM_ABI void setOptions(unsigned Slot, const void *O);
+
   // Module needs access to the add/removeModule methods.
   friend class Module;
 

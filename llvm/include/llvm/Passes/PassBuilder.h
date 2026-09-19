@@ -36,6 +36,7 @@ class StringRef;
 class AAManager;
 class TargetMachine;
 class ModuleSummaryIndex;
+struct PassesOptions;
 
 /// Tunable parameters for passes in the default pipelines.
 class PipelineTuningOptions {
@@ -117,6 +118,10 @@ class PassBuilder {
   std::optional<PGOOptions> PGOOpt;
   PassInstrumentationCallbacks *PIC;
   IntrusiveRefCntPtr<vfs::FileSystem> FS;
+  /// The command line options the default pipelines consult
+  /// (llvm/Passes/PassesOptions.td): what the constructor was given, else
+  /// PassesOptions::current().
+  const PassesOptions &Opts;
 
 public:
   /// A struct to capture parsed pass pipeline names.
@@ -137,7 +142,8 @@ public:
       PipelineTuningOptions PTO = PipelineTuningOptions(),
       std::optional<PGOOptions> PGOOpt = std::nullopt,
       PassInstrumentationCallbacks *PIC = nullptr,
-      IntrusiveRefCntPtr<vfs::FileSystem> FS = vfs::getRealFileSystem());
+      IntrusiveRefCntPtr<vfs::FileSystem> FS = vfs::getRealFileSystem(),
+      const PassesOptions *Opts = nullptr);
 
   /// Cross register the analysis managers through their proxies.
   ///

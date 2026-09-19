@@ -4233,6 +4233,14 @@ cc_library(
     textual_hdrs = ["lib/Passes/PassRegistry.def"],
 )
 
+gentbl_cc_library(
+    name = "passes_options_gen",
+    tbl_outs = {"include/llvm/Passes/PassesOptions.inc": ["-gen-opt-parser-defs"]},
+    tblgen = ":llvm-tblgen",
+    td_file = "include/llvm/Passes/PassesOptions.td",
+    deps = [":OptParserTdFiles"],
+)
+
 cc_library(
     name = "Passes",
     srcs = glob([
@@ -4258,6 +4266,7 @@ cc_library(
         ":Instrumentation",
         ":MC",
         ":ObjCARC",
+        ":Option",
         ":Plugins",
         ":Scalar",
         ":Support",
@@ -4267,6 +4276,7 @@ cc_library(
         ":common_transforms",
         ":config",
         ":pass_registry_def",
+        ":passes_options_gen",
     ],
 )
 

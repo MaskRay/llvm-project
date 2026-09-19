@@ -176,6 +176,13 @@ public:
   // This collects additional help to be printed.
   std::vector<StringRef> MoreHelp;
 
+  // Libraries whose options live in a struct rather than here, and the index
+  // of their option names, extended when ParseCommandLineOptions finds
+  // libraries registered since it last ran.
+  SmallVector<const LibraryOptions *, 4> Libraries;
+  StringMap<const LibraryOptions *> LibraryOptionsMap;
+  unsigned NumIndexedLibraries = 0;
+
   // This collects Options added with the cl::DefaultOption flag. Since they can
   // be overridden, they are not added to the appropriate SubCommands until
   // ParseCommandLineOptions actually runs.
@@ -237,7 +244,8 @@ public:
         return;
 
       // Add argument to the argument map!
-      if (!SC->OptionsMap.insert(std::make_pair(O->ArgStr, O)).second) {
+      if (!SC->OptionsMap.insert(std::make_pair(O->ArgStr, O)).second ||
+          LibraryOptionsMap.contains(O->ArgStr)) {
         errs() << ProgramName << ": CommandLine Error: Option '" << O->ArgStr
                << "' registered more than once!\n";
         HadErrors = true;
@@ -423,6 +431,10 @@ private:
     return Opt;
   }
   SubCommand *LookupSubCommand(StringRef Name, std::string &NearestString);
+
+  void indexLibraryOptions();
+  bool parseLibraryOptions(SmallVectorImpl<const char *> &Args,
+                           raw_ostream &Errs);
 };
 
 } // namespace
@@ -439,18 +451,12 @@ static CommandLineParser &globalParser() {
 
 template <typename T, T TrueVal, T FalseVal>
 static bool parseBool(Option &O, StringRef ArgName, StringRef Arg, T &Value) {
-  if (Arg == "" || Arg == "true" || Arg == "TRUE" || Arg == "True" ||
-      Arg == "1") {
-    Value = TrueVal;
-    return false;
-  }
-
-  if (Arg == "false" || Arg == "FALSE" || Arg == "False" || Arg == "0") {
-    Value = FalseVal;
-    return false;
-  }
-  return O.error("'" + Arg +
-                 "' is invalid value for boolean argument! Try 0 or 1");
+  bool B;
+  if (!to_bool(Arg, B))
+    return O.error("'" + Arg +
+                   "' is invalid value for boolean argument! Try 0 or 1");
+  Value = B ? TrueVal : FalseVal;
+  return false;
 }
 
 void cl::AddLiteralOption(Option &O, StringRef Name) {
@@ -1530,6 +1536,60 @@ void CommandLineParser::ResetAllOptionOccurrences() {
     if (SC->ConsumeAfterOpt)
       SC->ConsumeAfterOpt->reset();
   }
+  for (const LibraryOptions *L : Libraries)
+    L->Reset();
+}
+
+void cl::registerLibraryOptions(const LibraryOptions &L) {
+  auto &Libraries = globalParser().Libraries;
+  if (!is_contained(Libraries, &L))
+    Libraries.push_back(&L);
+}
+
+void CommandLineParser::indexLibraryOptions() {
+  bool HadErrors = false;
+  for (const LibraryOptions *L : drop_begin(Libraries, NumIndexedLibraries)) {
+    L->ForEachName([&](StringRef Name) {
+      auto [It, New] = LibraryOptionsMap.try_emplace(Name, L);
+      bool Registered = !New && It->second != L;
+      for (SubCommand *SC : RegisteredSubCommands)
+        Registered |= SC->OptionsMap.contains(Name);
+      if (Registered) {
+        errs() << ProgramName << ": CommandLine Error: Option '" << Name
+               << "' registered more than once!\n";
+        HadErrors = true;
+      }
+    });
+  }
+  NumIndexedLibraries = Libraries.size();
+  if (HadErrors)
+    report_fatal_error("inconsistency in registered CommandLine options");
+}
+
+// Hands Args to each library that declares an option they mention, keeping
+// what the libraries leave.
+bool CommandLineParser::parseLibraryOptions(SmallVectorImpl<const char *> &Args,
+                                            raw_ostream &Errs) {
+  if (NumIndexedLibraries != Libraries.size())
+    indexLibraryOptions();
+  SmallVector<const LibraryOptions *, 2> Mentioned;
+  for (const char *Arg : drop_begin(Args)) {
+    StringRef Name = Arg;
+    if (!Name.consume_front("-"))
+      continue;
+    Name.consume_front("-");
+    Name = Name.split('=').first;
+    auto It = LibraryOptionsMap.find(Name);
+    if (It != LibraryOptionsMap.end() && !is_contained(Mentioned, It->second))
+      Mentioned.push_back(It->second);
+  }
+  for (const LibraryOptions *L : Mentioned) {
+    SmallVector<const char *, 20> Rest;
+    if (!L->Parse(Args, Rest, Errs))
+      return false;
+    Args = std::move(Rest);
+  }
+  return true;
 }
 
 bool CommandLineParser::ParseCommandLineOptions(
@@ -1556,6 +1616,11 @@ bool CommandLineParser::ParseCommandLineOptions(
   ExpansionContext ECtx(A, Tokenize, VFS);
   if (Error Err = ECtx.expandResponseFiles(newArgv)) {
     *Errs << toString(std::move(Err)) << '\n';
+    return false;
+  }
+  if (!parseLibraryOptions(newArgv, *Errs)) {
+    if (!IgnoreErrors)
+      exit(1);
     return false;
   }
   argv = &newArgv[0];
@@ -2518,6 +2583,8 @@ public:
 
     outs() << "OPTIONS:\n";
     printOptions(Opts, MaxArgLen);
+    for (const LibraryOptions *L : globalParser().Libraries)
+      L->PrintHelp(outs(), ShowHidden);
 
     // Print any extra help the user has declared.
     for (const auto &I : globalParser().MoreHelp)

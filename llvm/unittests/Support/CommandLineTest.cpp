@@ -2502,4 +2502,62 @@ TEST(CommandLineTest, HelpWithEmptyCategory) {
   cl::ResetCommandLineParser();
 }
 
+std::vector<std::string> LibraryArgs;
+const cl::LibraryOptions TestLibrary = {
+    [](function_ref<void(StringRef)> F) {
+      F("library-flag");
+      F("library-int");
+    },
+    [](ArrayRef<const char *> Args, SmallVectorImpl<const char *> &Rest,
+       raw_ostream &) {
+      for (unsigned I = 0, E = Args.size(); I != E; ++I) {
+        StringRef Arg = Args[I];
+        if (Arg == "-library-flag")
+          LibraryArgs.push_back(Args[I]);
+        else if (Arg == "-library-int" && I + 1 != E)
+          LibraryArgs.insert(LibraryArgs.end(), {Args[I], Args[++I]});
+        else
+          Rest.push_back(Args[I]);
+      }
+      return true;
+    },
+    [](raw_ostream &OS, bool) { OS << "\nLIBRARY OPTIONS:\n"; },
+    [] { LibraryArgs.clear(); }};
+
+TEST(CommandLineTest, LibraryOptions) {
+  cl::ResetCommandLineParser();
+  cl::registerLibraryOptions(TestLibrary);
+  StackOption<int> Local("local");
+
+  const char *Args[] = {"prog", "-library-flag", "--local=3", "-library-int",
+                        "4"};
+  EXPECT_TRUE(cl::ParseCommandLineOptions(std::size(Args), Args, StringRef(),
+                                          &llvm::nulls()));
+  EXPECT_EQ(Local, 3);
+  EXPECT_THAT(LibraryArgs,
+              testing::ElementsAre("-library-flag", "-library-int", "4"));
+  cl::ResetAllOptionOccurrences();
+  EXPECT_TRUE(LibraryArgs.empty());
+
+  auto Output = interceptStdout(
+      []() { cl::PrintHelpMessage(/*Hidden=*/false, /*Categorized=*/false); });
+  EXPECT_NE(std::string::npos, Output.find("LIBRARY OPTIONS:"));
+  cl::ResetCommandLineParser();
+}
+
+#if GTEST_HAS_DEATH_TEST
+TEST(CommandLineTest, LibraryOptionsConflict) {
+  cl::ResetCommandLineParser();
+  cl::registerLibraryOptions(TestLibrary);
+  const char *Args[] = {"prog"};
+  EXPECT_DEATH(
+      {
+        StackOption<int> Clash("library-int");
+        cl::ParseCommandLineOptions(std::size(Args), Args);
+      },
+      "Option 'library-int' registered more than once");
+  cl::ResetCommandLineParser();
+}
+#endif
+
 } // anonymous namespace

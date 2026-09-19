@@ -216,6 +216,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/Passes/OptimizationLevel.h"
+#include "llvm/Passes/PassesOptions.h"
 #include "llvm/Passes/TriggerCrashPasses.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/CommandLine.h"
@@ -590,8 +591,10 @@ static Expected<OptimizationLevel> parseOptLevelParam(StringRef S) {
 PassBuilder::PassBuilder(TargetMachine *TM, PipelineTuningOptions PTO,
                          std::optional<PGOOptions> PGOOpt,
                          PassInstrumentationCallbacks *PIC,
-                         IntrusiveRefCntPtr<vfs::FileSystem> FS)
-    : TM(TM), PTO(PTO), PGOOpt(PGOOpt), PIC(PIC), FS(std::move(FS)) {
+                         IntrusiveRefCntPtr<vfs::FileSystem> FS,
+                         const PassesOptions *Opts)
+    : TM(TM), PTO(PTO), PGOOpt(PGOOpt), PIC(PIC), FS(std::move(FS)),
+      Opts(Opts ? *Opts : PassesOptions::current()) {
   if (TM)
     TM->registerPassBuilderCallbacks(*this);
   if (PIC) {

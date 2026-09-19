@@ -1822,6 +1822,9 @@ public:
 
   mutable OptPassGate *OPG = nullptr;
 
+  /// Per-library option structs a tool attached, by slot.
+  SmallVector<const void *, 4> Options;
+
   /// Access the object which can disable optional passes and individual
   /// optimizations at compile time.
   OptPassGate &getOptPassGate() const;

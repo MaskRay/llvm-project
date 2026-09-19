@@ -46,6 +46,7 @@ group("unittests") {
     "Object:ObjectTests",
     "ObjectYAML:ObjectYAMLTests",
     "Option:OptionTests",
+    "Passes:PassesTests",
     "Passes/PassBuilderBindings:PassesBindingsTests",
     "Passes/Plugins:PluginsTests",
     "ProfileData:ProfileDataTests",

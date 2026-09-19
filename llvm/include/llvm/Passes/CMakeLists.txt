@@ -1,0 +1,5 @@
+# -gen-opt-parser-defs is in llvm-tblgen, not llvm-min-tblgen.
+set(LLVM_TABLEGEN_PROJECT "")
+set(LLVM_TARGET_DEFINITIONS PassesOptions.td)
+tablegen(LLVM PassesOptions.inc -gen-opt-parser-defs)
+add_public_tablegen_target(passes_options_gen)

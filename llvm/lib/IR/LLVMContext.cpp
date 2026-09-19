@@ -24,6 +24,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include <atomic>
 #include <cassert>
 #include <string>
 #include <utility>
@@ -355,6 +356,21 @@ OptPassGate &LLVMContext::getOptPassGate() const {
 
 void LLVMContext::setOptPassGate(OptPassGate& OPG) {
   pImpl->setOptPassGate(OPG);
+}
+
+unsigned LLVMContext::allocateOptionsSlot() {
+  static std::atomic<unsigned> Next;
+  return Next++;
+}
+
+const void *LLVMContext::getOptions(unsigned Slot) const {
+  return Slot < pImpl->Options.size() ? pImpl->Options[Slot] : nullptr;
+}
+
+void LLVMContext::setOptions(unsigned Slot, const void *O) {
+  if (Slot >= pImpl->Options.size())
+    pImpl->Options.resize(Slot + 1);
+  pImpl->Options[Slot] = O;
 }
 
 const DiagnosticHandler *LLVMContext::getDiagHandlerPtr() const {

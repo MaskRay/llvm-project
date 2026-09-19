@@ -136,6 +136,11 @@ class Option<list<string> prefixes, string name, OptionKind kind,
   code Denormalizer = "";
   list<code> NormalizedValues = ?;
   list<SubCommand> SubCommands = subcommands;
+  // With KeyPath, the type of the struct member that stores the option's
+  // value; -gen-opt-parser-defs then lists the option under OPTION_VALUE (or
+  // OPTION_ENUM_VALUE with NormalizedValues) rather than
+  // OPTION_WITH_MARSHALLING.
+  code FieldType = ?;
 }
 
 // Helpers for defining options.
@@ -167,6 +172,32 @@ class JoinedAndSeparate<list<string> prefixes, string name,
 // Mix-ins for adding optional attributes.
 
 class Alias<Option alias> { Option Alias = alias; }
+// Store the option's value in the struct member `name`.
+class Field<code type, code name, code default = ""> {
+  code FieldType = type;
+  code KeyPath = name;
+  code DefaultValue = default;
+}
+
+// A C++ enumeration that -gen-opt-parser-defs defines under OPTION_ENUMS, so
+// that an option's type is declared next to the option. ExternalEnum names an
+// enumeration C++ declares elsewhere; only its spellings are used.
+class EnumMember<string name, string spelling, int value = -1> {
+  string Name = name;
+  string Spelling = spelling;
+  int Value = value;
+}
+class OptionEnum<string name, list<EnumMember> members, bit scoped = 1> {
+  string Name = name;
+  list<EnumMember> Members = members;
+  bit Scoped = scoped;
+  bit External = 0;
+}
+class ExternalEnum<string name, list<EnumMember> members, bit scoped = 1>
+    : OptionEnum<name, members, scoped> {
+  let External = 1;
+}
+
 class AliasArgs<list<string> aliasargs> { list<string> AliasArgs = aliasargs; }
 class EnumName<string name> { string EnumName = name; }
 class Flags<list<OptionFlag> flags> { list<OptionFlag> Flags = flags; }
@@ -277,5 +308,33 @@ class NormalizedValues<list<code> definitions> { list<code> NormalizedValues = d
 // aren't duplicated).
 def INPUT : Option<[], "<input>", KIND_INPUT>;
 def UNKNOWN : Option<[], "<unknown>", KIND_UNKNOWN>;
+
+// The spellings of cl::opt for options stored in a struct: -name=<v> or
+// -name <v>; -name or -name=<bool>; -name=<enumerator> or -name <enumerator>.
+multiclass ValueField<string name, code type, code member, code default,
+                      string help, list<OptionFlag> flags = []> {
+  def NAME#_EQ : Joined<["-", "--"], name#"=">, HelpText<help>,
+                 Field<type, member, default>, Flags<flags>;
+  def NAME : Separate<["-", "--"], name>, Alias<!cast<Option>(NAME#"_EQ")>,
+             Flags<flags>;
+}
+multiclass BoolField<string name, code member, code default, string help,
+                     list<OptionFlag> flags = []> {
+  def NAME#_EQ : Joined<["-", "--"], name#"=">, Field<"bool", member, default>,
+                 Flags<flags>;
+  def NAME : Flag<["-", "--"], name>, HelpText<help>,
+             Alias<!cast<Option>(NAME#"_EQ")>, AliasArgs<["true"]>,
+             Flags<flags>;
+}
+multiclass EnumField<string name, OptionEnum e, code member, code default,
+                     string help, list<OptionFlag> flags = []> {
+  def NAME#_EQ : Joined<["-", "--"], name#"=">, HelpText<help>,
+                 Field<e.Name, member, default>, Flags<flags>,
+                 Values<!interleave(!foreach(m, e.Members, m.Spelling), ",")>,
+                 NormalizedValuesScope<e.Name>,
+                 NormalizedValues<!foreach(m, e.Members, m.Name)>;
+  def NAME : Separate<["-", "--"], name>, Alias<!cast<Option>(NAME#"_EQ")>,
+             Flags<flags>;
+}
 
 #endif // LLVM_OPTION_OPTPARSER_TD
