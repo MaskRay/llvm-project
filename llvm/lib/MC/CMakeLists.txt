@@ -1,3 +1,7 @@
+set(LLVM_TARGET_DEFINITIONS MCTargetOptionsCommandFlags.td)
+tablegen(LLVM MCTargetOptionsCommandFlags.inc -gen-opt-parser-defs)
+add_public_tablegen_target(MCTargetOptionsCommandFlagsTableGen)
+
 add_llvm_component_library(LLVMMC
   ConstantPools.cpp
   DXContainerInfo.cpp
@@ -79,11 +83,13 @@ add_llvm_component_library(LLVMMC
   LINK_COMPONENTS
   BinaryFormat
   DebugInfoDWARFLowLevel
+  Option
   Support
   TargetParser
 
   DEPENDS
   intrinsics_gen
+  MCTargetOptionsCommandFlagsTableGen
   llvm_vcsrevision_h
   )
 

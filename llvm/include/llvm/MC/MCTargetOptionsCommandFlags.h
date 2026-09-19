@@ -16,74 +16,28 @@
 
 #include "llvm/Support/Compiler.h"
 #include <optional>
-#include <string>
 
 namespace llvm {
 
 class MCTargetOptions;
-enum class RelocSectionSymType;
-enum class EmitDwarfUnwindType;
 class StringRef;
 
 namespace mc {
 
-LLVM_ABI bool getRelaxAll();
-LLVM_ABI std::optional<bool> getExplicitRelaxAll();
-
-LLVM_ABI bool getIncrementalLinkerCompatible();
-
-LLVM_ABI bool getFDPIC();
-
-LLVM_ABI int getDwarfVersion();
-
-LLVM_ABI bool getDwarf64();
-
-LLVM_ABI EmitDwarfUnwindType getEmitDwarfUnwind();
-
-LLVM_ABI bool getEmitCompactUnwindNonCanonical();
-
-LLVM_ABI bool getEmitSFrameUnwind();
-
-LLVM_ABI bool getShowMCInst();
-
-LLVM_ABI bool getFatalWarnings();
-
-LLVM_ABI bool getNoWarn();
-
-LLVM_ABI bool getNoDeprecatedWarn();
-
-LLVM_ABI bool getNoTypeCheck();
-
-LLVM_ABI bool getSaveTempLabels();
-
-LLVM_ABI bool getCrel();
-
-LLVM_ABI bool getImplicitMapSyms();
-
-LLVM_ABI bool getX86RelaxRelocations();
-
-LLVM_ABI bool getX86Sse2Avx();
-
-LLVM_ABI bool getDisableIntegratedAS();
-
-LLVM_ABI RelocSectionSymType getRelocSectionSym();
-
-LLVM_ABI bool getLargeEHEncoding();
-
-LLVM_ABI StringRef getABIName();
-
-LLVM_ABI StringRef getAsSecureLogFile();
-
-/// Create this object with static storage to register mc-related command
-/// line options.
+/// Constructing this registers the options of MCTargetOptionsCommandFlags.td
+/// with cl::ParseCommandLineOptions.
 struct RegisterMCTargetOptionsFlags {
   LLVM_ABI RegisterMCTargetOptionsFlags();
 };
 
+/// The MCTargetOptions cl::ParseCommandLineOptions parsed.
 LLVM_ABI MCTargetOptions InitMCTargetOptionsFromFlags();
 
-} // namespace mc
+/// The value of -mc-relax-all if it was given.
+LLVM_ABI std::optional<bool> getExplicitRelaxAll();
+LLVM_ABI StringRef getABIName();
 
+} // namespace mc
 } // namespace llvm
 
-#endif
+#endif // LLVM_MC_MCTARGETOPTIONSCOMMANDFLAGS_H

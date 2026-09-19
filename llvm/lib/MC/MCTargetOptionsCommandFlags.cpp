@@ -1,4 +1,4 @@
-//===-- MCTargetOptionsCommandFlags.cpp -----------------------*- C++ //-*-===//
+//===-- MCTargetOptionsCommandFlags.cpp -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -13,230 +13,105 @@
 
 #include "llvm/MC/MCTargetOptionsCommandFlags.h"
 #include "llvm/MC/MCTargetOptions.h"
+#include "llvm/Option/ArgList.h"
+#include "llvm/Option/ArgValue.h"
+#include "llvm/Option/OptTable.h"
+#include "llvm/Option/Option.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/WithColor.h"
 
 using namespace llvm;
+using namespace llvm::opt;
 
-#define MCOPT(TY, NAME)                                                        \
-  static cl::opt<TY> *NAME##View;                                              \
-  TY llvm::mc::get##NAME() {                                                   \
-    assert(NAME##View && "RegisterMCTargetOptionsFlags not created.");         \
-    return *NAME##View;                                                        \
-  }
+namespace {
+enum ID {
+  OPT_INVALID = 0,
+#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
+#include "MCTargetOptionsCommandFlags.inc"
+#undef OPTION
+};
 
-#define MCSTROPT(NAME)                                                         \
-  static cl::opt<std::string> *NAME##View;                                     \
-  StringRef llvm::mc::get##NAME() {                                            \
-    assert(NAME##View && "RegisterMCTargetOptionsFlags not created.");         \
-    return *NAME##View;                                                        \
-  }
+#define OPTTABLE_CODE
+#include "MCTargetOptionsCommandFlags.inc"
 
-#define MCOPT_EXP(TY, NAME)                                                    \
-  MCOPT(TY, NAME)                                                              \
-  std::optional<TY> llvm::mc::getExplicit##NAME() {                            \
-    if (NAME##View->getNumOccurrences()) {                                     \
-      TY res = *NAME##View;                                                    \
-      return res;                                                              \
-    }                                                                          \
-    return std::nullopt;                                                       \
-  }
+std::optional<bool> ExplicitRelaxAll;
 
-MCOPT_EXP(bool, RelaxAll)
-MCOPT(bool, IncrementalLinkerCompatible)
-MCOPT(bool, FDPIC)
-MCOPT(int, DwarfVersion)
-MCOPT(bool, Dwarf64)
-MCOPT(EmitDwarfUnwindType, EmitDwarfUnwind)
-MCOPT(bool, EmitCompactUnwindNonCanonical)
-MCOPT(bool, EmitSFrameUnwind)
-MCOPT(bool, ShowMCInst)
-MCOPT(bool, FatalWarnings)
-MCOPT(bool, NoWarn)
-MCOPT(bool, NoDeprecatedWarn)
-MCOPT(bool, NoTypeCheck)
-MCOPT(bool, SaveTempLabels)
-MCOPT(bool, Crel)
-MCOPT(bool, ImplicitMapSyms)
-MCOPT(bool, X86RelaxRelocations)
-MCOPT(bool, X86Sse2Avx)
-MCOPT(bool, DisableIntegratedAS)
-MCOPT(RelocSectionSymType, RelocSectionSym)
-MCOPT(bool, LargeEHEncoding)
-MCSTROPT(ABIName)
-MCSTROPT(AsSecureLogFile)
-
-llvm::mc::RegisterMCTargetOptionsFlags::RegisterMCTargetOptionsFlags() {
-#define MCBINDOPT(NAME)                                                        \
-  do {                                                                         \
-    NAME##View = std::addressof(NAME);                                         \
-  } while (0)
-
-  static cl::opt<bool> RelaxAll(
-      "mc-relax-all", cl::desc("When used with filetype=obj, relax all fixups "
-                               "in the emitted object file"));
-  MCBINDOPT(RelaxAll);
-
-  static cl::opt<bool> IncrementalLinkerCompatible(
-      "incremental-linker-compatible",
-      cl::desc(
-          "When used with filetype=obj, "
-          "emit an object file which can be used with an incremental linker"));
-  MCBINDOPT(IncrementalLinkerCompatible);
-
-  static cl::opt<bool> FDPIC("fdpic", cl::desc("Use the FDPIC ABI"));
-  MCBINDOPT(FDPIC);
-
-  static cl::opt<int> DwarfVersion("dwarf-version", cl::desc("Dwarf version"),
-                                   cl::init(0));
-  MCBINDOPT(DwarfVersion);
-
-  static cl::opt<bool> Dwarf64(
-      "dwarf64",
-      cl::desc("Generate debugging info in the 64-bit DWARF format"));
-  MCBINDOPT(Dwarf64);
-
-  static cl::opt<EmitDwarfUnwindType> EmitDwarfUnwind(
-      "emit-dwarf-unwind", cl::desc("Whether to emit DWARF EH frame entries."),
-      cl::init(EmitDwarfUnwindType::Default),
-      cl::values(clEnumValN(EmitDwarfUnwindType::Always, "always",
-                            "Always emit EH frame entries"),
-                 clEnumValN(EmitDwarfUnwindType::NoCompactUnwind,
-                            "no-compact-unwind",
-                            "Only emit EH frame entries when compact unwind is "
-                            "not available"),
-                 clEnumValN(EmitDwarfUnwindType::DwarfOnly, "dwarf-only",
-                            "Force compact unwind to reference DWARF"),
-                 clEnumValN(EmitDwarfUnwindType::Default, "default",
-                            "Use target platform default")));
-  MCBINDOPT(EmitDwarfUnwind);
-
-  static cl::opt<bool> EmitCompactUnwindNonCanonical(
-      "emit-compact-unwind-non-canonical",
-      cl::desc(
-          "Whether to try to emit Compact Unwind for non canonical entries."),
-      cl::init(
-          false)); // By default, use DWARF for non-canonical personalities.
-  MCBINDOPT(EmitCompactUnwindNonCanonical);
-
-  static cl::opt<bool> EmitSFrameUnwind(
-      "gsframe", cl::desc("Whether to emit .sframe unwind sections."),
-      cl::init(false));
-  MCBINDOPT(EmitSFrameUnwind);
-
-  static cl::opt<bool> ShowMCInst(
-      "asm-show-inst",
-      cl::desc("Emit internal instruction representation to assembly file"));
-  MCBINDOPT(ShowMCInst);
-
-  static cl::opt<bool> FatalWarnings("fatal-warnings",
-                                     cl::desc("Treat warnings as errors"));
-  MCBINDOPT(FatalWarnings);
-
-  static cl::opt<bool> NoWarn("no-warn", cl::desc("Suppress all warnings"));
-  static cl::alias NoWarnW("W", cl::desc("Alias for --no-warn"),
-                           cl::aliasopt(NoWarn));
-  MCBINDOPT(NoWarn);
-
-  static cl::opt<bool> NoDeprecatedWarn(
-      "no-deprecated-warn", cl::desc("Suppress all deprecated warnings"));
-  MCBINDOPT(NoDeprecatedWarn);
-
-  static cl::opt<bool> NoTypeCheck(
-      "no-type-check", cl::desc("Suppress type errors (Wasm)"));
-  MCBINDOPT(NoTypeCheck);
-
-  static cl::opt<bool> SaveTempLabels(
-      "save-temp-labels", cl::desc("Don't discard temporary labels"));
-  MCBINDOPT(SaveTempLabels);
-
-  static cl::opt<bool> Crel("crel",
-                            cl::desc("Use CREL relocation format for ELF"));
-  MCBINDOPT(Crel);
-
-  static cl::opt<bool> ImplicitMapSyms(
-      "implicit-mapsyms",
-      cl::desc("Allow mapping symbol at section beginning to be implicit, "
-               "lowering number of mapping symbols at the expense of some "
-               "portability. Recommended for projects that can build all their "
-               "object files using this option"));
-  MCBINDOPT(ImplicitMapSyms);
-
-  static cl::opt<bool> X86RelaxRelocations(
-      "x86-relax-relocations",
-      cl::desc("Emit GOTPCRELX/REX_GOTPCRELX/CODE_4_GOTPCRELX instead of "
-               "GOTPCREL on x86-64 ELF"),
-      cl::init(true));
-  MCBINDOPT(X86RelaxRelocations);
-
-  static cl::opt<bool> X86Sse2Avx(
-      "x86-sse2avx", cl::desc("Specify that the assembler should encode SSE "
-                              "instructions with VEX prefix"));
-  MCBINDOPT(X86Sse2Avx);
-
-  static cl::opt<bool> DisableIntegratedAS(
-      "no-integrated-as", cl::desc("Disable integrated assembler"),
-      cl::init(false));
-  MCBINDOPT(DisableIntegratedAS);
-
-  static cl::opt<RelocSectionSymType> RelocSectionSym(
-      "reloc-section-sym",
-      cl::desc("Control section symbol conversion for relocations"),
-      cl::init(RelocSectionSymType::All),
-      cl::values(
-          clEnumValN(RelocSectionSymType::All, "all",
-                     "Use section symbols for all eligible local symbols"),
-          clEnumValN(RelocSectionSymType::Internal, "internal",
-                     "Only use section symbols for internal local symbols"),
-          clEnumValN(RelocSectionSymType::None, "none",
-                     "Never use section symbols")));
-  MCBINDOPT(RelocSectionSym);
-
-  static cl::opt<bool> LargeEHEncoding(
-      "large-eh-encoding",
-      cl::desc("Force 8-byte (sdata8) pointer encodings for ELF "
-               "exception-handling sections to avoid relocation overflows in "
-               "large binaries (x86_64: FDE/personality/LSDA/TType; "
-               "AArch64/PPC64: FDE only, the rest are already sdata8)"));
-  MCBINDOPT(LargeEHEncoding);
-
-  static cl::opt<std::string> ABIName(
-      "target-abi",
-      cl::desc("The name of the ABI to be targeted from the backend."),
-      cl::init(""));
-  MCBINDOPT(ABIName);
-
-  static cl::opt<std::string> AsSecureLogFile(
-      "as-secure-log-file", cl::desc("As secure log file name"), cl::Hidden);
-  MCBINDOPT(AsSecureLogFile);
-
-#undef MCBINDOPT
+// The options cl::ParseCommandLineOptions parsed.
+MCTargetOptions &flags() {
+  static MCTargetOptions Flags;
+  return Flags;
 }
 
-MCTargetOptions llvm::mc::InitMCTargetOptionsFromFlags() {
-  MCTargetOptions Options;
-  Options.MCRelaxAll = getRelaxAll();
-  Options.MCIncrementalLinkerCompatible = getIncrementalLinkerCompatible();
-  Options.FDPIC = getFDPIC();
-  Options.Dwarf64 = getDwarf64();
-  Options.DwarfVersion = getDwarfVersion();
-  Options.ShowMCInst = getShowMCInst();
-  Options.ABIName = getABIName();
-  Options.MCFatalWarnings = getFatalWarnings();
-  Options.MCNoWarn = getNoWarn();
-  Options.MCNoDeprecatedWarn = getNoDeprecatedWarn();
-  Options.MCNoTypeCheck = getNoTypeCheck();
-  Options.MCSaveTempLabels = getSaveTempLabels();
-  Options.Crel = getCrel();
-  Options.ImplicitMapSyms = getImplicitMapSyms();
-  Options.X86RelaxRelocations = getX86RelaxRelocations();
-  Options.X86Sse2Avx = getX86Sse2Avx();
-  Options.DisableIntegratedAS = getDisableIntegratedAS();
-  Options.RelocSectionSym = getRelocSectionSym();
-  Options.LargeEHEncoding = getLargeEHEncoding();
-  Options.EmitDwarfUnwind = getEmitDwarfUnwind();
-  Options.EmitCompactUnwindNonCanonical = getEmitCompactUnwindNonCanonical();
-  Options.EmitSFrameUnwind = getEmitSFrameUnwind();
-  Options.AsSecureLogFile = getAsSecureLogFile();
-
-  return Options;
+const OptTable &table() {
+  static const OptTable Table(optionTables());
+  return Table;
 }
+
+bool parse(ArrayRef<const char *> Args, SmallVectorImpl<const char *> &Rest,
+           raw_ostream &Errs) {
+  unsigned MissingIndex, MissingCount;
+  InputArgList AL = table().ParseArgs(Args, MissingIndex, MissingCount);
+  if (MissingCount) {
+    WithColor::error(Errs) << "option '" << Args[MissingIndex]
+                           << "' requires an argument\n";
+    return false;
+  }
+  MCTargetOptions &Flags = flags();
+  for (const Arg *A : AL) {
+    bool Ok = true;
+    switch (A->getOption().getID()) {
+    case OPT_UNKNOWN:
+    case OPT_INPUT:
+      Rest.push_back(Args[A->getIndex()]);
+      continue;
+#define OPTION_VALUE(ID, TYPE, NAME, DEFAULT)                                  \
+  case OPT_##ID: {                                                             \
+    TYPE V;                                                                    \
+    if ((Ok = parseArgValue(A->getValue(), V)))                                \
+      Flags.NAME = std::move(V);                                               \
+    break;                                                                     \
+  }
+#define OPTION_ENUM_VALUE(ID, TYPE, NAME, DEFAULT, ...)                        \
+  case OPT_##ID: {                                                             \
+    TYPE V;                                                                    \
+    if ((Ok = parseEnumValue(A->getValue(), V, {__VA_ARGS__})))                \
+      Flags.NAME = V;                                                          \
+    break;                                                                     \
+  }
+#include "MCTargetOptionsCommandFlags.inc"
+#undef OPTION_ENUM_VALUE
+#undef OPTION_VALUE
+    }
+    if (!Ok) {
+      WithColor::error(Errs) << "invalid value '" << A->getValue() << "' in '"
+                             << A->getAsString(AL) << "'\n";
+      return false;
+    }
+  }
+  if (AL.hasArg(OPT_mc_relax_all_EQ))
+    ExplicitRelaxAll = bool(Flags.MCRelaxAll);
+  return true;
+}
+
+void printHelp(raw_ostream &OS, bool ShowHidden) {
+  OS << '\n';
+  table().printHelpOptions(OS, ShowHidden);
+}
+
+void reset() {
+  flags() = MCTargetOptions();
+  ExplicitRelaxAll.reset();
+}
+
+const cl::LibraryOptions Library = {parse, printHelp, reset};
+} // namespace
+
+mc::RegisterMCTargetOptionsFlags::RegisterMCTargetOptionsFlags() {
+  cl::registerLibraryOptions(Library);
+}
+
+MCTargetOptions mc::InitMCTargetOptionsFromFlags() { return flags(); }
+
+std::optional<bool> mc::getExplicitRelaxAll() { return ExplicitRelaxAll; }
+
+StringRef mc::getABIName() { return flags().ABIName; }

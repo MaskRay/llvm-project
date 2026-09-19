@@ -84,6 +84,9 @@ public:
 
   int DwarfVersion = 0;
 
+  /// The nesting depth at which an assembly macro expansion is an error.
+  unsigned AsmMacroMaxNestingDepth = 100;
+
   /// If greater than 0, overrides the default MCAsmInfo binutils version.
   std::pair<int, int> BinutilsVersion = {0, 0};
 
