@@ -248,6 +248,7 @@ add_llvm_component_library(LLVMSupport
   OptimizedStructLayout.cpp
   Optional.cpp
   OptionStrCmp.cpp
+  OptionsRegistry.cpp
   PGOOptions.cpp
   Parallel.cpp
   PluginLoader.cpp

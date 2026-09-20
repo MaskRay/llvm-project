@@ -36,13 +36,21 @@ class StringRef;
 class AAManager;
 class TargetMachine;
 class ModuleSummaryIndex;
+struct PassesOptions;
 
 /// Tunable parameters for passes in the default pipelines.
 class PipelineTuningOptions {
 public:
-  /// Constructor sets pipeline tuning defaults based on cl::opts. Each option
-  /// can be set in the PassBuilder when using a LLVM as a library.
+  /// Constructor sets pipeline tuning defaults based on cl::opts and
+  /// PassesOptions::Global. Each option can be set in the PassBuilder when
+  /// using a LLVM as a library.
   LLVM_ABI PipelineTuningOptions();
+  /// As above, with \p Opts, which must outlive the PassBuilder, in place of
+  /// PassesOptions::Global.
+  LLVM_ABI explicit PipelineTuningOptions(const PassesOptions &Opts);
+
+  /// The LLVMPasses options the default pipelines read.
+  const PassesOptions *PassesOpts;
 
   /// Tuning option to set loop interleaving on/off, set based on opt level.
   bool LoopInterleaving;

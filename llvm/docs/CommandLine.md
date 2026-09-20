@@ -1680,3 +1680,49 @@ TODO: complete this section
 :::{todo}
 TODO: fill in this section
 :::
+
+## Declaring a Library's Options in TableGen
+
+A library can declare its options in a `.td` file instead of as `cl::opt`
+globals. `llvm-tblgen -gen-opt-parser-defs` generates a struct with a member
+per option, the table that parses them, and the hooks through which
+`cl::ParseCommandLineOptions` parses them and `-help-hidden` lists them.
+
+```text
+include "llvm/Option/OptParser.td"
+
+def FooOptions : OptionsStruct;
+// The spellings of FooMode, a C++ enumeration declared elsewhere.
+def FooMode : OptionEnum<"FooMode", [EnumMember<"Fast", "fast">,
+                                     EnumMember<"Small", "small">]>;
+
+defm Enable : BoolField<"foo-enable", "1", "Enable foo">;
+defm Threshold : ValueField<"foo-threshold", "unsigned", "8", "The threshold">;
+defm Mode : EnumField<"foo-mode", FooMode, "FooMode::Fast", "Foo's mode">;
+```
+
+A `defm` names the member and gives its spelling, type, default (a C++
+expression) and help. `BoolField` accepts `-foo-enable`, `-no-foo-enable` and
+`-foo-enable=<bool>`; the others accept `-name=<value>` and `-name <value>`.
+Besides integers, a member may be a `float`, a `double`, a `std::string`, a
+`std::optional<T>` (whether the option is given) or a `std::vector<T>` (every
+occurrence). Values are spelled as `cl::opt` spells them.
+
+`FooOptions.h` includes what the defaults need, defines `OPTIONS_STRUCT_DECL`
+and includes `FooOptions.inc`. `FooOptions.cpp` includes the header and
+`llvm/Option/LibraryOptions.h`, defines `OPTIONS_STRUCT_DEFS`, includes
+`FooOptions.inc`, and defines `static opt::RegisterLibraryOptions<FooOptions>
+Registration;`. `CMakeLists.txt` runs `tablegen(LLVM FooOptions.inc
+-gen-opt-parser-defs)` under an `add_public_tablegen_target`, which the library
+depends on, and the library links `Option`.
+
+Like a `static cl::opt`, an option is private to its library: the files live
+beside the sources, and a knob another library needs is exported through a
+function or a parameter. The struct goes under `include/llvm/` only when
+tools or other libraries are meant to read or set it, as `PassesOptions` is.
+
+`FooOptions::Global` is the instance `cl::ParseCommandLineOptions` fills, so
+`FooOptions::Global.Threshold` replaces a `cl::opt` global.
+`Ctx.getOptions<FooOptions>()` is what code working on an `LLVMContext` reads:
+the copy a tool attached with `Ctx.setOptions(...)`, else `Global`. A tool
+without `cl::` fills a struct with `parse(Args, Rest, Errs)`.

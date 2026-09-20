@@ -187,6 +187,10 @@ inline const StableFunctionMap *getStableFunctionMap() {
 
 inline bool emitCGData() { return CodeGenData::getInstance().emitCGData(); }
 
+/// Whether ThinLTO runs code generation twice, the first round emitting
+/// codegen data for the second (-codegen-data-thinlto-two-rounds).
+LLVM_ABI bool thinLTOTwoRounds();
+
 inline void
 publishOutlinedHashTree(std::unique_ptr<OutlinedHashTree> HashTree) {
   CodeGenData::getInstance().publishOutlinedHashTree(std::move(HashTree));

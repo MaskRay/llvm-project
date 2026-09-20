@@ -2361,9 +2361,21 @@ cc_library(
     ],
 )
 
+gentbl_cc_library(
+    name = "CGDataOptionsTableGen",
+    strip_include_prefix = "lib/CGData",
+    tbl_outs = {"lib/CGData/CGDataOptions.inc": ["-gen-opt-parser-defs"]},
+    tblgen = ":llvm-tblgen",
+    td_file = "lib/CGData/CGDataOptions.td",
+    deps = [":OptParserTdFiles"],
+)
+
 cc_library(
     name = "CGData",
-    srcs = glob(["lib/CGData/**/*.cpp"]),
+    srcs = glob([
+        "lib/CGData/**/*.cpp",
+        "lib/CGData/**/*.h",
+    ]),
     hdrs = glob([
         "include/llvm/CGData/**/*.h",
         "include/llvm/CGData/**/*.inc",
@@ -2372,9 +2384,11 @@ cc_library(
     deps = [
         ":BitReader",
         ":BitWriter",
+        ":CGDataOptionsTableGen",
         ":Core",
         ":Object",
         ":ObjectYAML",
+        ":Option",
         ":Support",
         ":TargetParser",
     ],
@@ -4243,6 +4257,14 @@ cc_library(
     textual_hdrs = ["lib/Passes/PassRegistry.def"],
 )
 
+gentbl_cc_library(
+    name = "passes_options_gen",
+    tbl_outs = {"include/llvm/Passes/PassesOptions.inc": ["-gen-opt-parser-defs"]},
+    tblgen = ":llvm-tblgen",
+    td_file = "include/llvm/Passes/PassesOptions.td",
+    deps = [":OptParserTdFiles"],
+)
+
 cc_library(
     name = "Passes",
     srcs = glob([
@@ -4268,6 +4290,7 @@ cc_library(
         ":Instrumentation",
         ":MC",
         ":ObjCARC",
+        ":Option",
         ":Plugins",
         ":Scalar",
         ":Support",
@@ -4277,6 +4300,7 @@ cc_library(
         ":common_transforms",
         ":config",
         ":pass_registry_def",
+        ":passes_options_gen",
     ],
 )
 
