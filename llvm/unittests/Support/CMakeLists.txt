@@ -72,6 +72,7 @@ add_llvm_unittest(SupportTests
   ModRefTest.cpp
   NativeFormatTests.cpp
   OptimizedStructLayoutTest.cpp
+  OptionsRegistryTest.cpp
   ParallelTest.cpp
   Path.cpp
   PerThreadBumpPtrAllocatorTest.cpp

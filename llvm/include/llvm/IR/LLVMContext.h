@@ -18,6 +18,7 @@
 #include "llvm/IR/DiagnosticHandler.h"
 #include "llvm/Support/CBindingWrapping.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/OptionsRegistry.h"
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -353,7 +354,14 @@ public:
   /// the global tracker.
   LLVM_ABI uint64_t incNextDILocationAtomGroup();
 
+  /// The command line options of a library, as code working on this context
+  /// reads them; see OptionsRegistry.
+  template <class T> const T &getOptions() const { return Options.get<T>(); }
+  template <class T> T &setOptions(T O) { return Options.set(std::move(O)); }
+
 private:
+  OptionsRegistry Options;
+
   // Module needs access to the add/removeModule methods.
   friend class Module;
 

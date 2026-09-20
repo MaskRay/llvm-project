@@ -254,11 +254,10 @@ private:
                                           unsigned &Index) const;
 
 protected:
-  OptTable(const Tables &Tables, bool IgnoreCase = false);
-
   void setValuesCodeFn(ValuesCodeFnTy Fn) { ValuesCodeFn = Fn; }
 
 public:
+  OptTable(const Tables &Tables, bool IgnoreCase = false);
   virtual ~OptTable();
 
   /// Return the string table used for option names.
@@ -508,12 +507,42 @@ public:
                  unsigned FlagsToInclude, unsigned FlagsToExclude,
                  bool ShowAllAliases) const;
 
+  /// Print the option lists of printHelp, without its header.
+  LLVM_ABI void printHelpOptions(raw_ostream &OS, bool ShowHidden) const;
+
+  /// Calls \p F with the name of each option that has a prefix, as spelled
+  /// after it.
+  LLVM_ABI void forEachOptionName(function_ref<void(StringRef)> F) const;
+
+  /// Parses \p Args, calling \p Apply on each option and appending every
+  /// other argument to \p Rest in order; reports a missing value, or a value
+  /// \p Apply rejects, to \p Errs and returns false.
+  LLVM_ABI bool applyArgs(ArrayRef<const char *> Args,
+                          SmallVectorImpl<const char *> &Rest,
+                          raw_ostream &Errs,
+                          function_ref<bool(const Arg &)> Apply) const;
+
+  /// Parses the option at Argv[Index] and any value it takes, advancing
+  /// \p Index past them, and calls \p Apply on it; reports an unknown
+  /// option, a missing value, or a value \p Apply rejects, to \p Errs and
+  /// returns false.
+  LLVM_ABI bool applyOneArg(ArrayRef<const char *> Argv, unsigned &Index,
+                            raw_ostream &Errs,
+                            function_ref<bool(const Arg &)> Apply) const;
+
 private:
+  bool applyOne(const ArgList &AL, unsigned &Index,
+                SmallVectorImpl<const char *> *Rest, raw_ostream &Errs,
+                function_ref<bool(const Arg &)> Apply) const;
   void internalPrintHelp(raw_ostream &OS, const char *Usage, const char *Title,
                          StringRef SubCommand, bool ShowHidden,
                          bool ShowAllAliases,
                          std::function<bool(const Info &)> ExcludeOption,
                          Visibility VisibilityMask) const;
+  void printHelpOptions(raw_ostream &OS, StringRef SubCommand, bool ShowHidden,
+                        bool ShowAllAliases,
+                        std::function<bool(const Info &)> ExcludeOption,
+                        Visibility VisibilityMask) const;
 };
 
 } // end namespace opt

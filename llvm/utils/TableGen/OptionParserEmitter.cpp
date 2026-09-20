@@ -231,6 +231,142 @@ static MarshallingInfo createMarshallingInfo(const Record &R) {
 /// OptionParserEmitter - This tablegen backend takes an input .td file
 /// describing a list of options and emits a data structure for parsing and
 /// working with those options when given an input command line.
+// Dump the struct of OptionsStruct, and its members and registration, which
+// use the tables emitted above under OPTIONS_STRUCT_DEFS.
+static void emitOptionsStruct(const Record &S, ArrayRef<const Record *> Groups,
+                              ArrayRef<const Record *> Opts, raw_ostream &OS) {
+  StringRef NS = S.getValueAsString("Namespace");
+  StringRef Name = S.getName();
+  std::string Q = NS.str() + "::" + Name.str();
+  auto Fields = make_filter_range(Opts, [](const Record *R) {
+    return !isa<UnsetInit>(R->getValueInit("FieldType"));
+  });
+  // registerLibraryOptions hands the table at most two arguments.
+  for (const Record *R : Opts) {
+    StringRef Kind = R->getValueAsDef("Kind")->getValueAsString("Name");
+    if (!is_contained({"Flag", "Joined", "Separate", "Input", "Unknown"}, Kind))
+      PrintFatalError(
+          R->getLoc(),
+          "an OptionsStruct's option is a Flag, Joined or Separate");
+  }
+
+  auto UsesType = [&](StringRef Type) {
+    return any_of(Fields, [&](const Record *R) {
+      return R->getValueAsString("FieldType").contains(Type);
+    });
+  };
+
+  OS << "/////////\n";
+  OS << "// Struct\n\n";
+  OS << "#ifdef OPTIONS_STRUCT_DECL\n";
+  OS << "#include \"llvm/Support/Compiler.h\"\n";
+  if (UsesType("std::optional"))
+    OS << "#include <optional>\n";
+  if (UsesType("std::string"))
+    OS << "#include <string>\n";
+  if (UsesType("std::vector"))
+    OS << "#include <vector>\n";
+  OS << "namespace llvm {\n"
+        "class raw_ostream;\n"
+        "template <typename T> class ArrayRef;\n"
+        "template <typename T> class SmallVectorImpl;\n"
+        "namespace opt {\n"
+        "class Arg;\n"
+        "class OptTable;\n"
+        "} // namespace opt\n"
+        "} // namespace llvm\n\n";
+  OS << "namespace " << NS << " {\n";
+  OS << "struct " << Name << " {\n";
+  for (const Record *R : Fields)
+    OS << "  " << R->getValueAsString("FieldType") << ' '
+       << R->getValueAsString("KeyPath") << '{'
+       << getOptionalString(*R, "DefaultValue") << "};\n";
+  OS << "\n  /// The process-wide instance: cl::ParseCommandLineOptions fills "
+        "it, and\n"
+        "  /// a context reads it until a tool attaches its own copy.\n";
+  OS << "  LLVM_ABI static " << Name << " Global;\n";
+  OS << "  /// The struct's slot in an OptionsRegistry.\n"
+        "  LLVM_ABI static unsigned Slot;\n"
+        "  /// The options' table, for parsing and help.\n"
+        "  LLVM_ABI static const llvm::opt::OptTable &table();\n"
+        "  /// Stores the value of \\p A, an option of table(); false if it is "
+        "invalid.\n"
+        "  LLVM_ABI bool apply(const llvm::opt::Arg &A);\n"
+        "  /// Parses the options this struct declares out of \\p Args, "
+        "appending every\n"
+        "  /// other argument to \\p Rest in order; reports errors to \\p Errs "
+        "and\n"
+        "  /// returns false.\n"
+        "  LLVM_ABI bool parse(llvm::ArrayRef<const char *> Args,\n"
+        "                      llvm::SmallVectorImpl<const char *> &Rest,\n"
+        "                      llvm::raw_ostream &Errs);\n";
+  OS << "};\n";
+  OS << "} // namespace " << NS << "\n";
+  OS << "#undef OPTIONS_STRUCT_DECL\n";
+  OS << "#endif // OPTIONS_STRUCT_DECL\n\n";
+
+  OS << "#ifdef OPTIONS_STRUCT_DEFS\n";
+  OS << Q << ' ' << Q << "::Global;\n";
+  OS << "unsigned " << Q << "::Slot;\n\n";
+  OS << "namespace {\n";
+  OS << "enum ID {\n  OPT_INVALID = 0,\n";
+  for (const Record *R : Groups)
+    OS << "  OPT_" << getOptionName(*R) << ",\n";
+  for (const Record *R : Opts)
+    OS << "  OPT_" << getOptionName(*R) << ",\n";
+  OS << "};\n"
+        "} // namespace\n\n";
+
+  OS << "const llvm::opt::OptTable &" << Q
+     << "::table() {\n"
+        "  static const llvm::opt::OptTable Table(optionTables());\n"
+        "  return Table;\n"
+        "}\n\n";
+
+  OS << "bool " << Q
+     << "::apply(const llvm::opt::Arg &A) {\n"
+        "  switch (A.getOption().getID()) {\n";
+  for (const Record *R : Opts) {
+    if (!isa<UnsetInit>(R->getValueInit("AssignValue"))) {
+      OS << "  case OPT_" << getOptionName(*R) << ":\n    "
+         << R->getValueAsString("AssignMember") << " = "
+         << R->getValueAsString("AssignValue") << ";\n    return true;\n";
+      continue;
+    }
+    if (isa<UnsetInit>(R->getValueInit("FieldType")))
+      continue;
+    OS << "  case OPT_" << getOptionName(*R) << ":\n    return llvm::opt::";
+    StringRef Member = R->getValueAsString("KeyPath");
+    if (const Record *E = R->getValueAsOptionalDef("FieldEnum")) {
+      OS << "parseEnumValue(A.getValue(), " << Member << ", {";
+      ListSeparator Sep;
+      for (const Record *M : E->getValueAsListOfDefs("Members")) {
+        OS << Sep << '{';
+        writeCstring(OS, M->getValueAsString("Spelling"));
+        OS << ", " << E->getValueAsString("Name")
+           << "::" << M->getValueAsString("Name") << '}';
+      }
+      OS << "});\n";
+    } else {
+      OS << "parseArgValue(A.getValue(), " << Member << ");\n";
+    }
+  }
+  OS << "  }\n"
+        "  llvm_unreachable(\"option without a field\");\n"
+        "}\n\n";
+
+  OS << "bool " << Q
+     << "::parse(llvm::ArrayRef<const char *> Args,\n"
+        "           llvm::SmallVectorImpl<const char *> &Rest,\n"
+        "           llvm::raw_ostream &Errs) {\n"
+        "  return table().applyArgs(Args, Rest, Errs,\n"
+        "                           [&](const llvm::opt::Arg &A) { return "
+        "apply(A); });\n"
+        "}\n";
+  OS << "#undef OPTIONS_STRUCT_DEFS\n";
+  OS << "#endif // OPTIONS_STRUCT_DEFS\n";
+}
+
 static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
   // Get the option groups and options.
   ArrayRef<const Record *> Groups =
@@ -322,9 +458,14 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
 
   OS << "/////////\n";
   OS << "// Tables\n\n";
-  OS << "#ifdef OPTTABLE_CODE\n";
+  OS << "#if defined(OPTTABLE_CODE) || defined(OPTIONS_STRUCT_DEFS)\n";
   // A function rather than an object: the object needs dynamic relocations.
   OS << "static llvm::opt::OptTable::Tables optionTables() {\n";
+  // The enumerators OptParser.td defines, for an OptionsStruct's .cpp, which
+  // has no using-directive for llvm::opt.
+  OS << "  using llvm::opt::DefaultVis, llvm::opt::HelpHidden,\n"
+        "      llvm::opt::RenderAsInput, llvm::opt::RenderJoined,\n"
+        "      llvm::opt::RenderSeparate;\n";
   Table.EmitStringTableDef(OS, "OptionStrTable");
   OS << "\n";
 
@@ -482,7 +623,7 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
      << ", OptionSubCommandIDsTable};\n";
   OS << "}\n";
   OS << "#undef OPTTABLE_CODE\n";
-  OS << "#endif // OPTTABLE_CODE\n\n";
+  OS << "#endif // OPTTABLE_CODE || OPTIONS_STRUCT_DEFS\n\n";
 
   // Dump ValuesCode.
   OS << "/////////\n";
@@ -624,7 +765,8 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
 
   auto IsMarshallingOption = [](const Record &R) {
     return !isa<UnsetInit>(R.getValueInit("KeyPath")) &&
-           !R.getValueAsString("KeyPath").empty();
+           !R.getValueAsString("KeyPath").empty() &&
+           isa<UnsetInit>(R.getValueInit("FieldType"));
   };
 
   std::vector<const Record *> OptsWithMarshalling;
@@ -636,7 +778,14 @@ static void emitOptionParser(const RecordKeeper &Records, raw_ostream &OS) {
     if (IsMarshallingOption(R))
       OptsWithMarshalling.push_back(&R);
   }
-  OS << "#endif // OPTION\n";
+  OS << "#endif // OPTION\n\n";
+
+  ArrayRef<const Record *> Structs =
+      Records.getAllDerivedDefinitions("OptionsStruct");
+  if (Structs.size() > 1)
+    PrintFatalError(Structs[1]->getLoc(), "one OptionsStruct per file");
+  if (!Structs.empty())
+    emitOptionsStruct(*Structs[0], Groups, Opts, OS);
 
   auto CmpMarshallingOpts = [](const Record *const *A, const Record *const *B) {
     unsigned AID = (*A)->getID();

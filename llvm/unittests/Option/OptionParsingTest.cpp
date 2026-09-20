@@ -566,3 +566,41 @@ OPTIONS:
                   multiple lines in it
 )");
 }
+
+TEST(OptTableTest, ForEachOptionName) {
+  TestOptTable T;
+  std::vector<std::string> Names;
+  T.forEachOptionName([&](StringRef Name) { Names.push_back(Name.str()); });
+  EXPECT_EQ(Names.size(), T.getNumOptions() - 3u); // input, unknown, my_group
+  EXPECT_TRUE(is_contained(Names, "C="));
+  EXPECT_FALSE(is_contained(Names, "my group"));
+}
+
+TEST(OptTableTest, ApplyArgs) {
+  TestOptTable T;
+  std::vector<std::string> Applied;
+  SmallVector<const char *> Rest;
+  std::string Err;
+  raw_string_ostream ErrOS(Err);
+  auto Apply = [&](const Arg &A) {
+    Applied.push_back(A.getSpelling().str() +
+                      (A.getNumValues() ? A.getValue() : ""));
+    return A.getOption().getID() != OPT_B;
+  };
+
+  const char *Ok[] = {"-A", "in.o", "-C", "v", "-unknown", "-Fx"};
+  EXPECT_TRUE(T.applyArgs(Ok, Rest, ErrOS, Apply));
+  EXPECT_EQ(Applied, (std::vector<std::string>{"-A", "-Cv", "-Fx"}));
+  EXPECT_EQ(Rest.size(), 2u);
+  EXPECT_STREQ(Rest[0], "in.o");
+  EXPECT_STREQ(Rest[1], "-unknown");
+
+  const char *Rejected[] = {"-Bv"};
+  EXPECT_FALSE(T.applyArgs(Rejected, Rest, ErrOS, Apply));
+  EXPECT_EQ(Err, "error: invalid value 'v' in '-Bv'\n");
+
+  Err.clear();
+  const char *Missing[] = {"-C"};
+  EXPECT_FALSE(T.applyArgs(Missing, Rest, ErrOS, Apply));
+  EXPECT_EQ(Err, "error: option '-C' requires an argument\n");
+}

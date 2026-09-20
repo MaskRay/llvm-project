@@ -98,6 +98,16 @@ class HelpTextVariant<list<OptionVisibility> visibilities, string text> {
   string Text = text;
 }
 
+// The spellings of a C++ enumeration's enumerators.
+class EnumMember<string name, string spelling> {
+  string Name = name;
+  string Spelling = spelling;
+}
+class OptionEnum<string name, list<EnumMember> members> {
+  string Name = name;
+  list<EnumMember> Members = members;
+}
+
 // Class definition for positional subcommands.
 class SubCommand<string name, string helpText, string usage = ""> {
   string Name = name;
@@ -136,6 +146,12 @@ class Option<list<string> prefixes, string name, OptionKind kind,
   code Denormalizer = "";
   list<code> NormalizedValues = ?;
   list<SubCommand> SubCommands = subcommands;
+  // With KeyPath, the type of the struct member that stores the option's
+  // value, which a Flag sets to AssignValue.
+  code FieldType = ?;
+  OptionEnum FieldEnum = ?;
+  code AssignMember = ?;
+  code AssignValue = ?;
 }
 
 // Helpers for defining options.
@@ -167,6 +183,28 @@ class JoinedAndSeparate<list<string> prefixes, string name,
 // Mix-ins for adding optional attributes.
 
 class Alias<Option alias> { Option Alias = alias; }
+// Store the option's value in the struct member `name`.
+class Field<code type, code name, code default = ""> {
+  code FieldType = type;
+  code KeyPath = name;
+  code DefaultValue = default;
+}
+
+class FieldEnum<OptionEnum e> { OptionEnum FieldEnum = e; }
+
+// A Flag that stores `value` in the struct member `name`.
+class Assign<code name, code value> {
+  code AssignMember = name;
+  code AssignValue = value;
+}
+
+// The struct, named after the def, holding every option with a Field;
+// -gen-opt-parser-defs declares it under OPTIONS_STRUCT_DECL and defines it,
+// with its table, parser and registration, under OPTIONS_STRUCT_DEFS.
+class OptionsStruct<string ns = "llvm"> {
+  string Namespace = ns;
+}
+
 class AliasArgs<list<string> aliasargs> { list<string> AliasArgs = aliasargs; }
 class EnumName<string name> { string EnumName = name; }
 class Flags<list<OptionFlag> flags> { list<OptionFlag> Flags = flags; }
@@ -277,5 +315,28 @@ class NormalizedValues<list<code> definitions> { list<code> NormalizedValues = d
 // aren't duplicated).
 def INPUT : Option<[], "<input>", KIND_INPUT>;
 def UNKNOWN : Option<[], "<unknown>", KIND_UNKNOWN>;
+
+// An option stored in the struct member named after the defm: -name=<v> or
+// -name <v>; -name or -no-name; -name=<enumerator> or -name <enumerator>. A
+// std::optional<T> member records whether the option was given; a
+// std::vector<T> member collects every occurrence. Like the developer cl::opts
+// they replace, the options are hidden from -help.
+multiclass ValueField<string name, code type, code default, string help> {
+  def NAME#_EQ : Joined<["-", "--"], name#"=">, HelpText<help>,
+                 Flags<[HelpHidden]>, Field<type, NAME, default>;
+  def NAME : Separate<["-", "--"], name>, Alias<!cast<Option>(NAME#"_EQ")>;
+}
+multiclass BoolField<string name, code default, string help> {
+  def NAME : Flag<["-", "--"], name>, HelpText<help>, Flags<[HelpHidden]>,
+             Assign<NAME, "true">;
+  def NAME#_no : Flag<["-", "--"], "no-"#name>, Assign<NAME, "false">;
+  def NAME#_EQ : Joined<["-", "--"], name#"=">, Field<"bool", NAME, default>;
+}
+multiclass EnumField<string name, OptionEnum e, code default, string help> {
+  def NAME#_EQ : Joined<["-", "--"], name#"=">, HelpText<help>,
+                 Flags<[HelpHidden]>, Field<e.Name, NAME, default>,
+                 FieldEnum<e>;
+  def NAME : Separate<["-", "--"], name>, Alias<!cast<Option>(NAME#"_EQ")>;
+}
 
 #endif // LLVM_OPTION_OPTPARSER_TD

@@ -1,0 +1,10 @@
+import("//third-party/unittest/unittest.gni")
+
+unittest("PassesTests") {
+  deps = [
+    "//llvm/lib/IR",
+    "//llvm/lib/Passes",
+    "//llvm/lib/Support",
+  ]
+  sources = [ "PassesOptionsTest.cpp" ]
+}

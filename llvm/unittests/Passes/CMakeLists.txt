@@ -6,3 +6,11 @@ endif()
 
 add_subdirectory(PassBuilderBindings)
 add_subdirectory(Plugins)
+
+set(LLVM_LINK_COMPONENTS Core Passes Support)
+add_llvm_unittest(PassesTests
+  PassesOptionsTest.cpp
+
+  DEPENDS
+  passes_options_gen
+  )

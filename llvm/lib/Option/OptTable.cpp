@@ -17,6 +17,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/OptionStrCmp.h"
+#include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <cassert>
@@ -746,10 +747,6 @@ void OptTable::internalPrintHelp(
     Visibility VisibilityMask) const {
   OS << "OVERVIEW: " << Title << "\n\n";
 
-  // Render help text into a map of group-name to a list of (option, help)
-  // pairs.
-  std::map<StringRef, std::vector<OptionInfo>> GroupedOptionHelp;
-
   auto ActiveSubCommand = llvm::find_if(
       SubCommands, [&](const auto &C) { return SubCommand == C.Name; });
   if (!SubCommand.empty()) {
@@ -767,6 +764,77 @@ void OptTable::internalPrintHelp(
       OS << "\n";
     }
   }
+  printHelpOptions(OS, SubCommand, ShowHidden, ShowAllAliases,
+                   std::move(ExcludeOption), VisibilityMask);
+}
+
+void OptTable::printHelpOptions(raw_ostream &OS, bool ShowHidden) const {
+  printHelpOptions(
+      OS, {}, ShowHidden, /*ShowAllAliases=*/false,
+      [](const Info &) { return false; }, Visibility());
+}
+
+void OptTable::forEachOptionName(function_ref<void(StringRef)> F) const {
+  for (const Info &I : OptionInfos.drop_front(FirstSearchableIndex))
+    if (!I.hasNoPrefix())
+      F(I.getName(StrTable, PrefixesTable));
+}
+
+// Rest takes an input or unknown argument; without it, one is an error.
+bool OptTable::applyOne(const ArgList &AL, unsigned &Index,
+                        SmallVectorImpl<const char *> *Rest, raw_ostream &Errs,
+                        function_ref<bool(const Arg &)> Apply) const {
+  const char *Str = AL.getArgString(Index);
+  std::unique_ptr<Arg> A = ParseOneArg(AL, Index);
+  if (!A) {
+    WithColor::error(Errs) << "option '" << Str << "' requires an argument\n";
+    return false;
+  }
+  Option::OptionClass Kind = A->getOption().getKind();
+  if (Kind == Option::InputClass || Kind == Option::UnknownClass) {
+    if (Rest) {
+      Rest->push_back(Str);
+      return true;
+    }
+    WithColor::error(Errs) << "unknown argument '" << Str << "'\n";
+    return false;
+  }
+  if (Apply(*A))
+    return true;
+  WithColor::error(Errs) << "invalid value '" << A->getValue() << "' in '"
+                         << A->getAsString(AL) << "'\n";
+  return false;
+}
+
+bool OptTable::applyArgs(ArrayRef<const char *> Args,
+                         SmallVectorImpl<const char *> &Rest, raw_ostream &Errs,
+                         function_ref<bool(const Arg &)> Apply) const {
+  InputArgList AL(Args.begin(), Args.end());
+  for (unsigned I = 0, E = Args.size(); I != E;)
+    if (!applyOne(AL, I, &Rest, Errs, Apply))
+      return false;
+  return true;
+}
+
+bool OptTable::applyOneArg(ArrayRef<const char *> Argv, unsigned &Index,
+                           raw_ostream &Errs,
+                           function_ref<bool(const Arg &)> Apply) const {
+  InputArgList AL(Argv.begin() + Index, Argv.end());
+  unsigned I = 0;
+  bool Ok = applyOne(AL, I, nullptr, Errs, Apply);
+  Index += I;
+  return Ok;
+}
+
+void OptTable::printHelpOptions(raw_ostream &OS, StringRef SubCommand,
+                                bool ShowHidden, bool ShowAllAliases,
+                                std::function<bool(const Info &)> ExcludeOption,
+                                Visibility VisibilityMask) const {
+  // Render help text into a map of group-name to a list of (option, help)
+  // pairs.
+  std::map<StringRef, std::vector<OptionInfo>> GroupedOptionHelp;
+  auto ActiveSubCommand = llvm::find_if(
+      SubCommands, [&](const auto &C) { return SubCommand == C.Name; });
 
   auto DoesOptionBelongToSubcommand = [&](const Info &CandidateInfo) {
     // Retrieve the SubCommandIDs registered to the given current CandidateInfo

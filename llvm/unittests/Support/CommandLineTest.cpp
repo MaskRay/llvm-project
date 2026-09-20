@@ -2527,4 +2527,72 @@ TEST(CommandLineTest, HelpWithEmptyCategory) {
   cl::ResetCommandLineParser();
 }
 
+std::vector<std::string> LibraryArgs;
+const cl::LibraryOptions TestLibrary = {
+    [](function_ref<void(StringRef)> F) {
+      F("library-flag");
+      F("library-int");
+    },
+    [](ArrayRef<const char *> Argv, unsigned &Index, raw_ostream &) {
+      StringRef Arg = Argv[Index++];
+      LibraryArgs.push_back(Arg.str());
+      if (Arg == "-library-int" && Index != Argv.size())
+        LibraryArgs.push_back(Argv[Index++]);
+      return true;
+    },
+    [](raw_ostream &OS, bool) { OS << "\nLIBRARY OPTIONS:\n"; },
+    [] { LibraryArgs.clear(); }};
+
+TEST(CommandLineTest, LibraryOptions) {
+  cl::ResetCommandLineParser();
+  cl::registerLibraryOptions(TestLibrary);
+  StackOption<int> Local("local");
+
+  const char *Args[] = {"prog", "-library-flag", "--local=3", "-library-int",
+                        "4"};
+  EXPECT_TRUE(cl::ParseCommandLineOptions(std::size(Args), Args, StringRef(),
+                                          &llvm::nulls()));
+  EXPECT_EQ(Local, 3);
+  EXPECT_THAT(LibraryArgs,
+              testing::ElementsAre("-library-flag", "-library-int", "4"));
+  cl::ResetAllOptionOccurrences();
+  EXPECT_TRUE(LibraryArgs.empty());
+
+  auto Output = interceptStdout(
+      []() { cl::PrintHelpMessage(/*Hidden=*/false, /*Categorized=*/false); });
+  EXPECT_NE(std::string::npos, Output.find("LIBRARY OPTIONS:"));
+  cl::ResetCommandLineParser();
+}
+
+// A library registered while parsing, as a plugin that an argument loads
+// does, serves the arguments after it.
+TEST(CommandLineTest, LibraryOptionsRegisteredWhileParsing) {
+  cl::ResetCommandLineParser();
+  StackOption<std::string> Load("load", cl::callback([](const std::string &) {
+                                  cl::registerLibraryOptions(TestLibrary);
+                                }));
+
+  const char *Args[] = {"prog", "-load=plugin", "-library-flag"};
+  EXPECT_TRUE(cl::ParseCommandLineOptions(std::size(Args), Args, StringRef(),
+                                          &llvm::nulls()));
+  EXPECT_THAT(LibraryArgs, testing::ElementsAre("-library-flag"));
+  cl::ResetAllOptionOccurrences();
+  cl::ResetCommandLineParser();
+}
+
+#if GTEST_HAS_DEATH_TEST
+TEST(CommandLineTest, LibraryOptionsConflict) {
+  cl::ResetCommandLineParser();
+  cl::registerLibraryOptions(TestLibrary);
+  const char *Args[] = {"prog"};
+  EXPECT_DEATH(
+      {
+        StackOption<int> Clash("library-int");
+        cl::ParseCommandLineOptions(std::size(Args), Args);
+      },
+      "Option 'library-int' registered more than once");
+  cl::ResetCommandLineParser();
+}
+#endif
+
 } // anonymous namespace

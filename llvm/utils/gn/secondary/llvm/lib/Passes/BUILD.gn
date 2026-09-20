@@ -1,5 +1,9 @@
 static_library("Passes") {
   output_name = "LLVMPasses"
+  public_deps = [
+    # Must be a public_dep because Passes's headers include PassesOptions.inc.
+    "//llvm/include/llvm/Passes:PassesOptions",
+  ]
   deps = [
     "//llvm/lib/Analysis",
     "//llvm/lib/CodeGen",
@@ -7,6 +11,7 @@ static_library("Passes") {
     "//llvm/lib/CodeGen/GlobalISel",
     "//llvm/lib/IR",
     "//llvm/lib/IRPrinter",
+    "//llvm/lib/Option",
     "//llvm/lib/Support",
     "//llvm/lib/Target",
     "//llvm/lib/Transforms/AggressiveInstCombine",
@@ -26,6 +31,7 @@ static_library("Passes") {
     "PassBuilder.cpp",
     "PassBuilderBindings.cpp",
     "PassBuilderPipelines.cpp",
+    "PassesOptions.cpp",
     "RunCodeGen.cpp",
     "StandardInstrumentations.cpp",
     "TriggerCrashPasses.cpp",

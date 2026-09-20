@@ -1688,3 +1688,46 @@ TODO: complete this section
 :::{todo}
 TODO: fill in this section
 :::
+
+## Declaring a Library's Options in TableGen
+
+A library can declare its options in a `.td` file instead of as `cl::opt`
+globals; `llvm-tblgen -gen-opt-parser-defs` generates a struct with a member
+per option, its parsing table, and its registration with
+`cl::ParseCommandLineOptions` and `-help-hidden`.
+
+```text
+include "llvm/Option/OptParser.td"
+
+def FooOptions : OptionsStruct;
+def FooMode : OptionEnum<"FooMode", [EnumMember<"Fast", "fast">,
+                                     EnumMember<"Small", "small">]>;
+
+defm Enable : BoolField<"foo-enable", "1", "Enable foo">;
+defm Threshold : ValueField<"foo-threshold", "unsigned", "8", "The threshold">;
+defm Mode : EnumField<"foo-mode", FooMode, "FooMode::Fast", "Foo's mode">;
+```
+
+A `defm` names the member and gives the spelling, type, default and help.
+`BoolField` accepts `-foo-enable`, `-no-foo-enable` and `-foo-enable=<bool>`;
+the others accept `-name=value` and `-name value`. A member may also be a
+`double`, a `std::string`, a `std::optional<T>` (was the option given) or a
+`std::vector<T>` (every occurrence).
+
+`FooOptions.h` defines `OPTIONS_STRUCT_DECL` and includes `FooOptions.inc`;
+`FooOptions.cpp` includes the header and `llvm/Option/LibraryOptions.h`,
+defines `OPTIONS_STRUCT_DEFS`, includes `FooOptions.inc`, and registers the
+struct with `static opt::RegisterLibraryOptions<FooOptions> R;`. `CMakeLists.txt`
+runs `tablegen(LLVM FooOptions.inc -gen-opt-parser-defs)` and the library
+depends on that target and on `Option`.
+
+Like a `static cl::opt`, an option is private to its library: the files live
+beside the sources, and a knob another library needs is exported through a
+function or a parameter. The struct goes under `include/llvm/` only when
+tools or other libraries are meant to read or set it, as `PassesOptions` is.
+
+`FooOptions::Global` is the instance `cl::ParseCommandLineOptions` fills, so
+`FooOptions::Global.Threshold` replaces a `cl::opt` global.
+`Ctx.getOptions<FooOptions>()` is what an `LLVMContext` reads: the copy a tool
+attached with `Ctx.setOptions(...)`, else `Global`. A tool without `cl::`
+fills a struct with `parse(Args, Rest, Errs)`.

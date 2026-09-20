@@ -14,6 +14,7 @@ configure_file(
 add_subdirectory(Analysis)
 add_subdirectory(CodeGen)
 add_subdirectory(IR)
+add_subdirectory(Passes)
 add_subdirectory(Support)
 add_subdirectory(Frontend)
 add_subdirectory(TargetParser)

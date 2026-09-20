@@ -36,13 +36,16 @@ class StringRef;
 class AAManager;
 class TargetMachine;
 class ModuleSummaryIndex;
+struct PassesOptions;
 
 /// Tunable parameters for passes in the default pipelines.
 class PipelineTuningOptions {
 public:
-  /// Constructor sets pipeline tuning defaults based on cl::opts. Each option
-  /// can be set in the PassBuilder when using a LLVM as a library.
+  /// Constructor sets pipeline tuning defaults based on \p Opts, by default
+  /// PassesOptions::Global. Each option can be set in the PassBuilder when
+  /// using a LLVM as a library.
   LLVM_ABI PipelineTuningOptions();
+  LLVM_ABI explicit PipelineTuningOptions(const PassesOptions &Opts);
 
   /// Tuning option to set loop interleaving on/off, set based on opt level.
   bool LoopInterleaving;
@@ -117,6 +120,7 @@ class PassBuilder {
   std::optional<PGOOptions> PGOOpt;
   PassInstrumentationCallbacks *PIC;
   IntrusiveRefCntPtr<vfs::FileSystem> FS;
+  const PassesOptions &Opts;
 
 public:
   /// A struct to capture parsed pass pipeline names.
@@ -137,7 +141,8 @@ public:
       PipelineTuningOptions PTO = PipelineTuningOptions(),
       std::optional<PGOOptions> PGOOpt = std::nullopt,
       PassInstrumentationCallbacks *PIC = nullptr,
-      IntrusiveRefCntPtr<vfs::FileSystem> FS = vfs::getRealFileSystem());
+      IntrusiveRefCntPtr<vfs::FileSystem> FS = vfs::getRealFileSystem(),
+      const PassesOptions *Opts = nullptr);
 
   /// Cross register the analysis managers through their proxies.
   ///

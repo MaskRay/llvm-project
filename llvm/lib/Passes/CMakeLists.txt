@@ -3,6 +3,7 @@ add_llvm_component_library(LLVMPasses
   PassBuilder.cpp
   PassBuilderBindings.cpp
   PassBuilderPipelines.cpp
+  PassesOptions.cpp
   RunCodeGen.cpp
   StandardInstrumentations.cpp
   TriggerCrashPasses.cpp
@@ -13,6 +14,7 @@ add_llvm_component_library(LLVMPasses
 
   DEPENDS
   intrinsics_gen
+  passes_options_gen
 
   LINK_COMPONENTS
   AggressiveInstCombine
@@ -28,6 +30,7 @@ add_llvm_component_library(LLVMPasses
   InstCombine
   IRPrinter
   ObjCARC
+  Option
   Scalar
   Support
   Target
