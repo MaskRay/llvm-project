@@ -25,6 +25,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 #include <optional>
+#include <random>
 #include <type_traits>
 using namespace llvm;
 
@@ -5322,6 +5323,73 @@ TEST_F(DIArgListTest, UpdatesOnRAUW) {
   GV0->replaceAllUsesWith(GV1.get());
   EXPECT_EQ(AL->getArgs()[0], CI);
   EXPECT_EQ(AL->getArgs()[1], MD1);
+}
+
+typedef MetadataTest ReplaceableUsesTest;
+
+// Randomized stress over the use list of a replaceable node: add, drop and
+// move tracking references in arbitrary order, then RAUW.
+TEST_F(ReplaceableUsesTest, Stress) {
+  std::minstd_rand Rng(42);
+  for (unsigned Trial = 0; Trial != 100; ++Trial) {
+    auto Temp = MDTuple::getTemporary(Context, {});
+    std::vector<std::unique_ptr<TrackingMDRef>> Refs;
+    unsigned Live = 0;
+    for (unsigned Step = 0; Step != 300; ++Step) {
+      unsigned Op = Rng() % 100;
+      if (Op < 45 || Refs.empty()) {
+        Refs.push_back(std::make_unique<TrackingMDRef>(Temp.get()));
+        ++Live;
+      } else if (Op < 80) {
+        unsigned I = Rng() % Refs.size();
+        if (Refs[I]) {
+          Refs[I].reset();
+          --Live;
+        }
+      } else {
+        unsigned I = Rng() % Refs.size();
+        if (Refs[I]) {
+          auto Moved = std::make_unique<TrackingMDRef>(std::move(*Refs[I]));
+          Refs[I].reset();
+          Refs.push_back(std::move(Moved));
+        }
+      }
+      ASSERT_EQ(Live, Temp->getNumTemporaryUses())
+          << "trial " << Trial << " step " << Step;
+    }
+    auto *N = MDTuple::getDistinct(Context, {});
+    Temp->replaceAllUsesWith(N);
+    EXPECT_EQ(0u, Temp->getNumTemporaryUses());
+    for (auto &R : Refs)
+      if (R)
+        EXPECT_EQ(static_cast<Metadata *>(N), R->get());
+  }
+}
+
+// Uses owned by MDNode operands, over a range of use-list sizes.
+TEST_F(ReplaceableUsesTest, OwnedOperands) {
+  for (unsigned NumUsers : {1u, 2u, 3u, 4u, 5u, 6u, 17u, 33u, 100u}) {
+    auto Temp = MDTuple::getTemporary(Context, {});
+    Metadata *TempMD = Temp.get();
+    std::vector<MDTuple *> Users;
+    for (unsigned I = 0; I != NumUsers; ++I)
+      Users.push_back(MDTuple::getDistinct(Context, {TempMD}));
+    EXPECT_EQ(NumUsers, Temp->getNumTemporaryUses());
+
+    // Drop every other user in forward order, then re-add.
+    for (unsigned I = 0; I < NumUsers; I += 2)
+      Users[I]->replaceOperandWith(0, nullptr);
+    EXPECT_EQ(NumUsers - (NumUsers + 1) / 2, Temp->getNumTemporaryUses());
+    for (unsigned I = 0; I < NumUsers; I += 2)
+      Users[I]->replaceOperandWith(0, TempMD);
+    EXPECT_EQ(NumUsers, Temp->getNumTemporaryUses());
+
+    auto *N = MDTuple::getDistinct(Context, {});
+    Temp->replaceAllUsesWith(N);
+    EXPECT_EQ(0u, Temp->getNumTemporaryUses());
+    for (MDTuple *U : Users)
+      EXPECT_EQ(static_cast<Metadata *>(N), U->getOperand(0));
+  }
 }
 
 typedef MetadataTest TrackingMDRefTest;
