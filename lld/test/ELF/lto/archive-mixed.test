@@ -37,9 +37,12 @@
 ; RUN: ld.lld --trace ref.o a.o.b.o.a   other.o.a  | \
 ; RUN:   FileCheck %s --implicit-check-not={{.}}
 
+;; With order-independent extraction, both members are still pulled regardless
+;; of the bitcode/object mix; they are traced in archive-member order (a then b)
+;; rather than reference-discovery order.
 ; CHECK:      ref.o
-; CHECK-NEXT: a.{{.*}}.b.{{.*}}.a(b.{{.*}})
 ; CHECK-NEXT: a.{{.*}}.b.{{.*}}.a(a.{{.*}})
+; CHECK-NEXT: a.{{.*}}.b.{{.*}}.a(b.{{.*}})
 
 ;--- a.ll
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
