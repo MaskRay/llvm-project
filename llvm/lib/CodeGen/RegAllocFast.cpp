@@ -1653,7 +1653,8 @@ void RegAllocFastImpl::allocateInstruction(MachineInstr &MI) {
   bool HasVRegDef = false;
   bool HasDef = false;
   bool HasEarlyClobber = false;
-  bool HasTiedDef = false;
+  bool HasUntiedUse = false;
+  bool HasLateTiedUse = false;
   bool NeedToAssignLiveThroughs = false;
   for (MachineOperand &MO : MI.operands()) {
     if (MO.isReg()) {
@@ -1666,10 +1667,12 @@ void RegAllocFastImpl::allocateInstruction(MachineInstr &MI) {
           HasVRegDef = true;
           if (MO.isEarlyClobber())
             HasEarlyClobber = true;
-          if (LowerTiedOps && MO.isTied())
-            HasTiedDef = true;
           if (isLiveThroughDef(MI, MO))
             NeedToAssignLiveThroughs = true;
+        } else if (!MO.isTied()) {
+          HasUntiedUse = true;
+        } else if (HasUntiedUse && LowerTiedOps) {
+          HasLateTiedUse = true;
         }
       } else if (Reg.isPhysical()) {
         if (!MRI->isReserved(Reg)) {
@@ -1810,16 +1813,32 @@ void RegAllocFastImpl::allocateInstruction(MachineInstr &MI) {
     }
   }
 
+  // Given %1 = OP %0, %0(tied-def 0), allocate tied %0 first, so that %0
+  // takes %1's register. In operand order, the untied %0 would take another
+  // register and the tied use would need a copy. useVirtReg() only rearranges
+  // implicit operands, so explicit operand indices stay valid.
+  if (HasLateTiedUse) {
+    for (unsigned I = 0, E = MI.getNumExplicitOperands(); I != E; ++I) {
+      MachineOperand &MO = MI.getOperand(I);
+      if (!MO.isReg() || !MO.isUse() || !MO.isTied() || MO.isUndef())
+        continue;
+      Register Reg = MO.getReg();
+      if (!Reg.isVirtual() || !shouldAllocateRegister(Reg))
+        continue;
+      mayLiveIn(Reg);
+      useVirtReg(MI, MO, Reg);
+    }
+  }
+
   // Allocate virtreg uses and insert reloads as necessary.
   // Implicit MOs can get moved/removed by useVirtReg(), so loop multiple
   // times to ensure no operand is missed.
   bool HasUndefUse = false;
-  bool TiedOnly = HasTiedDef;
   bool ReArrangedImplicitMOs = true;
   while (ReArrangedImplicitMOs) {
     ReArrangedImplicitMOs = false;
     for (MachineOperand &MO : MI.operands()) {
-      if (!MO.isReg() || !MO.isUse() || (TiedOnly && !MO.isTied()))
+      if (!MO.isReg() || !MO.isUse())
         continue;
       Register Reg = MO.getReg();
       if (!Reg.isVirtual() || !shouldAllocateRegister(Reg))
@@ -1839,13 +1858,6 @@ void RegAllocFastImpl::allocateInstruction(MachineInstr &MI) {
       ReArrangedImplicitMOs = useVirtReg(MI, MO, Reg);
       if (ReArrangedImplicitMOs)
         break;
-    }
-    // Given %1 = OP %0, %0(tied-def 0), allocate tied %0 first, so that %0
-    // takes %1's register. In operand order, the untied %0 would take another
-    // register and the tied use would need a copy.
-    if (TiedOnly && !ReArrangedImplicitMOs) {
-      TiedOnly = false;
-      ReArrangedImplicitMOs = true;
     }
   }
 
