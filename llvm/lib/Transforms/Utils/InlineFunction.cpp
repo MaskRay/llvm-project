@@ -905,11 +905,10 @@ static void propagateMemProfHelper(const CallBase *OrigCall,
 // inlined callee's callsite metadata with that of the inlined call,
 // and moving the subset of any memprof contexts to the inlined callee
 // allocations if they match the new inlined call stack.
-static void
-propagateMemProfMetadata(Function *Callee, CallBase &CB,
-                         bool ContainsMemProfMetadata,
-                         const ValueMap<const Value *, WeakTrackingVH> &VMap,
-                         OptimizationRemarkEmitter *ORE) {
+static void propagateMemProfMetadata(Function *Callee, CallBase &CB,
+                                     bool ContainsMemProfMetadata,
+                                     const ValueToValueMapTy &VMap,
+                                     OptimizationRemarkEmitter *ORE) {
   MDNode *CallsiteMD = CB.getMetadata(LLVMContext::MD_callsite);
   // Only need to update if the inlined callsite had callsite metadata, or if
   // there was any memprof metadata inlined.
@@ -963,10 +962,9 @@ static void collectPointerReturningCalls(Value *RetVal,
 /// metadata onto calls exposed by inlining the wrapper body.  Propagation is
 /// restricted to return-value producing calls, which avoids instrumenting
 /// unrelated calls in the wrapper body.
-static void
-propagateAllocTokenMetadata(Function *CalledFunc, CallBase &CB,
-                            const ValueMap<const Value *, WeakTrackingVH> &VMap,
-                            ClonedCodeInfo &InlinedFunctionInfo) {
+static void propagateAllocTokenMetadata(Function *CalledFunc, CallBase &CB,
+                                        const ValueToValueMapTy &VMap,
+                                        ClonedCodeInfo &InlinedFunctionInfo) {
   MDNode *AllocTokenMD = CB.getMetadata(LLVMContext::MD_alloc_token);
   if (!AllocTokenMD)
     return;
@@ -2165,7 +2163,7 @@ static void updateCallerBFI(BasicBlock *CallSiteBlock,
                             BlockFrequencyInfo *CalleeBFI,
                             const BasicBlock &CalleeEntryBlock) {
   SmallPtrSet<BasicBlock *, 16> ClonedBBs;
-  for (auto Entry : VMap) {
+  for (const auto &Entry : VMap) {
     if (!isa<BasicBlock>(Entry.first) || !Entry.second)
       continue;
     auto *OrigBB = cast<BasicBlock>(Entry.first);
@@ -2199,9 +2197,8 @@ static void updateCallProfile(Function *Callee, const ValueToValueMapTy &VMap,
   updateProfileCallee(Callee, -CallCount, &VMap);
 }
 
-void llvm::updateProfileCallee(
-    Function *Callee, int64_t EntryDelta,
-    const ValueMap<const Value *, WeakTrackingVH> *VMap) {
+void llvm::updateProfileCallee(Function *Callee, int64_t EntryDelta,
+                               const ValueToValueMapTy *VMap) {
   auto CalleeCount = Callee->getEntryCount();
   if (!CalleeCount)
     return;
@@ -2223,7 +2220,7 @@ void llvm::updateProfileCallee(
   // During inlining ?
   if (VMap) {
     uint64_t CloneEntryCount = *CalleeCount - NewEntryCount;
-    for (auto Entry : *VMap) {
+    for (const auto &Entry : *VMap) {
       if (isa<CallInst>(Entry.first))
         if (auto *CI = dyn_cast_or_null<CallInst>(Entry.second)) {
           CI->updateProfWeight(CloneEntryCount, *CalleeCount);

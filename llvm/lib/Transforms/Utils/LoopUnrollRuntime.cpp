@@ -1068,6 +1068,8 @@ bool llvm::UnrollRuntimeLoopRemainder(
                   NewPreHeader, VMap, DT, LI, PreserveLCSSA, *SE);
   }
 
+  VMap.clear();
+
   // If this loop is nested, then the loop unroller changes the code in the any
   // of its parent loops, so the Scalar Evolution pass needs to be run again.
   SE->forgetTopmostLoop(L);

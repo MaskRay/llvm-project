@@ -1186,7 +1186,7 @@ bool WinEHPrepareImpl::cloneCommonBlocks(Function &F) {
       }
     }
 
-    for (ValueToValueMapTy::value_type VT : VMap) {
+    for (auto &VT : VMap) {
       // If there were values defined in BB that are used outside the funclet,
       // then we now have to update all uses of the value to use either the
       // original value, the cloned value, or some PHI derived value.  This can
@@ -1194,7 +1194,7 @@ bool WinEHPrepareImpl::cloneCommonBlocks(Function &F) {
       // these up now.
       SmallVector<Use *, 16> UsesToRename;
 
-      auto *OldI = dyn_cast<Instruction>(const_cast<Value *>(VT.first));
+      auto *OldI = const_cast<Instruction *>(dyn_cast<Instruction>(VT.first));
       if (!OldI)
         continue;
       auto *NewI = cast<Instruction>(VT.second);

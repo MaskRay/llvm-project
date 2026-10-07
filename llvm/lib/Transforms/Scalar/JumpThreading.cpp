@@ -2354,6 +2354,8 @@ void JumpThreadingPass::threadThroughTwoBasicBlocks(BasicBlock *PredPredBB,
 
   updateSSA(PredBB, NewBB, ValueMapping);
 
+  ValueMapping.clear();
+
   // Clean up things like PHI nodes with single operands, dead instructions,
   // etc.
   SimplifyInstructionsInBlock(NewBB, TLI);
@@ -2478,6 +2480,8 @@ void JumpThreadingPass::threadEdge(BasicBlock *BB,
 
   remapSourceAtoms(ValueMapping, NewBB->begin(), NewBB->end());
   updateSSA(BB, NewBB, ValueMapping);
+
+  ValueMapping.clear();
 
   // At this point, the IR is fully up to date and consistent.  Do a quick scan
   // over the new instructions and zap any that are constants or dead.  This
@@ -3217,6 +3221,8 @@ bool JumpThreadingPass::threadGuard(BasicBlock *BB, IntrinsicInst *Guard,
       NewPN->insertBefore(InsertionPoint);
       Inst->replaceAllUsesWith(NewPN);
     }
+    UnguardedMapping.erase(Inst);
+    GuardedMapping.erase(Inst);
     Inst->dropDbgRecords();
     Inst->eraseFromParent();
   }

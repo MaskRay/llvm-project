@@ -170,6 +170,8 @@ llvm::prepareForDynamicDebugging(Module *M, StringRef PromotionSuffix) {
   // GlobalOpt promoting the alias. If the function-preservation mechanism
   // changes in the future GlobalOpt alias promotion must be handled another
   // way.
+  VMap.clear();
+
   appendToCompilerUsed(*M, GlobalsToPreserve);
 
   return UnoptM;

@@ -3806,6 +3806,8 @@ static std::optional<bool> foldCondBranchOnValueKnownInPredecessorImpl(
       InsertPt->cloneDebugInfoFrom(&*SrcDbgCursor);
     InsertPt->cloneDebugInfoFrom(BI);
 
+    TranslateMap.clear();
+
     BB->removePredecessor(EdgeBB);
     UncondBrInst *EdgeBI = cast<UncondBrInst>(EdgeBB->getTerminator());
     EdgeBI->setSuccessor(0, RealDest);

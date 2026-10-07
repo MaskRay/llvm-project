@@ -35,7 +35,6 @@ class Module;
 class Type;
 class Value;
 
-using ValueToValueMapTy = ValueMap<const Value *, WeakTrackingVH>;
 using DbgRecordIterator = simple_ilist<DbgRecord>::iterator;
 using MetadataSetTy = SmallPtrSet<const Metadata *, 16>;
 using MetadataPredicate = std::function<bool(const Metadata *)>;
@@ -153,14 +152,6 @@ inline RemapFlags operator|(RemapFlags LHS, RemapFlags RHS) {
 ///
 /// If an \a IdentityMD predicate is optionally provided, \a Metadata for which
 /// the predicate returns true will be mapped onto itself in \a VM on first use.
-///
-/// TODO: lib/Linker really doesn't need the \a ValueHandle in the \a
-/// ValueToValueMapTy.  We should template \a ValueMapper (and its
-/// implementation classes), and explicitly instantiate on two concrete
-/// instances of \a ValueMap (one as \a ValueToValueMap, and one with raw \a
-/// Value pointers).  It may be viable to do away with \a TrackingMDRef in the
-/// \a Metadata side map for the lib/Linker case as well, in which case we'll
-/// need a new template parameter on \a ValueMap.
 ///
 /// TODO: Update callers of \a RemapInstruction() and \a MapValue() (etc.) to
 /// use \a ValueMapper directly.

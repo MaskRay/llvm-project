@@ -367,6 +367,9 @@ static void splitCallSite(CallBase &CB,
       DTU.applyUpdatesPermissive({{DominatorTree::Delete, BB, TailBB}});
     }
 
+    for (auto &Mapping : ValueToValueMaps)
+      Mapping.clear();
+
     // Erase the tail block once done with musttail patching
     DTU.deleteBB(TailBB);
     return;
@@ -405,6 +408,8 @@ static void splitCallSite(CallBase &CB,
       CurrentI->replaceAllUsesWith(NewPN);
     }
     CurrentI->dropDbgRecords();
+    for (auto &Mapping : ValueToValueMaps)
+      Mapping.erase(CurrentI);
     CurrentI->eraseFromParent();
     // We are done once we handled the first original instruction in TailBB.
     if (CurrentI == OriginalBeginInst)

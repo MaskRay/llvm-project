@@ -198,6 +198,9 @@ static void substituteOperandWithArgument(Function *OldF,
       NewUser->setOperand(Op->getOperandNo(), NewArg);
   }
 
+  VMap.clear();
+  OldValMap.clear();
+
   // Replace all OldF uses with NewF.
   replaceFunctionCalls(OldF, NewF);
 

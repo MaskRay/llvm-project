@@ -340,6 +340,21 @@ public:
   ValueTy &operator*() const { return *getValPtr(); }
 };
 
+// Specialize simplify_type to allow AssertingVH to participate in
+// dyn_cast, isa, etc.
+template <typename T> struct simplify_type<AssertingVH<T>> {
+  using SimpleType = T *;
+  static SimpleType getSimplifiedValue(const AssertingVH<T> &AVH) {
+    return AVH;
+  }
+};
+template <typename T> struct simplify_type<const AssertingVH<T>> {
+  using SimpleType = T *;
+  static SimpleType getSimplifiedValue(const AssertingVH<T> &AVH) {
+    return AVH;
+  }
+};
+
 // Treat AssertingVH<T> like T* inside maps. This also allows using find_as()
 // to look up a value without constructing a value handle.
 template<typename T>

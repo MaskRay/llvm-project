@@ -1053,7 +1053,7 @@ static void cloneLoopBlocks(
 
   // LastValueMap is updated with the values for the current loop
   // which are used the next time this function is called.
-  for (auto KV : VMap)
+  for (const auto &KV : VMap)
     LVMap[KV.first] = KV.second;
 }
 
@@ -1390,6 +1390,9 @@ void llvm::peelLoop(Loop *L, unsigned PeelCount, bool PeelLast, LoopInfo *LI,
       PHI->setIncomingValueForBlock(NewPreHeader, NewVal);
     }
   }
+
+  VMap.clear();
+  LVMap.clear();
 
   // Update Metadata for count of peeled off iterations.
   unsigned AlreadyPeeled = 0;

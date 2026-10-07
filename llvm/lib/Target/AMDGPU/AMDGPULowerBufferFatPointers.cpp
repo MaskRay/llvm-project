@@ -1883,6 +1883,8 @@ void SplitPtrStructs::killAndReplaceSplitInstructions(
     });
 
     if (I->use_empty()) {
+      RsrcParts.erase(I);
+      OffParts.erase(I);
       I->eraseFromParent();
       continue;
     }
@@ -1895,6 +1897,8 @@ void SplitPtrStructs::killAndReplaceSplitInstructions(
     copyMetadata(Struct, I);
     Struct->takeName(I);
     I->replaceAllUsesWith(Struct);
+    RsrcParts.erase(I);
+    OffParts.erase(I);
     I->eraseFromParent();
   }
 }
@@ -2814,6 +2818,7 @@ bool AMDGPULowerBufferFatPointers::run(Module &M, const TargetMachine &TM,
   FatPtrConstMaterializer Materializer(&StructTM, CloneMap);
 
   ValueMapper LowerInFuncs(CloneMap, RF_None, &StructTM, &Materializer);
+  SmallVector<Function *> FunctionsToErase;
   for (auto [F, InterfaceChange] : NeedsRemap) {
     Function *NewF = F;
     if (InterfaceChange)
@@ -2829,13 +2834,15 @@ bool AMDGPULowerBufferFatPointers::run(Module &M, const TargetMachine &TM,
       NeedsPostProcess.push_back(NewF);
     if (InterfaceChange) {
       F->replaceAllUsesWith(NewF);
-      F->eraseFromParent();
+      FunctionsToErase.push_back(F);
     }
     Changed = true;
   }
   StructTM.clear();
   IntTM.clear();
   CloneMap.clear();
+  for (Function *F : FunctionsToErase)
+    F->eraseFromParent();
 
   SplitPtrStructs Splitter(DL, M.getContext(), &TM);
   for (Function *F : NeedsPostProcess)

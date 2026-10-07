@@ -167,6 +167,7 @@ void llvm::reduceArgumentsDeltaPass(Oracle &O, ReducerWorkItem &WorkItem) {
         ArgIndexesToKeep.insert(Index);
 
     auto *ClonedFunc = CloneFunction(F, VMap);
+    VMap.clear();
     // In order to preserve function order, we move Clone after old Function
     ClonedFunc->takeName(F);
     ClonedFunc->removeFromParent();

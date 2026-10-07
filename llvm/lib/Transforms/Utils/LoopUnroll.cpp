@@ -1357,6 +1357,7 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
       if (SE)
         SE->forgetValue(PN);
       PN->replaceAllUsesWith(PN->getIncomingValueForBlock(Preheader));
+      LastValueMap.erase(PN);
       PN->eraseFromParent();
     } else if (ULO.Count > 1) {
       if (Reductions.contains(PN))
@@ -1373,6 +1374,8 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
       PN->addIncoming(InVal, Latches.back());
     }
   }
+
+  LastValueMap.clear();
 
   // Connect latches of the unrolled iterations to the headers of the next
   // iteration. Currently they point to the header of the same iteration.

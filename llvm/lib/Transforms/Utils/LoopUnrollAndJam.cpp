@@ -491,6 +491,7 @@ llvm::UnrollAndJamLoop(Loop *L, unsigned Count, unsigned TripCount,
   if (CompletelyUnroll) {
     while (PHINode *Phi = dyn_cast<PHINode>(ForeBlocksFirst[0]->begin())) {
       Phi->replaceAllUsesWith(Phi->getIncomingValueForBlock(Preheader));
+      LastValueMap.erase(Phi);
       Phi->eraseFromParent();
     }
   } else {
@@ -498,6 +499,8 @@ llvm::UnrollAndJamLoop(Loop *L, unsigned Count, unsigned TripCount,
     updatePHIBlocksAndValues(ForeBlocksFirst[0], AftBlocksLast[0],
                              AftBlocksLast.back(), LastValueMap);
   }
+
+  LastValueMap.clear();
 
   for (unsigned It = 1; It != Count; It++) {
     // Remap ForeBlock successors from previous iteration to this

@@ -31,6 +31,8 @@ serializeModule(const Module &M, GVPredicate ShouldCloneDef,
     return false;
   });
 
+  VMap.clear();
+
   if (UpdateClonedDefSource)
     for (auto *GV : ClonedDefsInSrc)
       UpdateClonedDefSource(*GV);

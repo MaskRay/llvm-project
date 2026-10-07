@@ -414,6 +414,8 @@ bool llvm::SplitIndirectBrCriticalEdges(Function &F,
       for (Instruction &I : *DirectSucc)
         RemapSourceAtom(&I, VMap);
 
+    VMap.clear();
+
     BlockFrequency BlockFreqForDirectSucc;
     SmallVector<DominatorTree::UpdateType, 8> DTUpdates;
     SmallPtrSet<BasicBlock *, 8> SeenSrcs;

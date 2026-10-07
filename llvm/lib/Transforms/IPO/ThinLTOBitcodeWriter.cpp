@@ -375,6 +375,7 @@ void splitAndWriteThinLTOBitcode(
           return lowertypetests::hasTypeMetadata(*GVar);
         return false;
       }));
+  VMap.clear();
   StripDebugInfo(*MergedM);
   MergedM->removeModuleInlineAsm();
 

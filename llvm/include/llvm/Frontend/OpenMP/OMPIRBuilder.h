@@ -1284,9 +1284,8 @@ private:
   ///                   original and copied loop values and loop blocks.
   /// \param NamePrefix Optional name prefix for if.then if.else blocks.
   void createIfVersion(CanonicalLoopInfo *Loop, Value *IfCond,
-                       ValueMap<const Value *, WeakTrackingVH> &VMap,
-                       LoopAnalysis &LIA, LoopInfo &LI, llvm::Loop *L,
-                       const Twine &NamePrefix = "");
+                       ValueToValueMapTy &VMap, LoopAnalysis &LIA, LoopInfo &LI,
+                       llvm::Loop *L, const Twine &NamePrefix = "");
 
   /// Creates a task duplication function to be passed to kmpc_taskloop.
   ///

@@ -1669,6 +1669,9 @@ bool InferAddressSpacesImpl::rewriteWithNewAddressSpaces(
     }
   }
 
+  ValueWithNewAddrSpace.clear();
+  VMap.clear();
+
   // Deleting one instruction may recursively delete another queued
   // instruction. Create handles before the first deletion so overlapping
   // entries are nulled instead of leaving dangling pointers.

@@ -1368,9 +1368,9 @@ private:
     SmallVector<std::pair<Instruction *, Instruction *>> NewDefsVector;
     NewDefsVector.reserve(VMap.size());
 
-    for (auto Entry : VMap) {
-      Instruction *Inst =
-          dyn_cast<Instruction>(const_cast<Value *>(Entry.first));
+    for (auto &Entry : VMap) {
+      auto *Inst =
+          const_cast<Instruction *>(dyn_cast<Instruction>(Entry.first));
       if (!Inst || !Entry.second ||
           isa<UncondBrInst, CondBrInst, SwitchInst>(Inst))
         continue;

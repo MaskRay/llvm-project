@@ -396,9 +396,8 @@ LLVM_ABI BasicBlock *DuplicateInstructionsInSplitBetween(
 /// Updates profile information by adjusting the entry count by adding
 /// EntryDelta then scaling callsite information by the new count divided by the
 /// old count. VMap is used during inlinng to also update the new clone
-LLVM_ABI void updateProfileCallee(
-    Function *Callee, int64_t EntryDelta,
-    const ValueMap<const Value *, WeakTrackingVH> *VMap = nullptr);
+LLVM_ABI void updateProfileCallee(Function *Callee, int64_t EntryDelta,
+                                  const ValueToValueMapTy *VMap = nullptr);
 
 /// Find the 'llvm.experimental.noalias.scope.decl' intrinsics in the specified
 /// basic blocks and extract their scope. These are candidates for duplication

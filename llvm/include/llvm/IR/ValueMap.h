@@ -86,13 +86,9 @@ class ValueMap {
 
   using ValueMapCVH = ValueMapCallbackVH<KeyT, ValueT, Config>;
   using MapT = DenseMap<ValueMapCVH, ValueT, DenseMapInfo<ValueMapCVH>>;
-  using MDMapT = DenseMap<const Metadata *, TrackingMDRef>;
-  /// Map {(InlinedAt, old atom number) -> new atom number}.
-  using DMAtomT = SmallDenseMap<std::pair<Metadata *, uint64_t>, uint64_t>;
   using ExtraData = typename Config::ExtraData;
 
   MapT Map;
-  std::optional<MDMapT> MDMap;
   ExtraData Data;
 
 public:
@@ -112,26 +108,6 @@ public:
   ValueMap &operator=(const ValueMap &) = delete;
   ValueMap &operator=(ValueMap &&) = delete;
 
-  bool hasMD() const { return bool(MDMap); }
-  MDMapT &MD() {
-    if (!MDMap)
-      MDMap.emplace();
-    return *MDMap;
-  }
-  std::optional<MDMapT> &getMDMap() { return MDMap; }
-  /// Map {(InlinedAt, old atom number) -> new atom number}.
-  DMAtomT AtomMap;
-
-  /// Get the mapped metadata, if it's in the map.
-  std::optional<Metadata *> getMappedMD(const Metadata *MD) const {
-    if (!MDMap)
-      return std::nullopt;
-    auto Where = MDMap->find(MD);
-    if (Where == MDMap->end())
-      return std::nullopt;
-    return Where->second.get();
-  }
-
   using iterator = ValueMapIteratorImpl<MapT, KeyT, false>;
   using const_iterator = ValueMapIteratorImpl<MapT, KeyT, true>;
 
@@ -146,11 +122,7 @@ public:
   /// Grow the map so that it has at least Size buckets. Does not shrink
   void reserve(size_t Size) { Map.reserve(Size); }
 
-  void clear() {
-    Map.clear();
-    MDMap.reset();
-    AtomMap.clear();
-  }
+  void clear() { Map.clear(); }
 
   /// Return 1 if the specified key is in the map, 0 otherwise.
   size_type count(const KeyT &Val) const {
@@ -356,6 +328,47 @@ using ValueMapIterator = ValueMapIteratorImpl<DenseMapT, KeyT, false>;
 
 template <typename DenseMapT, typename KeyT>
 using ValueMapConstIterator = ValueMapIteratorImpl<DenseMapT, KeyT, true>;
+
+/// Map from source values to their clones, used by IR cloning and linking.
+///
+/// Keys are AssertingVH: a plain pointer in release builds that does not follow
+/// RAUW or deletion. A holder that deletes or RAUWs a key while the map is live
+/// must erase it or clear the map first.
+class ValueToValueMapTy
+    : public DenseMap<AssertingVH<const Value>, WeakTrackingVH> {
+  using MDMapT = DenseMap<const Metadata *, TrackingMDRef>;
+  std::optional<MDMapT> MDMap;
+
+public:
+  /// Map {(InlinedAt, old atom number) -> new atom number}.
+  SmallDenseMap<std::pair<Metadata *, uint64_t>, uint64_t> AtomMap;
+
+  ValueToValueMapTy() : DenseMap(64) {}
+
+  bool hasMD() const { return bool(MDMap); }
+  MDMapT &MD() {
+    if (!MDMap)
+      MDMap.emplace();
+    return *MDMap;
+  }
+  std::optional<MDMapT> &getMDMap() { return MDMap; }
+
+  /// Get the mapped metadata, if it's in the map.
+  std::optional<Metadata *> getMappedMD(const Metadata *MD) const {
+    if (!MDMap)
+      return std::nullopt;
+    auto Where = MDMap->find(MD);
+    if (Where == MDMap->end())
+      return std::nullopt;
+    return Where->second.get();
+  }
+
+  void clear() {
+    DenseMap::clear();
+    MDMap.reset();
+    AtomMap.clear();
+  }
+};
 
 } // end namespace llvm
 
