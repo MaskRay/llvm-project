@@ -20,9 +20,11 @@
 namespace llvm {
 
 class TargetTransformInfo;
+struct VectorizeOptions;
 
 class SandboxVectorizerPass
     : public OptionalPassInfoMixin<SandboxVectorizerPass> {
+  const VectorizeOptions *Opts;
   TargetTransformInfo *TTI = nullptr;
   AAResults *AA = nullptr;
   ScalarEvolution *SE = nullptr;

@@ -20,7 +20,6 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/Regex.h"
 
 namespace llvm {
 
@@ -40,15 +39,18 @@ struct VFRange;
 
 LLVM_ABI_FOR_TEST extern cl::opt<bool> VerifyEachVPlan;
 
+struct VPlanTransforms {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-LLVM_ABI_FOR_TEST extern cl::opt<bool> VPlanPrintBeforeAll;
-LLVM_ABI_FOR_TEST extern cl::opt<bool> VPlanPrintAfterAll;
-LLVM_ABI_FOR_TEST extern cl::list<std::string> VPlanPrintBeforePasses;
-LLVM_ABI_FOR_TEST extern cl::list<std::string> VPlanPrintAfterPasses;
-LLVM_ABI_FOR_TEST extern cl::opt<bool> VPlanPrintVectorRegionScope;
+  /// Return true if any -vplan-print-* option requests printing.
+  LLVM_ABI_FOR_TEST static bool isPrintingRequested();
+
+  /// Print \p Plan of \p Fn before or after the pass \p NumberedPassName if
+  /// requested.
+  LLVM_ABI_FOR_TEST static void printIfRequested(VPlan &Plan, Function *Fn,
+                                                 StringRef NumberedPassName,
+                                                 bool After);
 #endif
 
-struct VPlanTransforms {
   /// Helper to run a VPlan pass \p Pass on \p VPlan, forwarding extra arguments
   /// to the pass. Performs verification/printing after each VPlan pass if
   /// requested via command line options.
@@ -64,8 +66,7 @@ struct VPlanTransforms {
     unsigned Instance;
     std::string NumberedPassName;
 
-    if (VPlanPrintBeforeAll || VPlanPrintAfterAll ||
-        !VPlanPrintBeforePasses.empty() || !VPlanPrintAfterPasses.empty()) {
+    if (isPrintingRequested()) {
       Instance = ++PassCounter[{Fn, PassName}];
 
       NumberedPassName = Instance == 1
@@ -73,32 +74,14 @@ struct VPlanTransforms {
                              : (PassName + "@" + Twine(Instance)).str();
     }
 
-    auto PrintPlan = [&](StringRef BeforeOrAfterStr) {
-      dbgs() << "VPlan for loop in '" << Fn->getName() << "' "
-             << BeforeOrAfterStr << " " << NumberedPassName << '\n';
-      if (VPlanPrintVectorRegionScope && Plan.getVectorLoopRegion())
-        Plan.getVectorLoopRegion()->print(dbgs());
-      else
-        dbgs() << Plan << '\n';
-    };
-
-    auto MatchesPassListOption = [&](const cl::list<std::string> &ListOpt) {
-      return (ListOpt.getNumOccurrences() > 0 &&
-              any_of(ListOpt, [&](StringRef Entry) {
-                return Regex(Entry).match(NumberedPassName);
-              }));
-    };
-
-    if (VPlanPrintBeforeAll || MatchesPassListOption(VPlanPrintBeforePasses))
-      PrintPlan("before");
+    printIfRequested(Plan, Fn, NumberedPassName, /*After=*/false);
 #endif
 
     scope_exit PostTransformActions{[&]() {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
       // Make sure to print before verification, so that output is more useful
       // in case of failures:
-      if (VPlanPrintAfterAll || MatchesPassListOption(VPlanPrintAfterPasses))
-        PrintPlan("after");
+      printIfRequested(Plan, Fn, NumberedPassName, /*After=*/true);
 #endif
       if (VerifyEachVPlan && EnableVerify) {
         if (!verifyVPlanIsValid(Plan))
