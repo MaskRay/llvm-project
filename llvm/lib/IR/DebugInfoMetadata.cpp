@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "IROptions.h"
 #include "LLVMContextImpl.h"
 #include "MetadataImpl.h"
 #include "llvm/ADT/DenseSet.h"
@@ -36,12 +37,6 @@ namespace llvm {
 cl::opt<bool> EnableFSDiscriminator(
     "enable-fs-discriminator", cl::Hidden,
     cl::desc("Enable adding flow sensitive discriminators"));
-
-// When true, preserves line and column number by picking one of the merged
-// location info in a deterministic manner to assist sample based PGO.
-LLVM_ABI cl::opt<bool> PickMergedSourceLocations(
-    "pick-merged-source-locations", cl::init(false), cl::Hidden,
-    cl::desc("Preserve line and column number when merging locations."));
 } // namespace llvm
 
 uint32_t DIType::getAlignInBits() const {
@@ -317,7 +312,8 @@ DILocation *DILocation::getMergedLocation(DILocation *LocA, DILocation *LocB) {
   // rather than computing a merged location using line 0, which is typically
   // not useful for PGO. If one of them is null, then try to return one which is
   // valid.
-  if (PickMergedSourceLocations) {
+  if (getIROptions((LocA ? LocA : LocB)->getContext())
+          .pick_merged_source_locations) {
     if (!LocA || !LocB)
       return LocA ? LocA : LocB;
 
