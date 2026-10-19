@@ -37,14 +37,13 @@
 //    candidate contributes the target's hash, propagated for a few rounds,
 //    so the hash also covers sections a few relocation hops away.
 //
-// 2. Next, we split each equivalence class by comparing everything except
-//    relocation targets (equalsConstant). These properties never change, so
-//    this step runs once.
+// 2. Next, we split each equivalence class by comparing sections exactly.
+//    Relocation targets are considered equivalent if they are in the same
+//    equivalence class.
 //
-// 3. Then we split classes by comparing relocation targets (equalsVariable),
-//    which are considered equivalent if they are in the same equivalence
-//    class. A split may make two relocations that targeted the same class
-//    target different classes, so we repeat this step until no class splits.
+// 3. A split may make two relocations that targeted the same class target
+//    different classes, so we compare the relocation targets (equalsVariable)
+//    of the classes referencing a split class again until no class splits.
 //
 // 4. For each equivalence class C, pick an arbitrary section in C, and
 //    merge all the other sections in C with it.
@@ -80,10 +79,6 @@ using namespace llvm::object;
 using namespace lld;
 using namespace lld::elf;
 
-// Until segregate() runs, a candidate's eqClass holds its index, then its hash,
-// with this bit set. Unique IDs of ineligible sections never have it.
-constexpr uint32_t tagBit = 1U << 31;
-
 namespace {
 template <class ELFT> class ICF {
 public:
@@ -91,7 +86,7 @@ public:
   void run();
 
 private:
-  void segregate(size_t begin, size_t end, uint32_t eqClassBase, bool constant);
+  void segregate(size_t begin, size_t end, bool checkConstant);
 
   template <class RelTy>
   void hashRelocs(const InputSection &sec, uint64_t &h,
@@ -118,8 +113,10 @@ private:
   Ctx &ctx;
   SmallVector<InputSection *, 0> sections;
 
-  // We repeat the main loop while `Repeat` is true.
-  std::atomic<bool> repeat;
+  // Unique IDs of ineligible sections are below eqClassBase. A candidate's
+  // eqClass is eqClassBase plus its index while hashing, then plus the position
+  // of the first section of its class.
+  uint32_t eqClassBase;
 
   // The main loop counter.
   int cnt = 0;
@@ -141,13 +138,7 @@ private:
   // places, we can keep the invariance.
   //
   // Below, `Current` has the index of the current class, and `Next` has
-  // the index of the next class. If threading is enabled, they are either
-  // (0, 1) or (1, 0).
-  //
-  // Note on single-thread: if that's the case, they are always (0, 0)
-  // because we can safely read the next class without worrying about race
-  // conditions. Using the same location makes this algorithm converge
-  // faster because it uses results of the same iteration earlier.
+  // the index of the next class. They are either (0, 1) or (1, 0).
   int current = 0;
   int next = 0;
 };
@@ -191,8 +182,7 @@ static bool isEligible(InputSection *s) {
 
 // Split an equivalence class into smaller classes.
 template <class ELFT>
-void ICF<ELFT>::segregate(size_t begin, size_t end, uint32_t eqClassBase,
-                          bool constant) {
+void ICF<ELFT>::segregate(size_t begin, size_t end, bool checkConstant) {
   // This loop rearranges sections in [Begin, End) so that all sections
   // that are equal in terms of equals{Constant,Variable} are contiguous
   // in [Begin, End).
@@ -204,26 +194,20 @@ void ICF<ELFT>::segregate(size_t begin, size_t end, uint32_t eqClassBase,
   while (begin < end) {
     // Divide [Begin, End) into two. Let Mid be the start index of the
     // second group.
-    auto bound =
-        std::stable_partition(sections.begin() + begin + 1,
-                              sections.begin() + end, [&](InputSection *s) {
-                                if (constant)
-                                  return equalsConstant(sections[begin], s);
-                                return equalsVariable(sections[begin], s);
-                              });
+    auto bound = std::stable_partition(
+        sections.begin() + begin + 1, sections.begin() + end,
+        [&](InputSection *s) {
+          return (!checkConstant || equalsConstant(sections[begin], s)) &&
+                 equalsVariable(sections[begin], s);
+        });
     size_t mid = bound - sections.begin();
 
     // Now we split [Begin, End) into [Begin, Mid) and [Mid, End) by
-    // updating the sections in [Begin, Mid). We use Mid as the basis for
-    // the equivalence class ID because every group ends with a unique index.
-    // Add this to eqClassBase to avoid equality with unique IDs.
+    // updating the sections in [Begin, Mid). We use Begin as the basis for
+    // the equivalence class ID because every group starts at a unique index,
+    // so a class that does not split keeps its ID.
     for (size_t i = begin; i < mid; ++i)
-      sections[i]->eqClass[next] = eqClassBase + mid;
-
-    // If we created a group, we need to iterate the main loop again.
-    if (mid != end)
-      repeat = true;
-
+      sections[i]->eqClass[next] = eqClassBase + begin;
     begin = mid;
   }
 }
@@ -280,8 +264,8 @@ void ICF<ELFT>::hashRelocs(const InputSection &sec, uint64_t &h,
     auto *is = dyn_cast_or_null<InputSection>(d->section);
     if (!is)
       continue;
-    if (is->eqClass[0] & tagBit)
-      edges.push_back(is->eqClass[0] & ~tagBit);
+    if (is->eqClass[0] >= eqClassBase)
+      edges.push_back(is->eqClass[0] - eqClassBase);
     else
       h = mix(h, is->eqClass[0]);
   }
@@ -452,6 +436,9 @@ void ICF<ELFT>::forEachClassRange(size_t begin, size_t end,
 template <class ELFT>
 void ICF<ELFT>::parallelForEachClass(
     llvm::function_ref<void(size_t, size_t)> fn) {
+  current = cnt % 2;
+  next = (cnt + 1) % 2;
+
   // If threading is disabled or the number of sections are
   // too small to use threading, call Fn sequentially.
   if (parallel::strategy.ThreadsRequested == 1 || sections.size() < 1024) {
@@ -459,9 +446,6 @@ void ICF<ELFT>::parallelForEachClass(
     ++cnt;
     return;
   }
-
-  current = cnt % 2;
-  next = (cnt + 1) % 2;
 
   // Shard into non-overlapping intervals, and call Fn in parallel.
   // The sharding must be completed before any calls to Fn are made
@@ -507,6 +491,7 @@ template <class ELFT> void ICF<ELFT>::run() {
     return std::make_pair(begin, std::min(begin + chunkSize, n));
   };
   ArrayRef<InputSectionBase *> inputs = ctx.inputSections;
+  eqClassBase = uniqueId + inputs.size() + 1;
   size_t numInputChunks = divideCeil(inputs.size(), chunkSize);
   SmallVector<uint32_t, 0> offsets(numInputChunks + 1);
   parallelFor(0, numInputChunks, [&](size_t c) {
@@ -517,7 +502,7 @@ template <class ELFT> void ICF<ELFT>::run() {
       if (!s || s->eqClass[0])
         continue;
       if (isEligible(s)) {
-        s->eqClass[0] = tagBit;
+        s->eqClass[0] = eqClassBase;
         ++n;
       } else {
         s->eqClass[0] = s->eqClass[1] = uniqueId + 1 + i;
@@ -532,16 +517,13 @@ template <class ELFT> void ICF<ELFT>::run() {
     uint32_t index = offsets[c];
     for (size_t i = begin; i != end; ++i) {
       auto *s = dyn_cast<InputSection>(inputs[i]);
-      if (s && s->eqClass[0] == tagBit) {
-        s->eqClass[0] = index | tagBit;
+      if (s && s->eqClass[0] >= eqClassBase) {
+        s->eqClass[0] = eqClassBase + index;
         sections[index++] = s;
       }
     }
   });
-  uniqueId += inputs.size();
-
-  assert(sections.size() <= tagBit && uniqueId < tagBit &&
-         "tagBit marks a candidate and the low bits index sections");
+  assert(uint64_t(eqClassBase) + sections.size() <= UINT32_MAX);
 
   // Hash sections in chunks. Each chunk appends its sections' edges to its own
   // buffer; edgeEnd[i] is where section i's edges end.
@@ -583,36 +565,70 @@ template <class ELFT> void ICF<ELFT>::run() {
   }
 
   // From now on, sections in Sections vector are ordered so that sections
-  // in the same equivalence class are consecutive in the vector.
-  SmallVector<uint64_t, 0> keys;
+  // in the same equivalence class are consecutive in the vector. Sections with
+  // the same hash form a class.
+  SmallVector<std::pair<uint64_t, uint32_t>, 0> keys;
   keys.resize_for_overwrite(numSections);
-  parallelFor(0, numSections, [&](size_t i) {
-    uint32_t h = hashes[i] | tagBit;
-    sections[i]->eqClass[0] = h;
-    keys[i] = uint64_t(h) << 32 | i;
-  });
+  parallelFor(0, numSections,
+              [&](size_t i) { keys[i] = {hashes[i], uint32_t(i)}; });
   parallelSort(keys.begin(), keys.end());
   SmallVector<InputSection *, 0> sorted;
   sorted.resize_for_overwrite(numSections);
-  parallelFor(0, numSections,
-              [&](size_t i) { sorted[i] = sections[uint32_t(keys[i])]; });
+  parallelFor(0, numChunks, [&](size_t c) {
+    auto [begin, end] = chunkRange(c, numSections);
+    uint64_t hash = keys[begin].first;
+    size_t head =
+        llvm::partition_point(ArrayRef(keys).take_front(begin),
+                              [=](auto &k) { return k.first < hash; }) -
+        keys.begin();
+    for (size_t i = begin; i != end; ++i) {
+      if (keys[i].first != keys[head].first)
+        head = i;
+      sorted[i] = sections[keys[i].second];
+      sorted[i]->eqClass[0] = eqClassBase + head;
+    }
+  });
+  SmallVector<InputSection *, 0> candidates = std::move(sections);
   sections = std::move(sorted);
 
-  // Compare static contents and assign unique equivalence class IDs for each
-  // static content. Use a base offset for these IDs to ensure no overlap with
-  // the unique IDs already assigned.
-  uint32_t eqClassBase = ++uniqueId;
-  parallelForEachClass([&](size_t begin, size_t end) {
-    segregate(begin, end, eqClassBase, true);
-  });
-
-  // Split groups by comparing relocations until convergence is obtained.
-  do {
-    repeat = false;
-    parallelForEachClass([&](size_t begin, size_t end) {
-      segregate(begin, end, eqClassBase, false);
+  // Compare sections exactly. Then, only a class with a member whose
+  // relocation target changed class in the previous pass can split.
+  parallelForEachClass(
+      [&](size_t begin, size_t end) { segregate(begin, end, true); });
+  auto dirty = std::make_unique<std::atomic<bool>[]>(numSections);
+  auto markDirty = [&] {
+    std::atomic<bool> any = false;
+    parallelFor(0, numChunks, [&](size_t c) {
+      ArrayRef<uint32_t> edges = chunkEdges[c];
+      auto [begin, end] = chunkRange(c, numSections);
+      bool marked = false;
+      for (size_t i = begin; i != end; ++i) {
+        size_t j = i % chunkSize ? edgeEnd[i - 1] : 0;
+        if (llvm::any_of(edges.slice(j, edgeEnd[i] - j), [&](uint32_t t) {
+              return candidates[t]->eqClass[next] !=
+                     candidates[t]->eqClass[current];
+            })) {
+          dirty[candidates[i]->eqClass[next] - eqClassBase].store(
+              true, std::memory_order_relaxed);
+          marked = true;
+        }
+      }
+      if (marked)
+        any.store(true, std::memory_order_relaxed);
     });
-  } while (repeat);
+    return any.load();
+  };
+  while (markDirty()) {
+    parallelForEachClass([&](size_t begin, size_t end) {
+      if (dirty[begin].load(std::memory_order_relaxed)) {
+        dirty[begin].store(false, std::memory_order_relaxed);
+        segregate(begin, end, false);
+      } else {
+        for (size_t i = begin; i != end; ++i)
+          sections[i]->eqClass[next] = sections[i]->eqClass[current];
+      }
+    });
+  }
 
   Log(ctx) << "ICF needed " << cnt << " iterations";
 
@@ -632,16 +648,16 @@ template <class ELFT> void ICF<ELFT>::run() {
   // Print classes in input order, independent of the hash.
   if (ctx.arg.printIcfSections) {
     DenseMap<InputSection *, SmallVector<InputSection *, 0>> folded;
-    for (InputSectionBase *sec : ctx.inputSections)
-      if (auto *s = dyn_cast<InputSection>(sec); s && s->repl != s)
+    for (InputSection *s : candidates)
+      if (s->repl != s)
         folded[s->repl].push_back(s);
-    for (InputSectionBase *sec : ctx.inputSections) {
-      auto it = folded.find(dyn_cast<InputSection>(sec));
+    for (InputSection *s : candidates) {
+      auto it = folded.find(s);
       if (it == folded.end())
         continue;
-      Msg(ctx) << "selected section " << sec;
-      for (InputSection *s : it->second)
-        Msg(ctx) << "  removing identical section " << s;
+      Msg(ctx) << "selected section " << s;
+      for (InputSection *m : it->second)
+        Msg(ctx) << "  removing identical section " << m;
     }
   }
 
