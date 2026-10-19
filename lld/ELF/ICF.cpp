@@ -72,6 +72,7 @@
 #include "llvm/Support/xxhash.h"
 #include <algorithm>
 #include <atomic>
+#include <numeric>
 
 using namespace llvm;
 using namespace llvm::ELF;
@@ -497,20 +498,47 @@ template <class ELFT> void ICF<ELFT>::run() {
   ctx.in.ehFrame->iterateFDEWithLSDA<ELFT>(
       [&](InputSection &s) { s.eqClass[0] = s.eqClass[1] = ++uniqueId; });
 
-  // Collect sections to merge.
-  for (InputSectionBase *sec : ctx.inputSections) {
-    auto *s = dyn_cast<InputSection>(sec);
-    if (s && s->eqClass[0] == 0) {
+  // Collect sections to merge, numbering candidates in input order.
+  // Ineligible sections are assigned unique IDs, i.e. each section belongs to
+  // an equivalence class of its own.
+  constexpr size_t chunkSize = 1024;
+  auto chunkRange = [](size_t c, size_t n) {
+    size_t begin = c * chunkSize;
+    return std::make_pair(begin, std::min(begin + chunkSize, n));
+  };
+  ArrayRef<InputSectionBase *> inputs = ctx.inputSections;
+  size_t numInputChunks = divideCeil(inputs.size(), chunkSize);
+  SmallVector<uint32_t, 0> offsets(numInputChunks + 1);
+  parallelFor(0, numInputChunks, [&](size_t c) {
+    auto [begin, end] = chunkRange(c, inputs.size());
+    uint32_t n = 0;
+    for (size_t i = begin; i != end; ++i) {
+      auto *s = dyn_cast<InputSection>(inputs[i]);
+      if (!s || s->eqClass[0])
+        continue;
       if (isEligible(s)) {
-        s->eqClass[0] = sections.size() | tagBit;
-        sections.push_back(s);
+        s->eqClass[0] = tagBit;
+        ++n;
       } else {
-        // Ineligible sections are assigned unique IDs, i.e. each section
-        // belongs to an equivalence class of its own.
-        s->eqClass[0] = s->eqClass[1] = ++uniqueId;
+        s->eqClass[0] = s->eqClass[1] = uniqueId + 1 + i;
       }
     }
-  }
+    offsets[c + 1] = n;
+  });
+  std::partial_sum(offsets.begin(), offsets.end(), offsets.begin());
+  sections.resize_for_overwrite(offsets.back());
+  parallelFor(0, numInputChunks, [&](size_t c) {
+    auto [begin, end] = chunkRange(c, inputs.size());
+    uint32_t index = offsets[c];
+    for (size_t i = begin; i != end; ++i) {
+      auto *s = dyn_cast<InputSection>(inputs[i]);
+      if (s && s->eqClass[0] == tagBit) {
+        s->eqClass[0] = index | tagBit;
+        sections[index++] = s;
+      }
+    }
+  });
+  uniqueId += inputs.size();
 
   assert(sections.size() <= tagBit && uniqueId < tagBit &&
          "tagBit marks a candidate and the low bits index sections");
@@ -518,7 +546,6 @@ template <class ELFT> void ICF<ELFT>::run() {
   // Hash sections in chunks. Each chunk appends its sections' edges to its own
   // buffer; edgeEnd[i] is where section i's edges end.
   size_t numSections = sections.size();
-  constexpr size_t chunkSize = 1024;
   size_t numChunks = divideCeil(numSections, chunkSize);
   SmallVector<uint64_t, 0> hashes, nextHashes;
   SmallVector<uint32_t, 0> edgeEnd;
@@ -528,8 +555,7 @@ template <class ELFT> void ICF<ELFT>::run() {
   SmallVector<SmallVector<uint32_t, 0>, 0> chunkEdges(numChunks);
   parallelFor(0, numChunks, [&](size_t c) {
     SmallVectorImpl<uint32_t> &edges = chunkEdges[c];
-    size_t begin = c * chunkSize,
-           end = std::min(begin + chunkSize, numSections);
+    auto [begin, end] = chunkRange(c, numSections);
     for (size_t i = begin; i != end; ++i) {
       InputSection *s = sections[i];
       uint64_t h = xxh3_64bits(s->content());
@@ -544,8 +570,7 @@ template <class ELFT> void ICF<ELFT>::run() {
   for (unsigned round = 0; round != 7; ++round) {
     parallelFor(0, numChunks, [&](size_t c) {
       ArrayRef<uint32_t> edges = chunkEdges[c];
-      size_t begin = c * chunkSize,
-             end = std::min(begin + chunkSize, numSections);
+      auto [begin, end] = chunkRange(c, numSections);
       size_t j = 0;
       for (size_t i = begin; i != end; ++i) {
         uint64_t h = hashes[i];
@@ -592,7 +617,7 @@ template <class ELFT> void ICF<ELFT>::run() {
   Log(ctx) << "ICF needed " << cnt << " iterations";
 
   // Merge sections by the equivalence class.
-  forEachClassRange(0, sections.size(), [&](size_t begin, size_t end) {
+  parallelForEachClass([&](size_t begin, size_t end) {
     for (size_t i = begin + 1; i < end; ++i) {
       sections[begin]->replace(sections[i]);
 
