@@ -1351,8 +1351,7 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
   //     point to a variable in the wrong scope.
   SmallDenseMap<DINode *, DINode *> RemappedMetadata;
   SmallVector<DbgVariableRecord *, 4> DVRsToDelete;
-  DenseMap<const MDNode *, MDNode *> Cache;
-  DebugLocMap DLMap;
+  DebugLocMap Cache;
 
   auto GetUpdatedDIVariable = [&](DILocalVariable *OldVar) {
     DINode *&NewVar = RemappedMetadata[OldVar];
@@ -1426,17 +1425,17 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
   for (Instruction &I : instructions(NewFunc)) {
     if (const DebugLoc &DL = I.getFullDebugLoc())
       I.setDebugLoc(
-          DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, Cache, DLMap));
+          DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, Cache));
     for (DbgRecord &DR : I.getDbgRecordRange())
       DR.setDebugLoc(DebugLoc::replaceInlinedAtSubprogram(DR.getFullDebugLoc(),
-                                                          *NewSP, Cache, DLMap));
+                                                          *NewSP, Cache));
 
     // Loop info metadata may contain line locations. Fix them up.
-    auto updateLoopInfoLoc = [&Cache, &DLMap, &NewFunc, NewSP](Metadata *MD) -> Metadata * {
+    auto updateLoopInfoLoc = [&Cache, NewSP](Metadata *MD) -> Metadata * {
       if (DILocation *Loc = dyn_cast_or_null<DILocation>(MD)) {
         DebugLoc DL = Loc->getAsDebugLoc();
-        return DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, Cache,
-          DLMap).convertToDILocation();
+        return DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, Cache)
+            .convertToDILocation();
       }
       return MD;
     };

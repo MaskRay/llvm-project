@@ -573,19 +573,6 @@ public:
     #endif
   }
   DbgLocStorage getDebugLocStorage() const { return DbgLoc; }
-  /// Return the debug location for this node as a DebugLoc, using the provided
-  /// Function's FLMD context for FLMD builds. This is only needed, and should
-  /// only be used, for instructions that have not been inserted into a function
-  /// yet.
-  DebugLoc getFullDebugLoc(const Function *ContextFunction) const {
-    #if LLVM_USE_FLMD_SOURCE_LOCS
-      if (!DbgLoc)
-        return DebugLoc();
-      return DebugLoc(DbgLoc, DebugLocContext(ContextFunction));
-    #else
-      return DebugLoc(DbgLoc);
-    #endif
-  };
 
   /// Fetch the debug location for this node, unless this is a debug intrinsic,
   /// in which case fetch the debug location of the next non-debug node.

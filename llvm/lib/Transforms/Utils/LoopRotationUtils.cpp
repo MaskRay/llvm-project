@@ -573,7 +573,7 @@ bool LoopRotate::rotateLoop(Loop *L, bool SimplifiedLatch) {
 
     // Otherwise, create a duplicate of the instruction.
     Instruction *C = Inst->clone();
-    if (DebugLoc DL = C->getFullDebugLoc(Inst->getFunction()))
+    if (DebugLoc DL = C->getFullDebugLoc())
       mapAtomInstance(DL, ValueMap);
 
     C->insertBefore(LoopEntryBranch->getIterator());

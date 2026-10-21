@@ -5939,7 +5939,7 @@ bool InstCombinerImpl::run() {
         // We copy the old instruction's DebugLoc to the new instruction, unless
         // InstCombine already assigned a DebugLoc to it, in which case we
         // should trust the more specifically selected DebugLoc.
-        Result->setDebugLoc(Result->getFullDebugLoc(I->getFunction()).orElse(I->getFullDebugLoc()));
+        Result->setDebugLoc(Result->getFullDebugLoc().orElse(I->getFullDebugLoc()));
         // We also copy annotation metadata to the new instruction.
         Result->copyMetadata(*I, LLVMContext::MD_annotation);
         // Everything uses the new instruction now.

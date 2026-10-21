@@ -49,7 +49,7 @@ void InstCombinerImpl::PHIArgMergedDebugLoc(Instruction *Inst, PHINode &PN) {
 
   for (Value *V : drop_begin(PN.incoming_values())) {
     auto *I = cast<Instruction>(V);
-    Inst->applyMergedLocation(Inst->getFullDebugLoc(PN.getFunction()), I->getFullDebugLoc(PN.getFunction()));
+    Inst->applyMergedLocation(Inst->getFullDebugLoc(), I->getFullDebugLoc());
   }
 }
 

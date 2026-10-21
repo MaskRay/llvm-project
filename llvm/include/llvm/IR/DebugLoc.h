@@ -157,7 +157,6 @@ struct FLDebugLoc {
   /// An FLDebugLoc is empty iff it has no SrcLoc and no InlinedAtIdx.
   explicit operator bool() const { return asRawInt(); }
   bool isValidLoc() const { return (bool)*this; }
-  bool isInlinedInstrLoc() const { return InlinedAtIdx && SrcLocIdx; }
   bool isNonInlinedInstrLoc() const { return !InlinedAtIdx && SrcLocIdx; }
   bool isInstrLoc() const { return SrcLocIdx; }
   bool isInlinedCall() const { return InlinedAtIdx && !SrcLocIdx; }
@@ -213,15 +212,8 @@ struct FLDebugLoc {
   DILocalScope *getScope(const DIFunctionLocalMetadata *Context) const {
     return Context->getScope(getSrcLoc(Context).ScopeIdx);
   }
-  // If we know in advance we know both, this can be faster.
-  std::pair<FLSrcLoc, DILocalScope *> getSrcLocAndScope(const DIFunctionLocalMetadata *Context) const {
-    FLSrcLoc SrcLoc = getSrcLoc(Context);
-    return {SrcLoc, Context->getScope(SrcLoc.ScopeIdx)};
-  }
 };
 
-DIFunctionLocalMetadata *getFLMDForInstruction(const Instruction *I);
-DIFunctionLocalMetadata *getFLMDForFunction(const Function *F);
 class DebugLoc;
 
 /// Helper class used to fetch the required context object to create a new
@@ -382,7 +374,50 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 };
 
-class DebugLocMap;
+#if LLVM_USE_FLMD_SOURCE_LOCS
+// Caches rewritten SrcLocs and InlinedCalls while rewriting a function's
+// locations, e.g. in replaceInlinedAtSubprogram, appendInlinedAt or
+// ValueMapper. Values are raw indexes, so a missing entry reads as none. The
+// base class caches cloned scopes, as the MDNode map does without FLMD.
+class DebugLocMap : public DenseMap<const MDNode *, MDNode *> {
+  DenseMap<uint32_t, uint32_t> SrcLocMap;
+  DenseMap<uint32_t, uint32_t> InlinedCallMap;
+  // SrcLocs rebuilt in their own scope (see replaceInlinedAtSubprogram).
+  DenseMap<uint32_t, uint32_t> SameScopeSrcLocMap;
+
+  static FLIndex<uint32_t> lookup(const DenseMap<uint32_t, uint32_t> &Map,
+                                  FLIndex<uint32_t> In) {
+    return FLIndex<uint32_t>::fromRaw(In ? Map.lookup(In.asRaw()) : 0);
+  }
+  static void insert(DenseMap<uint32_t, uint32_t> &Map, FLIndex<uint32_t> In,
+                     FLIndex<uint32_t> Out) {
+    assert(In && Out && "Must map valid indexes only.");
+    Map.try_emplace(In.asRaw(), Out.asRaw());
+  }
+
+public:
+  FLIndex<uint32_t> getSrcLoc(FLIndex<uint32_t> In) const {
+    return lookup(SrcLocMap, In);
+  }
+  void insertSrcLoc(FLIndex<uint32_t> In, FLIndex<uint32_t> Out) {
+    insert(SrcLocMap, In, Out);
+  }
+  FLIndex<uint32_t> getSameScopeSrcLoc(FLIndex<uint32_t> In) const {
+    return lookup(SameScopeSrcLocMap, In);
+  }
+  void insertSameScopeSrcLoc(FLIndex<uint32_t> In, FLIndex<uint32_t> Out) {
+    insert(SameScopeSrcLocMap, In, Out);
+  }
+  FLIndex<uint32_t> getInlinedCall(FLIndex<uint32_t> In) const {
+    return lookup(InlinedCallMap, In);
+  }
+  void insertInlinedCall(FLIndex<uint32_t> In, FLIndex<uint32_t> Out) {
+    insert(InlinedCallMap, In, Out);
+  }
+};
+#else
+using DebugLocMap = DenseMap<const MDNode *, MDNode *>;
+#endif
 
 /// A debug info location.
 ///
@@ -438,12 +473,6 @@ operator DbgLocStorage() const { return Storage; }
   DIFunctionLocalMetadata *getFLContext() const { return FLContext; }
   // Several methods from FLDebugLoc are not relevant or possible for
   // DILocations, but are useful to be callable from a DebugLoc.
-  bool isInlinedInstrLoc() const {
-    return getUnderlyingStorage().isInlinedInstrLoc();
-  }
-  bool isNonInlinedInstrLoc() const {
-    return getUnderlyingStorage().isNonInlinedInstrLoc();
-  }
   bool isInstrLoc() const {
     return getUnderlyingStorage().isInstrLoc();
   }
@@ -458,21 +487,12 @@ operator DbgLocStorage() const { return Storage; }
     return getUnderlyingStorage().getIdxForInlinedCall();
   }
 
-  FLInlinedCall getAsInlinedCall() const {
-    return getUnderlyingStorage().getAsInlinedCall(FLContext);
-  }
   FLIndex<uint32_t> getInlinedAtIdx() const {
     return getUnderlyingStorage().getInlinedAtIdx(FLContext);
   }
   FLSrcLoc getSrcLoc() const {
     return getUnderlyingStorage().getSrcLoc(FLContext);
   }
-  // If we know in advance we know both, this can be faster.
-  std::pair<FLSrcLoc, DILocalScope *> getSrcLocAndScope() const {
-    return getUnderlyingStorage().getSrcLocAndScope(FLContext);
-  }
-  std::pair<FLDebugLoc, DIFunctionLocalMetadata *> getAsFLDebugLoc() const;
-  static DebugLoc getFromFLDebugLoc(FLDebugLoc FLDL, DIFunctionLocalMetadata *FLContext);
 #endif
 
 
@@ -570,17 +590,13 @@ operator DbgLocStorage() const { return Storage; }
   /// of the chain now is inlined-at the new call site.
   /// \param   InlinedAt The new outermost inlined-at in the chain.
   LLVM_ABI static DebugLoc
-  appendInlinedAt(const DebugLoc &DL, DebugLoc InlinedAt, LLVMContext &Ctx,
-                  DenseMap<const MDNode *, MDNode *> &Cache,
-                  DebugLocMap &DLMap);
+  appendInlinedAt(const DebugLoc &DL, DebugLoc InlinedAt, DebugLocMap &Cache);
 
   /// Rebuild the entire inline-at chain by replacing the subprogram at the
   /// end of the chain with NewSP.
-  /// The DLMap argument is only used when FLMD source locations are enabled.
   LLVM_ABI static DebugLoc
   replaceInlinedAtSubprogram(const DebugLoc &DL, DISubprogram &NewSP,
-                             DenseMap<const MDNode *, MDNode *> &Cache,
-                             DebugLocMap &DLMap);
+                             DebugLocMap &Cache);
 
   static bool isPseudoProbeDiscriminator(unsigned Discriminator);
 
@@ -845,51 +861,6 @@ inline raw_ostream &operator<<(raw_ostream &OS, const DebugLoc &DL) {
   return OS;
 }
 raw_ostream &operator<<(raw_ostream &OS, const FLDebugLoc &DL);
-
-#if LLVM_USE_FLMD_SOURCE_LOCS
-// Caches rewritten SrcLocs and InlinedCalls while rewriting a function's
-// locations, e.g. in replaceInlinedAtSubprogram, appendInlinedAt or
-// ValueMapper. Values are raw indexes, so a missing entry reads as none.
-class DebugLocMap {
-  DenseMap<uint32_t, uint32_t> SrcLocMap;
-  DenseMap<uint32_t, uint32_t> InlinedCallMap;
-  // SrcLocs rebuilt in their own scope (see replaceInlinedAtSubprogram).
-  DenseMap<uint32_t, uint32_t> SameScopeSrcLocMap;
-
-  static FLIndex<uint32_t> lookup(const DenseMap<uint32_t, uint32_t> &Map,
-                                  FLIndex<uint32_t> In) {
-    return FLIndex<uint32_t>::fromRaw(In ? Map.lookup(In.asRaw()) : 0);
-  }
-  static void insert(DenseMap<uint32_t, uint32_t> &Map, FLIndex<uint32_t> In,
-                     FLIndex<uint32_t> Out) {
-    assert(In && Out && "Must map valid indexes only.");
-    Map.try_emplace(In.asRaw(), Out.asRaw());
-  }
-
-public:
-  FLIndex<uint32_t> getSrcLoc(FLIndex<uint32_t> In) const {
-    return lookup(SrcLocMap, In);
-  }
-  void insertSrcLoc(FLIndex<uint32_t> In, FLIndex<uint32_t> Out) {
-    insert(SrcLocMap, In, Out);
-  }
-  FLIndex<uint32_t> getSameScopeSrcLoc(FLIndex<uint32_t> In) const {
-    return lookup(SameScopeSrcLocMap, In);
-  }
-  void insertSameScopeSrcLoc(FLIndex<uint32_t> In, FLIndex<uint32_t> Out) {
-    insert(SameScopeSrcLocMap, In, Out);
-  }
-  FLIndex<uint32_t> getInlinedCall(FLIndex<uint32_t> In) const {
-    return lookup(InlinedCallMap, In);
-  }
-  void insertInlinedCall(FLIndex<uint32_t> In, FLIndex<uint32_t> Out) {
-    insert(InlinedCallMap, In, Out);
-  }
-};
-#else
-class DebugLocMap {};
-#endif
-
 
 inline DebugLocContext::DebugLocContext(DebugLoc DL)
     : Context(DL.getContext()) {}

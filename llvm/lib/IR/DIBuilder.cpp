@@ -17,10 +17,7 @@
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/DebugLoc.h"
-#include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include <optional>
 
@@ -137,7 +134,6 @@ void DIBuilder::finalize() {
 
   // Can't handle unresolved nodes anymore.
   AllowUnresolvedNodes = false;
-
 }
 
 /// If N is compile unit return NULL otherwise return N.
@@ -1055,36 +1051,6 @@ static DISubprogram *getSubprogram(bool IsDistinct, Ts &&...Args) {
     return DISubprogram::getDistinct(std::forward<Ts>(Args)...);
   return DISubprogram::get(std::forward<Ts>(Args)...);
 }
-
-#if LLVM_USE_FLMD_SOURCE_LOCS
-DebugLoc::DebugLocContext DIBuilder::startFunctionContext(Function *F, DISubprogram *SP) {
-  assert(SP->isDefinition() && "Function context must only be created for definitions, not declarations.");
-  return DebugLoc::DebugLocContext(F);
-}
-DebugLoc DIBuilder::addInlinedFunctionContext(DISubprogram *CalleeSP, DebugLoc CallLoc) {
-  assert(CalleeSP->isDefinition() && "Function context must only be created for definitions, not declarations.");
-  if (!CallLoc)
-    return DebugLoc();
-  FLDebugLoc Call = CallLoc.getUnderlyingStorage();
-  DIFunctionLocalMetadata *FLContext = CallLoc.getFLContext();
-  FLIndex<uint32_t> NewCallIdx = FLContext->addInlinedCall(
-      FLInlinedCall(Call.SrcLocIdx, Call.InlinedAtIdx), /*Uniquable=*/true);
-  return DebugLoc(FLDebugLoc::getInlinedCallLoc(NewCallIdx), FLContext);
-}
-void DIBuilder::finalizeFunctionContext(Function *F) {}
-#else
-DebugLoc::DebugLocContext DIBuilder::startFunctionContext(Function *F, DISubprogram *SP) {
-  return DebugLoc::DebugLocContext(F->getContext());
-}
-
-DebugLoc DIBuilder::addInlinedFunctionContext(DISubprogram *CalleeSP, DebugLoc CallLoc) {
-  return CallLoc;
-}
-
-void DIBuilder::finalizeFunctionContext(Function *F) {
-
-}
-#endif
 
 DISubprogram *DIBuilder::createFunction(
     DIScope *Context, StringRef Name, StringRef LinkageName, DIFile *File,

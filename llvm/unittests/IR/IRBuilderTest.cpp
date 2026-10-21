@@ -1139,8 +1139,8 @@ TEST_F(IRBuilderTest, createArtificialSubprogram) {
   DebugLoc InlinedAtNode =
       DebugLoc::getDistinct(Ctx, GSP->getScopeLine(), 0, GSP);
   DebugLoc DL = I->getDebugLoc();
-  DenseMap<const MDNode *, MDNode *> IANodes;
-  auto IA = DebugLoc::appendInlinedAt(DL, InlinedAtNode, Ctx, IANodes);
+  DebugLocMap IANodes;
+  auto IA = DebugLoc::appendInlinedAt(DL, InlinedAtNode, IANodes);
   auto NewDL =
       DebugLoc::get(Ctx, DL.getLine(), DL.getCol(), DL.getScope(), IA);
   I->setDebugLoc(NewDL);

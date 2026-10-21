@@ -534,15 +534,6 @@ public:
     return DebugLoc(DbgLoc);
 #endif
   }
-  DebugLoc getFullDebugLoc(Function *FunctionContext) const {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-    if (!DbgLoc)
-      return DebugLoc();
-    return DebugLoc(DbgLoc, getFLMDForFunction(FunctionContext));
-#else
-    return DebugLoc(DbgLoc);
-#endif
-  }
   /// Return the operand containing the offset to be used if this DBG_VALUE
   /// instruction is indirect; will be an invalid register if this value is
   /// not indirect, and an immediate with value 0 otherwise.

@@ -219,11 +219,7 @@ public:
     return DbgLoc;
   }
   DbgLocStorage getDebugLoc() const { return DbgLoc; }
-  [[deprecated]] DebugLoc getDebugLoc(Function *) const {
-    return getFullDebugLoc();
-  }
   LLVM_ABI DebugLoc getFullDebugLoc() const;
-  DebugLoc getFullDebugLoc(Function *) const { return getFullDebugLoc(); }
   void setDebugLoc(DebugLoc Loc) { DbgLoc = Loc.getStorage(); }
   void setDebugLoc(DbgLocStorage Loc) { DbgLoc = Loc.getCopied(); }
   void setDebugLocIfPresent(DebugLoc Loc) { DbgLoc = Loc.getStorage().orElse(DbgLoc); }

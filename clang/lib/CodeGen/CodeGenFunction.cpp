@@ -444,9 +444,6 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
   assert(EHStack.empty() &&
          "did not remove all scopes from cleanup stack!");
 
-  if (CGDebugInfo *DI = getDebugInfo())
-    DI->FinalizeFunctionSourceLocs(CurFn);
-
   // If someone did an indirect goto, emit the indirect goto block at the end of
   // the function.
   if (IndirectBranch) {

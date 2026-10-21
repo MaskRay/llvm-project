@@ -99,10 +99,6 @@ struct FLInlinedCall {
   uint64_t asRawInt() const {
     return (uint64_t)SrcLocIdx.asRaw() << 32 | InlinedAtIdx.asRaw();
   }
-  static FLInlinedCall fromRawInt(uint64_t RawInt) {
-    return FLInlinedCall(FLIndex<uint32_t>::fromRaw(RawInt >> 32),
-                         FLIndex<uint32_t>::fromRaw(RawInt));
-  }
   bool operator==(const FLInlinedCall &Other) const {
     return asRawInt() == Other.asRawInt();
   }

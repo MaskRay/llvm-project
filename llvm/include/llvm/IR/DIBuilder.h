@@ -118,20 +118,6 @@ namespace llvm {
     /// subprogram afterwards.
     LLVM_ABI void finalizeSubprogram(DISubprogram *SP);
 
-    /// Call when starting to emit instructions with source locations into F;
-    /// returns the context that should be used by DebugLocs in F.
-    /// NB: This should only be used when SP is distinct/a definition, right?
-    DebugLoc::DebugLocContext startFunctionContext(Function *F, DISubprogram *SP);
-    /// Call when creating an inlined function, which may or may not have its
-    /// own function body elsewhere. 
-    /// Returns the InlinedCall DebugLoc that should be used as the InlinedAt
-    /// argument for source locations in this inlined function.
-    DebugLoc addInlinedFunctionContext(DISubprogram *CalleeSP, DebugLoc CallLoc);
-    /// Call after the last source location for a function has been emitted to
-    /// remove the expensive uniquing maps.
-    void finalizeFunctionContext(Function *F);
-
-
     /// A CompileUnit provides an anchor for all debugging
     /// information generated during this instance of compilation.
     /// \param Lang          Source programming language, eg. dwarf::DW_LANG_C99
