@@ -14,6 +14,7 @@
 #ifndef LLVM_IR_FUNCTIONLOCALMETADATA_H
 #define LLVM_IR_FUNCTIONLOCALMETADATA_H
 
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -88,7 +89,7 @@ struct DenseMapInfo<FLIndex<IndexType>> {
 };
 
 /// A call site that code has been inlined at. Whether the site is uniqued or
-/// distinct is recorded by the context's uniquing index, not in the entry.
+/// distinct is recorded by the table, not in the entry.
 struct FLInlinedCall {
   FLIndex<uint32_t> SrcLocIdx;
   FLIndex<uint32_t> InlinedAtIdx;
@@ -107,6 +108,9 @@ struct FLInlinedCall {
   }
   bool operator!=(const FLInlinedCall &Other) const {
     return asRawInt() != Other.asRawInt();
+  }
+  unsigned getHash() const {
+    return static_cast<unsigned>(size_t(hash_value(asRawInt())));
   }
 };
 
@@ -154,12 +158,12 @@ struct FLScope {
   const DILocalScope *get() const;
 };
 
-/// Uniquing index for FLSrcLocs: each bucket holds (hash << 32 | index) so the
-/// set needs no access to the table when it grows.
-struct FLSrcLocIndexInfo {
+/// Uniquing index for table entries: each bucket holds (hash << 32 | index) so
+/// the set needs no access to the table when it grows.
+template <typename EntryT> struct FLEntryIndexInfo {
   struct Key {
-    const FLSrcLoc &Loc;
-    ArrayRef<FLSrcLoc> Table;
+    const EntryT &Entry;
+    ArrayRef<EntryT> Table;
     unsigned Hash;
   };
   static uint64_t getEmptyKey() { return ~0ULL; }
@@ -170,9 +174,11 @@ struct FLSrcLocIndexInfo {
   static bool isEqual(const Key &K, uint64_t V) {
     if (V >= getTombstoneKey() || (V >> 32) != K.Hash)
       return false;
-    return K.Table[uint32_t(V)] == K.Loc;
+    return K.Table[uint32_t(V)] == K.Entry;
   }
 };
+template <typename EntryT>
+using FLEntryIndex = DenseSet<uint64_t, FLEntryIndexInfo<EntryT>>;
 
 /// Storage for all source locations in an LLVMContext. There is exactly one
 /// per LLVMContext (see LLVMContext::getFLContext), shared by every function.
@@ -181,9 +187,11 @@ class DIFunctionLocalMetadata : public MDNode {
   ~DIFunctionLocalMetadata() = default;
 
   DenseMap<const MDNode *, uint32_t> ScopeIndex;
-  DenseSet<uint64_t, FLSrcLocIndexInfo> SrcLocIndex;
+  FLEntryIndex<FLSrcLoc> SrcLocIndex;
   // Uniqued inlined calls only; distinct sites are never found by lookup.
-  DenseMap<uint64_t, uint32_t> UniquedInlinedCalls;
+  FLEntryIndex<FLInlinedCall> UniquedInlinedCallIndex;
+  // Whether each inlined call is uniqued.
+  BitVector UniquedInlinedCalls;
 
 public:
   friend class LLVMContextImpl;
@@ -228,7 +236,9 @@ public:
   /// Returns the existing uniqued site equal to \p InlinedCall if \p Uniquable,
   /// otherwise appends a new site.
   FLIndex<uint32_t> addInlinedCall(FLInlinedCall InlinedCall, bool Uniquable);
-  bool isUniquedInlinedCall(FLIndex<uint32_t> Idx) const;
+  bool isUniquedInlinedCall(FLIndex<uint32_t> Idx) const {
+    return UniquedInlinedCalls[Idx.get()];
+  }
 
   static bool classof(const Metadata *MD) {
     return MD->getMetadataID() == DIFunctionLocalMetadataKind;

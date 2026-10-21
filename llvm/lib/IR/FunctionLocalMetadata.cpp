@@ -25,39 +25,43 @@ FLIndex<uint32_t> DIFunctionLocalMetadata::getFLScopeIdx(const MDNode *Scope) {
   return It->second;
 }
 
+// Returns the index of the entry equal to \p Entry, or Table.size() after
+// adding the new entry to \p Index; the caller appends it.
+template <typename EntryT>
+static std::pair<uint32_t, bool> internEntry(FLEntryIndex<EntryT> &Index,
+                                             ArrayRef<EntryT> Table,
+                                             const EntryT &Entry) {
+  unsigned Hash = Entry.getHash();
+  uint32_t NewIdx = Table.size();
+  auto [It, Inserted] =
+      Index.insert_as((uint64_t)Hash << 32 | NewIdx,
+                      typename FLEntryIndexInfo<EntryT>::Key{Entry, Table, Hash});
+  return {Inserted ? NewIdx : uint32_t(*It), Inserted};
+}
+
 FLIndex<uint32_t>
 DIFunctionLocalMetadata::getFLSrcLocIdx(const FLSrcLoc &SrcLoc) {
-  unsigned Hash = SrcLoc.getHash();
-  uint32_t NewIdx = SrcLocs.size();
-  auto [It, Inserted] = SrcLocIndex.insert_as(
-      (uint64_t)Hash << 32 | NewIdx,
-      FLSrcLocIndexInfo::Key{SrcLoc, SrcLocs, Hash});
+  auto [Idx, Inserted] = internEntry<FLSrcLoc>(SrcLocIndex, SrcLocs, SrcLoc);
   if (!Inserted)
-    return uint32_t(*It);
+    return Idx;
   SrcLocs.push_back(SrcLoc);
   if (SrcLoc.AtomGroup)
     getContext().updateDILocationAtomGroupWaterline(SrcLoc.AtomGroup + 1);
-  return NewIdx;
+  return Idx;
 }
 
 FLIndex<uint32_t>
 DIFunctionLocalMetadata::addInlinedCall(FLInlinedCall InlinedCall,
                                         bool Uniquable) {
-  uint32_t NewIdx = InlinedCalls.size();
   if (Uniquable) {
-    auto [It, Inserted] =
-        UniquedInlinedCalls.try_emplace(InlinedCall.asRawInt(), NewIdx);
+    auto [Idx, Inserted] = internEntry<FLInlinedCall>(
+        UniquedInlinedCallIndex, InlinedCalls, InlinedCall);
     if (!Inserted)
-      return It->second;
+      return Idx;
   }
   InlinedCalls.push_back(InlinedCall);
-  return NewIdx;
-}
-
-bool DIFunctionLocalMetadata::isUniquedInlinedCall(
-    FLIndex<uint32_t> Idx) const {
-  auto It = UniquedInlinedCalls.find(getInlinedCall(Idx).asRawInt());
-  return It != UniquedInlinedCalls.end() && It->second == Idx.get();
+  UniquedInlinedCalls.push_back(Uniquable);
+  return InlinedCalls.size() - 1;
 }
 
 FLTableSubset::FLTableSubset(const DIFunctionLocalMetadata &Table)
