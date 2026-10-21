@@ -340,6 +340,18 @@ private:
                     unsigned Abbrev);
   unsigned createDILocationAbbrev();
   void writeDIFunctionLocalMetadata(const DIFunctionLocalMetadata *N, SmallVectorImpl<uint64_t> &Record, unsigned &Abbrev);
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  /// The raw handle of \p DL, renumbered for this module's location table.
+  uint64_t mapFLDebugLoc(const DebugLoc &DL) const {
+    FLDebugLoc Loc = DL.getUnderlyingStorage();
+    if (!Loc)
+      return 0;
+    const FLTableSubset &Subset = *VE.getFLSubset();
+    return FLDebugLoc(Subset.mapSrcLoc(Loc.SrcLocIdx),
+                      Subset.mapInlinedCall(Loc.InlinedAtIdx))
+        .asRawInt();
+  }
+#endif
   void writeDILocation(const DILocation *N, SmallVectorImpl<uint64_t> &Record,
                        unsigned &Abbrev);
   unsigned createGenericDINodeAbbrev();
@@ -1890,29 +1902,35 @@ void ModuleBitcodeWriter::writeMDTuple(const MDTuple *N,
 void ModuleBitcodeWriter::writeDIFunctionLocalMetadata(const DIFunctionLocalMetadata *N,
                                           SmallVectorImpl<uint64_t> &Record,
                                           unsigned &Abbrev) {
-  // No abbreviation for this type.
+  // No abbreviation for this type. Only the entries this module references
+  // are written, renumbered.
+  const FLTableSubset &Subset = *VE.getFLSubset();
+  assert(&Subset.getTable() == N && "Writing a different location table");
   const uint64_t Version = 2 << 1;
   Record.push_back((uint64_t)N->isDistinct() | Version);
   // Print each array separately, leading with a length-field.
   // Scopes
-  Record.push_back(N->Scopes.size());
-  for (const FLScope &Scope : N->Scopes)
-    Record.push_back(VE.getMetadataID(Scope.Scope));
+  Record.push_back(Subset.scopes().size());
+  for (uint32_t Idx : Subset.scopes())
+    Record.push_back(VE.getMetadataID(N->Scopes[Idx].Scope));
   // SrcLocs
-  Record.push_back(N->SrcLocs.size());
-  for (const FLSrcLoc &SrcLoc : N->SrcLocs) {
+  Record.push_back(Subset.srcLocs().size());
+  for (uint32_t Idx : Subset.srcLocs()) {
+    const FLSrcLoc &SrcLoc = N->SrcLocs[Idx];
     Record.push_back(SrcLoc.Line);
     Record.push_back(SrcLoc.Column);
-    Record.push_back(SrcLoc.ScopeIdx.asRaw());
+    Record.push_back(Subset.mapScope(SrcLoc.ScopeIdx).asRaw());
     Record.push_back(SrcLoc.AtomGroup);
     Record.push_back(SrcLoc.AtomRank | SrcLoc.ImplicitCode << 3);
   }
   // InlinedCalls, with the uniqued flag in the low bit.
-  Record.push_back(N->InlinedCalls.size());
-  for (auto [Idx, InlinedCall] : enumerate(N->InlinedCalls)) {
-    Record.push_back(InlinedCall.SrcLocIdx.asRaw());
-    Record.push_back((uint64_t)InlinedCall.InlinedAtIdx.asRaw() << 1 |
-                     N->isUniquedInlinedCall(Idx));
+  Record.push_back(Subset.inlinedCalls().size());
+  for (uint32_t Idx : Subset.inlinedCalls()) {
+    const FLInlinedCall &InlinedCall = N->InlinedCalls[Idx];
+    Record.push_back(Subset.mapSrcLoc(InlinedCall.SrcLocIdx).asRaw());
+    Record.push_back(
+        (uint64_t)Subset.mapInlinedCall(InlinedCall.InlinedAtIdx).asRaw() << 1 |
+        N->isUniquedInlinedCall(Idx));
   }
   Stream.EmitRecord(bitc::METADATA_FLMD, Record, Abbrev);
   Record.clear();
@@ -1945,7 +1963,7 @@ void ModuleBitcodeWriter::writeDILocation(const DILocation *N,
   if (!Abbrev)
     Abbrev = createDILocationAbbrev();
 #if LLVM_USE_FLMD_SOURCE_LOCS
-  Record.push_back(N->getAsDebugLoc().getUnderlyingStorage().asRawInt());
+  Record.push_back(mapFLDebugLoc(N->getAsDebugLoc()));
   Record.push_back(VE.getMetadataID(N->getFLContext()));
   Stream.EmitRecord(bitc::METADATA_FL_LOCATION, Record, Abbrev);
 #else
@@ -2764,10 +2782,8 @@ void ModuleBitcodeWriter::writeModuleMetadata() {
   writeNamedMetadata(Record);
 
   // Name the location table so that lazy loading can load it up front.
-  if (const DIFunctionLocalMetadata *FLContext =
-          M.getContext().getFLContextIfExists();
-      FLContext && VE.getMetadataOrNullID(FLContext)) {
-    Record.push_back(VE.getMetadataID(FLContext));
+  if (const FLTableSubset *Subset = VE.getFLSubset()) {
+    Record.push_back(VE.getMetadataID(&Subset->getTable()));
     Stream.EmitRecord(bitc::METADATA_FLMD_TABLE, Record);
     Record.clear();
   }
@@ -3914,7 +3930,7 @@ void ModuleBitcodeWriter::writeFunction(
           Stream.EmitRecord(bitc::FUNC_CODE_DEBUG_LOC_AGAIN, Vals);
         } else {
 #if LLVM_USE_FLMD_SOURCE_LOCS
-          uint64_t RawDL = DL.getUnderlyingStorage().asRawInt();
+          uint64_t RawDL = mapFLDebugLoc(DL);
           unsigned High = Hi_32(RawDL);
           unsigned Low = Lo_32(RawDL);
           Vals.push_back(High);
@@ -3975,7 +3991,7 @@ void ModuleBitcodeWriter::writeFunction(
             // DbgRecord would be costly - we're already emitting +1 field per
             // DbgRecord (although with the benefit that we don't have to lookup
             // metadata at all!)
-            uint64_t RawDL = DLR->getFullDebugLoc().getUnderlyingStorage().asRawInt();
+            uint64_t RawDL = mapFLDebugLoc(DLR->getFullDebugLoc());
             unsigned High = Hi_32(RawDL);
             unsigned Low = Lo_32(RawDL);
             Vals.push_back(High);
@@ -4001,7 +4017,7 @@ void ModuleBitcodeWriter::writeFunction(
           //   ..., LocationMetadata, DIAssignID, DIExpression, LocationMetadata
           DbgVariableRecord &DVR = cast<DbgVariableRecord>(DR);
 #if LLVM_USE_FLMD_SOURCE_LOCS
-          uint64_t RawDL = DVR.getFullDebugLoc().getUnderlyingStorage().asRawInt();
+          uint64_t RawDL = mapFLDebugLoc(DVR.getFullDebugLoc());
           unsigned High = Hi_32(RawDL);
           unsigned Low = Lo_32(RawDL);
           Vals.push_back(High);

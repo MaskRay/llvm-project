@@ -407,11 +407,12 @@ ValueEnumerator::ValueEnumerator(const Module &M,
   EnumerateValueSymbolTable(M.getValueSymbolTable());
   EnumerateNamedMetadata(M);
 
-  // Instruction locations index into the context-wide location table.
+  // Instruction locations index into the context-wide location table; only
+  // the entries this module references are written.
   if (const DIFunctionLocalMetadata *FLContext =
           M.getContext().getFLContextIfExists();
       FLContext && !FLContext->empty())
-    EnumerateMetadata(nullptr, FLContext);
+    FLSubset.emplace(*FLContext);
 
   SmallVector<std::pair<unsigned, MDNode *>, 8> MDs;
   for (const GlobalVariable &GV : M.globals()) {
@@ -453,6 +454,17 @@ ValueEnumerator::ValueEnumerator(const Module &M,
           if (!isa<LocalAsMetadata>(MD))
             EnumerateMetadata(&F, MD);
         };
+
+#if LLVM_USE_FLMD_SOURCE_LOCS
+        if (FLSubset) {
+          FLDebugLoc DL = I.getDebugLocStorage().get();
+          FLSubset->add(DL.SrcLocIdx, DL.InlinedAtIdx);
+          for (DbgRecord &DR : I.getDbgRecordRange()) {
+            FLDebugLoc RDL = DR.getDebugLocStorage().get();
+            FLSubset->add(RDL.SrcLocIdx, RDL.InlinedAtIdx);
+          }
+        }
+#endif
 
         for (DbgRecord &DR : I.getDbgRecordRange()) {
           if (DbgLabelRecord *DLR = dyn_cast<DbgLabelRecord>(&DR)) {
@@ -504,6 +516,24 @@ ValueEnumerator::ValueEnumerator(const Module &M,
     for (const auto &I : MDs)
       EnumerateMetadata(nullptr, I.second);
   }
+
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  if (FLSubset) {
+    for (const Metadata *MD : this->MDs)
+      if (auto *Loc = dyn_cast<DILocation>(MD)) {
+        FLDebugLoc DL = Loc->getAsDebugLoc().getUnderlyingStorage();
+        FLSubset->add(DL.SrcLocIdx, DL.InlinedAtIdx);
+      }
+    FLSubset->finalize();
+    if (FLSubset->empty()) {
+      FLSubset.reset();
+    } else {
+      for (uint32_t Idx : FLSubset->scopes())
+        EnumerateMetadata(nullptr, FLSubset->getTable().Scopes[Idx].Scope);
+      EnumerateMetadata(nullptr, &FLSubset->getTable());
+    }
+  }
+#endif
 
   // Optimize constant ordering.
   OptimizeConstants(FirstConstant, Values.size());
@@ -673,28 +703,14 @@ void ValueEnumerator::dropFunctionFromMetadata(
         Worklist.push_back(N);
   };
   push(FirstMD);
-  // DIFunctionLocalMetadata contains many non-operand metadata references,
-  // which are enumerated with it and thus must also be dropped with it as a
-  // special case.
-  auto DropFLContext = [&](const DIFunctionLocalMetadata *FLContext) {
-    for (auto Scope : FLContext->Scopes) {
-      auto MD = MetadataMap.find(Scope.get());
-      if (MD != MetadataMap.end())
-        push(*MD);
-    }
-  };
-  while (!Worklist.empty()) {
-    const MDNode *Next = Worklist.pop_back_val();
-    for (const Metadata *Op : Next->operands()) {
+  while (!Worklist.empty())
+    for (const Metadata *Op : Worklist.pop_back_val()->operands()) {
       if (!Op)
         continue;
       auto MD = MetadataMap.find(Op);
       if (MD != MetadataMap.end())
         push(*MD);
     }
-    if (auto *FLContext = dyn_cast<DIFunctionLocalMetadata>(Next))
-      DropFLContext(FLContext);
-  }
 }
 
 void ValueEnumerator::EnumerateMetadata(unsigned F, const Metadata *MD) {
@@ -706,63 +722,28 @@ void ValueEnumerator::EnumerateMetadata(unsigned F, const Metadata *MD) {
 
   // Start by enumerating MD, and then work through its transitive operands in
   // post-order.  This requires a depth-first search.
-  SmallVector<std::pair<const MDNode *, size_t>, 32> Worklist;
+  SmallVector<std::pair<const MDNode *, MDNode::op_iterator>, 32> Worklist;
   if (const MDNode *N = enumerateMetadataImpl(F, MD))
-    Worklist.push_back(std::make_pair(N, 0));
+    Worklist.push_back(std::make_pair(N, N->op_begin()));
 
   while (!Worklist.empty()) {
     const MDNode *N = Worklist.back().first;
 
     // Enumerate operands until we hit a new node.  We need to traverse these
     // nodes' operands before visiting the rest of N's operands.
-    size_t NumOps = N->getNumOperands();
-    if (Worklist.back().second < NumOps) {
-      MDNode::op_iterator I = std::find_if(
-          N->op_begin() + Worklist.back().second, N->op_end(),
-          [&](const Metadata *MD) { return enumerateMetadataImpl(F, MD); });
-      if (I != N->op_end()) {
-        auto *Op = cast<MDNode>(*I);
-        Worklist.back().second = I + 1 - N->op_begin();
+    MDNode::op_iterator I = std::find_if(
+        Worklist.back().second, N->op_end(),
+        [&](const Metadata *MD) { return enumerateMetadataImpl(F, MD); });
+    if (I != N->op_end()) {
+      auto *Op = cast<MDNode>(*I);
+      Worklist.back().second = ++I;
 
-        // Delay traversing Op if it's a distinct node and N is uniqued.
-        if (Op->isDistinct() && !N->isDistinct())
-          DelayedDistinctNodes.push_back(Op);
-        else
-          Worklist.push_back(std::make_pair(Op, 0));
-        continue;
-      }
-      Worklist.back().second = NumOps;
-    }
-    
-    // Special case: if this is a DIFunctionLocalMetadata, then we must also
-    // enumerate metadata referenced from its storage context.
-    if (auto *FLContext = dyn_cast<DIFunctionLocalMetadata>(N)) {
-      size_t NumOps = FLContext->getNumOperands();
-      size_t NumScopes = FLContext->Scopes.size();
-      size_t ScopesStart = NumOps;
-      size_t ScopesEnd = ScopesStart + NumScopes;
-      assert(Worklist.back().second >= ScopesStart);
-      if (Worklist.back().second < ScopesEnd) {
-        size_t ScopeOffset = Worklist.back().second - ScopesStart;
-        auto *ScopeIt = std::find_if(
-          FLContext->Scopes.begin() + ScopeOffset, FLContext->Scopes.end(),
-          [&](const FLScope &Scope) {
-            return enumerateMetadataImpl(F, Scope.Scope);
-          });
-        if (ScopeIt != FLContext->Scopes.end()) {
-          auto *Op = ScopeIt->Scope;
-          size_t OpScopeOffset = ScopeIt - FLContext->Scopes.begin();
-          Worklist.back().second = ScopesStart + OpScopeOffset + 1;
-
-          // Delay traversing Op if it's a distinct node and N is uniqued.
-          if (Op->isDistinct() && !N->isDistinct())
-            DelayedDistinctNodes.push_back(Op);
-          else
-            Worklist.push_back(std::make_pair(Op, 0));
-          continue;
-        }
-        Worklist.back().second = ScopesEnd;
-      }
+      // Delay traversing Op if it's a distinct node and N is uniqued.
+      if (Op->isDistinct() && !N->isDistinct())
+        DelayedDistinctNodes.push_back(Op);
+      else
+        Worklist.push_back(std::make_pair(Op, Op->op_begin()));
+      continue;
     }
 
     // All the operands have been visited.  Now assign an ID.
@@ -774,7 +755,7 @@ void ValueEnumerator::EnumerateMetadata(unsigned F, const Metadata *MD) {
     // that are leaves in last uniqued subgraph.
     if (Worklist.empty() || Worklist.back().first->isDistinct()) {
       for (const MDNode *N : DelayedDistinctNodes)
-        Worklist.push_back(std::make_pair(N, 0));
+        Worklist.push_back(std::make_pair(N, N->op_begin()));
       DelayedDistinctNodes.clear();
     }
   }

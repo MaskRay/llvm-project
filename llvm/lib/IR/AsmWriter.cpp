@@ -82,6 +82,7 @@
 #include <cstdint>
 #include <iterator>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -830,6 +831,9 @@ private:
   bool FunctionProcessed = false;
   bool ShouldInitializeAllMetadata;
 
+  /// The location table entries the module references, if any.
+  std::optional<FLTableSubset> FLSubset;
+
   std::function<void(AbstractSlotTrackerStorage *, const Module *, bool)>
       ProcessModuleHookFn;
   std::function<void(AbstractSlotTrackerStorage *, const Function *, bool)>
@@ -910,6 +914,12 @@ public:
   int getLocalSlot(const Value *V);
   int getGlobalSlot(const GlobalValue *V);
   int getMetadataSlot(const MDNode *N) override;
+
+  /// The module's location table entries, renumbered for printing.
+  const FLTableSubset *getFLSubset() {
+    initializeIfNeeded();
+    return FLSubset ? &*FLSubset : nullptr;
+  }
   int getAttributeGroupSlot(AttributeSet AS);
   int getModulePathSlot(StringRef Path);
   int getGUIDSlot(GlobalValue::GUID GUID);
@@ -1147,11 +1157,17 @@ void SlotTracker::processModule() {
       CreateMetadataSlot(N);
   }
 
-  // Instruction locations index into the context-wide location table.
+  // Instruction locations index into the context-wide location table; only
+  // the entries this module references are printed.
   if (const DIFunctionLocalMetadata *FLContext =
           TheModule->getContext().getFLContextIfExists();
-      FLContext && !FLContext->empty())
-    CreateMetadataSlot(FLContext);
+      FLContext && !FLContext->empty()) {
+    FLSubset.emplace(FLTableSubset::collect(*FLContext, *TheModule));
+    if (FLSubset->empty())
+      FLSubset.reset();
+    else
+      CreateMetadataSlot(FLContext);
+  }
 
   for (const Function &F : *TheModule) {
     if (!F.hasName())
@@ -2176,32 +2192,71 @@ static void writeFLInlinedCall(raw_ostream &Out, FLInlinedCall InlinedCall,
   Out << ")";
 }
 
+static const FLTableSubset *getFLSubset(AsmWriterContext &WriterCtx,
+                                        const DIFunctionLocalMetadata *FLMD) {
+  const FLTableSubset *Subset =
+      WriterCtx.Machine ? WriterCtx.Machine->getFLSubset() : nullptr;
+  return Subset && &Subset->getTable() == FLMD ? Subset : nullptr;
+}
+
 static void writeDIFunctionLocalMetadata(raw_ostream &Out, const DIFunctionLocalMetadata *FLMD,
                                          AsmWriterContext &WriterCtx) {
+  // With a module, print only the entries it references, renumbered.
+  const FLTableSubset *Subset = getFLSubset(WriterCtx, FLMD);
+  auto Iota = [](size_t Size) {
+    SmallVector<uint32_t, 0> Indexes(Size);
+    std::iota(Indexes.begin(), Indexes.end(), 0);
+    return Indexes;
+  };
+  SmallVector<uint32_t, 0> AllScopes, AllSrcLocs, AllInlinedCalls;
+  if (!Subset) {
+    AllScopes = Iota(FLMD->Scopes.size());
+    AllSrcLocs = Iota(FLMD->SrcLocs.size());
+    AllInlinedCalls = Iota(FLMD->InlinedCalls.size());
+  }
+  ArrayRef<uint32_t> Scopes = Subset ? Subset->scopes() : AllScopes;
+  ArrayRef<uint32_t> SrcLocs = Subset ? Subset->srcLocs() : AllSrcLocs;
+  ArrayRef<uint32_t> InlinedCalls =
+      Subset ? Subset->inlinedCalls() : AllInlinedCalls;
+  auto MapScope = [&](FLIndex<uint32_t> Idx) {
+    return Subset ? Subset->mapScope(Idx) : Idx;
+  };
+  auto MapSrcLoc = [&](FLIndex<uint32_t> Idx) {
+    return Subset ? Subset->mapSrcLoc(Idx) : Idx;
+  };
+  auto MapInlinedCall = [&](FLIndex<uint32_t> Idx) {
+    return Subset ? Subset->mapInlinedCall(Idx) : Idx;
+  };
+
   Out << "!DIFunctionLocalMetadata(";
   ListSeparator LS;
   // Print each kind of FLMD, with each entry on a separate line.
-  if (FLMD->Scopes.size()) {
+  if (!Scopes.empty()) {
     Out << LS << "scopes: [\n";
-    for (auto [Index, Scope] : enumerate(FLMD->Scopes)) {
+    for (auto [Index, Idx] : enumerate(Scopes)) {
       Out << "  ";
-      writeMetadataAsOperand(Out, Scope, WriterCtx);
+      writeMetadataAsOperand(Out, FLMD->Scopes[Idx].Scope, WriterCtx);
       Out << ", ; " << Index << "\n";
     }
     Out << "]";
   }
-  if (FLMD->SrcLocs.size()) {
+  if (!SrcLocs.empty()) {
     Out << LS << "srcLocs: [\n";
-    for (auto [Index, SrcLoc] : enumerate(FLMD->SrcLocs)) {
+    for (auto [Index, Idx] : enumerate(SrcLocs)) {
+      FLSrcLoc SrcLoc = FLMD->SrcLocs[Idx];
+      SrcLoc.ScopeIdx = MapScope(SrcLoc.ScopeIdx);
       writeFLSrcLoc(Out, SrcLoc, WriterCtx);
       Out << ", ; " << Index << "\n";
     }
     Out << "]";
   }
-  if (FLMD->InlinedCalls.size()) {
+  if (!InlinedCalls.empty()) {
     Out << LS << "inlinedCalls: [\n";
-    for (auto [Index, InlinedCall] : enumerate(FLMD->InlinedCalls)) {
-      writeFLInlinedCall(Out, InlinedCall, FLMD->isUniquedInlinedCall(Index));
+    for (auto [Index, Idx] : enumerate(InlinedCalls)) {
+      FLInlinedCall InlinedCall = FLMD->InlinedCalls[Idx];
+      InlinedCall = FLInlinedCall(MapSrcLoc(InlinedCall.SrcLocIdx),
+                                  MapInlinedCall(InlinedCall.InlinedAtIdx));
+      writeFLInlinedCall(Out, InlinedCall, FLMD->isUniquedInlinedCall(Idx));
       Out << ", ; " << Index << "\n";
     }
     Out << "]";
@@ -2209,7 +2264,12 @@ static void writeDIFunctionLocalMetadata(raw_ostream &Out, const DIFunctionLocal
   Out << ")";
 }
 
-static void writeFLDebugLoc(raw_ostream &Out, FLDebugLoc DL, AsmWriterContext &WriterCtx) {
+static void writeFLDebugLoc(raw_ostream &Out, FLDebugLoc DL,
+                            AsmWriterContext &WriterCtx,
+                            const DIFunctionLocalMetadata *FLMD) {
+  if (const FLTableSubset *Subset = getFLSubset(WriterCtx, FLMD))
+    DL = FLDebugLoc(Subset->mapSrcLoc(DL.SrcLocIdx),
+                    Subset->mapInlinedCall(DL.InlinedAtIdx));
   Out << "!!dbgLoc(";
   MDFieldPrinter Printer(Out, WriterCtx);
   Printer.printInt("srcLoc", DL.SrcLocIdx.get(), false);
@@ -2226,7 +2286,8 @@ static void writeDILocation(raw_ostream &Out, const DILocation *DL,
     DebugLoc DbgLoc = DL->getAsDebugLoc();
     Out << "dbgLoc: ";
     // TODO: Switch behaviour here depending on flag settings.
-    writeFLDebugLoc(Out, DbgLoc.getUnderlyingStorage(), WriterCtx);
+    writeFLDebugLoc(Out, DbgLoc.getUnderlyingStorage(), WriterCtx,
+                    DbgLoc.getFLContext());
     Out << ", fnContext: ";
     writeMetadataAsOperand(Out, DbgLoc.getFLContext(), WriterCtx);
   } else {
@@ -5018,7 +5079,8 @@ void AssemblyWriter::printInstruction(const Instruction &I) {
       Out << ", ";
 #if LLVM_USE_FLMD_SOURCE_LOCS
       auto Context = getContext();
-      writeFLDebugLoc(Out, I.getDebugLocStorage().get(), Context);
+      writeFLDebugLoc(Out, I.getDebugLocStorage().get(), Context,
+                      DL.getFLContext());
 #else
       llvm_unreachable("TODO");
 #endif
@@ -5100,7 +5162,8 @@ void AssemblyWriter::printDbgVariableRecord(const DbgVariableRecord &DVR) {
     Out << ", ";
   }
 #if LLVM_USE_FLMD_SOURCE_LOCS
-  writeFLDebugLoc(Out, DVR.getFullDebugLoc().getUnderlyingStorage(), WriterCtx);
+  writeFLDebugLoc(Out, DVR.getFullDebugLoc().getUnderlyingStorage(), WriterCtx,
+                  DVR.getFullDebugLoc().getFLContext());
 #else
   PrintOrNull(DVR.getDebugLoc().getAsDILocation());
 #endif
@@ -5122,7 +5185,8 @@ void AssemblyWriter::printDbgLabelRecord(const DbgLabelRecord &Label) {
   writeAsOperandInternal(Out, Label.getRawLabel(), WriterCtx, true);
   Out << ", ";
 #if LLVM_USE_FLMD_SOURCE_LOCS
-  writeFLDebugLoc(Out, Label.getFullDebugLoc().getUnderlyingStorage(), WriterCtx);
+  writeFLDebugLoc(Out, Label.getFullDebugLoc().getUnderlyingStorage(), WriterCtx,
+                  Label.getFullDebugLoc().getFLContext());
 #else
   writeAsOperandInternal(Out, Label.getDebugLoc().getAsDILocation(), WriterCtx, true);
 #endif

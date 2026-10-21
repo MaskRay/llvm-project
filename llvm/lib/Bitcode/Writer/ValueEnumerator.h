@@ -17,9 +17,11 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/UniqueVector.h"
 #include "llvm/IR/Attributes.h"
+#include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/UseListOrder.h"
 #include <cassert>
 #include <cstdint>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -66,6 +68,8 @@ private:
   ComdatSetType Comdats;
 
   std::vector<const Metadata *> MDs;
+  /// The location table entries this module references, if any.
+  std::optional<FLTableSubset> FLSubset;
   std::vector<const Metadata *> FunctionMDs;
 
   /// Index of information about a piece of metadata.
@@ -198,6 +202,10 @@ public:
 
   /// Check whether the current block has any metadata to emit.
   bool hasMDs() const { return NumModuleMDs < MDs.size(); }
+
+  const FLTableSubset *getFLSubset() const {
+    return FLSubset ? &*FLSubset : nullptr;
+  }
 
   /// Get the MDString metadata for this block.
   ArrayRef<const Metadata *> getMDStrings() const {

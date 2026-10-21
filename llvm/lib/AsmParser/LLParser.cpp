@@ -5953,18 +5953,27 @@ bool LLParser::parseDIFunctionLocalMetadata(MDNode *&Result, bool IsDistinct) {
   PARSE_MD_FIELDS();
 #undef VISIT_MD_FIELDS
 
-  // The table is context-wide, so it can only be read into an empty one.
+  // The table is context-wide; intern the entries. Instruction locations are
+  // not parsed, so the index mapping is not kept.
   DIFunctionLocalMetadata *FLMD = Context.getFLContext();
-  if (!FLMD->empty())
-    return tokError("location table already populated");
-  FLMD->SrcLocs = std::move(srcLocs.Val);
-  FLMD->Scopes = std::move(scopes.Val);
-  SmallVector<bool, 0> Uniquable;
-  for (auto [InlinedCall, IsUniqued] : inlinedCalls.Val) {
-    FLMD->InlinedCalls.push_back(InlinedCall);
-    Uniquable.push_back(IsUniqued);
+  SmallVector<uint32_t, 0> ScopeMap, SrcLocMap, InlinedCallMap;
+  auto Map = [](ArrayRef<uint32_t> Map, FLIndex<uint32_t> Idx) {
+    return FLIndex<uint32_t>::fromRaw(
+        Idx && Idx.get() < Map.size() ? Map[Idx.get()] : 0);
+  };
+  for (FLScope Scope : scopes.Val)
+    ScopeMap.push_back(FLMD->getFLScopeIdx(Scope.Scope).asRaw());
+  for (FLSrcLoc SrcLoc : srcLocs.Val) {
+    SrcLoc.ScopeIdx = Map(ScopeMap, SrcLoc.ScopeIdx);
+    SrcLocMap.push_back(FLMD->getFLSrcLocIdx(SrcLoc).asRaw());
   }
-  FLMD->indexEntries(0, 0, 0, Uniquable);
+  for (auto [InlinedCall, IsUniqued] : inlinedCalls.Val)
+    InlinedCallMap.push_back(
+        FLMD->addInlinedCall(
+                FLInlinedCall(Map(SrcLocMap, InlinedCall.SrcLocIdx),
+                              Map(InlinedCallMap, InlinedCall.InlinedAtIdx)),
+                IsUniqued)
+            .asRaw());
   Result = FLMD;
   return false;
 }

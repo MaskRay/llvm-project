@@ -12,7 +12,9 @@
 
 #include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
 
 using namespace llvm;
 
@@ -58,18 +60,71 @@ bool DIFunctionLocalMetadata::isUniquedInlinedCall(
   return It != UniquedInlinedCalls.end() && It->second == Idx.get();
 }
 
-void DIFunctionLocalMetadata::indexEntries(
-    uint32_t FirstScope, uint32_t FirstSrcLoc, uint32_t FirstInlinedCall,
-    ArrayRef<bool> UniquableInlinedCalls) {
-  assert(UniquableInlinedCalls.size() == InlinedCalls.size() - FirstInlinedCall);
-  for (uint32_t Idx = FirstScope; Idx != Scopes.size(); ++Idx)
-    ScopeIndex.try_emplace(Scopes[Idx].Scope, Idx);
-  for (uint32_t Idx = FirstSrcLoc; Idx != SrcLocs.size(); ++Idx) {
-    unsigned Hash = SrcLocs[Idx].getHash();
-    SrcLocIndex.insert_as((uint64_t)Hash << 32 | Idx,
-                          FLSrcLocIndexInfo::Key{SrcLocs[Idx], SrcLocs, Hash});
+FLTableSubset::FLTableSubset(const DIFunctionLocalMetadata &Table)
+    : Table(Table), ScopeMap(Table.Scopes.size()),
+      SrcLocMap(Table.SrcLocs.size()),
+      InlinedCallMap(Table.InlinedCalls.size()) {}
+
+void FLTableSubset::addSrcLoc(FLIndex<uint32_t> Idx) {
+  if (!Idx || SrcLocMap[Idx.get()])
+    return;
+  SrcLocMap[Idx.get()] = 1;
+  ScopeMap[Table.getSrcLoc(Idx).ScopeIdx.get()] = 1;
+}
+
+void FLTableSubset::add(FLIndex<uint32_t> SrcLocIdx,
+                        FLIndex<uint32_t> InlinedAtIdx) {
+  assert(!Finalized && "Subset is already numbered");
+  addSrcLoc(SrcLocIdx);
+  for (FLIndex<uint32_t> IA = InlinedAtIdx; IA && !InlinedCallMap[IA.get()];
+       IA = Table.getInlinedCall(IA).InlinedAtIdx) {
+    InlinedCallMap[IA.get()] = 1;
+    addSrcLoc(Table.getInlinedCall(IA).SrcLocIdx);
   }
-  for (uint32_t Idx = FirstInlinedCall; Idx != InlinedCalls.size(); ++Idx)
-    if (UniquableInlinedCalls[Idx - FirstInlinedCall])
-      UniquedInlinedCalls.try_emplace(InlinedCalls[Idx].asRawInt(), Idx);
+}
+
+void FLTableSubset::finalize() {
+  auto Number = [](std::vector<uint32_t> &Map, SmallVectorImpl<uint32_t> &Old) {
+    for (uint32_t Idx = 0, E = Map.size(); Idx != E; ++Idx)
+      if (Map[Idx]) {
+        Old.push_back(Idx);
+        Map[Idx] = Old.size();
+      }
+  };
+  Number(ScopeMap, Scopes);
+  Number(SrcLocMap, SrcLocs);
+  Number(InlinedCallMap, InlinedCalls);
+  Finalized = true;
+}
+
+FLTableSubset FLTableSubset::collect(const DIFunctionLocalMetadata &Table,
+                                     const Module &M) {
+  FLTableSubset Subset(Table);
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  auto AddLoc = [&](const DILocation *Loc) {
+    FLDebugLoc DL = Loc->getAsDebugLoc().getUnderlyingStorage();
+    Subset.add(DL.SrcLocIdx, DL.InlinedAtIdx);
+  };
+  SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
+  for (const Function &F : M)
+    for (const Instruction &I : instructions(F)) {
+      FLDebugLoc DL = I.getDebugLocStorage().get();
+      Subset.add(DL.SrcLocIdx, DL.InlinedAtIdx);
+      for (const DbgRecord &DR : I.getDbgRecordRange()) {
+        FLDebugLoc RDL = DR.getDebugLocStorage().get();
+        Subset.add(RDL.SrcLocIdx, RDL.InlinedAtIdx);
+      }
+      MDs.clear();
+      I.getAllMetadataOtherThanDebugLoc(MDs);
+      for (auto [Kind, N] : MDs) {
+        if (auto *Loc = dyn_cast<DILocation>(N))
+          AddLoc(Loc);
+        for (const MDOperand &Op : N->operands())
+          if (auto *Loc = dyn_cast_or_null<DILocation>(Op.get()))
+            AddLoc(Loc);
+      }
+    }
+#endif
+  Subset.finalize();
+  return Subset;
 }

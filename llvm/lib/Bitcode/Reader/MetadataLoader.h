@@ -74,9 +74,8 @@ public:
   // Return true there are remaining unresolved forward references.
   bool hasFwdRefs() const;
 
-  /// Offset a location read from this module past the entries that other
-  /// modules already added to the context's location table.
-  FLDebugLoc rebaseFLDebugLoc(FLDebugLoc DL) const;
+  /// Map a location read from this module to the context's location table.
+  FLDebugLoc mapFLDebugLoc(FLDebugLoc DL) const;
 
   /// Return the given metadata, creating a replaceable forward reference if
   /// necessary.

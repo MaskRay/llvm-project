@@ -5263,7 +5263,7 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
       unsigned High = Record[0];
       unsigned Low = Record[1];
       uint64_t Result = Make_64(High, Low);
-      FLDebugLoc DL = MDLoader->rebaseFLDebugLoc(FLDebugLoc::fromRawInt(Result));
+      FLDebugLoc DL = MDLoader->mapFLDebugLoc(FLDebugLoc::fromRawInt(Result));
 #if LLVM_USE_FLMD_SOURCE_LOCS
       // TODO: Handle this for non-FLMD builds.
       LastLoc = DL;
@@ -6808,7 +6808,7 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
       unsigned Low = Record[1];
       uint64_t Result = Make_64(High, Low);
       DbgLocStorage DIL =
-          MDLoader->rebaseFLDebugLoc(FLDebugLoc::fromRawInt(Result));
+          MDLoader->mapFLDebugLoc(FLDebugLoc::fromRawInt(Result));
 #else
       DebugLoc DIL = DebugLoc::getFromDILocation(cast<DILocation>(getFnMetadataByID(Record[0])));
 #endif
@@ -6849,7 +6849,7 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
       unsigned Low = Record[Slot++];
       uint64_t Result = Make_64(High, Low);
       DbgLocStorage DIL =
-          MDLoader->rebaseFLDebugLoc(FLDebugLoc::fromRawInt(Result));
+          MDLoader->mapFLDebugLoc(FLDebugLoc::fromRawInt(Result));
 #else
       DebugLoc DIL = DebugLoc::getFromDILocation(cast<DILocation>(getFnMetadataByID(Record[Slot++])));
 #endif

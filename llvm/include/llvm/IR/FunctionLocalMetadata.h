@@ -25,11 +25,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <vector>
 
 namespace llvm {
 
 class DILocalScope;
 class DIFunctionLocalMetadata;
+class Module;
 
 /// Small wrapper class for an FLMD index, which may be "no index".
 /// Should be checked to see if value is present before using, otherwise the
@@ -225,15 +227,56 @@ public:
   FLIndex<uint32_t> addInlinedCall(FLInlinedCall InlinedCall, bool Uniquable);
   bool isUniquedInlinedCall(FLIndex<uint32_t> Idx) const;
 
-  /// Add the entries from the given positions on, which were appended to the
-  /// tables directly, to the uniquing indexes. \p UniquableInlinedCalls has
-  /// one element per appended inlined call.
-  void indexEntries(uint32_t FirstScope, uint32_t FirstSrcLoc,
-                    uint32_t FirstInlinedCall,
-                    ArrayRef<bool> UniquableInlinedCalls);
-
   static bool classof(const Metadata *MD) {
     return MD->getMetadataID() == DIFunctionLocalMetadataKind;
+  }
+};
+
+/// The entries of a location table that one module references, renumbered
+/// densely in table order, so an inline site still follows its parent. Used
+/// to write a module's locations without those of other modules.
+class FLTableSubset {
+  const DIFunctionLocalMetadata &Table;
+  // Old index -> new raw index (new index + 1); 0 if unreferenced.
+  std::vector<uint32_t> ScopeMap, SrcLocMap, InlinedCallMap;
+  // Referenced old indexes, in table order.
+  SmallVector<uint32_t, 0> Scopes, SrcLocs, InlinedCalls;
+  bool Finalized = false;
+
+  void addSrcLoc(FLIndex<uint32_t> Idx);
+
+public:
+  explicit FLTableSubset(const DIFunctionLocalMetadata &Table);
+
+  /// Collect the locations of instructions, debug records, and DILocations
+  /// attached to instructions (e.g. in llvm.loop), then finalize.
+  static FLTableSubset collect(const DIFunctionLocalMetadata &Table,
+                               const Module &M);
+
+  void add(FLIndex<uint32_t> SrcLocIdx, FLIndex<uint32_t> InlinedAtIdx);
+  void finalize();
+
+  bool empty() const { return SrcLocs.empty() && InlinedCalls.empty(); }
+  const DIFunctionLocalMetadata &getTable() const { return Table; }
+  ArrayRef<uint32_t> scopes() const { return Scopes; }
+  ArrayRef<uint32_t> srcLocs() const { return SrcLocs; }
+  ArrayRef<uint32_t> inlinedCalls() const { return InlinedCalls; }
+
+  FLIndex<uint32_t> mapScope(FLIndex<uint32_t> Idx) const {
+    return mapIdx(ScopeMap, Idx);
+  }
+  FLIndex<uint32_t> mapSrcLoc(FLIndex<uint32_t> Idx) const {
+    return mapIdx(SrcLocMap, Idx);
+  }
+  FLIndex<uint32_t> mapInlinedCall(FLIndex<uint32_t> Idx) const {
+    return mapIdx(InlinedCallMap, Idx);
+  }
+
+private:
+  FLIndex<uint32_t> mapIdx(const std::vector<uint32_t> &Map,
+                           FLIndex<uint32_t> Idx) const {
+    assert(Finalized && "Subset is not numbered yet");
+    return FLIndex<uint32_t>::fromRaw(Idx ? Map[Idx.get()] : 0);
   }
 };
 
