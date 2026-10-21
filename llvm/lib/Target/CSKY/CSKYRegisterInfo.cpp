@@ -189,7 +189,7 @@ bool CSKYRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MachineFunction &MF = *MI->getParent()->getParent();
   MachineRegisterInfo &MRI = MF.getRegInfo();
   const CSKYInstrInfo *TII = MF.getSubtarget<CSKYSubtarget>().getInstrInfo();
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI->getFullDebugLoc();
   const CSKYSubtarget &STI = MF.getSubtarget<CSKYSubtarget>();
 
   switch (MI->getOpcode()) {

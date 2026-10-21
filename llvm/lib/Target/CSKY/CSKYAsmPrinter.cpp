@@ -69,7 +69,7 @@ void CSKYAsmPrinter::EmitToStreamer(MCStreamer &S, const MCInst &Inst) {
 #include "CSKYGenMCPseudoLowering.inc"
 
 void CSKYAsmPrinter::expandTLSLA(const MachineInstr *MI) {
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI->getFullDebugLoc();
 
   MCSymbol *PCLabel = OutContext.getOrCreateSymbol(
       Twine(MAI.getInternalSymbolPrefix()) + "PC" + Twine(getFunctionNumber()) +

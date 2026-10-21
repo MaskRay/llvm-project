@@ -2709,7 +2709,7 @@ void DXILBitcodeWriter::writeFunction(const Function &F) {
       NeedsMetadataAttachment |= I.hasMetadataOtherThanDebugLoc();
 
       // If the instruction has a debug location, emit it.
-      DILocation *DL = I.getDebugLoc();
+      DILocation *DL = I.getFullDebugLoc().getAsDILocation();
       if (!DL)
         continue;
 

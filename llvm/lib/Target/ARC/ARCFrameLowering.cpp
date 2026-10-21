@@ -469,7 +469,7 @@ MachineBasicBlock::iterator ARCFrameLowering::eliminateCallFramePseudoInstr(
   LLVM_DEBUG(dbgs() << "EmitCallFramePseudo: " << MF.getName() << "\n");
   const ARCInstrInfo *TII = MF.getSubtarget<ARCSubtarget>().getInstrInfo();
   MachineInstr &Old = *I;
-  DebugLoc dl = Old.getDebugLoc();
+  DebugLoc dl = Old.getFullDebugLoc();
   unsigned Amt = Old.getOperand(0).getImm();
   auto *AFI = MF.getInfo<ARCFunctionInfo>();
   if (!hasFP(MF)) {

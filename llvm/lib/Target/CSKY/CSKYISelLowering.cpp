@@ -964,7 +964,7 @@ static MachineBasicBlock *
 emitSelectPseudo(MachineInstr &MI, MachineBasicBlock *BB, unsigned Opcode) {
 
   const TargetInstrInfo &TII = *BB->getParent()->getSubtarget().getInstrInfo();
-  DebugLoc DL = MI.getDebugLoc();
+  DebugLoc DL = MI.getFullDebugLoc();
 
   // To "insert" a SELECT instruction, we actually have to insert the
   // diamond control-flow pattern.  The incoming instruction knows the

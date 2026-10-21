@@ -42,7 +42,7 @@ static void replaceFrameIndex(MachineBasicBlock::iterator II,
   assert(RS && "Need register scavenger.");
   MachineInstr &MI = *II;
   MachineBasicBlock &MBB = *MI.getParent();
-  DebugLoc DL = MI.getDebugLoc();
+  DebugLoc DL = MI.getFullDebugLoc();
   unsigned BaseReg = FrameReg;
   RegState KillState = {};
   if (MI.getOpcode() == ARC::LD_rs9 && (Offset >= 256 || Offset < -256)) {

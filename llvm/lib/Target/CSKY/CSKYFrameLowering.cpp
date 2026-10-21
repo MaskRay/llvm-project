@@ -236,7 +236,7 @@ void CSKYFrameLowering::emitEpilogue(MachineFunction &MF,
     MBBI = MBB.getFirstTerminator();
     if (MBBI == MBB.end())
       MBBI = MBB.getLastNonDebugInstr();
-    DL = MBBI->getDebugLoc();
+    DL = MBBI->getFullDebugLoc();
 
     // If this is not a terminator, the actual insert location should be after
     // the last instruction.
@@ -470,7 +470,7 @@ bool CSKYFrameLowering::spillCalleeSavedRegisters(
   const TargetInstrInfo &TII = *MF->getSubtarget().getInstrInfo();
   DebugLoc DL;
   if (MI != MBB.end() && !MI->isDebugInstr())
-    DL = MI->getDebugLoc();
+    DL = MI->getFullDebugLoc();
 
   for (auto &CS : CSI) {
     // Insert the spill to the stack frame.
@@ -493,7 +493,7 @@ bool CSKYFrameLowering::restoreCalleeSavedRegisters(
   const TargetInstrInfo &TII = *MF->getSubtarget().getInstrInfo();
   DebugLoc DL;
   if (MI != MBB.end() && !MI->isDebugInstr())
-    DL = MI->getDebugLoc();
+    DL = MI->getFullDebugLoc();
 
   for (auto &CS : reverse(CSI)) {
     MCRegister Reg = CS.getReg();
@@ -510,7 +510,7 @@ MachineBasicBlock::iterator CSKYFrameLowering::eliminateCallFramePseudoInstr(
     MachineFunction &MF, MachineBasicBlock &MBB,
     MachineBasicBlock::iterator MI) const {
   Register SPReg = CSKY::R14;
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI->getFullDebugLoc();
 
   if (!hasReservedCallFrame(MF)) {
     // If space has not been reserved for a call frame, ADJCALLSTACKDOWN and
