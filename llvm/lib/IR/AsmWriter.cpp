@@ -2266,8 +2266,6 @@ static void writeDILocation(raw_ostream &Out, const DILocation *DL,
     // TODO: Switch behaviour here depending on flag settings.
     writeFLDebugLoc(Out, DbgLoc.getUnderlyingStorage(), WriterCtx,
                     DbgLoc.getFLContext());
-    Out << ", fnContext: ";
-    writeMetadataAsOperand(Out, DbgLoc.getFLContext(), WriterCtx);
   } else {
     MDFieldPrinter Printer(Out, WriterCtx);
     // Always output the line, since 0 is a relevant and important value for it.

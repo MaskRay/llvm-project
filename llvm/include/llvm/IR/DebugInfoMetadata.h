@@ -2659,19 +2659,18 @@ class DILocation : public MDNode {
 
   FLDebugLoc DLStorage;
 
-  DILocation(LLVMContext &C, StorageType Storage, FLDebugLoc FLDL,
-      Metadata *FLContext)
-    : MDNode(C, DILocationKind, Storage, FLContext),
-      DLStorage(FLDL) {}
+  // The empty tuple operand only keeps loop-metadata walkers, which read
+  // operand 0 of every property node, in bounds.
+  DILocation(LLVMContext &C, StorageType Storage, FLDebugLoc FLDL)
+      : MDNode(C, DILocationKind, Storage, MDTuple::get(C, {})),
+        DLStorage(FLDL) {}
   ~DILocation() { dropAllReferences(); }
 
   static DILocation *getImpl(LLVMContext &Context, FLDebugLoc FLDL,
-                             Metadata *FLContext, StorageType Storage,
-                             bool ShouldCreate = true);
+                             StorageType Storage, bool ShouldCreate = true);
   static DILocation *getImpl(LLVMContext &Context, DebugLoc DL,
                              StorageType Storage, bool ShouldCreate = true) {
-    return getImpl(Context, DL.getUnderlyingStorage(), DL.getFLContext(),
-      Storage, ShouldCreate);
+    return getImpl(Context, DL.getUnderlyingStorage(), Storage, ShouldCreate);
   }
 
   LLVM_ABI static DILocation *
@@ -2695,7 +2694,7 @@ class DILocation : public MDNode {
 
 public:
   DIFunctionLocalMetadata *getFLContext() const {
-    return cast<DIFunctionLocalMetadata>(getOperand(0));
+    return getContext().getFLContext();
   }
   DebugLoc getAsDebugLoc() const {
     return DebugLoc(DLStorage, getFLContext());
@@ -2714,9 +2713,7 @@ public:
   void replaceOperandWith(unsigned I, Metadata *New) = delete;
 
   DEFINE_MDNODE_GET(DILocation, (DebugLoc DL), (DL))
-  DEFINE_MDNODE_GET(DILocation,
-                    (FLDebugLoc FLDL, Metadata *FLContext),
-                    (FLDL, FLContext))
+  DEFINE_MDNODE_GET(DILocation, (FLDebugLoc FLDL), (FLDL))
   DEFINE_MDNODE_GET(DILocation,
                     (unsigned Line, unsigned Column, Metadata *Scope,
                      Metadata *InlinedAt = nullptr, bool ImplicitCode = false,

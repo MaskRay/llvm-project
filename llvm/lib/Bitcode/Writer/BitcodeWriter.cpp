@@ -1937,8 +1937,7 @@ unsigned ModuleBitcodeWriter::createDILocationAbbrev() {
   auto Abbv = std::make_shared<BitCodeAbbrev>();
 #if LLVM_USE_FLMD_SOURCE_LOCS
   Abbv->Add(BitCodeAbbrevOp(bitc::METADATA_FL_LOCATION));
-  Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::VBR, 6)); // debugLoc
-  Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::VBR, 6)); // flContext
+  Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::VBR, 6)); // handle
 #else
   Abbv->Add(BitCodeAbbrevOp(bitc::METADATA_LOCATION));
   Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 1)); // isDistinct
@@ -1959,7 +1958,6 @@ void ModuleBitcodeWriter::writeDILocation(const DILocation *N,
     Abbrev = createDILocationAbbrev();
 #if LLVM_USE_FLMD_SOURCE_LOCS
   Record.push_back(mapFLDebugLoc(N->getAsDebugLoc()));
-  Record.push_back(VE.getMetadataID(N->getFLContext()));
   Stream.EmitRecord(bitc::METADATA_FL_LOCATION, Record, Abbrev);
 #else
   Record.push_back(N->isDistinct());

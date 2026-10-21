@@ -401,7 +401,7 @@ enum MetadataCodes {
   METADATA_SUBRANGE_TYPE = 48,    // [distinct, ...]
   METADATA_FIXED_POINT_TYPE = 49, // [distinct, ...]
   METADATA_FLMD = 50,             // [[scopes], [srclocs], [inlinedcalls], [loops]]
-  METADATA_FL_LOCATION = 51,       // [distinct, line, col, scope, inlined-at?]
+  METADATA_FL_LOCATION = 51,      // [location table handle]
   METADATA_FLMD_TABLE = 52,        // [location table metadata ID]
 };
 

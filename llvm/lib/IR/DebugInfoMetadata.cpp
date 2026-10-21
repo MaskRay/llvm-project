@@ -424,12 +424,11 @@ DILocation *DILocation::getMergedLocation(DILocation *LocA, DILocation *LocB) {
 }
 #else
 DILocation *DILocation::getImpl(LLVMContext &Context, FLDebugLoc FLDL,
-                                Metadata *FLContext, StorageType Storage,
-                                bool ShouldCreate) {
+                                StorageType Storage, bool ShouldCreate) {
   assert(FLDL && "Tried to 'get' an empty value");
   if (Storage == Uniqued) {
     if (auto *N = getUniqued(Context.pImpl->DILocations,
-                             DILocationInfo::KeyTy(FLDL, FLContext)))
+                             DILocationInfo::KeyTy(FLDL)))
       return N;
     if (!ShouldCreate)
       return nullptr;
@@ -437,8 +436,7 @@ DILocation *DILocation::getImpl(LLVMContext &Context, FLDebugLoc FLDL,
     assert(ShouldCreate && "Expected non-uniqued nodes to always be created");
   }
 
-  return storeImpl(new (1, Storage)
-                       DILocation(Context, Storage, FLDL, FLContext),
+  return storeImpl(new (1, Storage) DILocation(Context, Storage, FLDL),
                    Storage, Context.pImpl->DILocations);
 }
 

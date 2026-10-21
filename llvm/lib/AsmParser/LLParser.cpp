@@ -5983,8 +5983,7 @@ bool LLParser::parseDIFunctionLocalMetadata(MDNode *&Result, bool IsDistinct) {
 ///   isImplicitCode: true, atomGroup: 1, atomRank: 1)
 /// As-of FLMD, there are two possible forms a DILocation can take:
 ///   1. The above form, with DebugLoc fields emitted.
-///   2. !DILocation(dbgLoc: !!dbgLoc(srcLoc: 3, inlinedAt: 4),
-///                  flContext: !5)
+///   2. !DILocation(dbgLoc: !!dbgLoc(srcLoc: 3, inlinedAt: 4))
 ///   We therefore have 4 possible parsing logics required depending on whether
 ///   the compiler is using FLMD or not, and whether the IR uses FLMD or not.
 bool LLParser::parseDILocation(MDNode *&Result, bool IsDistinct) {

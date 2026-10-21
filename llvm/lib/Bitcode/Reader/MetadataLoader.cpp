@@ -420,6 +420,7 @@ class MetadataLoader::MetadataLoaderImpl {
   };
   std::optional<FLMDRawTable> FLMDPending;
   bool FLMDTableSeen = false;
+  bool FLMDInterned = false;
   // Module index -> raw index (index + 1) in the context-wide table.
   SmallVector<uint32_t, 0> FLMDSrcLocMap, FLMDInlinedCallMap;
   // DILocations read before the table was interned, with their raw handles.
@@ -1365,9 +1366,10 @@ void MetadataLoader::MetadataLoaderImpl::internFLMDTable() {
                               mapFLIndex(FLMDInlinedCallMap, InlinedAt >> 1)),
                 InlinedAt & 1)
             .asRaw());
+  FLMDInterned = true;
   for (auto &[Temp, Raw] : FLMDPendingLocations)
     Temp->replaceAllUsesWith(DILocation::get(
-        Context, mapFLDebugLoc(FLDebugLoc::fromRawInt(Raw)), FLContext));
+        Context, mapFLDebugLoc(FLDebugLoc::fromRawInt(Raw))));
   FLMDPendingLocations.clear();
 }
 
@@ -1593,22 +1595,20 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
     break;
   }
   case bitc::METADATA_FL_LOCATION: {
-    // 2 fields, never distinct.
-    // FIXME: Any reason to allow distinct nodes?
-    if (Record.size() != 2)
+    // [handle], never distinct.
+    if (Record.size() != 1)
       return error("Invalid record");
 
-    // The table operand is always the context-wide one. Until this module's
-    // table is interned, stand in a temporary for the location.
-    if (FLMDPending) {
+    // Until this module's table is interned, stand in a temporary for the
+    // location.
+    if (!FLMDInterned) {
       FLMDPendingLocations.emplace_back(MDTuple::getTemporary(Context, {}),
                                         Record[0]);
       MetadataList.assignValue(FLMDPendingLocations.back().first.get(),
                                NextMetadataNo);
     } else {
       FLDebugLoc DL = mapFLDebugLoc(FLDebugLoc::fromRawInt(Record[0]));
-      MetadataList.assignValue(
-          DILocation::get(Context, DL, Context.getFLContext()), NextMetadataNo);
+      MetadataList.assignValue(DILocation::get(Context, DL), NextMetadataNo);
     }
     NextMetadataNo++;
     break;
