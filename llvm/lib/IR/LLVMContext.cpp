@@ -19,6 +19,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
+#include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/LLVMRemarkStreamer.h"
 #include "llvm/Remarks/RemarkStreamer.h"
 #include "llvm/Support/Casting.h"
@@ -99,6 +100,8 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(SystemSSID == SyncScope::System &&
          "system synchronization scope ID drifted!");
   (void)SystemSSID;
+
+  FLContext = DIFunctionLocalMetadata::getDistinct(*this);
 }
 
 LLVMContext::~LLVMContext() { delete pImpl; }
@@ -390,10 +393,3 @@ uint64_t LLVMContext::incNextDILocationAtomGroup() {
   return pImpl->NextAtomGroup++;
 }
 
-DIFunctionLocalMetadata *LLVMContext::getFLContext() {
-  return pImpl->getFLContext(*this);
-}
-
-DIFunctionLocalMetadata *LLVMContext::getFLContextIfExists() const {
-  return pImpl->FLContext;
-}

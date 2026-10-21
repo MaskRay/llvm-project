@@ -1072,13 +1072,6 @@ DebugLoc DIBuilder::addInlinedFunctionContext(DISubprogram *CalleeSP, DebugLoc C
   return DebugLoc(FLDebugLoc::getInlinedCallLoc(NewCallIdx), FLContext);
 }
 void DIBuilder::finalizeFunctionContext(Function *F) {}
-DebugLoc DIBuilder::getLoc(
-    DebugLoc::DebugLocContext Context, unsigned Line, unsigned Column,
-    MDNode *Scope, DebugLoc InlinedAt, bool ImplicitCode, uint64_t AtomGroup,
-    uint8_t AtomRank) {
-  return DebugLoc::get(Context, Line, Column, Scope, InlinedAt, ImplicitCode,
-                       AtomGroup, AtomRank);
-}
 #else
 DebugLoc::DebugLocContext DIBuilder::startFunctionContext(Function *F, DISubprogram *SP) {
   return DebugLoc::DebugLocContext(F->getContext());
@@ -1090,12 +1083,6 @@ DebugLoc DIBuilder::addInlinedFunctionContext(DISubprogram *CalleeSP, DebugLoc C
 
 void DIBuilder::finalizeFunctionContext(Function *F) {
 
-}
-DebugLoc DIBuilder::getLoc(
-    DebugLoc::DebugLocContext Context, unsigned Line, unsigned Column,
-    MDNode *Scope, DebugLoc InlinedAt, bool ImplicitCode, uint64_t AtomGroup,
-    uint8_t AtomRank) {
-  return DebugLoc::get(Context, Line, Column, Scope, InlinedAt, ImplicitCode, AtomGroup, AtomRank);
 }
 #endif
 

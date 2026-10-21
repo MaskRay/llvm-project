@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/IR/Instruction.h"
-#include "LLVMContextImpl.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/AttributeMask.h"
@@ -98,12 +97,7 @@ const DataLayout &Instruction::getDataLayout() const {
 }
 
 DebugLocContext Instruction::getDebugLocContext() const {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  LLVMContext &C = getContext();
-  return DebugLocContext(C.pImpl->getFLContext(C));
-#else
   return DebugLocContext(getContext());
-#endif
 }
 
 void Instruction::removeFromParent() {

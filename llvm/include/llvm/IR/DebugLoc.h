@@ -228,23 +228,8 @@ class DebugLoc;
 /// DebugLoc from any of the objects that can reach it (see comment above the
 /// private functions above).
 struct DebugLocContext {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  DIFunctionLocalMetadata *Context;
-  /// Warning: Only use in conditionally-compiled code, where
-  /// LLVM_USE_FLMD_SOURCE_LOCS is defined - otherwise this will cause an
-  /// error when the flag is not defined.
-  explicit DebugLocContext(DIFunctionLocalMetadata *FLMDContext) : Context(FLMDContext) {}
-  explicit DebugLocContext(LLVMContext &C);
-#else
   LLVMContext &Context;
-  /// Warning: Only use in conditionally-compiled code, where
-  /// LLVM_USE_FLMD_SOURCE_LOCS is not defined - otherwise this will cause an
-  /// error when the flag is defined.
-  explicit DebugLocContext(LLVMContext &LLVMContext) : Context(LLVMContext) {}
-  DebugLocContext(DebugLoc DL) : Context(DL.getContext()) {
-    assert(DL && "DebugLocContext can only be obtained from a non-empty DebugLoc.");
-  }
-#endif
+  DebugLocContext(LLVMContext &C) : Context(C) {}
   DebugLocContext(const Instruction *I);
   DebugLocContext(const Function *F);
   DebugLocContext(DebugLoc DL);
@@ -420,7 +405,7 @@ public:
   DebugLoc(DbgLocStorage Loc, DIFunctionLocalMetadata *FLContext)
     : Storage(Loc), FLContext(FLContext) {}
   DebugLoc(DbgLocStorage Loc, DebugLocContext DLContext)
-    : Storage(Loc), FLContext(DLContext.Context) {
+    : Storage(Loc), FLContext(DLContext.Context.getFLContext()) {
     assert((!Storage || FLContext) && "Invalid context provided for non-empty Storage.");
   }
 #else
@@ -507,64 +492,29 @@ operator DbgLocStorage() const { return Storage; }
   friend bool operator==(const DILocation *LHS, const DebugLoc &RHS) { return RHS.Storage == LHS; }
   friend bool operator!=(const DILocation *LHS, const DebugLoc &RHS) { return RHS.Storage != LHS; }
 
-private:
-  /// The following set of functions are the "real" functions that we use to
-  /// create a DebugLoc; all require a "context" object, which is the
-  /// LLVMContext for non-FLMD DebugLocs, and DIFunctionLocalMetadata* for FLMD
-  /// DebugLocs. To avoid compile errors when toggling the FLMD DebugLocs
-  /// feature, passing the context objects directly is not enabled; instead, we
-  /// pass an object which can be used to locate either context object depending
-  /// on the feature toggle, using a wrapper `DebugLocContext` class. An
-  /// explicit `DebugLocContext(<ActualContext>)` is also available, but should
-  /// only be used in cases where the feature toggle is known (and will
-  /// otherwise not compile).
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  static DebugLoc get(
-    DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
-    DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint64_t AtomGroup = 0,
-    uint8_t AtomRank = 0);
-  static DebugLoc getInlinedCall(
-    DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
-    DebugLoc InlinedAt, bool ImplicitCode, bool Uniquable);
-#else
-  static DebugLoc get(
-    LLVMContext &Context, unsigned Line, unsigned Column, Metadata *Scope,
-    DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint64_t AtomGroup = 0,
-    uint8_t AtomRank = 0);
-  static DebugLoc getInlinedCall(
-    LLVMContext &Context, unsigned Line, unsigned Column, Metadata *Scope,
-    DebugLoc InlinedAt, bool ImplicitCode, bool Uniquable);
-#endif
-public:
-
-  /// Helper class used to fetch the required context object to create a new
-  /// DebugLoc from any of the objects that can reach it (see comment above the
-  /// private functions above).
+  /// The context that new DebugLocs are created in.
   using DebugLocContext = llvm::DebugLocContext;
   static DebugLoc get(
     DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint64_t AtomGroup = 0,
-    uint8_t AtomRank = 0) {
-    return DebugLoc::get(Context.Context, Line, Column, Scope, InlinedAt, ImplicitCode, AtomGroup, AtomRank);
-  }
+    uint8_t AtomRank = 0);
+  static DebugLoc getInlinedCall(
+    DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
+    DebugLoc InlinedAt, bool ImplicitCode, bool Uniquable);
   static DebugLoc getDistinctInlinedCall(
     DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false) {
-    return DebugLoc::getInlinedCall(Context.Context, Line, Column, Scope, InlinedAt, ImplicitCode, /*Uniquable=*/false);
+    return DebugLoc::getInlinedCall(Context, Line, Column, Scope, InlinedAt, ImplicitCode, /*Uniquable=*/false);
   }
   static DebugLoc getUniquedInlinedCall(
     DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false) {
-    return DebugLoc::getInlinedCall(Context.Context, Line, Column, Scope, InlinedAt, ImplicitCode, /*Uniquable=*/true);
+    return DebugLoc::getInlinedCall(Context, Line, Column, Scope, InlinedAt, ImplicitCode, /*Uniquable=*/true);
   }
-#if LLVM_USE_FLMD_SOURCE_LOCS
   DebugLocContext getDLContext() const {
     assert((bool)*this && "Can only get DL Context from a valid DebugLoc.");
-    return DebugLocContext(getFLContext());
+    return DebugLocContext(getContext());
   }
-#else
-  DebugLocContext getDLContext() const;
-#endif
 
   /// Creates a DebugLoc representing the same location as this DebugLoc, but
   /// as a uniqued inlined call, as using a DILocation as inlinedAt would.
@@ -953,10 +903,8 @@ class DebugLocMap {};
 #endif
 
 
-inline DebugLocContext::DebugLocContext(DebugLoc DL) {
-  // assert(DL && "DebugLocContext can only be obtained from a non-empty DebugLoc.");
-  Context = DL.getDLContext().Context;
-}
+inline DebugLocContext::DebugLocContext(DebugLoc DL)
+    : Context(DL.getContext()) {}
 inline DebugLoc DbgLocStorage::withContext(DebugLocContext Context) const {
   return DebugLoc(*this, Context);
 }

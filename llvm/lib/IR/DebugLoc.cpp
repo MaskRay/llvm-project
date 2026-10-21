@@ -99,10 +99,6 @@ DILocation &DebugLoc::operator*() const {
   return *getAsDILocation();
 }
 #else
-DebugLoc::DebugLocContext DebugLoc::getDLContext() const {
-  assert((bool)*this && "Can only get DL Context from a valid DebugLoc.");
-  return DebugLocContext(getUnderlyingStorage()->getContext());
-}
 
 // std::pair<FLDebugLoc, DIFunctionLocalMetadata *> DebugLoc::getAsFLDebugLoc() const {
 //   return {getStorage().get(), FLContext};
@@ -162,16 +158,18 @@ static FLIndex<uint32_t> getInlinedAtCallIdx(DIFunctionLocalMetadata *Context,
 }
 
 DebugLoc DebugLoc::get(
-    DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
+    DebugLocContext C, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt, bool ImplicitCode, uint64_t AtomGroup,
     uint8_t AtomRank) {
+  DIFunctionLocalMetadata *Context = C.Context.getFLContext();
   FLIndex<uint32_t> SrcLocIdx = getSrcLocIdx(Context, Line, Column, Scope,
                                              ImplicitCode, AtomGroup, AtomRank);
   return DebugLoc(FLDebugLoc(SrcLocIdx, getInlinedAtCallIdx(Context, InlinedAt)), Context);
 }
 DebugLoc DebugLoc::getInlinedCall(
-    DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
+    DebugLocContext C, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt, bool ImplicitCode, bool Uniquable) {
+  DIFunctionLocalMetadata *Context = C.Context.getFLContext();
   FLIndex<uint32_t> SrcLocIdx =
       getSrcLocIdx(Context, Line, Column, Scope, ImplicitCode, 0, 0);
   FLIndex<uint32_t> NewInlinedAtIdx = Context->addInlinedCall(
@@ -179,43 +177,35 @@ DebugLoc DebugLoc::getInlinedCall(
   return DebugLoc(FLDebugLoc::getInlinedCallLoc(NewInlinedAtIdx), Context);
 }
 
-DebugLoc::DebugLocContext::DebugLocContext(LLVMContext &C)
-    : Context(C.getFLContext()) {}
-DebugLoc::DebugLocContext::DebugLocContext(const Instruction *I)
-    : Context(I->getContext().getFLContext()) {}
-DebugLoc::DebugLocContext::DebugLocContext(const Function *F)
-    : Context(F->getContext().getFLContext()) {}
 DILocation *DebugLoc::convertToDILocation() const {
   return DILocation::get(getContext(), *this);
 }
 #else
 DebugLoc DebugLoc::get(
-    LLVMContext &Context, unsigned Line, unsigned Column, Metadata *Scope,
+    DebugLocContext C, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt, bool ImplicitCode, uint64_t AtomGroup,
     uint8_t AtomRank) {
+  LLVMContext &Context = C.Context;
   return DebugLoc::getFromDILocation(DILocation::get(Context, Line, Column, Scope, InlinedAt.getAsDILocation(), ImplicitCode, AtomGroup, AtomRank));
 }
 DebugLoc DebugLoc::getInlinedCall(
-    LLVMContext &Context, unsigned Line, unsigned Column, Metadata *Scope,
+    DebugLocContext C, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt, bool ImplicitCode, bool Uniquable) {
+  LLVMContext &Context = C.Context;
   if (Uniquable)
     return DebugLoc::getFromDILocation(DILocation::get(Context, Line, Column, Scope, InlinedAt.getAsDILocation(), ImplicitCode));
   return DebugLoc::getFromDILocation(DILocation::getDistinct(Context, Line, Column, Scope, InlinedAt.getAsDILocation(), ImplicitCode));
 }
 
-DebugLoc::DebugLocContext::DebugLocContext(const Instruction *I) :
-    Context(I->getContext()) {
-  assert(I->getParent() && I->getFunction() &&
-    "Instruction cannot be used to get function context if not inserted in a "
-    "function.");
-}
-DebugLoc::DebugLocContext::DebugLocContext(const Function *F) :
-    Context(F->getContext()) {}
-
 DILocation *DebugLoc::convertToDILocation() const {
   return getAsDILocation();
 }
 #endif
+
+DebugLocContext::DebugLocContext(const Instruction *I)
+    : Context(I->getContext()) {}
+DebugLocContext::DebugLocContext(const Function *F)
+    : Context(F->getContext()) {}
 
 DebugLoc DebugLoc::getFromMDNode(const MDNode *MD) {
   return DebugLoc::getFromDILocation(dyn_cast_or_null<DILocation>(MD));
@@ -354,7 +344,7 @@ DebugLoc DebugLoc::replaceInlinedAtSubprogram(
     }
   }
 
-  return DebugLoc(UpdatedLoc, NewFnContext.Context);
+  return DebugLoc(UpdatedLoc, NewFnContext);
 }
 
 DebugLoc DebugLoc::appendInlinedAt(const DebugLoc &DL, DebugLoc InlinedAt,
@@ -678,7 +668,7 @@ static DebugLoc getMergedDebugLoc(DebugLoc LocA, DebugLoc LocB) {
       // atom group. This essentially regresses to non-key-instructions
       // behaviour (now that it's the only instruction in its group it'll
       // probably get is_stmt applied).
-      Group = C.Context->getContext().incNextDILocationAtomGroup();
+      Group = C.Context.incNextDILocationAtomGroup();
       Rank = 1;
     }
     return MakeLoc(Line, Col, Scope, IsImplicitCode, Group, Rank);

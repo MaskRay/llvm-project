@@ -50,7 +50,7 @@ void LexicalScopes::resetModule() {
 void LexicalScopes::resetFunction() {
   MF = nullptr;
   CurrentFnLexicalScope = nullptr;
-  DbgLocCtx = {};
+  DbgLocCtx.reset();
   LexicalScopeMap.clear();
   AbstractScopeMap.clear();
   InlinedLexicalScopeMap.clear();
@@ -73,7 +73,7 @@ void LexicalScopes::scanFunction(const MachineFunction &Fn) {
   if (skipUnit(Fn.getFunction().getSubprogram()->getUnit()))
     return;
   MF = &Fn;
-  DbgLocCtx = DebugLocContext(&Fn.getFunction());
+  DbgLocCtx.emplace(&Fn.getFunction());
   SmallVector<InsnRange, 4> MIRanges;
   DenseMap<const MachineInstr *, LexicalScope *> MI2ScopeMap;
   extractLexicalScopes(MIRanges, MI2ScopeMap);

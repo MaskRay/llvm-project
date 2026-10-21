@@ -157,8 +157,6 @@ class CGDebugInfo {
   /// function. This is used to pop unbalanced regions at the end of a
   /// function.
   std::vector<unsigned> FnBeginRegionCount;
-  /// Context used to create new DebugLocs.
-  llvm::DebugLoc::DebugLocContext getDLContext() const;
 
   /// This is a storage for names that are constructed on demand. For
   /// example, C++ destructors, C++ operators etc..

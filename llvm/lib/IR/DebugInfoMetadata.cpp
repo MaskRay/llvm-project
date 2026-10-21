@@ -449,7 +449,7 @@ DILocation *DILocation::getImpl(LLVMContext &Context, unsigned Line,
   assert(isa<DILocalScope>(Scope) && (!InlinedAt || InlinedAtLoc) &&
          "TODO: Handle this failstate gracefully.");
   DebugLoc DL = DebugLoc::get(
-      DebugLoc::DebugLocContext(Context.getFLContext()), Line, Column, Scope,
+      DebugLoc::DebugLocContext(Context), Line, Column, Scope,
       InlinedAtLoc ? InlinedAtLoc->getAsDebugLoc() : DebugLoc(), ImplicitCode,
       AtomGroup, AtomRank);
   return getImpl(Context, DL, Storage, ShouldCreate);

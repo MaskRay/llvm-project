@@ -354,12 +354,12 @@ public:
   /// the global tracker.
   LLVM_ABI uint64_t incNextDILocationAtomGroup();
 
-  /// Get the source location table shared by every function in this context,
-  /// creating it on first use.
-  LLVM_ABI DIFunctionLocalMetadata *getFLContext();
-  /// Get the source location table if it has been created, otherwise null.
-  LLVM_ABI DIFunctionLocalMetadata *getFLContextIfExists() const;
+  /// Get the source location table shared by every function in this context.
+  DIFunctionLocalMetadata *getFLContext() const { return FLContext; }
+
 private:
+  DIFunctionLocalMetadata *FLContext;
+
   // Module needs access to the add/removeModule methods.
   friend class Module;
 

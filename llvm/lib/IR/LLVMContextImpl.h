@@ -1554,14 +1554,6 @@ struct MDAttachment {
 
 class LLVMContextImpl {
 public:
-  /// Source location table shared by every function; see
-  /// LLVMContext::getFLContext.
-  DIFunctionLocalMetadata *FLContext = nullptr;
-  DIFunctionLocalMetadata *getFLContext(LLVMContext &Ctx) {
-    if (LLVM_UNLIKELY(!FLContext))
-      FLContext = DIFunctionLocalMetadata::getDistinct(Ctx);
-    return FLContext;
-  }
 
   /// OwnedModules - The set of modules instantiated in this context, and which
   /// will be automatically deleted if this context is deleted.

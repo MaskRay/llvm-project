@@ -1159,7 +1159,7 @@ void SlotTracker::processModule() {
   // Instruction locations index into the context-wide location table; only
   // the entries this module references are printed.
   if (const DIFunctionLocalMetadata *FLContext =
-          TheModule->getContext().getFLContextIfExists();
+          TheModule->getContext().getFLContext();
       FLContext && !FLContext->empty()) {
     FLSubset.emplace(FLTableSubset::collect(*FLContext, *TheModule));
     if (FLSubset->empty())

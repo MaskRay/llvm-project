@@ -410,7 +410,7 @@ ValueEnumerator::ValueEnumerator(const Module &M,
   // Instruction locations index into the context-wide location table; only
   // the entries this module references are written.
   if (const DIFunctionLocalMetadata *FLContext =
-          M.getContext().getFLContextIfExists();
+          M.getContext().getFLContext();
       FLContext && !FLContext->empty())
     FLSubset.emplace(*FLContext);
 

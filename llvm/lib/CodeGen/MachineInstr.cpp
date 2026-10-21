@@ -762,11 +762,7 @@ bool MachineInstr::isIdenticalTo(const MachineInstr &Other,
 
 
 DebugLocContext MachineInstr::getDebugLocContext() const {
-#if LLVM_USE_FLMD_SOURCE_LOCS
   return DebugLocContext(getMF()->getFunction().getContext());
-#else
-  return DebugLocContext(getContext());
-#endif
 }
 
 bool MachineInstr::isEquivalentDbgInstr(const MachineInstr &Other) const {

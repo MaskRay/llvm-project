@@ -1372,14 +1372,14 @@ LLVMDebugLoc LLVMDIBuilderCreateDebugLocation2(
     LLVMMetadataRef FnCtx, unsigned Line, unsigned Column, LLVMMetadataRef Scope,
     LLVMDebugLoc InlinedAt) {
   return wrap(DebugLoc::get(
-    DebugLoc::DebugLocContext(unwrapDI<DIFunctionLocalMetadata>(FnCtx)),
+    DebugLoc::DebugLocContext(unwrapDI<DIFunctionLocalMetadata>(FnCtx)->getContext()),
     Line, Column, unwrap(Scope), unwrap(InlinedAt)));
 }
 LLVMDebugLoc LLVMDIBuilderCreateInlineCallDebugLocation(
     LLVMMetadataRef CallerCtx, LLVMMetadataRef CalleeCtx, unsigned Line,
     unsigned Column, LLVMMetadataRef Scope, LLVMDebugLoc InlinedAt) {
   return wrap(DebugLoc::getDistinctInlinedCall(
-    DebugLoc::DebugLocContext(unwrapDI<DIFunctionLocalMetadata>(CallerCtx)),
+    DebugLoc::DebugLocContext(unwrapDI<DIFunctionLocalMetadata>(CallerCtx)->getContext()),
     Line, Column, unwrap(Scope), unwrap(InlinedAt)));
 }
 

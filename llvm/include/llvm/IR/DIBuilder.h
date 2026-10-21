@@ -130,11 +130,6 @@ namespace llvm {
     /// Call after the last source location for a function has been emitted to
     /// remove the expensive uniquing maps.
     void finalizeFunctionContext(Function *F);
-    DebugLoc getLoc(
-        DebugLoc::DebugLocContext Context, unsigned Line, unsigned Column,
-        MDNode *Scope, DebugLoc InlinedAt = DebugLoc(),
-        bool ImplicitCode = false, uint64_t AtomGroup = 0,
-        uint8_t AtomRank = 0);
 
 
     /// A CompileUnit provides an anchor for all debugging
