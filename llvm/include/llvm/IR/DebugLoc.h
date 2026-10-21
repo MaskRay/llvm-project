@@ -507,8 +507,6 @@ operator DbgLocStorage() const { return Storage; }
   friend bool operator==(const DILocation *LHS, const DebugLoc &RHS) { return RHS.Storage == LHS; }
   friend bool operator!=(const DILocation *LHS, const DebugLoc &RHS) { return RHS.Storage != LHS; }
 
-  bool operator<(const DebugLoc &Other) const { return Storage < Other.Storage; }
-
 private:
   /// The following set of functions are the "real" functions that we use to
   /// create a DebugLoc; all require a "context" object, which is the
@@ -822,18 +820,8 @@ public:
   LLVM_ABI bool isImplicitCode() const;
   LLVM_ABI void setImplicitCode(bool ImplicitCode);
 
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  bool operator==(const DebugLoc &DL) const {
-    return (!Storage && !DL.Storage) || (Storage == DL.Storage && FLContext == DL.FLContext);
-  }
-  bool operator!=(const DebugLoc &DL) const {
-    if (!Storage && !DL.Storage) return false;
-    return Storage != DL.Storage || FLContext != DL.FLContext;
-  }
-#else
   bool operator==(const DebugLoc &DL) const { return Storage == DL.Storage; }
   bool operator!=(const DebugLoc &DL) const { return Storage != DL.Storage; }
-#endif
   LLVM_ABI void dump() const;
   LLVM_ABI void dump(const Module *M) const;
 
@@ -1008,10 +996,6 @@ struct DenseMapInfo<DbgLocStorage> {
 
 
 inline hash_code hash_value(const DebugLoc &Val) {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  if (Val)
-    return hash_combine(Val.getStorage(), Val.getFLContext());
-#endif
   return hash_value(Val.getStorage());
 }
 
