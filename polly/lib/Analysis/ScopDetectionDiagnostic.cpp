@@ -173,7 +173,7 @@ RejectReason::RejectReason(RejectReasonKind K) : Kind(K) {
 
 const DebugLoc RejectReason::Unknown = DebugLoc();
 
-const DebugLoc &RejectReason::getDebugLoc() const {
+DebugLoc RejectReason::getDebugLoc() const {
   // Allocate an empty DebugLoc and return it a reference to it.
   return Unknown;
 }
@@ -208,7 +208,7 @@ std::string ReportInvalidTerminator::getMessage() const {
   return ("Invalid instruction terminates BB: " + BB->getName()).str();
 }
 
-const DebugLoc &ReportInvalidTerminator::getDebugLoc() const {
+DebugLoc ReportInvalidTerminator::getDebugLoc() const {
   return BB->getTerminator()->getFullDebugLoc();
 }
 
@@ -230,7 +230,7 @@ std::string ReportUnreachableInExit::getMessage() const {
   return "Unreachable in exit block" + BBName;
 }
 
-const DebugLoc &ReportUnreachableInExit::getDebugLoc() const { return DbgLoc; }
+DebugLoc ReportUnreachableInExit::getDebugLoc() const { return DbgLoc; }
 
 std::string ReportUnreachableInExit::getEndUserMessage() const {
   return "Unreachable in exit block.";
@@ -259,7 +259,7 @@ std::string ReportIndirectPredecessor::getMessage() const {
   return getEndUserMessage();
 }
 
-const DebugLoc &ReportIndirectPredecessor::getDebugLoc() const {
+DebugLoc ReportIndirectPredecessor::getDebugLoc() const {
   return DbgLoc;
 }
 
@@ -286,7 +286,7 @@ std::string ReportIrreducibleRegion::getMessage() const {
   return "Irreducible region encountered: " + R->getNameStr();
 }
 
-const DebugLoc &ReportIrreducibleRegion::getDebugLoc() const { return DbgLoc; }
+DebugLoc ReportIrreducibleRegion::getDebugLoc() const { return DbgLoc; }
 
 std::string ReportIrreducibleRegion::getEndUserMessage() const {
   return "Irreducible region encountered in control flow.";
@@ -494,7 +494,7 @@ std::string ReportLoopBound::getMessage() const {
          "' in loop: " + L->getHeader()->getName();
 }
 
-const DebugLoc &ReportLoopBound::getDebugLoc() const { return Loc; }
+DebugLoc ReportLoopBound::getDebugLoc() const { return Loc; }
 
 bool ReportLoopBound::classof(const RejectReason *RR) {
   return RR->getKind() == RejectReasonKind::LoopBound;
@@ -523,7 +523,7 @@ bool ReportLoopHasNoExit::classof(const RejectReason *RR) {
   return RR->getKind() == RejectReasonKind::LoopHasNoExit;
 }
 
-const DebugLoc &ReportLoopHasNoExit::getDebugLoc() const { return Loc; }
+DebugLoc ReportLoopHasNoExit::getDebugLoc() const { return Loc; }
 
 std::string ReportLoopHasNoExit::getEndUserMessage() const {
   return "Loop cannot be handled because it has no exit.";
@@ -548,7 +548,7 @@ bool ReportLoopHasMultipleExits::classof(const RejectReason *RR) {
   return RR->getKind() == RejectReasonKind::LoopHasMultipleExits;
 }
 
-const DebugLoc &ReportLoopHasMultipleExits::getDebugLoc() const { return Loc; }
+DebugLoc ReportLoopHasMultipleExits::getDebugLoc() const { return Loc; }
 
 std::string ReportLoopHasMultipleExits::getEndUserMessage() const {
   return "Loop cannot be handled because it has multiple exits.";
@@ -574,7 +574,7 @@ bool ReportLoopOnlySomeLatches::classof(const RejectReason *RR) {
   return RR->getKind() == RejectReasonKind::LoopHasNoExit;
 }
 
-const DebugLoc &ReportLoopOnlySomeLatches::getDebugLoc() const { return Loc; }
+DebugLoc ReportLoopOnlySomeLatches::getDebugLoc() const { return Loc; }
 
 std::string ReportLoopOnlySomeLatches::getEndUserMessage() const {
   return "Loop cannot be handled because not all latches are part of loop "
@@ -597,7 +597,7 @@ std::string ReportFuncCall::getMessage() const {
   return "Call instruction: " + *Inst;
 }
 
-const DebugLoc &ReportFuncCall::getDebugLoc() const {
+DebugLoc ReportFuncCall::getDebugLoc() const {
   return Inst->getFullDebugLoc();
 }
 
@@ -628,7 +628,7 @@ std::string ReportNonSimpleMemoryAccess::getMessage() const {
   return "Non-simple memory access: " + *Inst;
 }
 
-const DebugLoc &ReportNonSimpleMemoryAccess::getDebugLoc() const {
+DebugLoc ReportNonSimpleMemoryAccess::getDebugLoc() const {
   return Inst->getFullDebugLoc();
 }
 
@@ -693,7 +693,7 @@ std::string ReportAlias::getEndUserMessage() const {
                             " may access the same memory.");
 }
 
-const DebugLoc &ReportAlias::getDebugLoc() const { return Inst->getFullDebugLoc(); }
+DebugLoc ReportAlias::getDebugLoc() const { return Inst->getFullDebugLoc(); }
 
 bool ReportAlias::classof(const RejectReason *RR) {
   return RR->getKind() == RejectReasonKind::Alias;
@@ -728,7 +728,7 @@ std::string ReportIntToPtr::getMessage() const {
   return "Find bad intToptr prt: " + *BaseValue;
 }
 
-const DebugLoc &ReportIntToPtr::getDebugLoc() const {
+DebugLoc ReportIntToPtr::getDebugLoc() const {
   return BaseValue->getFullDebugLoc();
 }
 
@@ -752,7 +752,7 @@ std::string ReportAlloca::getMessage() const {
   return "Alloca instruction: " + *Inst;
 }
 
-const DebugLoc &ReportAlloca::getDebugLoc() const {
+DebugLoc ReportAlloca::getDebugLoc() const {
   return Inst->getFullDebugLoc();
 }
 
@@ -776,7 +776,7 @@ std::string ReportUnknownInst::getMessage() const {
   return "Unknown instruction: " + *Inst;
 }
 
-const DebugLoc &ReportUnknownInst::getDebugLoc() const {
+DebugLoc ReportUnknownInst::getDebugLoc() const {
   return Inst->getFullDebugLoc();
 }
 
@@ -802,7 +802,7 @@ std::string ReportEntry::getEndUserMessage() const {
   return "Scop contains function entry (not yet supported).";
 }
 
-const DebugLoc &ReportEntry::getDebugLoc() const {
+DebugLoc ReportEntry::getDebugLoc() const {
   return BB->getTerminator()->getFullDebugLoc();
 }
 
@@ -830,7 +830,7 @@ std::string ReportUnprofitable::getEndUserMessage() const {
   return "No profitable polyhedral optimization found";
 }
 
-const DebugLoc &ReportUnprofitable::getDebugLoc() const {
+DebugLoc ReportUnprofitable::getDebugLoc() const {
   for (const BasicBlock *BB : R->blocks())
     for (const Instruction &Inst : *BB)
       if (const DebugLoc &DL = Inst.getStableDebugLoc())
@@ -861,7 +861,7 @@ std::string ReportIncompatibleType::getMessage() const {
   return "Incompatible type: " + *Inst;
 }
 
-const DebugLoc &ReportIncompatibleType::getDebugLoc() const {
+DebugLoc ReportIncompatibleType::getDebugLoc() const {
   return Inst->getFullDebugLoc();
 }
 

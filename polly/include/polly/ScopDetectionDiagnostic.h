@@ -159,7 +159,7 @@ public:
   /// Get the source location of this error.
   ///
   /// @return The debug location for this error.
-  virtual const DebugLoc &getDebugLoc() const;
+  virtual DebugLoc getDebugLoc() const;
 };
 
 using RejectReasonPtr = std::shared_ptr<RejectReason>;
@@ -223,7 +223,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   //@}
 };
 
@@ -248,7 +248,7 @@ public:
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
   std::string getEndUserMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   //@}
 };
 
@@ -274,7 +274,7 @@ public:
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
   std::string getEndUserMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   //@}
 };
 
@@ -300,7 +300,7 @@ public:
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
   std::string getEndUserMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   //@}
 };
 
@@ -324,7 +324,7 @@ public:
 
   /// @name RejectReason interface
   //@{
-  const DebugLoc &getDebugLoc() const override { return Inst->getFullDebugLoc(); }
+  DebugLoc getDebugLoc() const override { return Inst->getFullDebugLoc(); }
   //@}
 };
 
@@ -581,7 +581,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   std::string getEndUserMessage() const override;
   //@}
 };
@@ -609,7 +609,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   std::string getEndUserMessage() const override;
   //@}
 };
@@ -637,7 +637,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   std::string getEndUserMessage() const override;
   //@}
 };
@@ -665,7 +665,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   std::string getEndUserMessage() const override;
   //@}
 };
@@ -689,7 +689,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   std::string getEndUserMessage() const override;
   //@}
 };
@@ -728,7 +728,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   std::string getEndUserMessage() const override;
   //@}
 };
@@ -770,7 +770,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   //@}
 };
 
@@ -792,7 +792,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   //@}
 };
 
@@ -814,7 +814,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   //@}
 };
 
@@ -837,7 +837,7 @@ public:
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
   std::string getEndUserMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   //@}
 };
 
@@ -860,7 +860,7 @@ public:
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
   std::string getEndUserMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   //@}
 };
 
@@ -883,7 +883,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   std::string getEndUserMessage() const override;
   //@}
 };
@@ -908,7 +908,7 @@ public:
   std::string getRemarkName() const override;
   const BasicBlock *getRemarkBB() const override;
   std::string getMessage() const override;
-  const DebugLoc &getDebugLoc() const override;
+  DebugLoc getDebugLoc() const override;
   std::string getEndUserMessage() const override;
   //@}
 };
