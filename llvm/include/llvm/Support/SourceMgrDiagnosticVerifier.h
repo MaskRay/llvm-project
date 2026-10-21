@@ -74,6 +74,8 @@ public:
     SourceMgr::DiagKind kind;
     /// The line number the expected diagnostic should be on.
     unsigned lineNo;
+    /// The 1-based column the expected diagnostic should be at, or 0 for any.
+    unsigned columnNo = 0;
     /// The location of the expected diagnostic within the input file.
     SMLoc fileLoc;
     /// A flag indicating if the expected diagnostic has been matched yet.
@@ -85,7 +87,17 @@ public:
     std::optional<Regex> substringRegex;
   };
 
-  SourceMgrDiagnosticVerifier() = default;
+  /// Recognizes '<prefix>-<kind>' directives for each of \p prefixes.
+  explicit SourceMgrDiagnosticVerifier(ArrayRef<StringRef> prefixes = {
+                                           "expected"});
+
+  /// Returns "error", "warning", "remark" or "note".
+  static StringRef getDiagKindStr(SourceMgr::DiagKind kind);
+
+  /// Prints an error to \p os without going through \p mgr's diagnostic
+  /// handler, which may be the one feeding the verifier.
+  static void printMessage(raw_ostream &os, const SourceMgr &mgr, SMLoc loc,
+                           const Twine &msg, ArrayRef<SMRange> ranges = {});
 
   /// Computes and caches the list of expected diagnostics for \p buf, if not
   /// already cached. Returns the (mutable) cached list.
@@ -112,10 +124,12 @@ public:
   /// buffer), the diagnostic is matched against an empty list, i.e. it can
   /// never match and is always unexpected. On a near miss, prints a message
   /// through \p mgr. \p reportUnexpected controls whether near misses /
-  /// unexpected diagnostics are reported at all.
+  /// unexpected diagnostics are reported at all. A \p columnNo of 0 means the
+  /// caller has no column, and the directives' columns are ignored.
   MatchResult process(raw_ostream &os, SourceMgr &mgr, SourceMgr::DiagKind kind,
                       bool hasLoc, const MemoryBuffer *buf, unsigned lineNo,
-                      StringRef message, bool reportUnexpected = true);
+                      unsigned columnNo, StringRef message,
+                      bool reportUnexpected = true);
 
   /// Reports (through \p mgr) any expected diagnostic that was never matched
   /// by a call to \p process. Returns whether verification succeeded overall,
@@ -124,10 +138,8 @@ public:
   bool verify(raw_ostream &os, SourceMgr &mgr);
 
 private:
-  /// Regex used to recognize 'expected-<kind>' comments. Like FileCheck, a
-  /// prefix in the middle of a word is not recognized.
-  Regex expected{"(^|[^[:alnum:]_-])expected-(error|note|remark|warning)(-re)? "
-                 "*(@([+-][0-9]+|above|below|unknown))? *{{(.*)}}$"};
+  /// Regex used to recognize '<prefix>-<kind>' comments.
+  Regex expected;
 
   /// The expected diagnostics for each buffer that has been scanned so far,
   /// keyed by buffer identifier (i.e. file name).

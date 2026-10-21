@@ -39,6 +39,7 @@
 #include "llvm/Support/LibraryOptionsContext.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/SourceMgrDiagnosticVerifier.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -224,6 +225,13 @@ static cl::opt<bool> ValidateCFI("validate-cfi",
                                  cl::desc("Validate the CFI directives"),
                                  cl::cat(MCCategory));
 
+static cl::opt<std::string>
+    Verify("verify", cl::ValueOptional,
+           cl::desc("Check diagnostics against '<prefix>-<kind> {{...}}' "
+                    "comments instead of printing them (default prefix: "
+                    "expected)"),
+           cl::value_desc("prefix1,prefix2,..."), cl::cat(MCCategory));
+
 enum ActionType {
   AC_AsLex,
   AC_Assemble,
@@ -379,6 +387,25 @@ static int AssembleInput(const char *ProgName, const Target *TheTarget,
   return Res;
 }
 
+static void verifyDiagnostic(SourceMgrDiagnosticVerifier &Verifier,
+                             SourceMgr &SrcMgr, const SMDiagnostic &D) {
+  SMLoc Loc = D.getLoc();
+  const MemoryBuffer *Buf = nullptr;
+  unsigned Line = 0, Col = 0;
+  if (unsigned ID = Loc.isValid() ? SrcMgr.FindBufferContainingLoc(Loc) : 0) {
+    Buf = SrcMgr.getMemoryBuffer(ID);
+    std::tie(Line, Col) = SrcMgr.getLineAndColumn(Loc, ID);
+  }
+  if (Verifier.process(errs(), SrcMgr, D.getKind(), Loc.isValid(), Buf, Line,
+                       Col, D.getMessage()) !=
+      SourceMgrDiagnosticVerifier::MatchResult::Unexpected)
+    return;
+  SourceMgrDiagnosticVerifier::printMessage(
+      errs(), SrcMgr, Buf ? Loc : SMLoc(),
+      "unexpected " + SourceMgrDiagnosticVerifier::getDiagKindStr(D.getKind()) +
+          ": " + D.getMessage());
+}
+
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
 
@@ -450,6 +477,22 @@ int main(int argc, char **argv) {
   SrcMgr.setIncludeDirs(IncludeDirs);
   SrcMgr.setVirtualFileSystem(vfs::getRealFileSystem());
 
+  std::optional<SourceMgrDiagnosticVerifier> Verifier;
+  if (Verify.getNumOccurrences()) {
+    if (Action == AC_AsLex) {
+      WithColor::error(errs(), ProgName)
+          << "--verify is not supported with --as-lex\n";
+      return 1;
+    }
+    SmallVector<StringRef> Prefixes;
+    StringRef(Verify).split(Prefixes, ',', -1, /*KeepEmpty=*/false);
+    if (Prefixes.empty())
+      Prefixes.push_back("expected");
+    Verifier.emplace(Prefixes);
+    // '@unknown' directives must be known before the first diagnostic.
+    (void)Verifier->computeExpectedDiags(errs(), SrcMgr, Buffer);
+  }
+
   std::unique_ptr<MCRegisterInfo> MRI(TheTarget->createMCRegInfo(TheTriple));
   assert(MRI && "Unable to create target register info!");
 
@@ -499,6 +542,21 @@ int main(int argc, char **argv) {
   std::unique_ptr<MCObjectFileInfo> MOFI(
       TheTarget->createMCObjectFileInfo(Ctx, PIC, LargeCodeModel));
   Ctx.setObjectFileInfo(MOFI.get());
+
+  if (Verifier) {
+    // Parser and disassembler diagnostics are reported through SrcMgr, others
+    // through Ctx. Funnel the former into Ctx so that each reaches the
+    // verifier once.
+    SrcMgr.setDiagHandler(
+        [](const SMDiagnostic &D, void *C) {
+          static_cast<MCContext *>(C)->diagnose(D);
+        },
+        &Ctx);
+    Ctx.setDiagnosticHandler([&](const SMDiagnostic &D, bool, const SourceMgr &,
+                                 std::vector<const MDNode *> &) {
+      verifyDiagnostic(*Verifier, SrcMgr, D);
+    });
+  }
 
   Ctx.setGenDwarfForAssembly(GenDwarfForAssembly);
   // Default to 4 for dwarf version.
@@ -678,12 +736,24 @@ int main(int argc, char **argv) {
     Res = Disassembler::disassemble(*TheTarget, *STI, *Str, *Buffer, SrcMgr,
                                     Ctx, HexBytes, NumBenchmarkRuns);
 
+  bool Verified = true;
+  if (Verifier) {
+    // Scan buffers that reported no diagnostic, e.g. .include'd files.
+    for (unsigned I = 1, E = SrcMgr.getNumBuffers(); I <= E; ++I)
+      (void)Verifier->computeExpectedDiags(errs(), SrcMgr,
+                                           SrcMgr.getMemoryBuffer(I));
+    Verified = Verifier->verify(errs(), SrcMgr);
+  }
+
   // Keep output if no errors.
-  if (Res == 0) {
+  if (Res == 0 && Verified) {
     Out->keep();
     if (DwoOut)
       DwoOut->keep();
   }
 
+  // A failure without a diagnostic (e.g. a bad --defsym) cannot be expected.
+  if (Verifier)
+    Res = (Res && !Ctx.hadError()) || !Verified;
   return Res;
 }

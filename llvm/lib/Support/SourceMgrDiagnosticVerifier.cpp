@@ -7,13 +7,32 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/SourceMgrDiagnosticVerifier.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 
-/// Given a diagnostic kind, return a human readable string for it.
-static StringRef getDiagKindStr(SourceMgr::DiagKind kind) {
+SourceMgrDiagnosticVerifier::SourceMgrDiagnosticVerifier(
+    ArrayRef<StringRef> prefixes) {
+  // Like FileCheck, don't match a prefix in the middle of a word.
+  expected = Regex("(^|[^[:alnum:]_-])(" +
+                   join(map_range(prefixes, Regex::escape), "|") +
+                   ")-(error|note|remark|warning)(-re)? "
+                   "*(@([+-][0-9]+|above|below|unknown))?(:([0-9]+))? "
+                   "*{{(.*)}}$");
+}
+
+void SourceMgrDiagnosticVerifier::printMessage(raw_ostream &os,
+                                               const SourceMgr &mgr, SMLoc loc,
+                                               const Twine &msg,
+                                               ArrayRef<SMRange> ranges) {
+  mgr.printIncludeStackForDiagnostic(loc, os);
+  mgr.GetMessage(loc, SourceMgr::DK_Error, msg, ranges).print(nullptr, os);
+}
+
+StringRef
+SourceMgrDiagnosticVerifier::getDiagKindStr(SourceMgr::DiagKind kind) {
   switch (kind) {
   case SourceMgr::DK_Note:
     return "note";
@@ -32,9 +51,9 @@ bool SourceMgrDiagnosticVerifier::ExpectedDiag::emitError(
   if (fileLoc.isValid()) {
     SMRange range(fileLoc, SMLoc::getFromPointer(fileLoc.getPointer() +
                                                  substring.size()));
-    mgr.PrintMessage(os, fileLoc, SourceMgr::DK_Error, msg, range);
+    printMessage(os, mgr, fileLoc, msg, range);
   } else {
-    mgr.PrintMessage(os, fileLoc, SourceMgr::DK_Error, msg);
+    printMessage(os, mgr, fileLoc, msg);
   }
   return false;
 }
@@ -87,7 +106,11 @@ SourceMgrDiagnosticVerifier::computeExpectedDiags(raw_ostream &os,
   // If the buffer is invalid, return an empty list.
   if (!buf)
     return {};
-  auto &expectedDiags = expectedDiagsPerFile[buf->getBufferIdentifier()];
+  auto [it, inserted] =
+      expectedDiagsPerFile.try_emplace(buf->getBufferIdentifier());
+  auto &expectedDiags = it->second;
+  if (!inserted)
+    return expectedDiags;
 
   // The number of the last line that did not correlate to a designator.
   unsigned lastNonDesignatorLine = 0;
@@ -112,28 +135,35 @@ SourceMgrDiagnosticVerifier::computeExpectedDiags(raw_ostream &os,
     }
 
     // Point to the start of expected-*.
-    SMLoc expectedStart = SMLoc::getFromPointer(matches[1].end());
+    SMLoc expectedStart = SMLoc::getFromPointer(matches[2].data());
 
     SourceMgr::DiagKind kind;
-    if (matches[2] == "error")
+    if (matches[3] == "error")
       kind = SourceMgr::DK_Error;
-    else if (matches[2] == "warning")
+    else if (matches[3] == "warning")
       kind = SourceMgr::DK_Warning;
-    else if (matches[2] == "remark")
+    else if (matches[3] == "remark")
       kind = SourceMgr::DK_Remark;
     else {
-      assert(matches[2] == "note");
+      assert(matches[3] == "note");
       kind = SourceMgr::DK_Note;
     }
-    ExpectedDiag record(kind, lineNo + 1, expectedStart, matches[6]);
+    ExpectedDiag record(kind, lineNo + 1, expectedStart, matches[9]);
 
     // Check to see if this is a regex match, i.e. it includes the `-re`.
-    if (!matches[3].empty() && !record.computeRegex(os, mgr)) {
+    if (!matches[4].empty() && !record.computeRegex(os, mgr)) {
       ok = false;
       continue;
     }
 
-    StringRef offsetMatch = matches[4];
+    if (!matches[8].empty() &&
+        (matches[8].getAsInteger(10, record.columnNo) || !record.columnNo)) {
+      record.emitError(os, mgr, "invalid column '" + matches[8] + "'");
+      ok = false;
+      continue;
+    }
+
+    StringRef offsetMatch = matches[5];
     if (!offsetMatch.empty()) {
       offsetMatch = offsetMatch.drop_front(1);
 
@@ -179,21 +209,16 @@ SourceMgrDiagnosticVerifier::getExpectedDiags(StringRef bufName) {
   return std::nullopt;
 }
 
-SourceMgrDiagnosticVerifier::MatchResult
-SourceMgrDiagnosticVerifier::process(raw_ostream &os, SourceMgr &mgr,
-                                     SourceMgr::DiagKind kind, bool hasLoc,
-                                     const MemoryBuffer *buf, unsigned lineNo,
-                                     StringRef message, bool reportUnexpected) {
+SourceMgrDiagnosticVerifier::MatchResult SourceMgrDiagnosticVerifier::process(
+    raw_ostream &os, SourceMgr &mgr, SourceMgr::DiagKind kind, bool hasLoc,
+    const MemoryBuffer *buf, unsigned lineNo, unsigned columnNo,
+    StringRef message, bool reportUnexpected) {
   MutableArrayRef<ExpectedDiag> diags;
   if (hasLoc) {
     // If the buffer couldn't be resolved, `diags` stays empty: a diagnostic
     // with a location in an unknown file can never match anything.
-    if (buf) {
-      if (auto maybeDiags = getExpectedDiags(buf->getBufferIdentifier()))
-        diags = *maybeDiags;
-      else
-        diags = computeExpectedDiags(os, mgr, buf);
-    }
+    if (buf)
+      diags = computeExpectedDiags(os, mgr, buf);
   } else {
     diags = expectedUnknownLocDiags;
   }
@@ -205,7 +230,8 @@ SourceMgrDiagnosticVerifier::process(raw_ostream &os, SourceMgr &mgr,
   // If this was an expected error, remember that we saw it and return.
   for (auto &e : diags) {
     // File line must match (unless it's an unknown location).
-    if (hasLoc && e.lineNo != lineNo)
+    if (hasLoc && (e.lineNo != lineNo ||
+                   (columnNo && e.columnNo && e.columnNo != columnNo)))
       continue;
     if (e.match(message)) {
       if (e.kind == kind) {
@@ -226,10 +252,10 @@ SourceMgrDiagnosticVerifier::process(raw_ostream &os, SourceMgr &mgr,
 
   // Otherwise, emit an error for the near miss.
   if (nearMiss) {
-    mgr.PrintMessage(os, nearMiss->fileLoc, SourceMgr::DK_Error,
-                     "'" + getDiagKindStr(kind) +
-                         "' diagnostic emitted when expecting a '" +
-                         getDiagKindStr(nearMiss->kind) + "'");
+    printMessage(os, mgr, nearMiss->fileLoc,
+                 "'" + getDiagKindStr(kind) +
+                     "' diagnostic emitted when expecting a '" +
+                     getDiagKindStr(nearMiss->kind) + "'");
     return MatchResult::NearMiss;
   }
   return MatchResult::Unexpected;

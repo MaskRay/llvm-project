@@ -437,6 +437,8 @@ Makes programs 10x faster by doing Special New Thing.
 
 * llvm-mca no longer defaults -mcpu to "native"
 
+* llvm-mc supports `--verify`, which checks diagnostics against `expected-error {{...}}`-style comments in the input.
+
 * llvm-rc now supports `/showIncludes` to report header and resource-file
   dependencies in a format compatible with Ninja's `deps = msvc` mode.
 
