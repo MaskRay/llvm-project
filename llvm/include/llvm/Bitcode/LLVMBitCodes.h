@@ -400,9 +400,9 @@ enum MetadataCodes {
   METADATA_ASSIGN_ID = 47,        // [distinct, ...]
   METADATA_SUBRANGE_TYPE = 48,    // [distinct, ...]
   METADATA_FIXED_POINT_TYPE = 49, // [distinct, ...]
-  METADATA_FLMD = 50,             // [[scopes], [srclocs], [inlinedcalls], [loops]]
+  METADATA_FLMD = 50,             // [distinct, n x scope, n x srcloc, n x call]
   METADATA_FL_LOCATION = 51,      // [location table handle]
-  METADATA_FLMD_TABLE = 52,        // [location table metadata ID]
+  METADATA_FLMD_TABLE = 52,       // [location table metadata ID]
 };
 
 // The constants block (CONSTANTS_BLOCK_ID) describes emission for each

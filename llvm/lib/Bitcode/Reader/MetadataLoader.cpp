@@ -2625,53 +2625,40 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
       return error("Invalid record: more than one location table");
     FLMDTableSeen = true;
     FLMDRawTable &Table = FLMDPending.emplace();
-    uint64_t CurrentRecord = 1;
-    auto Next = [&]() -> Expected<uint64_t> {
-      if (CurrentRecord >= Record.size())
-        return error("Invalid record: truncated location table");
-      return Record[CurrentRecord++];
+    // Each array is a count followed by that many fixed-size entries.
+    ArrayRef<uint64_t> Fields = ArrayRef(Record).drop_front();
+    auto TakeArray = [&](size_t EntrySize, ArrayRef<uint64_t> &Entries) {
+      if (Fields.empty() || Fields[0] > (Fields.size() - 1) / EntrySize)
+        return false;
+      Entries = Fields.slice(1, Fields[0] * EntrySize);
+      Fields = Fields.drop_front(1 + Entries.size());
+      return true;
     };
-    // Scopes. Loading a placeholder for each makes sure the scope is loaded
+    ArrayRef<uint64_t> Scopes, SrcLocs, InlinedCalls;
+    if (!TakeArray(1, Scopes) || !TakeArray(5, SrcLocs) ||
+        !TakeArray(2, InlinedCalls) || !Fields.empty())
+      return error("Invalid record: truncated location table");
+    uint64_t NumScopes = Scopes.size(), NumSrcLocs = SrcLocs.size() / 5;
+    // Loading a placeholder for each scope makes sure the scope is loaded
     // before the table is interned.
-    Expected<uint64_t> NumScopes = Next();
-    if (!NumScopes)
-      return NumScopes.takeError();
-    for (uint64_t ScopeIdx = 0; ScopeIdx < *NumScopes; ++ScopeIdx) {
-      Expected<uint64_t> Scope = Next();
-      if (!Scope)
-        return Scope.takeError();
-      getMD(*Scope);
-      Table.ScopeIDs.push_back(*Scope);
+    for (uint64_t Scope : Scopes) {
+      getMD(Scope);
+      Table.ScopeIDs.push_back(Scope);
     }
-    // SrcLocs
-    Expected<uint64_t> NumSrcLocs = Next();
-    if (!NumSrcLocs)
-      return NumSrcLocs.takeError();
-    for (uint64_t SrcLocIdx = 0; SrcLocIdx < *NumSrcLocs; ++SrcLocIdx) {
-      std::array<uint64_t, 5> &Fields = Table.SrcLocs.emplace_back();
-      for (uint64_t &Field : Fields) {
-        Expected<uint64_t> V = Next();
-        if (!V)
-          return V.takeError();
-        Field = *V;
-      }
-      if (!Fields[2] || Fields[2] > *NumScopes || Fields[3] > UINT32_MAX)
+    Table.SrcLocs.reserve(NumSrcLocs);
+    for (size_t I = 0; I != SrcLocs.size(); I += 5) {
+      std::array<uint64_t, 5> &Entry = Table.SrcLocs.emplace_back();
+      llvm::copy(SrcLocs.slice(I, 5), Entry.begin());
+      if (!Entry[2] || Entry[2] > NumScopes || Entry[3] > UINT32_MAX)
         return error("Invalid record: bad location table entry");
     }
-    // InlinedCalls; a site's parent precedes it.
-    Expected<uint64_t> NumInlinedCalls = Next();
-    if (!NumInlinedCalls)
-      return NumInlinedCalls.takeError();
-    for (uint64_t Idx = 0; Idx < *NumInlinedCalls; ++Idx) {
-      Expected<uint64_t> SrcLoc = Next();
-      if (!SrcLoc)
-        return SrcLoc.takeError();
-      Expected<uint64_t> InlinedAt = Next();
-      if (!InlinedAt)
-        return InlinedAt.takeError();
-      if (!*SrcLoc || *SrcLoc > *NumSrcLocs || (*InlinedAt >> 1) > Idx)
+    // A site's parent precedes it.
+    Table.InlinedCalls.reserve(InlinedCalls.size() / 2);
+    for (size_t I = 0; I != InlinedCalls.size(); I += 2) {
+      uint64_t SrcLoc = InlinedCalls[I], InlinedAt = InlinedCalls[I + 1];
+      if (!SrcLoc || SrcLoc > NumSrcLocs || (InlinedAt >> 1) > I / 2)
         return error("Invalid record: bad location table inlined call");
-      Table.InlinedCalls.emplace_back(*SrcLoc, *InlinedAt);
+      Table.InlinedCalls.emplace_back(SrcLoc, InlinedAt);
     }
     MetadataList.assignValue(FLContext, NextMetadataNo);
     NextMetadataNo++;

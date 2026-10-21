@@ -1902,6 +1902,8 @@ void ModuleBitcodeWriter::writeDIFunctionLocalMetadata(const DIFunctionLocalMeta
   const FLTableSubset &Subset = *VE.getFLSubset();
   assert(&Subset.getTable() == N && "Writing a different location table");
   const uint64_t Version = 2 << 1;
+  Record.reserve(4 + Subset.scopes().size() + 5 * Subset.srcLocs().size() +
+                 2 * Subset.inlinedCalls().size());
   Record.push_back((uint64_t)N->isDistinct() | Version);
   // Print each array separately, leading with a length-field.
   // Scopes
