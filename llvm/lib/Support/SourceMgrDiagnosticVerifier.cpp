@@ -112,28 +112,28 @@ SourceMgrDiagnosticVerifier::computeExpectedDiags(raw_ostream &os,
     }
 
     // Point to the start of expected-*.
-    SMLoc expectedStart = SMLoc::getFromPointer(matches[0].data());
+    SMLoc expectedStart = SMLoc::getFromPointer(matches[1].end());
 
     SourceMgr::DiagKind kind;
-    if (matches[1] == "error")
+    if (matches[2] == "error")
       kind = SourceMgr::DK_Error;
-    else if (matches[1] == "warning")
+    else if (matches[2] == "warning")
       kind = SourceMgr::DK_Warning;
-    else if (matches[1] == "remark")
+    else if (matches[2] == "remark")
       kind = SourceMgr::DK_Remark;
     else {
-      assert(matches[1] == "note");
+      assert(matches[2] == "note");
       kind = SourceMgr::DK_Note;
     }
-    ExpectedDiag record(kind, lineNo + 1, expectedStart, matches[5]);
+    ExpectedDiag record(kind, lineNo + 1, expectedStart, matches[6]);
 
     // Check to see if this is a regex match, i.e. it includes the `-re`.
-    if (!matches[2].empty() && !record.computeRegex(os, mgr)) {
+    if (!matches[3].empty() && !record.computeRegex(os, mgr)) {
       ok = false;
       continue;
     }
 
-    StringRef offsetMatch = matches[3];
+    StringRef offsetMatch = matches[4];
     if (!offsetMatch.empty()) {
       offsetMatch = offsetMatch.drop_front(1);
 

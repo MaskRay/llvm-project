@@ -124,8 +124,9 @@ public:
   bool verify(raw_ostream &os, SourceMgr &mgr);
 
 private:
-  /// Regex used to recognize 'expected-<kind>' comments.
-  Regex expected{"expected-(error|note|remark|warning)(-re)? "
+  /// Regex used to recognize 'expected-<kind>' comments. Like FileCheck, a
+  /// prefix in the middle of a word is not recognized.
+  Regex expected{"(^|[^[:alnum:]_-])expected-(error|note|remark|warning)(-re)? "
                  "*(@([+-][0-9]+|above|below|unknown))? *{{(.*)}}$"};
 
   /// The expected diagnostics for each buffer that has been scanned so far,
