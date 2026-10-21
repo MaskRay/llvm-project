@@ -559,7 +559,7 @@ bool ScopBuilder::buildConditionSets(
   }
 
   if (TooComplex) {
-    scop->invalidate(COMPLEXITY, TI ? TI->getDebugLoc() : DebugLoc(),
+    scop->invalidate(COMPLEXITY, TI ? TI->getFullDebugLoc() : DebugLoc(),
                      TI ? TI->getParent() : nullptr /* BasicBlock */);
     isl_set_free(AlternativeCondSet);
     isl_set_free(ConsequenceCondSet);
@@ -807,7 +807,7 @@ bool ScopBuilder::addLoopBoundsToHeaderDomain(
 
   isl::set UnboundedCtx = Parts.first.params();
   recordAssumption(&RecordedAssumptions, INFINITELOOP, UnboundedCtx,
-                   HeaderBB->getTerminator()->getDebugLoc(), AS_RESTRICTION,
+                   HeaderBB->getTerminator()->getFullDebugLoc(), AS_RESTRICTION,
                    nullptr, RequiresRTC);
   return true;
 }
@@ -1030,7 +1030,7 @@ bool ScopBuilder::propagateInvalidStmtDomains(
       InvalidDomain = Domain;
       isl::set DomPar = Domain.params();
       recordAssumption(&RecordedAssumptions, ERRORBLOCK, DomPar,
-                       BB->getTerminator()->getDebugLoc(), AS_RESTRICTION);
+                       BB->getTerminator()->getFullDebugLoc(), AS_RESTRICTION);
       Domain = isl::set::empty(Domain.get_space());
     }
 
@@ -1072,7 +1072,7 @@ bool ScopBuilder::propagateInvalidStmtDomains(
         continue;
 
       InvalidDomainMap.erase(BB);
-      scop->invalidate(COMPLEXITY, TI->getDebugLoc(), TI->getParent());
+      scop->invalidate(COMPLEXITY, TI->getFullDebugLoc(), TI->getParent());
       return false;
     }
 
@@ -1597,7 +1597,7 @@ bool ScopBuilder::buildAccessMultiDimParam(MemAccInst Inst, ScopStmt *Stmt) {
       cast<SCEVConstant>(Sizes.back())->getAPInt().getSExtValue();
   Sizes.pop_back();
   if (ElementSize != DelinearizedSize)
-    scop->invalidate(DELINEARIZATION, Inst->getDebugLoc(), Inst->getParent());
+    scop->invalidate(DELINEARIZATION, Inst->getFullDebugLoc(), Inst->getParent());
 
   addArrayAccess(Stmt, Inst, AccType, BasePointer->getValue(), ElementType,
                  true, AccItr->second.DelinearizedSubscripts, Sizes, Val);
@@ -2376,7 +2376,7 @@ void ScopBuilder::assumeNoOutOfBounds() {
     for (auto &Access : Stmt) {
       isl::set Outside = Access->assumeNoOutOfBound();
       const auto &Loc = Access->getAccessInstruction()
-                            ? Access->getAccessInstruction()->getDebugLoc()
+                            ? Access->getAccessInstruction()->getFullDebugLoc()
                             : DebugLoc();
       recordAssumption(&RecordedAssumptions, INBOUNDS, Outside, Loc,
                        AS_ASSUMPTION);
@@ -2832,7 +2832,7 @@ void ScopBuilder::verifyInvariantLoads() {
     // @p LI, then mark this scop as infeasible for optimization.
     for (ScopStmt &Stmt : *scop)
       if (Stmt.getArrayAccessOrNULLFor(LI)) {
-        scop->invalidate(INVARIANTLOAD, LI->getDebugLoc(), LI->getParent());
+        scop->invalidate(INVARIANTLOAD, LI->getFullDebugLoc(), LI->getParent());
         return;
       }
   }
@@ -3005,7 +3005,7 @@ isl::set ScopBuilder::getNonHoistableCtx(MemoryAccess *Access,
   if (TooComplex || !isRequiredInvariantLoad(LI))
     return {};
 
-  scop->addAssumption(INVARIANTLOAD, WrittenCtx, LI->getDebugLoc(),
+  scop->addAssumption(INVARIANTLOAD, WrittenCtx, LI->getFullDebugLoc(),
                       AS_RESTRICTION, LI->getParent());
   return WrittenCtx;
 }
@@ -3069,7 +3069,7 @@ void ScopBuilder::addInvariantLoads(ScopStmt &Stmt,
 
   if (unsignedFromIslSize(DomainCtx.n_basic_set()) >= MaxDisjunctsInDomain) {
     auto *AccInst = InvMAs.front().MA->getAccessInstruction();
-    scop->invalidate(COMPLEXITY, AccInst->getDebugLoc(), AccInst->getParent());
+    scop->invalidate(COMPLEXITY, AccInst->getFullDebugLoc(), AccInst->getParent());
     return;
   }
 
@@ -3527,7 +3527,7 @@ bool ScopBuilder::buildAliasGroup(
   // compute a sufficiently tight lower and upper bound: bail out.
   for (MemoryAccess *MA : AliasGroup) {
     if (!MA->isAffine()) {
-      scop->invalidate(ALIASING, MA->getAccessInstruction()->getDebugLoc(),
+      scop->invalidate(ALIASING, MA->getAccessInstruction()->getFullDebugLoc(),
                        MA->getAccessInstruction()->getParent());
       return false;
     }

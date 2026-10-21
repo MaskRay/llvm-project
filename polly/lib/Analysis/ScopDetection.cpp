@@ -1802,7 +1802,7 @@ bool ScopDetection::isValidRegion(DetectionContext &Context) {
     Instruction *PredTerm = Pred->getTerminator();
     if (isa<IndirectBrInst>(PredTerm) || isa<CallBrInst>(PredTerm))
       return invalid<ReportIndirectPredecessor>(
-          Context, /*Assert=*/true, PredTerm, PredTerm->getDebugLoc());
+          Context, /*Assert=*/true, PredTerm, PredTerm->getFullDebugLoc());
   }
 
   // SCoP cannot contain the entry block of the function, because we need
@@ -1914,7 +1914,7 @@ bool ScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
         // else, an irreducible control flow in the region is detected.
         if (!DT.dominates(SuccBB, CurrBB)) {
           // Get debug info of instruction which causes irregular control flow.
-          DbgLoc = TInst->getDebugLoc();
+          DbgLoc = TInst->getFullDebugLoc();
           return false;
         }
       }

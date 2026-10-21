@@ -105,7 +105,7 @@ void SCEVAffinator::takeNonNegativeAssumption(
   PWAC.second =
       isl::manage(isl_set_union(PWAC.second.release(), isl_set_copy(NegDom)));
   auto *Restriction = BB ? NegDom : isl_set_params(NegDom);
-  auto DL = BB ? BB->getTerminator()->getDebugLoc() : DebugLoc();
+  auto DL = BB ? BB->getTerminator()->getFullDebugLoc() : DebugLoc();
   recordAssumption(RecordedAssumptions, UNSIGNED, isl::manage(Restriction), DL,
                    AS_RESTRICTION, BB);
 }
@@ -147,7 +147,7 @@ PWACtx SCEVAffinator::checkForWrapping(const SCEV *Expr, PWACtx PWAC) const {
   isl::set NotEqualSet = PWAC.first.ne_set(PWAMod);
   PWAC.second = PWAC.second.unite(NotEqualSet).coalesce();
 
-  const DebugLoc &Loc = BB ? BB->getTerminator()->getDebugLoc() : DebugLoc();
+  const DebugLoc &Loc = BB ? BB->getTerminator()->getFullDebugLoc() : DebugLoc();
   if (!BB)
     NotEqualSet = NotEqualSet.params();
   NotEqualSet = NotEqualSet.coalesce();
@@ -581,7 +581,7 @@ PWACtx SCEVAffinator::visitUnknown(const SCEVUnknown *Expr) {
 PWACtx SCEVAffinator::complexityBailout() {
   // We hit the complexity limit for affine expressions; invalidate the scop
   // and return a constant zero.
-  const DebugLoc &Loc = BB ? BB->getTerminator()->getDebugLoc() : DebugLoc();
+  const DebugLoc &Loc = BB ? BB->getTerminator()->getFullDebugLoc() : DebugLoc();
   S->invalidate(COMPLEXITY, Loc);
   return visit(SE.getZero(Type::getInt32Ty(S->getFunction().getContext())));
 }

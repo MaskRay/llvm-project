@@ -2192,7 +2192,7 @@ __isl_give PWACtx Scop::getPwAff(const SCEV *E, BasicBlock *BB,
     return PWAC;
   }
 
-  auto DL = BB ? BB->getTerminator()->getDebugLoc() : DebugLoc();
+  auto DL = BB ? BB->getTerminator()->getFullDebugLoc() : DebugLoc();
   invalidate(COMPLEXITY, DL, BB);
   return Affinator.getPwAff(SE->getZero(E->getType()), BB, RecordedAssumptions);
 }

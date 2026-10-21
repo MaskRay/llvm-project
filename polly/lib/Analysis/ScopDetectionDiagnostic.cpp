@@ -209,7 +209,7 @@ std::string ReportInvalidTerminator::getMessage() const {
 }
 
 const DebugLoc &ReportInvalidTerminator::getDebugLoc() const {
-  return BB->getTerminator()->getDebugLoc();
+  return BB->getTerminator()->getFullDebugLoc();
 }
 
 bool ReportInvalidTerminator::classof(const RejectReason *RR) {
@@ -598,7 +598,7 @@ std::string ReportFuncCall::getMessage() const {
 }
 
 const DebugLoc &ReportFuncCall::getDebugLoc() const {
-  return Inst->getDebugLoc();
+  return Inst->getFullDebugLoc();
 }
 
 std::string ReportFuncCall::getEndUserMessage() const {
@@ -629,7 +629,7 @@ std::string ReportNonSimpleMemoryAccess::getMessage() const {
 }
 
 const DebugLoc &ReportNonSimpleMemoryAccess::getDebugLoc() const {
-  return Inst->getDebugLoc();
+  return Inst->getFullDebugLoc();
 }
 
 std::string ReportNonSimpleMemoryAccess::getEndUserMessage() const {
@@ -693,7 +693,7 @@ std::string ReportAlias::getEndUserMessage() const {
                             " may access the same memory.");
 }
 
-const DebugLoc &ReportAlias::getDebugLoc() const { return Inst->getDebugLoc(); }
+const DebugLoc &ReportAlias::getDebugLoc() const { return Inst->getFullDebugLoc(); }
 
 bool ReportAlias::classof(const RejectReason *RR) {
   return RR->getKind() == RejectReasonKind::Alias;
@@ -729,7 +729,7 @@ std::string ReportIntToPtr::getMessage() const {
 }
 
 const DebugLoc &ReportIntToPtr::getDebugLoc() const {
-  return BaseValue->getDebugLoc();
+  return BaseValue->getFullDebugLoc();
 }
 
 bool ReportIntToPtr::classof(const RejectReason *RR) {
@@ -753,7 +753,7 @@ std::string ReportAlloca::getMessage() const {
 }
 
 const DebugLoc &ReportAlloca::getDebugLoc() const {
-  return Inst->getDebugLoc();
+  return Inst->getFullDebugLoc();
 }
 
 bool ReportAlloca::classof(const RejectReason *RR) {
@@ -777,7 +777,7 @@ std::string ReportUnknownInst::getMessage() const {
 }
 
 const DebugLoc &ReportUnknownInst::getDebugLoc() const {
-  return Inst->getDebugLoc();
+  return Inst->getFullDebugLoc();
 }
 
 bool ReportUnknownInst::classof(const RejectReason *RR) {
@@ -803,7 +803,7 @@ std::string ReportEntry::getEndUserMessage() const {
 }
 
 const DebugLoc &ReportEntry::getDebugLoc() const {
-  return BB->getTerminator()->getDebugLoc();
+  return BB->getTerminator()->getFullDebugLoc();
 }
 
 bool ReportEntry::classof(const RejectReason *RR) {
@@ -836,7 +836,7 @@ const DebugLoc &ReportUnprofitable::getDebugLoc() const {
       if (const DebugLoc &DL = Inst.getStableDebugLoc())
         return DL;
 
-  return R->getEntry()->getTerminator()->getDebugLoc();
+  return R->getEntry()->getTerminator()->getFullDebugLoc();
 }
 
 bool ReportUnprofitable::classof(const RejectReason *RR) {
@@ -862,7 +862,7 @@ std::string ReportIncompatibleType::getMessage() const {
 }
 
 const DebugLoc &ReportIncompatibleType::getDebugLoc() const {
-  return Inst->getDebugLoc();
+  return Inst->getFullDebugLoc();
 }
 
 std::string ReportIncompatibleType::getEndUserMessage() const {

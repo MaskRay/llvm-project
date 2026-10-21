@@ -324,7 +324,7 @@ public:
 
   /// @name RejectReason interface
   //@{
-  const DebugLoc &getDebugLoc() const override { return Inst->getDebugLoc(); }
+  const DebugLoc &getDebugLoc() const override { return Inst->getFullDebugLoc(); }
   //@}
 };
 
