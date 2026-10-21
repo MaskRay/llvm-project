@@ -579,7 +579,6 @@ operator DbgLocStorage() const { return Storage; }
   /// The DLMap argument is only used when FLMD source locations are enabled.
   LLVM_ABI static DebugLoc
   replaceInlinedAtSubprogram(const DebugLoc &DL, DISubprogram &NewSP,
-                             DebugLocContext NewFnContext,
                              DenseMap<const MDNode *, MDNode *> &Cache,
                              DebugLocMap &DLMap);
 
@@ -730,6 +729,9 @@ operator DbgLocStorage() const { return Storage; }
 
   /// Return true if the source locations match, ignoring isImplicitCode and
   /// source atom info.
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  LLVM_ABI bool isSameSourceLocation(const DebugLoc &Other) const;
+#else
   bool isSameSourceLocation(const DebugLoc &Other) const {
     if (Storage == Other.Storage)
       return true;
@@ -737,6 +739,7 @@ operator DbgLocStorage() const { return Storage; }
            getCol() == Other.getCol() && getScope() == Other.getScope() &&
            getInlinedAt() == Other.getInlinedAt();
   }
+#endif
 
   LLVM_ABI unsigned getLine() const;
   LLVM_ABI unsigned getCol() const;
@@ -844,50 +847,43 @@ inline raw_ostream &operator<<(raw_ostream &OS, const DebugLoc &DL) {
 raw_ostream &operator<<(raw_ostream &OS, const FLDebugLoc &DL);
 
 #if LLVM_USE_FLMD_SOURCE_LOCS
-// Caches the rewritten SrcLoc (for non-inlined locations) or InlinedCall (for
-// inlined locations and inlined calls) while rewriting a function's locations,
-// e.g. in replaceInlinedAtSubprogram or appendInlinedAt.
+// Caches rewritten SrcLocs and InlinedCalls while rewriting a function's
+// locations, e.g. in replaceInlinedAtSubprogram, appendInlinedAt or
+// ValueMapper. Values are raw indexes, so a missing entry reads as none.
 class DebugLocMap {
   DenseMap<uint32_t, uint32_t> SrcLocMap;
   DenseMap<uint32_t, uint32_t> InlinedCallMap;
+  // SrcLocs rebuilt in their own scope (see replaceInlinedAtSubprogram).
+  DenseMap<uint32_t, uint32_t> SameScopeSrcLocMap;
+
+  static FLIndex<uint32_t> lookup(const DenseMap<uint32_t, uint32_t> &Map,
+                                  FLIndex<uint32_t> In) {
+    return FLIndex<uint32_t>::fromRaw(In ? Map.lookup(In.asRaw()) : 0);
+  }
+  static void insert(DenseMap<uint32_t, uint32_t> &Map, FLIndex<uint32_t> In,
+                     FLIndex<uint32_t> Out) {
+    assert(In && Out && "Must map valid indexes only.");
+    Map.try_emplace(In.asRaw(), Out.asRaw());
+  }
+
 public:
   FLIndex<uint32_t> getSrcLoc(FLIndex<uint32_t> In) const {
-    if (!In)
-      return In;
-    auto It = SrcLocMap.find(In.get());
-    return It == SrcLocMap.end() ? FLIndex<uint32_t>()
-                                 : FLIndex<uint32_t>(It->second);
+    return lookup(SrcLocMap, In);
   }
   void insertSrcLoc(FLIndex<uint32_t> In, FLIndex<uint32_t> Out) {
-    assert(In && Out && "Must map valid indexes only.");
-    SrcLocMap.try_emplace(In.get(), Out.get());
+    insert(SrcLocMap, In, Out);
   }
-
+  FLIndex<uint32_t> getSameScopeSrcLoc(FLIndex<uint32_t> In) const {
+    return lookup(SameScopeSrcLocMap, In);
+  }
+  void insertSameScopeSrcLoc(FLIndex<uint32_t> In, FLIndex<uint32_t> Out) {
+    insert(SameScopeSrcLocMap, In, Out);
+  }
   FLIndex<uint32_t> getInlinedCall(FLIndex<uint32_t> In) const {
-    if (!In)
-      return In;
-    auto It = InlinedCallMap.find(In.get());
-    return It == InlinedCallMap.end() ? FLIndex<uint32_t>()
-                                      : FLIndex<uint32_t>(It->second);
+    return lookup(InlinedCallMap, In);
   }
   void insertInlinedCall(FLIndex<uint32_t> In, FLIndex<uint32_t> Out) {
-    assert(In && Out && "Must map valid indexes only.");
-    InlinedCallMap.try_emplace(In.get(), Out.get());
-  }
-
-  FLDebugLoc getFLDebugLoc(FLDebugLoc In) const {
-    if (!In)
-      return In;
-    // For non-inlined locs, we map just the SrcLoc.
-    if (In.isNonInlinedInstrLoc()) {
-      if (auto Found = getSrcLoc(In.SrcLocIdx))
-        return FLDebugLoc(Found, {});
-      return {};
-    }
-    // For inlined calls or inlined locs, we map just the InlinedAt.
-    if (auto Found = getInlinedCall(In.InlinedAtIdx))
-      return FLDebugLoc(In.SrcLocIdx, Found);
-    return {};
+    insert(InlinedCallMap, In, Out);
   }
 };
 #else

@@ -1426,16 +1426,16 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
   for (Instruction &I : instructions(NewFunc)) {
     if (const DebugLoc &DL = I.getFullDebugLoc())
       I.setDebugLoc(
-          DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, &NewFunc, Cache, DLMap));
+          DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, Cache, DLMap));
     for (DbgRecord &DR : I.getDbgRecordRange())
       DR.setDebugLoc(DebugLoc::replaceInlinedAtSubprogram(DR.getFullDebugLoc(),
-                                                          *NewSP, &NewFunc, Cache, DLMap));
+                                                          *NewSP, Cache, DLMap));
 
     // Loop info metadata may contain line locations. Fix them up.
     auto updateLoopInfoLoc = [&Cache, &DLMap, &NewFunc, NewSP](Metadata *MD) -> Metadata * {
       if (DILocation *Loc = dyn_cast_or_null<DILocation>(MD)) {
         DebugLoc DL = Loc->getAsDebugLoc();
-        return DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, &NewFunc, Cache,
+        return DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, Cache,
           DLMap).convertToDILocation();
       }
       return MD;

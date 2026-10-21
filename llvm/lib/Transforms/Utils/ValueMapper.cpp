@@ -911,8 +911,9 @@ std::optional<Metadata *> Mapper::mapSimpleMetadata(const Metadata *MD) {
   if (isa<DIFunctionLocalMetadata>(MD))
     return const_cast<Metadata *>(MD);
   if (auto *Loc = dyn_cast<DILocation>(MD)) {
-    DebugLoc NewDL = mapDebugLoc(Loc->getAsDebugLoc());
-    if (NewDL == Loc->getAsDebugLoc())
+    DebugLoc OldDL = Loc->getAsDebugLoc();
+    DebugLoc NewDL = mapDebugLoc(OldDL);
+    if (NewDL == OldDL)
       return mapToSelf(MD);
     return mapToMetadata(MD, DILocation::get(Loc->getContext(), NewDL));
   }
@@ -942,23 +943,27 @@ FLIndex<uint32_t> Mapper::mapFLSrcLoc(DIFunctionLocalMetadata *Context,
                                       FLIndex<uint32_t> Idx) {
   if (!Idx)
     return Idx;
+  DebugLocMap &LocMap = getVM().FLLocMap;
+  if (FLIndex<uint32_t> Found = LocMap.getSrcLoc(Idx))
+    return Found;
   FLSrcLoc SrcLoc = Context->getSrcLoc(Idx);
   MDNode *Scope = Context->getScope(SrcLoc.ScopeIdx).Scope;
   auto *NewScope = cast<MDNode>(mapMetadata(Scope));
-  if (NewScope == Scope)
-    return Idx;
-  SrcLoc.ScopeIdx = Context->getFLScopeIdx(NewScope);
-  return Context->getFLSrcLocIdx(SrcLoc);
+  FLIndex<uint32_t> NewIdx = Idx;
+  if (NewScope != Scope) {
+    SrcLoc.ScopeIdx = Context->getFLScopeIdx(NewScope);
+    NewIdx = Context->getFLSrcLocIdx(SrcLoc);
+  }
+  LocMap.insertSrcLoc(Idx, NewIdx);
+  return NewIdx;
 }
 
 FLIndex<uint32_t> Mapper::mapFLInlinedCall(DIFunctionLocalMetadata *Context,
                                            FLIndex<uint32_t> Idx) {
   if (!Idx)
     return Idx;
-  // Cached in the VM so that a distinct site maps to one new site.
-  if (auto It = getVM().FLInlinedCallMap.find(Idx.get());
-      It != getVM().FLInlinedCallMap.end())
-    return It->second;
+  if (FLIndex<uint32_t> Found = getVM().FLLocMap.getInlinedCall(Idx))
+    return Found;
   FLInlinedCall InlinedCall = Context->getInlinedCall(Idx);
   FLInlinedCall NewInlinedCall(mapFLSrcLoc(Context, InlinedCall.SrcLocIdx),
                                mapFLInlinedCall(Context, InlinedCall.InlinedAtIdx));
@@ -966,7 +971,7 @@ FLIndex<uint32_t> Mapper::mapFLInlinedCall(DIFunctionLocalMetadata *Context,
   if (NewInlinedCall != InlinedCall)
     NewIdx = Context->addInlinedCall(NewInlinedCall,
                                      Context->isUniquedInlinedCall(Idx));
-  getVM().FLInlinedCallMap[Idx.get()] = NewIdx.get();
+  getVM().FLLocMap.insertInlinedCall(Idx, NewIdx);
   return NewIdx;
 }
 #endif
@@ -1393,10 +1398,23 @@ void ValueMapper::scheduleRemapFunction(Function &F, unsigned MCID) {
 }
 
 void llvm::RemapSourceAtom(Instruction *I, ValueToValueMapTy &VM) {
-  DebugLoc DL = I->getFullDebugLoc();
+  const DebugLoc &DL = I->getFullDebugLoc();
   if (!DL)
     return;
 
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  // Read the entry once, then intern the copy with the remapped group.
+  FLSrcLoc SrcLoc = DL.getSrcLoc();
+  if (!SrcLoc.AtomGroup)
+    return;
+  auto R = VM.AtomMap.find({DL.getAtomContext(), SrcLoc.AtomGroup});
+  if (R == VM.AtomMap.end())
+    return;
+  SrcLoc.AtomGroup = R->second;
+  FLDebugLoc Loc = DL.getUnderlyingStorage();
+  Loc.SrcLocIdx = DL.getFLContext()->getFLSrcLocIdx(SrcLoc);
+  I->setDebugLoc(DebugLoc(Loc, DL.getFLContext()));
+#else
   auto AtomGroup = DL.getAtomGroup();
   if (!AtomGroup)
     return;
@@ -1407,13 +1425,9 @@ void llvm::RemapSourceAtom(Instruction *I, ValueToValueMapTy &VM) {
   AtomGroup = R->second;
 
   // Remap the atom group and copy all other fields.
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  DebugLoc New = DL.getWithAtom(AtomGroup, DL.getAtomRank());
-#else
-  DebugLoc New = DebugLoc::get(
-      I, DL.getLine(), DL.getCol(), DL.getScope(),
-      DL.getInlinedAt(), DL.isImplicitCode(), AtomGroup, DL.getAtomRank());
+  I->setDebugLoc(DebugLoc::get(I, DL.getLine(), DL.getCol(), DL.getScope(),
+                               DL.getInlinedAt(), DL.isImplicitCode(),
+                               AtomGroup, DL.getAtomRank()));
 #endif
-  I->setDebugLoc(New);
 }
 

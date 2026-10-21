@@ -90,8 +90,6 @@ class ValueMap {
   using MDMapT = DenseMap<const Metadata *, TrackingMDRef>;
   /// Map {(InlinedAt, old atom number) -> new atom number}.
   using DMAtomT = SmallDenseMap<std::pair<DebugLoc, uint64_t>, uint64_t>;
-  /// Map {old inlined call index -> new inlined call index} for FLMD.
-  using FLInlinedCallMapT = DenseMap<uint32_t, uint32_t>;
   using ExtraData = typename Config::ExtraData;
 
   MapT Map;
@@ -124,7 +122,9 @@ public:
   std::optional<MDMapT> &getMDMap() { return MDMap; }
   /// Map {(InlinedAt, old atom number) -> new atom number}.
   DMAtomT AtomMap;
-  FLInlinedCallMapT FLInlinedCallMap;
+  /// Remapped location table entries, so a distinct inline site maps to one
+  /// new site.
+  DebugLocMap FLLocMap;
 
   /// Get the mapped metadata, if it's in the map.
   std::optional<Metadata *> getMappedMD(const Metadata *MD) const {
