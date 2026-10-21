@@ -2169,25 +2169,26 @@ static void writeGenericDINode(raw_ostream &Out, const GenericDINode *N,
 }
 
 static void writeFLSrcLoc(raw_ostream &Out, FLSrcLoc SrcLoc, AsmWriterContext &WriterCtx) {
-  Out << "  (line: " << SrcLoc.Line;
-  if (SrcLoc.Column)
-    Out << ", column: " << SrcLoc.Column;
-  Out << ", scope: " << SrcLoc.ScopeIdx.get();
-  if (SrcLoc.ImplicitCode)
-    Out << ", isImplicitCode: true";
-  if (SrcLoc.AtomGroup)
-    Out << ", atomGroup: " << SrcLoc.AtomGroup;
-  if (SrcLoc.AtomRank)
-    Out << ", atomRank: " << unsigned(SrcLoc.AtomRank);
+  Out << "  (";
+  MDFieldPrinter Printer(Out, WriterCtx);
+  Printer.printInt("line", SrcLoc.Line, /*ShouldSkipZero=*/false);
+  Printer.printInt("column", SrcLoc.Column);
+  Printer.printInt("scope", SrcLoc.ScopeIdx.get(), /*ShouldSkipZero=*/false);
+  Printer.printBool("isImplicitCode", SrcLoc.ImplicitCode, /*Default=*/false);
+  Printer.printInt("atomGroup", SrcLoc.AtomGroup);
+  Printer.printInt<unsigned>("atomRank", SrcLoc.AtomRank);
   Out << ")";
 }
 static void writeFLInlinedCall(raw_ostream &Out, FLInlinedCall InlinedCall,
                                bool Uniqued) {
-  Out << "  (srcLoc: " << InlinedCall.SrcLocIdx.get();
+  Out << "  (";
+  MDFieldPrinter Printer(Out);
+  Printer.printInt("srcLoc", InlinedCall.SrcLocIdx.get(),
+                   /*ShouldSkipZero=*/false);
   if (InlinedCall.InlinedAtIdx)
-    Out << ", inlinedAt: " << InlinedCall.InlinedAtIdx.get();
-  if (!Uniqued)
-    Out << ", distinct: true";
+    Printer.printInt("inlinedAt", InlinedCall.InlinedAtIdx.get(),
+                     /*ShouldSkipZero=*/false);
+  Printer.printBool("distinct", !Uniqued, /*Default=*/false);
   Out << ")";
 }
 

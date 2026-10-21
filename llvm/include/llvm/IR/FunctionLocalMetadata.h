@@ -111,6 +111,11 @@ struct FLInlinedCall {
 };
 
 /// Stores source location information, including the source atom.
+// Set to unknown on overflow. We only have 16 bits to play with here.
+inline unsigned adjustColumn(unsigned Column) {
+  return Column < (1u << 16) ? Column : 0;
+}
+
 struct FLSrcLoc {
   uint32_t Line = 0;
   uint16_t Column = 0;
@@ -119,11 +124,10 @@ struct FLSrcLoc {
   FLIndex<uint32_t> ScopeIdx;
   uint32_t AtomGroup = 0;
   FLSrcLoc() = default;
-  // A column that does not fit becomes unknown, as for DILocation.
   FLSrcLoc(uint32_t Line, unsigned Column, FLIndex<uint32_t> ScopeIdx,
            uint32_t AtomGroup = 0, uint8_t AtomRank = 0,
            bool ImplicitCode = false)
-      : Line(Line), Column(Column < (1u << 16) ? Column : 0),
+      : Line(Line), Column(adjustColumn(Column)),
         AtomRank(AtomRank), ImplicitCode(ImplicitCode), ScopeIdx(ScopeIdx),
         AtomGroup(AtomGroup) {
     assert(ScopeIdx && "SrcLoc needs valid scope!");

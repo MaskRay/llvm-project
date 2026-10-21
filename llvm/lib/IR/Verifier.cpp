@@ -3298,20 +3298,10 @@ void Verifier::visitFunction(const Function &F) {
   // FIXME: Check this incrementally while visiting !dbg attachments.
   // FIXME: Only check when N is the canonical subprogram for F.
   SmallPtrSet<const MDNode *, 32> Seen;
-  auto VisitDILocation = [&](const Instruction &I, const MDNode *Node) {
-    // Be careful about using DILocation here since we might be dealing with
-    // broken code (this is the Verifier after all).
-    const DILocation *DL = dyn_cast_or_null<DILocation>(Node);
+  auto VisitDebugLoc = [&](const Instruction &I, DebugLoc DL) {
     if (!DL)
       return;
-    if (!Seen.insert(DL).second)
-      return;
-
-    Metadata *Parent = DL->getRawScope();
-    CheckDI(Parent && isa<DILocalScope>(Parent),
-            "DILocation's scope must be a DILocalScope", N, &F, &I, DL, Parent);
-
-    DILocalScope *Scope = DL->getInlinedAtScope();
+    DILocalScope *Scope = DL.getInlinedAtScope();
     Check(Scope, "Failed to find DILocalScope", DL);
 
     if (!Seen.insert(Scope).second)
@@ -3328,18 +3318,19 @@ void Verifier::visitFunction(const Function &F) {
             "!dbg attachment points at wrong subprogram for function", N, &F,
             &I, DL, Scope, SP);
   };
-  auto VisitDebugLoc = [&](const Instruction &I, DebugLoc DL) {
+  auto VisitDILocation = [&](const Instruction &I, const MDNode *Node) {
+    // Be careful about using DILocation here since we might be dealing with
+    // broken code (this is the Verifier after all).
+    const DILocation *DL = dyn_cast_or_null<DILocation>(Node);
     if (!DL)
       return;
-    DILocalScope *Scope = DL.getInlinedAtScope();
-    if (!Seen.insert(Scope).second)
+    if (!Seen.insert(DL).second)
       return;
-    DISubprogram *SP = Scope->getSubprogram();
-    if ((Scope != SP) && !Seen.insert(SP).second)
-      return;
-    CheckDI(SP->describes(&F),
-            "!dbg attachment points at wrong subprogram for function", N, &F,
-            &I, DL, Scope, SP);
+
+    Metadata *Parent = DL->getRawScope();
+    CheckDI(Parent && isa<DILocalScope>(Parent),
+            "DILocation's scope must be a DILocalScope", N, &F, &I, DL, Parent);
+    VisitDebugLoc(I, DL->getAsDebugLoc());
   };
   for (auto &BB : F)
     for (auto &I : BB) {

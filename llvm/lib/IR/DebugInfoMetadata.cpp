@@ -63,12 +63,6 @@ DebugVariableAggregate::DebugVariableAggregate(const DbgVariableRecord *DVR)
     : DebugVariable(DVR->getVariable(), std::nullopt,
                     DVR->getFullDebugLoc().getInlinedAt()) {}
 
-static void adjustColumn(unsigned &Column) {
-  // Set to unknown on overflow.  We only have 16 bits to play with here.
-  if (Column >= (1u << 16))
-    Column = 0;
-}
-
 
 
 using LineColumn = std::pair<unsigned /* Line */, unsigned /* Column */>;
@@ -192,7 +186,7 @@ DILocation *DILocation::getImpl(LLVMContext &Context, unsigned Line,
                                 uint64_t AtomGroup, uint8_t AtomRank,
                                 StorageType Storage, bool ShouldCreate) {
   // Fixup column.
-  adjustColumn(Column);
+  Column = adjustColumn(Column);
 
   if (Storage == Uniqued) {
     if (auto *N = getUniqued(Context.pImpl->DILocations,
@@ -1588,7 +1582,7 @@ DILexicalBlock *DILexicalBlock::getImpl(LLVMContext &Context, Metadata *Scope,
                                         unsigned Column, StorageType Storage,
                                         bool ShouldCreate) {
   // Fixup column.
-  adjustColumn(Column);
+  Column = adjustColumn(Column);
 
   assert(Scope && "Expected scope");
   DEFINE_GETIMPL_LOOKUP(DILexicalBlock, (Scope, File, Line, Column));
