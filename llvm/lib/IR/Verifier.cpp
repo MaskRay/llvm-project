@@ -520,7 +520,7 @@ private:
 
 void Verifier::visitDbgRecords(Instruction &I) {
   if (I.hasDebugLoc())
-    visitDebugLoc(I.getDebugLoc());
+    visitDebugLoc(I.getFullDebugLoc());
   if (!I.DebugMarker)
     return;
   CheckDI(I.DebugMarker->MarkedInstr == &I,
