@@ -290,21 +290,26 @@ DebugLoc DebugLoc::replaceInlinedAtSubprogram(
   FLDebugLoc CachedResult;
 
   // Collect the inline chain, stopping if we find a location that has already
-  // been processed.
+  // been processed. An inlined instruction location is rebuilt from its
+  // inlined call.
   for (FLDebugLoc Storage = RootLoc.getStorage().get(); Storage;
        Storage = Storage.getInlinedAt(Context)) {
-    CachedResult = DLMap.getFLDebugLoc(Storage);
-    if (CachedResult)
-      break;
+    if (!Storage.isInlinedInstrLoc()) {
+      CachedResult = DLMap.getFLDebugLoc(Storage);
+      if (CachedResult)
+        break;
+    }
     LocChain.push_back(Storage);
   }
 
+  // As with DILocation::get, the rebuilt locations drop atoms and
+  // isImplicitCode, and the rebuilt inlined calls are uniqued.
   auto GetNewSrcLoc = [&](FLIndex<uint32_t> OldIdx, DILocalScope *NewScope) {
     if (FLIndex<uint32_t> Found = DLMap.getSrcLoc(OldIdx))
       return Found;
     FLSrcLoc SrcLoc = Context->getSrcLoc(OldIdx);
-    SrcLoc.ScopeIdx = Context->getFLScopeIdx(NewScope);
-    FLIndex<uint32_t> NewIdx = Context->getFLSrcLocIdx(SrcLoc);
+    FLIndex<uint32_t> NewIdx =
+        Context->getFLSrcLocIdx(SrcLoc.Line, SrcLoc.Column, NewScope);
     DLMap.insertSrcLoc(OldIdx, NewIdx);
     return NewIdx;
   };
@@ -322,7 +327,7 @@ DebugLoc DebugLoc::replaceInlinedAtSubprogram(
       assert(!OldCall.InlinedAtIdx && "LocToUpdate should be the back of the InlinedAt chain.");
       FLIndex<uint32_t> NewCallIdx = Context->addInlinedCall(
           FLInlinedCall(GetNewSrcLoc(OldCall.SrcLocIdx, NewScope), {}),
-          Context->isUniquedInlinedCall(OldCallIdx));
+          /*Uniquable=*/true);
       DLMap.insertInlinedCall(OldCallIdx, NewCallIdx);
       UpdatedLoc = FLDebugLoc::getInlinedCallLoc(NewCallIdx);
     } else {
@@ -341,11 +346,14 @@ DebugLoc DebugLoc::replaceInlinedAtSubprogram(
       FLInlinedCall OldCall = Context->getInlinedCall(OldCallIdx);
       FLIndex<uint32_t> NewCallIdx = Context->addInlinedCall(
           FLInlinedCall(OldCall.SrcLocIdx, UpdatedLoc.getIdxForInlinedCall()),
-          Context->isUniquedInlinedCall(OldCallIdx));
+          /*Uniquable=*/true);
       DLMap.insertInlinedCall(OldCallIdx, NewCallIdx);
       UpdatedLoc = FLDebugLoc::getInlinedCallLoc(NewCallIdx);
     } else {
-      UpdatedLoc = FLDebugLoc(LocToUpdate.SrcLocIdx, UpdatedLoc.getIdxForInlinedCall());
+      FLSrcLoc SrcLoc = Context->getSrcLoc(LocToUpdate.SrcLocIdx);
+      FLIndex<uint32_t> SrcLocIdx = Context->getFLSrcLocIdx(
+          FLSrcLoc(SrcLoc.Line, SrcLoc.Column, SrcLoc.ScopeIdx));
+      UpdatedLoc = FLDebugLoc(SrcLocIdx, UpdatedLoc.getIdxForInlinedCall());
     }
   }
 
