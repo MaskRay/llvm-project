@@ -1353,6 +1353,15 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
   SmallDenseMap<DINode *, DINode *> RemappedMetadata;
   SmallVector<DbgVariableRecord *, 4> DVRsToDelete;
   DenseMap<const MDNode *, MDNode *> Cache;
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  // Moved instructions still use OldFunc's indices; their locations are copied
+  // into a context of NewFunc's own below.
+  if (!NewFunc.getFLContext()) {
+    auto *NewFL = DIFunctionLocalMetadata::getDistinct(Ctx);
+    FLMDBuilder Builder(NewFL, NewSP);
+    NewFunc.setMetadata(LLVMContext::MD_flmd, NewFL);
+  }
+#endif
   DebugLocMap DLMap(&OldFunc, &NewFunc);
 
   auto GetUpdatedDIVariable = [&](DILocalVariable *OldVar) {
@@ -1425,17 +1434,14 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
   // debug assignment metadata in the new function.
   DenseMap<DIAssignID *, DIAssignID *> AssignmentIDMap;
   for (Instruction &I : instructions(NewFunc)) {
-    // If FLMD source locs are in use, we don't need to renumber each
-    // instruction - the indices will transfer. We only need to remap scopes
-    // from the new FLMD context.
 #if LLVM_USE_FLMD_SOURCE_LOCS
-    if (DebugLoc DL = I.getFullDebugLoc())
-    
+    if (DebugLoc DL = I.getFullDebugLoc(&OldFunc))
       I.setDebugLoc(
           DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, &NewFunc, Cache, DLMap));
     for (DbgRecord &DR : I.getDbgRecordRange())
-      DR.setDebugLoc(DebugLoc::replaceInlinedAtSubprogram(DR.getFullDebugLoc(),
-                                                          *NewSP, &NewFunc, Cache, DLMap));
+      if (DebugLoc DL = DR.getFullDebugLoc(&OldFunc))
+        DR.setDebugLoc(DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP,
+                                                            &NewFunc, Cache, DLMap));
 #else
     if (DebugLoc DL = I.getDebugLoc())
       I.setDebugLoc(

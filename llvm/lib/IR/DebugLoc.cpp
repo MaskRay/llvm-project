@@ -112,23 +112,11 @@ static FLIndex<uint16_t> getInlineCallDILocationToFLIndex(DILocation *DIL, DISub
   DISubprogram *InlineeSP = InlineeScope->getSubprogram();
   // Reference into LastInlineeFLMD->InlinedCalls.
   FLIndex<uint16_t> InlinedAtIdx = getInlineCallDILocationToFLIndex(DIL->getInlinedAt(), InlineeSP);
-  // Get inlinedAtIdx...
-  // For a given FLInlinedCall `IC`, there are 2-3 relevant DIFunctionLocalMetadata:
-  // - InlinedFLMD: The inlined function, which `IC` was a call of.
-  // - InlineeFLMD: The inlinee function, which `IC` was in.
-  // - LastInlineeFLMD: The outermost function of the chain of inlined calls
-  //   containing `IC`.
-  // Indexes for the created FLInlinedCall `IC` are as follows
-  // - SrcLocIdx references LastInlineeFLMD->InlinedCalls[IC.InlinedAtIdx]->getInlinee().
-  // - InlinedAtIdx references LastInlineeFLMD->InlinedCalls.
-  // - Any FLDebugLocs or FLInlinedCalls inlined at `IC` have SrcLocIdx referring to InlineeFLMD.
-  // Relevant FLMD contexts: 
-  DIFunctionLocalMetadata *InlineeFLMD = FLMDConversionContext.getFLMDForSP(InlineeSP);
+  // All indices refer to the context of the outermost function of the chain,
+  // LastInlineeFLMD.
   DIFunctionLocalMetadata *LastInlineeFLMD = FLMDConversionContext.getFLMDForSP(DIL->getInlinedAtScope()->getSubprogram());
-  DIFunctionLocalMetadata *InlinedFLMD = FLMDConversionContext.getFLMDForSP(InlinedSP);
-  // Get SrcLocIdx for this call, which references InlineeFLMD->SrcLocs
-  FLIndex<uint32_t> SrcLocIdx = InlineeFLMD->getFLSrcLocIdx(DIL->getLine(), DIL->getColumn(), InlineeScope);
-  FLIndex<uint16_t> NewIdx = LastInlineeFLMD->addInlinedCall(FLInlinedCall(SrcLocIdx, InlinedAtIdx, InlinedFLMD, !DIL->isDistinct()));
+  FLIndex<uint32_t> SrcLocIdx = LastInlineeFLMD->getFLSrcLocIdx(DIL->getLine(), DIL->getColumn(), InlineeScope);
+  FLIndex<uint16_t> NewIdx = LastInlineeFLMD->addInlinedCall(FLInlinedCall(SrcLocIdx, InlinedAtIdx, !DIL->isDistinct()));
   if (DIL->isDistinct()) {
     FLMDConversionContext.InlinedCallLocMap.insert({DIL, NewIdx});
     FLMDConversionContext.InlinedCallIdxToDILocMap.insert({{NewIdx, LastInlineeFLMD}, DIL});
@@ -144,7 +132,7 @@ FLDebugLoc FLDebugLoc::getFromDILocation(const DILocation *DIL, DISubprogram *In
     return FLDebugLoc::getInlinedCallLoc(getInlineCallDILocationToFLIndex(const_cast<DILocation*>(DIL), InlinedSP));
   DILocalScope *OrigScope = DIL->getScope();
   FLIndex<uint16_t> InlinedAtIdx = getInlineCallDILocationToFLIndex(DIL->getInlinedAt(), OrigScope->getSubprogram());
-  DIFunctionLocalMetadata *OrigFLMD = FLMDConversionContext.getFLMDForSP(OrigScope->getSubprogram());
+  DIFunctionLocalMetadata *OrigFLMD = FLMDConversionContext.getFLMDForSP(DIL->getInlinedAtScope()->getSubprogram());
   FLIndex<uint32_t> SrcLocIdx = OrigFLMD->getFLSrcLocIdx(DIL->getLine(), DIL->getColumn(), OrigScope);
   return FLDebugLoc(SrcLocIdx, InlinedAtIdx, DIL->getAtomGroup(), DIL->getAtomRank());
 }
@@ -168,8 +156,8 @@ static DILocation *getInlinedAtDILocation(DIFunctionLocalMetadata *FLMD,
   // Otherwise, make a new one.
   FLInlinedCall InlinedCall = FLMD->getInlinedCall(InlinedAtIdx);
   DILocation *InlinedAt = getInlinedAtDILocation(FLMD, InlinedCall.InlinedAtIdx);
-  FLSrcLoc SrcLoc = FLMD->getSrcLoc(InlinedCall.SrcLocIdx, InlinedCall.InlinedAtIdx);
-  DILocalScope *Scope = FLMD->getScope(SrcLoc.ScopeIdx, InlinedCall.InlinedAtIdx);
+  FLSrcLoc SrcLoc = FLMD->getSrcLoc(InlinedCall.SrcLocIdx);
+  DILocalScope *Scope = FLMD->getScope(SrcLoc.ScopeIdx);
   DILocation *Result;
   // if (InlinedCall.Uniquable)
   //   Result = DILocation::get(FLMD->getContext(), SrcLoc.Line, SrcLoc.Column, Scope, InlinedAt);
@@ -256,68 +244,47 @@ DILocation &DebugLoc::operator*() const {
 //===----------------------------------------------------------------------===//
 
 #if LLVM_USE_FLMD_SOURCE_LOCS
+static FLIndex<uint16_t> getInlinedCallIdx(DIFunctionLocalMetadata *Context,
+                                           DebugLoc InlinedAt) {
+  if (!InlinedAt)
+    return {};
+  assert(InlinedAt.getStorage().get().isInlinedCall() && "InlinedAt was not an inlined call reference.");
+  assert(InlinedAt.getFLContext() == Context && "InlinedAt is from another function.");
+  return InlinedAt.getStorage().get().getIdxForInlinedCall();
+}
 DebugLoc DebugLoc::get(
     DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt, bool ImplicitCode, uint64_t AtomGroup,
     uint8_t AtomRank) {
-  DILocalScope *LocalScope = cast<DILocalScope>(Scope);
-  
-  FLIndex<uint32_t> SrcLocIdx;
-  FLIndex<uint16_t> InlinedAtIdx;
-  if (InlinedAt) {
-    assert(InlinedAt.getStorage().get().isInlinedCall() && "InlinedAt was not an inlined call reference.");
-    SrcLocIdx = InlinedAt.getStorage().get().getAsInlinedCall(Context).getInlinee()->getFLSrcLocIdx(Line, Column, LocalScope);
-    InlinedAtIdx = InlinedAt.getStorage().get().getIdxForInlinedCall();
-  } else {
-    SrcLocIdx = Context->getFLSrcLocIdx(Line, Column, LocalScope);
-  }
+  FLIndex<uint16_t> InlinedAtIdx = getInlinedCallIdx(Context, InlinedAt);
+  FLIndex<uint32_t> SrcLocIdx =
+      Context->getFLSrcLocIdx(Line, Column, cast<DILocalScope>(Scope));
   Context->updateAtomGroupWaterline(InlinedAtIdx, AtomGroup);
   FLDebugLoc FLDbgLoc(SrcLocIdx, InlinedAtIdx, AtomGroup, AtomRank);
   return DebugLoc(FLDbgLoc, Context);
 }
-DebugLoc DebugLoc::getDistinctInlinedCall(
-    DIFunctionLocalMetadata *CalleeContext,
-    DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
-    DebugLoc InlinedAt, bool ImplicitCode, uint64_t MaxAtomGroup) {
-  DILocalScope *LocalScope = cast<DILocalScope>(Scope);
-  
-  FLIndex<uint32_t> SrcLocIdx;
-  FLIndex<uint16_t> InlinedAtIdx;
-  if (InlinedAt) {
-    assert(InlinedAt.getStorage().get().isInlinedCall() && "InlinedAt was not an inlined call reference.");
-    SrcLocIdx = InlinedAt.getStorage().get().getAsInlinedCall(Context).getInlinee()->getFLSrcLocIdx(Line, Column, LocalScope);
-    InlinedAtIdx = InlinedAt.getStorage().get().getIdxForInlinedCall();
-  } else {
-    SrcLocIdx = Context->getFLSrcLocIdx(Line, Column, LocalScope);
-  }
-  FLInlinedCall InlinedCall(SrcLocIdx, InlinedAtIdx, CalleeContext, false,
-    MaxAtomGroup ? MaxAtomGroup : CalleeContext->MaxAtomGroup);
+static DebugLoc createInlinedCall(DIFunctionLocalMetadata *Context,
+                                  unsigned Line, unsigned Column,
+                                  Metadata *Scope, DebugLoc InlinedAt,
+                                  bool Uniquable, uint64_t MaxAtomGroup) {
+  FLIndex<uint16_t> InlinedAtIdx = getInlinedCallIdx(Context, InlinedAt);
+  FLIndex<uint32_t> SrcLocIdx =
+      Context->getFLSrcLocIdx(Line, Column, cast<DILocalScope>(Scope));
+  FLInlinedCall InlinedCall(SrcLocIdx, InlinedAtIdx, Uniquable, MaxAtomGroup);
   FLIndex<uint16_t> NewInlinedAtIdx = Context->addInlinedCall(InlinedCall);
   return DebugLoc(FLDebugLoc::getInlinedCallLoc(NewInlinedAtIdx), Context);
 }
-DebugLoc DebugLoc::getUniquedInlinedCall(
-    DIFunctionLocalMetadata *CalleeContext,
+DebugLoc DebugLoc::getDistinctInlinedCall(
     DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt, bool ImplicitCode, uint64_t MaxAtomGroup) {
-  DILocalScope *LocalScope = cast<DILocalScope>(Scope);
-  
-  FLIndex<uint32_t> SrcLocIdx;
-  FLIndex<uint16_t> InlinedAtIdx;
-  if (InlinedAt) {
-    assert(InlinedAt.getStorage().get().isInlinedCall() && "InlinedAt was not an inlined call reference.");
-    SrcLocIdx = InlinedAt.getStorage().get().getAsInlinedCall(Context).getInlinee()->getFLSrcLocIdx(Line, Column, LocalScope);
-    InlinedAtIdx = InlinedAt.getStorage().get().getIdxForInlinedCall();
-  } else {
-    SrcLocIdx = Context->getFLSrcLocIdx(Line, Column, LocalScope);
-  }
-  FLInlinedCall InlinedCall(SrcLocIdx, InlinedAtIdx, CalleeContext, true,
-    MaxAtomGroup ? MaxAtomGroup : CalleeContext->MaxAtomGroup);
-  // FIXME: Should we take a MaxAtomGroup here? It might be a good idea to fully
-  // commit to this function being for merged InlinedCalls only, so that we can
-  // make its merged args explicit, and select the highest MaxAtomGroup. For now
-  // we can just do that at the call sites.
-  FLIndex<uint16_t> NewInlinedAtIdx = Context->addInlinedCall(InlinedCall);
-  return DebugLoc(FLDebugLoc::getInlinedCallLoc(NewInlinedAtIdx), Context);
+  return createInlinedCall(Context, Line, Column, Scope, InlinedAt, false,
+                        MaxAtomGroup);
+}
+DebugLoc DebugLoc::getUniquedInlinedCall(
+    DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
+    DebugLoc InlinedAt, bool ImplicitCode, uint64_t MaxAtomGroup) {
+  return createInlinedCall(Context, Line, Column, Scope, InlinedAt, true,
+                        MaxAtomGroup);
 }
 
 DebugLoc::DebugLocContext::DebugLocContext(const Instruction *I) {
@@ -359,14 +326,12 @@ DebugLoc DebugLoc::get(
   return DebugLoc::getFromDILocation(DILocation::get(Context, Line, Column, Scope, InlinedAt.getAsDILocation(), ImplicitCode, AtomGroup, AtomRank));
 }
 DebugLoc DebugLoc::getUniquedInlinedCall(
-    LLVMContext &,
     LLVMContext &Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt, bool ImplicitCode, uint64_t AtomGroup,
     uint8_t AtomRank) {
   return DebugLoc::getFromDILocation(DILocation::getDistinct(Context, Line, Column, Scope, InlinedAt.getAsDILocation(), ImplicitCode, AtomGroup, AtomRank));
 }
 DebugLoc DebugLoc::getDistinctInlinedCall(
-    LLVMContext &,
     LLVMContext &Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt, bool ImplicitCode, uint64_t AtomGroup,
     uint8_t AtomRank) {
@@ -391,8 +356,13 @@ DebugLoc DebugLoc::getFromMDNode(const MDNode *MD) {
   return DebugLoc::getFromDILocation(dyn_cast_or_null<DILocation>(MD));
 }
 
-DebugLoc DebugLoc::convertToInlinedCall(DebugLocContext CalleeContext) const {
-  return DebugLoc::getDistinctInlinedCall(CalleeContext, getDLContext(), getLine(), getColumn(), getScope(), getInlinedAt(), isImplicitCode());
+DebugLoc DebugLoc::convertToInlinedCall() const {
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  uint64_t MaxAtomGroup = FLContext->MaxAtomGroup;
+#else
+  uint64_t MaxAtomGroup = 0;
+#endif
+  return DebugLoc::getDistinctInlinedCall(getDLContext(), getLine(), getColumn(), getScope(), getInlinedAt(), isImplicitCode(), MaxAtomGroup);
 }
 
 #if LLVM_USE_FLMD_SOURCE_LOCS
@@ -447,19 +417,29 @@ void DebugLoc::setImplicitCode(bool ImplicitCode) {
 }
 
 
-DebugLocMap::DebugLocMap(Function *SrcFn, Function *DestFn) {
-  SrcContext = cast<DIFunctionLocalMetadata>(
-    SrcFn->getMetadata(LLVMContext::MD_flmd));
-  DestContext = cast<DIFunctionLocalMetadata>(
-    DestFn->getMetadata(LLVMContext::MD_flmd));
+DebugLocMap::DebugLocMap(Function *SrcFn, Function *DestFn)
+    : DebugLocMap(getFLMDForFunction(SrcFn), getFLMDForFunction(DestFn)) {}
+
+DebugLocMap::DebugLocMap(DIFunctionLocalMetadata *SrcContext,
+                         DIFunctionLocalMetadata *DestContext)
+    : SrcContext(SrcContext), DestContext(DestContext) {
   SrcLocMap.resize(SrcContext->SrcLocs.size());
+  ScopeMap.resize(SrcContext->Scopes.size());
   InlinedCallMap.resize(SrcContext->InlinedCalls.size());
+}
+
+FLIndex<uint16_t> DebugLocMap::mapScope(FLIndex<uint16_t> In) {
+  FLIndex<uint16_t> &Out = ScopeMap[In.get()];
+  if (!Out)
+    Out = DestContext->getFLScopeIdx(SrcContext->getScope(In).get());
+  return Out;
 }
 
 DebugLoc DebugLoc::replaceInlinedAtSubprogram(
     const DebugLoc &RootLoc, DISubprogram &NewSP, DebugLocContext NewFnContext,
     DenseMap<const MDNode *, MDNode *> &Cache, DebugLocMap &DLMap) {
   assert(RootLoc && "RootLoc must be a valid location.");
+  assert(DLMap.getDestContext() == NewFnContext.Context);
   // InlinedAt chain from the source function.
   SmallVector<FLDebugLoc> LocChain;
   DIFunctionLocalMetadata *SrcContext = RootLoc.getFLContext();
@@ -485,44 +465,44 @@ DebugLoc DebugLoc::replaceInlinedAtSubprogram(
       *LocToUpdate.getScope(SrcContext), NewSP, NewSP.getContext(), Cache);
     // Unlike the DILocation version, we have different paths for if the root of
     // the inline chain is an inlined call, or if RootLoc was not inlined.
+    FLIndex<uint32_t> OldSrcLocIdx = LocToUpdate.isInlinedCall()
+        ? LocToUpdate.getAsInlinedCall(SrcContext).SrcLocIdx
+        : LocToUpdate.SrcLocIdx;
+    // The old SrcLoc may have already been mapped; if so, then reuse it,
+    // otherwise create the mapping now.
+    FLIndex<uint32_t> NewSrcLocIdx = DLMap.getSrcLoc(OldSrcLocIdx);
+    if (!NewSrcLocIdx) {
+      FLSrcLoc SrcLoc = SrcContext->getSrcLoc(OldSrcLocIdx);
+      NewSrcLocIdx = NewFnContext.Context->getFLSrcLocIdx(SrcLoc.Line, SrcLoc.Column, NewScope);
+      DLMap.insertSrcLoc(OldSrcLocIdx, NewSrcLocIdx);
+    }
     if (LocToUpdate.isInlinedCall()) {
       FLInlinedCall OldCall = LocToUpdate.getAsInlinedCall(SrcContext);
       assert(!OldCall.InlinedAtIdx && "LocToUpdate should be the back of the InlinedAt chain.");
-      // The old SrcLoc may have already been mapped; if so, then reuse it,
-      // otherwise create the mapping now.
-      FLIndex<uint32_t> NewSrcLocIdx = DLMap.getSrcLoc(OldCall.SrcLocIdx);
-      if (!NewSrcLocIdx) {
-        FLSrcLoc SrcLoc = SrcContext->getSrcLoc(OldCall.SrcLocIdx);
-        NewSrcLocIdx = NewFnContext.Context->getFLSrcLocIdx(SrcLoc.Line, SrcLoc.Column, NewScope);
-        DLMap.insertSrcLoc(OldCall.SrcLocIdx, NewSrcLocIdx);
-      }
-      FLInlinedCall NewCall(NewSrcLocIdx, {}, OldCall.InlineeFLMD, OldCall.Uniquable, OldCall.MaxAtomGroup);
+      FLInlinedCall NewCall(NewSrcLocIdx, {}, OldCall.Uniquable, OldCall.MaxAtomGroup);
       FLIndex<uint16_t> NewCallIdx = NewFnContext.Context->addInlinedCall(NewCall);
       DLMap.insertInlinedCall(LocToUpdate.getIdxForInlinedCall(), NewCallIdx);
       UpdatedLoc = FLDebugLoc::getInlinedCallLoc(NewCallIdx);
     } else {
-      assert(!LocToUpdate.isInlinedCall() && LocToUpdate.isInstrLoc() && "LocToUpdate should be a non-inlined InstrLoc.");
-      assert(!DLMap.getSrcLoc(LocToUpdate.SrcLocIdx) && "LocToUpdate has already been updated+mapped?");
-      FLSrcLoc SrcLoc = SrcContext->getSrcLoc(LocToUpdate.SrcLocIdx);
-      FLIndex<uint32_t> NewSrcLocIdx = NewFnContext.Context->getFLSrcLocIdx(SrcLoc.Line, SrcLoc.Column, NewScope);
-      DLMap.insertSrcLoc(LocToUpdate.SrcLocIdx, NewSrcLocIdx);
+      assert(LocToUpdate.isInstrLoc() && "LocToUpdate should be a non-inlined InstrLoc.");
       UpdatedLoc = FLDebugLoc(NewSrcLocIdx, {}, LocToUpdate.AtomGroup, LocToUpdate.AtomRank);
     }
   }
 
   // Recreate the location chain, bottom-up, starting at the new scope (or a
-  // cached result).
+  // cached result). SrcLocs inside the chain keep their scopes but must be
+  // copied into the new context.
   for (FLDebugLoc LocToUpdate : reverse(LocChain)) {
     assert(UpdatedLoc.isInlinedCall());
     if (LocToUpdate.isInlinedCall()) {
       FLInlinedCall OldCall = LocToUpdate.getAsInlinedCall(SrcContext);
       FLIndex<uint16_t> NewInlinedCallIdx = NewFnContext.Context->addInlinedCall(
-        FLInlinedCall(OldCall.SrcLocIdx, UpdatedLoc.getIdxForInlinedCall(), OldCall.InlineeFLMD, OldCall.Uniquable, OldCall.MaxAtomGroup)
+        FLInlinedCall(DLMap.mapSrcLoc(OldCall.SrcLocIdx), UpdatedLoc.getIdxForInlinedCall(), OldCall.Uniquable, OldCall.MaxAtomGroup)
       );
       UpdatedLoc = FLDebugLoc::getInlinedCallLoc(NewInlinedCallIdx);
       DLMap.insertInlinedCall(LocToUpdate.getIdxForInlinedCall(), UpdatedLoc.getIdxForInlinedCall());
     } else {
-      UpdatedLoc = FLDebugLoc(LocToUpdate.SrcLocIdx, UpdatedLoc.getIdxForInlinedCall(), LocToUpdate.AtomGroup, LocToUpdate.AtomRank);
+      UpdatedLoc = FLDebugLoc(DLMap.mapSrcLoc(LocToUpdate.SrcLocIdx), UpdatedLoc.getIdxForInlinedCall(), LocToUpdate.AtomGroup, LocToUpdate.AtomRank);
     }
   }
 
@@ -556,11 +536,11 @@ DebugLoc DebugLoc::appendInlinedAt(const DebugLoc &DL, DebugLoc InlinedAt,
   // Key Instructions: InlinedAt fields don't need atom info.
   for (DebugLoc MD : reverse(InlinedAtLocations)) {
     assert(MD.isInlinedCall());
-    
     Last = DebugLoc::getDistinctInlinedCall(
-        DebugLocContext(MD.getAsInlinedCall().getInlinee()), InlinedAt,
-        MD.getLine(), MD.getColumn(), MD.getScope(), Last);
-    DLMap.insertDebugLoc(MD, Last);
+        InlinedAt, MD.getLine(), MD.getColumn(), MD.getScope(), Last, false,
+        MD.getAsInlinedCall().MaxAtomGroup);
+    DLMap.insertInlinedCall(MD.getIdxForInlinedCall(),
+                            Last.getIdxForInlinedCall());
   }
 
   return Last;
@@ -777,21 +757,15 @@ static DebugLoc getMergedDebugLoc(DebugLoc LocA, DebugLoc LocB) {
     if (L1.getScope()->getSubprogram() != L2.getScope()->getSubprogram())
       return DebugLoc();
 
-    // If the locations are not both inlined calls or both instruction locs, or
-    // if they are inlined calls that point to different inlinees, then we
-    // cannot produce a common location.
+    // If the locations are not both inlined calls or both instruction locs,
+    // then we cannot produce a common location.
     // TODO: Is it possible that we could merge an inlined call with a
     // non-inlined call here if they were otherwise compatible? Should be fine
     // to handle if so.
     if (L1.isInlinedCall() != L2.isInlinedCall())
       return DebugLoc();
-    if (L1.isInlinedCall() && L1.getAsInlinedCall().getInlinee() != L2.getAsInlinedCall().getInlinee())
-      return DebugLoc();
-    DIFunctionLocalMetadata *Inlinee = L1.isInlinedCall() ?
-      L1.getAsInlinedCall().getInlinee() :
-      nullptr;
-    uint16_t MaxMergedAtomGroup = L1.isInlinedCall() ? std::max(L1.getAsInlinedCall().MaxAtomGroup, L2.getAsInlinedCall().MaxAtomGroup) : 0;
-    DebugLoc::DebugLocContext InlineeCtx(Inlinee);
+    bool IsInlinedCall = L1.isInlinedCall();
+    uint16_t MaxMergedAtomGroup = IsInlinedCall ? std::max(L1.getAsInlinedCall().MaxAtomGroup, L2.getAsInlinedCall().MaxAtomGroup) : 0;
 
     // Find nearest common scope inside subprogram.
     DIScope *Scope = getNearestMatchingScope<EqualScopesMatcher>(L1, L2).first;
@@ -814,8 +788,8 @@ static DebugLoc getMergedDebugLoc(DebugLoc LocA, DebugLoc LocB) {
       // If files are still different, assume that L1 and L2 were "included"
       // from CommonLoc. Use it as merged location.
       if (Scope->getFile() != L1.getFile() || L1.getFile() != L2.getFile()) {
-        if (Inlinee)
-          return DebugLoc::getUniquedInlinedCall(InlineeCtx, C, CommonLoc.first, CommonLoc.second,
+        if (IsInlinedCall)
+          return DebugLoc::getUniquedInlinedCall(C, CommonLoc.first, CommonLoc.second,
                                                  CommonLocScope, InlinedAt, false, MaxMergedAtomGroup);
         return DebugLoc::get(C, CommonLoc.first, CommonLoc.second,
                                CommonLocScope, InlinedAt);
@@ -831,8 +805,8 @@ static DebugLoc getMergedDebugLoc(DebugLoc LocA, DebugLoc LocB) {
     // Discard source location atom if the line becomes 0. And there's nothing
     // further to do if neither location has an atom number.
     if (!SameLine || !(L1.getAtomGroup() || L2.getAtomGroup())) {
-      if (Inlinee)
-        return DebugLoc::getUniquedInlinedCall(InlineeCtx, C, Line, Col, Scope, InlinedAt, IsImplicitCode,
+      if (IsInlinedCall)
+        return DebugLoc::getUniquedInlinedCall(C, Line, Col, Scope, InlinedAt, IsImplicitCode,
                               MaxMergedAtomGroup);
       return DebugLoc::get(C, Line, Col, Scope, InlinedAt, IsImplicitCode,
                              /*AtomGroup*/ 0, /*AtomRank*/ 0);
@@ -869,9 +843,9 @@ static DebugLoc getMergedDebugLoc(DebugLoc LocA, DebugLoc LocB) {
       Group = InlinedAt.getNewAtomGroup();
       Rank = 1;
     }
-    if (Inlinee)
+    if (IsInlinedCall)
       return DebugLoc::getUniquedInlinedCall(
-        InlineeCtx, C, Line, Col, Scope, InlinedAt, IsImplicitCode, MaxMergedAtomGroup);
+        C, Line, Col, Scope, InlinedAt, IsImplicitCode, MaxMergedAtomGroup);
     return DebugLoc::get(C, Line, Col, Scope, InlinedAt, IsImplicitCode,
                            Group, Rank);
   };

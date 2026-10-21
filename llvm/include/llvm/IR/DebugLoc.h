@@ -210,21 +210,21 @@ struct FLDebugLoc {
   }
   FLSrcLoc getSrcLoc(DIFunctionLocalMetadata *Context) const {
     if (isInlinedCall())
-      return getLocForInlinedCall(Context).getSrcLoc(Context);      
-    return Context->getSrcLoc(SrcLocIdx, InlinedAtIdx);
+      return getLocForInlinedCall(Context).getSrcLoc(Context);
+    return Context->getSrcLoc(SrcLocIdx);
   }
   DILocalScope *getScope(DIFunctionLocalMetadata *Context) const {
     if (isInlinedCall())
       return getLocForInlinedCall(Context).getScope(Context);
     FLSrcLoc SrcLoc = getSrcLoc(Context);
-    return Context->getScope(SrcLoc.ScopeIdx, InlinedAtIdx);
+    return Context->getScope(SrcLoc.ScopeIdx);
   }
   // If we know in advance we know both, this can be faster.
   std::pair<FLSrcLoc, DILocalScope *> getSrcLocAndScope(DIFunctionLocalMetadata *Context) const {
     if (isInlinedCall())
       return getLocForInlinedCall(Context).getSrcLocAndScope(Context);
     FLSrcLoc SrcLoc = getSrcLoc(Context);
-    DILocalScope *Scope = Context->getScope(SrcLoc.ScopeIdx, InlinedAtIdx);
+    DILocalScope *Scope = Context->getScope(SrcLoc.ScopeIdx);
     return {SrcLoc, Scope};
   }
 
@@ -569,12 +569,10 @@ private:
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint64_t AtomGroup = 0,
     uint8_t AtomRank = 0);
   static DebugLoc getDistinctInlinedCall(
-    DIFunctionLocalMetadata *CalleeContext,
     DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false,
     uint64_t MaxAtomGroup = 0);
   static DebugLoc getUniquedInlinedCall(
-    DIFunctionLocalMetadata *CalleeContext,
     DIFunctionLocalMetadata *Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false,
     uint64_t MaxAtomGroup = 0);
@@ -584,12 +582,10 @@ private:
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint64_t AtomGroup = 0,
     uint8_t AtomRank = 0);
   static DebugLoc getDistinctInlinedCall(
-    LLVMContext &CalleeContext,
     LLVMContext &Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint64_t AtomGroup = 0,
     uint8_t AtomRank = 0);
   static DebugLoc getUniquedInlinedCall(
-    LLVMContext &CalleeContext,
     LLVMContext &Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint64_t AtomGroup = 0,
     uint8_t AtomRank = 0);
@@ -607,16 +603,14 @@ public:
     return DebugLoc::get(Context.Context, Line, Column, Scope, InlinedAt, ImplicitCode, AtomGroup, AtomRank);
   }
   static DebugLoc getDistinctInlinedCall(
-    DebugLocContext CalleeContext,
     DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint64_t MaxAtomGroup = 0) {
-    return DebugLoc::getDistinctInlinedCall(CalleeContext.Context, Context.Context, Line, Column, Scope, InlinedAt, ImplicitCode, MaxAtomGroup);
+    return DebugLoc::getDistinctInlinedCall(Context.Context, Line, Column, Scope, InlinedAt, ImplicitCode, MaxAtomGroup);
   }
   static DebugLoc getUniquedInlinedCall(
-    DebugLocContext CalleeContext,
     DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint16_t MaxAtomGroup = 0) {
-    return DebugLoc::getUniquedInlinedCall(CalleeContext.Context, Context.Context, Line, Column, Scope, InlinedAt, ImplicitCode, 0);
+    return DebugLoc::getUniquedInlinedCall(Context.Context, Line, Column, Scope, InlinedAt, ImplicitCode, MaxAtomGroup);
   }
 #if LLVM_USE_FLMD_SOURCE_LOCS
   DebugLocContext getDLContext() const {
@@ -628,8 +622,8 @@ public:
 #endif
 
   /// Creates a DebugLoc representing the same location as this DebugLoc, but
-  /// as an inlined call to the function with the given context.
-  DebugLoc convertToInlinedCall(DebugLocContext CalleeContext) const;
+  /// as an inlined call.
+  DebugLoc convertToInlinedCall() const;
   /// FIXME: Just replace this with `getAsDILocation` later.
   DILocation *convertToDILocation() const;
 
@@ -990,20 +984,37 @@ inline raw_ostream &operator<<(raw_ostream &OS, const DebugLoc &DL) {
 raw_ostream &operator<<(raw_ostream &OS, const FLDebugLoc &DL);
 
 #if LLVM_USE_FLMD_SOURCE_LOCS
-// Class used to map DebugLocs from one context to another. Currently used only
-// for replaceInlinedAtSubprogram, and thus assumes that the InlineeFLMD
-// contexts do not change, meaning that for any given DebugLoc we remap either
-// the SrcLocIdx or the InlinedAtIdx, never both. If this assumption is broken,
-// e.g. if we perform a more complex remapping, replacing the InlineeFLMD
-// references, then this class needs to be updated.
+// Maps indices of one FLMD context to another, e.g. when inlining or moving
+// code between functions. SrcLocs and Scopes are copied into the destination
+// context on first use, so each source entry is copied at most once per map.
+// InlinedCalls are mapped explicitly by the user via insertInlinedCall.
 class DebugLocMap {
   // Default initialize the SmallVectors with empty elements (which are all 0s).
   SmallVector<FLIndex<uint32_t>> SrcLocMap;
+  SmallVector<FLIndex<uint16_t>> ScopeMap;
   SmallVector<FLIndex<uint16_t>> InlinedCallMap;
   DIFunctionLocalMetadata *SrcContext;
   DIFunctionLocalMetadata *DestContext;
 public:
   DebugLocMap(Function *SrcFn, Function *DestFn);
+  DebugLocMap(DIFunctionLocalMetadata *SrcContext,
+              DIFunctionLocalMetadata *DestContext);
+
+  DIFunctionLocalMetadata *getDestContext() const { return DestContext; }
+
+  FLIndex<uint16_t> mapScope(FLIndex<uint16_t> In);
+  FLIndex<uint32_t> mapSrcLoc(FLIndex<uint32_t> In) {
+    if (!In)
+      return In;
+    FLIndex<uint32_t> &Out = SrcLocMap[In.get()];
+    if (!Out) {
+      FLSrcLoc SrcLoc = SrcContext->getSrcLoc(In);
+      SrcLoc.ScopeIdx = mapScope(SrcLoc.ScopeIdx);
+      DestContext->SrcLocs.push_back(SrcLoc);
+      Out = DestContext->SrcLocs.size() - 1;
+    }
+    return Out;
+  }
 
   FLIndex<uint32_t> getSrcLoc(FLIndex<uint32_t> In) {
     if (!In)
@@ -1025,43 +1036,25 @@ public:
     InlinedCallMap[In.get()] = Out;
   }
 
+  // Returns the mapped location if the non-inlined SrcLoc, or the InlinedAt
+  // chain, of In has been mapped already; an inlined SrcLoc is then copied.
   FLDebugLoc getFLDebugLoc(FLDebugLoc In) {
     if (!In)
       return In;
-    // For non-inlined locs, we map just the SrcLoc.
     if (In.isNonInlinedInstrLoc()) {
       if (auto Found = getSrcLoc(In.SrcLocIdx))
         return FLDebugLoc(Found, {}, In.AtomGroup, In.AtomRank);
       return {};
     }
-    // For inlined calls or inlined locs, we map just the InlinedAt.
     if (auto Found = getInlinedCall(In.InlinedAtIdx))
-      return FLDebugLoc(In.SrcLocIdx, Found, In.AtomGroup, In.AtomRank);
+      return FLDebugLoc(mapSrcLoc(In.SrcLocIdx), Found, In.AtomGroup,
+                        In.AtomRank);
     return {};
-  }
-  void insertFLDebugLoc(FLDebugLoc In, FLDebugLoc Out) {
-    assert(In && !getFLDebugLoc(In) &&
-           "Must map existing unmapped DebugLoc only.");
-    if (In.isNonInlinedInstrLoc()) {
-      assert(Out.isNonInlinedInstrLoc() &&
-             "Attempted to map non-matching DebugLocs!");
-      insertSrcLoc(In.SrcLocIdx, Out.SrcLocIdx);
-      return;
-    }
-    assert(In.SrcLocIdx == Out.SrcLocIdx &&
-           In.getWholeAtom() == Out.getWholeAtom() &&
-           "Attempted to map non-matching DebugLocs!");
-    insertInlinedCall(In.InlinedAtIdx, Out.InlinedAtIdx);
   }
 
   DebugLoc getDebugLoc(DebugLoc In) {
     assert(In.getFLContext() == SrcContext && "Mapping DebugLoc from the wrong function.");
     return DebugLoc(getFLDebugLoc(In.getStorage().get()), DestContext);
-  }
-  void insertDebugLoc(DebugLoc In, DebugLoc Out) {
-    assert(In.getFLContext() == SrcContext && "Mapping DebugLoc from the wrong function.");
-    assert(Out.getFLContext() == DestContext && "Mapping DebugLoc to the wrong function.");
-    insertFLDebugLoc(In.getStorage().get(), Out.getStorage().get());
   }
 };
 #else

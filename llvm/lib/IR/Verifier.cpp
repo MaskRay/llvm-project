@@ -519,6 +519,8 @@ private:
   } while (false)
 
 void Verifier::visitDbgRecords(Instruction &I) {
+  if (I.hasDebugLoc())
+    visitDebugLoc(I.getDebugLoc());
   if (!I.DebugMarker)
     return;
   CheckDI(I.DebugMarker->MarkedInstr == &I,
@@ -1005,6 +1007,16 @@ void Verifier::visitMDNode(const MDNode &BaseMD,
 
 void Verifier::visitDebugLoc(DebugLoc DL) {
 #if LLVM_USE_FLMD_SOURCE_LOCS
+  if (!DL)
+    return;
+  const DIFunctionLocalMetadata *Ctx = DL.getFLContext();
+  FLDebugLoc FLDL = DL.getUnderlyingStorage();
+  CheckDI(Ctx, "DebugLoc in a function without an FLMD context", DL);
+  CheckDI(!FLDL.SrcLocIdx || FLDL.SrcLocIdx.get() < Ctx->SrcLocs.size(),
+          "DebugLoc has an invalid source location index", DL, Ctx);
+  CheckDI(!FLDL.InlinedAtIdx ||
+              FLDL.InlinedAtIdx.get() < Ctx->InlinedCalls.size(),
+          "DebugLoc has an invalid inlinedAt index", DL, Ctx);
   if (DL.getAtomGroup()) {
     CheckDI(DL.getAtomGroup() <= DL.getFLContext()->getAtomGroupWaterline(DL.getInlinedAtIdx()),
       "AtomGroup is above the InlinedAt waterline!",
@@ -1071,26 +1083,21 @@ static bool isDINode(const Metadata *MD) { return !MD || isa<DINode>(MD); }
 static bool isMDTuple(const Metadata *MD) { return !MD || isa<MDTuple>(MD); }
 
 void Verifier::visitDIFunctionLocalMetadata(const DIFunctionLocalMetadata &N) {
-  FLScope RootScope = N.getScope(0);
-
-  // CheckDI(DL.getInlinedAtScope()->getSubprogram() == DL.getFLContext()->Scopes[0],
-  //   "InlinedAtScope for DebugLoc does not point at root function scope!",
-  //   DL.getFLContext(), DL.getFLContext()->Scopes[0], DL.getInlinedAtScope(),
-  //   DL.getInlinedAtScope()->getSubprogram());
-  // if (DL.getAtomGroup()) {
-  //   if (auto InlinedAtIdx = DL.getInlinedAtIdx()) {
-  //     CheckDI(DL.getAtomGroup() <= DL.getFLContext()->getInlinedCall(InlinedAtIdx).MaxAtomGroup,
-  //       "AtomGroup is above the InlinedAt waterline!",
-  //       DL, DL.getAtomGroup(),
-  //       DL.getFLContext()->getInlinedCall(InlinedAtIdx).MaxAtomGroup,
-  //       DL.getFLContext());
-  //   } else {
-  //     CheckDI(DL.getAtomGroup() <= DL.getFLContext()->MaxAtomGroup,
-  //       "AtomGroup is above the FLContext waterline!", 
-  //       DL, DL.getAtomGroup(), DL.getFLContext()->MaxAtomGroup,
-  //       DL.getFLContext());
-  //   }
-  // }
+  // A nodebug function's context holds only copies of inlined code.
+  if (!N.IsNonDebugFn)
+    CheckDI(!N.Scopes.empty() && isa<DISubprogram>(N.Scopes[0].get()),
+            "FLMD context should start with a subprogram", &N);
+  for (const FLSrcLoc &SrcLoc : N.SrcLocs)
+    CheckDI(SrcLoc.ScopeIdx.get() < N.Scopes.size(),
+            "FLMD source location has an invalid scope index", &N);
+  for (const FLInlinedCall &InlinedCall : N.InlinedCalls) {
+    CheckDI(!InlinedCall.SrcLocIdx ||
+                InlinedCall.SrcLocIdx.get() < N.SrcLocs.size(),
+            "FLMD inlined call has an invalid source location index", &N);
+    CheckDI(!InlinedCall.InlinedAtIdx ||
+                InlinedCall.InlinedAtIdx.get() < N.InlinedCalls.size(),
+            "FLMD inlined call has an invalid inlinedAt index", &N);
+  }
 }
 
 void Verifier::visitDILocation(const DILocation &N) {

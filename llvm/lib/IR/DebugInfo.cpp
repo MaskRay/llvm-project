@@ -857,16 +857,16 @@ private:
       if (InlinedCall.Uniquable) {
         return DILocation::get(MLD->getContext(),
           DebugLoc::getUniquedInlinedCall(
-            DebugLoc::DebugLocContext(InlinedCall.getInlinee()),
             DebugLoc::DebugLocContext(DL.getFLContext()), DL.getLine(),
             DL.getColumn(), Scope,
-            cast<DILocation>(InlinedAt)->getAsDebugLoc()));
+            cast<DILocation>(InlinedAt)->getAsDebugLoc(), false,
+            InlinedCall.MaxAtomGroup));
       }
       return DILocation::get(MLD->getContext(),
         DebugLoc::getDistinctInlinedCall(
-          DebugLoc::DebugLocContext(InlinedCall.getInlinee()),
           DebugLoc::DebugLocContext(DL.getFLContext()), DL.getLine(),
-          DL.getColumn(), Scope, cast<DILocation>(InlinedAt)->getAsDebugLoc()));
+          DL.getColumn(), Scope, cast<DILocation>(InlinedAt)->getAsDebugLoc(),
+          false, InlinedCall.MaxAtomGroup));
     }
     return DILocation::get(MLD->getContext(),
       DebugLoc::get(
@@ -1387,10 +1387,9 @@ LLVMDebugLoc LLVMDIBuilderCreateDebugLocation2(
     Line, Column, unwrap(Scope), unwrap(InlinedAt)));
 }
 LLVMDebugLoc LLVMDIBuilderCreateInlineCallDebugLocation(
-    LLVMMetadataRef CallerCtx, LLVMMetadataRef CalleeCtx, unsigned Line,
-    unsigned Column, LLVMMetadataRef Scope, LLVMDebugLoc InlinedAt) {
+    LLVMMetadataRef CallerCtx, unsigned Line, unsigned Column,
+    LLVMMetadataRef Scope, LLVMDebugLoc InlinedAt) {
   return wrap(DebugLoc::getDistinctInlinedCall(
-    DebugLoc::DebugLocContext(unwrapDI<DIFunctionLocalMetadata>(CalleeCtx)),
     DebugLoc::DebugLocContext(unwrapDI<DIFunctionLocalMetadata>(CallerCtx)),
     Line, Column, unwrap(Scope), unwrap(InlinedAt)));
 }

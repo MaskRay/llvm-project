@@ -95,27 +95,29 @@ struct FLInlinedCall {
   FLIndex<uint16_t> InlinedAtIdx;
   uint16_t MaxAtomGroup : 15;
   uint16_t Uniquable : 1;
-  MDNode *InlineeFLMD;
   FLInlinedCall() = default;
   FLInlinedCall(
       FLIndex<uint32_t> SrcLocIdx, FLIndex<uint16_t> InlinedAtIdx,
-      MDNode *InlineeFLMD, bool Uniquable, uint16_t MaxAtomGroup = 0)
+      bool Uniquable, uint16_t MaxAtomGroup = 0)
       : SrcLocIdx(SrcLocIdx), InlinedAtIdx(InlinedAtIdx),
-        MaxAtomGroup(MaxAtomGroup), Uniquable(Uniquable),
-        InlineeFLMD(InlineeFLMD) {
+        MaxAtomGroup(MaxAtomGroup), Uniquable(Uniquable) {
     assert(MaxAtomGroup < 0x8000 && "Max Atom group too large for bitfield!");
   }
-  DIFunctionLocalMetadata *getInlinee() const {
-    return cast<DIFunctionLocalMetadata>(InlineeFLMD);
-  }
-  std::pair<uint64_t, DIFunctionLocalMetadata*> asRawParts() const {
+  uint64_t asRawInt() const {
     uint64_t Result = (uint64_t)SrcLocIdx.asRaw() << 32;
     Result |= (uint64_t)InlinedAtIdx.asRaw() << 16;
     Result |= (uint64_t)MaxAtomGroup << 1;
     Result |= Uniquable;
-    return {Result, getInlinee()};
+    return Result;
   }
-  static FLInlinedCall fromRawParts(uint64_t RawInt, DIFunctionLocalMetadata *Inlinee);
+  static FLInlinedCall fromRawInt(uint64_t RawInt) {
+    FLInlinedCall Result;
+    Result.SrcLocIdx = FLIndex<uint32_t>::fromRaw(RawInt >> 32);
+    Result.InlinedAtIdx = FLIndex<uint16_t>::fromRaw(RawInt >> 16);
+    Result.MaxAtomGroup = (RawInt & 0xfffe) >> 1;
+    Result.Uniquable = (RawInt & 1);
+    return Result;
+  }
   uint16_t getNewAtomGroup() {
     // FIXME: Remove this assert later, it's not really a problem if atom groups
     // wrap - but we probably want to wrap straight to 1 rather than 0, and we
@@ -127,21 +129,20 @@ struct FLInlinedCall {
   bool isEquivalent(const FLInlinedCall &Other) {
     return SrcLocIdx == Other.SrcLocIdx
       && InlinedAtIdx == Other.InlinedAtIdx
-      && Uniquable == Other.Uniquable
-      && InlineeFLMD == Other.InlineeFLMD;
+      && Uniquable == Other.Uniquable;
   }
   // FIXME: We should really ignore MaxAtomGroup for some/most/all equality
   //        comparisons, but exactly how we handle that field during e.g.
   //        uniquing may not be as simple as ignoring it.
   bool operator==(const FLInlinedCall &Other) const {
-    return asRawParts() == Other.asRawParts();
+    return asRawInt() == Other.asRawInt();
   }
   bool operator!=(const FLInlinedCall &Other) const {
-    return asRawParts() != Other.asRawParts();
+    return asRawInt() != Other.asRawInt();
   }
 
   friend inline hash_code hash_value(const FLInlinedCall &IC) {
-    return hash_value(IC.asRawParts());
+    return hash_value(IC.asRawInt());
   }
 };
 template<>
@@ -313,8 +314,9 @@ public:
   // TODO: Move this to Subclassdata.
   uint16_t MaxAtomGroup = 0;
   // If this is true, then this is a special FLContext, used for a function
-  // without debug info to store inlined call information. This FLContext
-  // contains no Scopes and no SrcLocs, meaning it is never valid to create a
+  // without debug info to store inlined call information. This FLContext holds
+  // only copies of the Scopes and SrcLocs of inlined code: Scopes[0] is not a
+  // subprogram for the function, and it is never valid to create a
   // non-inlined debug loc within it.
   // Nested InlinedCalls are copied during inlining as normal, and the resulting
   // InlinedCall for the inlining operation has no SrcLoc and no InlinedAt; this
@@ -349,18 +351,8 @@ public:
   FLScope getScope(FLIndex<uint16_t> Idx) const {
     return Scopes[Idx.get()];
   }
-  FLScope getScope(FLIndex<uint16_t> Idx, FLIndex<uint16_t> InlinedAt) const {
-    if (!InlinedAt)
-      return Scopes[Idx.get()];
-    return InlinedCalls[InlinedAt.get()].getInlinee()->getScope(Idx);
-  }
   FLSrcLoc getSrcLoc(FLIndex<uint32_t> Idx) const {
     return SrcLocs[Idx.get()];
-  }
-  FLSrcLoc getSrcLoc(FLIndex<uint32_t> Idx, FLIndex<uint16_t> InlinedAt) const {
-    if (!InlinedAt)
-      return SrcLocs[Idx.get()];
-    return InlinedCalls[InlinedAt.get()].getInlinee()->getSrcLoc(Idx);
   }
   FLInlinedCall getInlinedCall(FLIndex<uint16_t> Idx) const {
     return InlinedCalls[Idx.get()];
@@ -417,9 +409,7 @@ public:
     return InlinedCalls.size() - 1;
   }
 
-  ResolvedFLSrcLoc getResolvedSrcLoc(FLIndex<uint32_t> SrcLocIdx, FLIndex<uint16_t> InlinedAtIdx = FLIndex<uint16_t>()) {
-    if (InlinedAtIdx)
-      return InlinedCalls[InlinedAtIdx.get()].getInlinee()->getResolvedSrcLoc(SrcLocIdx);
+  ResolvedFLSrcLoc getResolvedSrcLoc(FLIndex<uint32_t> SrcLocIdx) {
     FLSrcLoc SrcLoc = SrcLocs[SrcLocIdx.get()];
     DILocalScope *Scope = Scopes[SrcLoc.ScopeIdx.get()].get();
     return ResolvedFLSrcLoc { SrcLoc.Line, SrcLoc.Column, Scope };
@@ -429,7 +419,7 @@ public:
     std::unique_ptr<ResolvedFLInlinedCall> InlinedAt;
     if (InlinedCall.InlinedAtIdx)
       InlinedAt.reset(new ResolvedFLInlinedCall(getResolvedInlinedCall(InlinedCall.InlinedAtIdx)));
-    ResolvedFLSrcLoc SrcLoc = getResolvedSrcLoc(InlinedCall.SrcLocIdx, InlinedCall.InlinedAtIdx);
+    ResolvedFLSrcLoc SrcLoc = getResolvedSrcLoc(InlinedCall.SrcLocIdx);
     return ResolvedFLInlinedCall {
       SrcLoc, InlinedAtIdx.get(), InlinedCall.MaxAtomGroup,
       InlinedCall.Uniquable, std::move(InlinedAt) };

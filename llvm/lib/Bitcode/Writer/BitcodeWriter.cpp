@@ -1895,7 +1895,7 @@ void ModuleBitcodeWriter::writeDIFunctionLocalMetadata(const DIFunctionLocalMeta
                                           SmallVectorImpl<uint64_t> &Record,
                                           unsigned &Abbrev) {
   // No abbreviation for this type.
-  const uint64_t Version = 1 << 1;
+  const uint64_t Version = 2 << 1;
   Record.push_back((uint64_t)N->isDistinct() | Version);
   Record.push_back(N->MaxAtomGroup);
   // Print each array separately, leading with a length-field.
@@ -1910,11 +1910,8 @@ void ModuleBitcodeWriter::writeDIFunctionLocalMetadata(const DIFunctionLocalMeta
   }
   // InlinedCalls
   Record.push_back(N->InlinedCalls.size());
-  for (const FLInlinedCall &InlinedCall : N->InlinedCalls) {
-    auto [RawInt, MDPtr] = InlinedCall.asRawParts();
-    Record.push_back(RawInt);
-    Record.push_back(VE.getMetadataID(MDPtr));
-  }
+  for (const FLInlinedCall &InlinedCall : N->InlinedCalls)
+    Record.push_back(InlinedCall.asRawInt());
   // Loops
   Record.push_back(N->Loops.size());
   for (const FLLoop &Loop : N->Loops) {

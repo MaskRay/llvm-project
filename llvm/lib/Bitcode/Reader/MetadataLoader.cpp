@@ -411,7 +411,6 @@ class MetadataLoader::MetadataLoaderImpl {
   MetadataLoaderCallbacks Callbacks;
 
   DenseMap<DIFunctionLocalMetadata *, std::list<std::pair<uint32_t, TrackingMDRef>>> FLMDScopeFwdRefs;
-  DenseMap<DIFunctionLocalMetadata *, std::list<std::pair<uint32_t, TrackingMDRef>>> FLMDInlineeFwdRefs;
 
   /// Cursor associated with the lazy-loading of Metadata. This is the easy way
   /// to keep around the right "context" (Abbrev list) to be able to jump in
@@ -1298,16 +1297,7 @@ void MetadataLoader::MetadataLoaderImpl::resolveForwardRefsAndPlaceholders(
       ScopeFwdRefs.pop_front();
     }
   }
-  for (auto &[FLMD, InlineeFwdRefs] : FLMDInlineeFwdRefs) {
-    while (!InlineeFwdRefs.empty()) {
-      auto &[Idx, Ref] = InlineeFwdRefs.front();
-      FLMD->InlinedCalls[Idx].InlineeFLMD = cast<DIFunctionLocalMetadata>(Ref.get());
-      // dbgs() << "Resolved 1 fwd ref: " << Ref.get() << "\n";
-      InlineeFwdRefs.pop_front();
-    }
-  }
   FLMDScopeFwdRefs.clear();
-  FLMDInlineeFwdRefs.clear();
 }
 
 static Value *getValueFwdRef(BitcodeReaderValueList &ValueList, unsigned Idx,
@@ -2545,6 +2535,8 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
   case bitc::METADATA_FLMD: {
     IsDistinct = Record[0] & 1;
     uint64_t Version = Record[0] >> 1;
+    if (Version != 2)
+      return error("Invalid record: unsupported DIFunctionLocalMetadata version");
     if (!IsDistinct)
       return error(
           "Invalid record: DIFunctionLocalMetadata must be distinct");
@@ -2576,21 +2568,9 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
     }
     // InlinedCalls
     uint64_t NumInlinedCalls = Record[CurrentRecord++];
-    // dbgs() << "Reading " << NumInlinedCalls << " Inlined calls for FLContext: " << NewFLMD << "\n";
-    for (uint64_t InlinedCallIdx = 0; InlinedCallIdx < NumInlinedCalls; ++InlinedCallIdx) {
-      uint64_t RawInt = Record[CurrentRecord++];
-      uint64_t RawInlineeID = Record[CurrentRecord++];
-      auto *InlineeMD = getMD(RawInlineeID);
-      if (DIFunctionLocalMetadata *InlineeFLMD = dyn_cast<DIFunctionLocalMetadata>(InlineeMD)) {
-        // dbgs() << "Read 1 pre-loaded: " << RawInlineeID << " = " << InlineeFLMD << "\n";
-        NewFLMD->InlinedCalls.push_back(FLInlinedCall::fromRawParts(RawInt, InlineeFLMD));
-      } else {
-        // dbgs() << "Read 1 fwd ref: " << RawInlineeID << " = " << InlineeFLMD << "\n";
-        auto &InlineeFwdRefs = FLMDInlineeFwdRefs.try_emplace(NewFLMD).first->getSecond();
-        InlineeFwdRefs.emplace_back(InlinedCallIdx, InlineeMD);
-        NewFLMD->InlinedCalls.push_back(FLInlinedCall::fromRawParts(RawInt, nullptr));
-      }
-    }
+    for (uint64_t InlinedCallIdx = 0; InlinedCallIdx < NumInlinedCalls; ++InlinedCallIdx)
+      NewFLMD->InlinedCalls.push_back(
+          FLInlinedCall::fromRawInt(Record[CurrentRecord++]));
     // Loops
     uint64_t NumLoops = Record[CurrentRecord++];
     for (uint64_t LoopIdx = 0; LoopIdx < NumLoops; ++LoopIdx) {

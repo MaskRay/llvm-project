@@ -5874,8 +5874,7 @@ bool LLParser::parseFLMDEntry(LocTy Loc, FLInlinedCall &Result) {
   #define VISIT_MD_FIELDS(OPTIONAL, REQUIRED)                                  \
     REQUIRED(srcLoc, MDUnsignedField, (0, UINT32_MAX - 1));                    \
     OPTIONAL(inlinedAt, MDUnsignedField, (0, UINT16_MAX - 1));                 \
-    OPTIONAL(distinct, MDBoolField, (true));                                   \
-    REQUIRED(inlineeFLMD, MDNodeField, (/* AllowNull */ false));
+    OPTIONAL(distinct, MDBoolField, (true));
     PARSE_MD_FIELDS();
   #undef VISIT_MD_FIELDS
   if (parseToken(lltok::rparen, "expected ')' at end of !!inlinedCall"))
@@ -5885,7 +5884,7 @@ bool LLParser::parseFLMDEntry(LocTy Loc, FLInlinedCall &Result) {
   // the 'Seen' field to check whether we want to use it.
   if (inlinedAt.Seen)
     ActualInlinedAt = FLIndex<uint16_t>(inlinedAt.Val);
-  Result = FLInlinedCall(srcLoc.Val, ActualInlinedAt, inlineeFLMD.Val, !distinct.Val);
+  Result = FLInlinedCall(srcLoc.Val, ActualInlinedAt, !distinct.Val);
   return false;
 }
 

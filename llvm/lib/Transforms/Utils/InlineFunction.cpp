@@ -1945,132 +1945,32 @@ static DebugLoc inlineDebugLoc(DebugLoc OrigDL, DebugLoc InlinedAt,
 
 namespace {
 #if LLVM_USE_FLMD_SOURCE_LOCS
-// Used when inlining a call without a location (which also means it comes from
-// a nodebug function).
-// For a callee with debug info, we inline all locations at a transient
-// no-location inlined call. For a callee without debug info but with some
-// debug locations, we can simply copy its InlinedCalls. A callee without debug
-// info or any locations is a no-op.
-void inlineIntoNodebug(Function *Callee, Function *Caller, Function::iterator FI, bool CalleeHasDebugInfo) {
-  DIFunctionLocalMetadata *CalleeFL = getFLMDForFunction(Callee);
-  if (!CalleeFL)
-    return;
-  DIFunctionLocalMetadata *CallerFL = getFLMDForFunction(Caller);
-  assert(!Caller->getSubprogram());
-  if (!CallerFL) {
-    CallerFL = DIFunctionLocalMetadata::getDistinct(Caller->getContext());
-    CallerFL->setNonDebug();
-    Caller->setMetadata(LLVMContext::MD_flmd, CallerFL);
-  }
-
-  // The simplest case: if Callee is also a nodebug function (which contains
-  // debug locations) then we have a transparent passthrough, copying debug
-  // locations (purely through their InlinedCalls) to the new FLMD.
-
-  // Otherwise, we have to create a new no-location InlinedCall which will be
-  // overwritten if Caller is ever inlined.
-
-
-  // The general approach to inlining is to copy the InlinedCalls from Callee to
-  // Caller, add an offset to every non-empty InlinedAtIdx in all copied
-  // DebugLocs/InlinedCalls to point to the new Caller copy, and change any
-  // empty InlinedAtIdx to point to the new InlinedCall from this inlining
-  // instance.
-  // The nodebug case is very similar, except for the new InlinedCall:
-  // - If the Callee has debug info, then we create an InlinedCall with no
-  //   source location, which will be treated as a transient location to be
-  //   overwritten if we eventually inline into a function with debug info.
-  // - If the Callee has no debug info (but has inlined debug locations), then
-  //   we create no new InlinedCall and leave any transient InlinedCalls (which
-  //   should be the only InlinedCalls without an InlinedAt) as-is, effectively
-  //   reusing/overwriting them.
-  FLIndex<uint16_t> NewInlinedAt;
-  if (Callee->getSubprogram()) {
-    NewInlinedAt = CallerFL->addInlinedCall(
-      FLInlinedCall({}, {}, CalleeFL, false));
-  }
-
-  uint16_t InlinedCallOffset = CallerFL->InlinedCalls.size();
-  CallerFL->InlinedCalls.append(CalleeFL->InlinedCalls);
-  auto UpdateInlinedAt = [NewInlinedAt, InlinedCallOffset](FLIndex<uint16_t> &InlinedAt) {
-    if (InlinedAt)
-      InlinedAt.addOffset(InlinedCallOffset);
-    else
-      InlinedAt = NewInlinedAt;
-  };
-  for (auto &InlinedCall : drop_begin(CallerFL->InlinedCalls, InlinedCallOffset))
-    UpdateInlinedAt(InlinedCall.InlinedAtIdx);
-  auto UpdateDebugLoc = [&UpdateInlinedAt](FLDebugLoc DL) {
-    UpdateInlinedAt(DL.InlinedAtIdx);
-    return DL;
-  };
-  auto UpdateLoopInfoLoc = [&](Metadata *MD) -> Metadata * {
-    if (DILocation *Loc = dyn_cast_or_null<DILocation>(MD)) {
-      FLDebugLoc DL = Loc->getAsDebugLoc().getUnderlyingStorage();
-      DebugLoc NewDL(UpdateDebugLoc(DL), CallerFL);
-      return DILocation::get(NewDL.getContext(), NewDL);
-    }
-    return MD;
-  };
-  for (; FI != Caller->end(); ++FI) {
-    for (Instruction &I : *FI) {
-      updateLoopMetadataDebugLocations(I, UpdateLoopInfoLoc);
-      if (I.hasDebugLoc())
-        I.setDebugLoc(UpdateDebugLoc(I.getDebugLocStorage().get()));
-      for (DbgRecord &DVR : I.getDbgRecordRange())
-        DVR.setDebugLoc(UpdateDebugLoc(DVR.getDebugLocStorage().get()));
-    }
-  }
-}
-
 /// Update inlined instructions' line numbers to
 /// to encode location where these instructions are inlined.
+///
+/// Every index in an FLMD context refers to that same context, so the callee's
+/// InlinedCalls, SrcLocs and Scopes that the inlined code refers to are copied
+/// into the caller on first use, and all inlined locations are rewritten to
+/// caller indices. The callee's own locations become inlined at a new
+/// InlinedCall for TheCall. If TheCall has no location (e.g. it is in a nodebug
+/// function), that InlinedCall has no location either; it is transient, and is
+/// overwritten with the call location when the nodebug function is itself
+/// inlined at a located call. A nodebug callee gets no new InlinedCall.
 static void fixupLineNumbers(Function *Caller, Function::iterator FI,
                              Instruction *TheCall, bool CalleeHasDebugInfo) {
   Function *Callee = cast<CallBase>(TheCall)->getCalledFunction();
   DIFunctionLocalMetadata *CalleeFL = getFLMDForFunction(Callee);
-  if (CalleeHasDebugInfo && !CalleeFL) {
-    // In this case, the callee is a function with !dbg but without !flmd,
-    // meaning that it has no source locations to update, but is not nodebug;
-    // no instructions have source locations, and they should still have none
-    // post-inlining, so nothing left to do.
+  // If the callee contains no source locations, then we have nothing to do.
+  if (!CalleeFL)
     return;
+
+  DIFunctionLocalMetadata *CallerFL = getFLMDForFunction(Caller);
+  if (!CallerFL) {
+    assert(!Caller->getSubprogram());
+    CallerFL = DIFunctionLocalMetadata::getDistinct(Caller->getContext());
+    CallerFL->setNonDebug();
+    Caller->setMetadata(LLVMContext::MD_flmd, CallerFL);
   }
-  // From this point, CalleeHasDebugInfo implies CalleeFL, but the reverse is
-  // not true: !CalleeHasDebugInfo && CalleeFL may occur if a nodebug function
-  // had a debug function inlined into it.
-
-  // When using FLMD, we still need to perform some update steps if we are
-  // inlining from a call without debug info. Note that even if the caller
-  // function is nodebug, if the call still has a debug location (because it was
-  // inlined from a function with debug info), we can follow the normal inlining
-  // procedure below.
-  if (!TheCall->getFullDebugLoc()) {
-    // If the call doesn't have debug info, it must mean that either the caller
-    // or callee has no debug info. If the callee has no debug info and the call
-    // has no debug info, then there is nothing to do; otherwise, if the callee
-    // has debug info but the caller and call do not, then perform inlining
-    // to preserve the callee source information.
-    if (!Caller->getSubprogram()) {
-      return;
-    }
-    assert(!Callee->getSubprogram() &&
-      "Inlinable call without debug info, with caller and callee with debug info?");
-    inlineIntoNodebug(Callee, Caller, FI, CalleeHasDebugInfo);
-    return;
-  }
-
-
-  // With FLMD, the inlining process is fairly straightforward. We copy all
-  // InlinedCalls from Callee to Caller, and update InlinedAt indexes from all
-  // copied InlinedCalls and inlined DebugLocs to point at either their
-  // Caller-copy by adding an offset, or the new InlinedCall from this call.
-  //
-  // Alternatively, if Callee has no debug information but does contain
-  // DebugLocs, then it contains one or more transient InlinedCalls, which all
-  // other DebugLocs/InlinedCalls have at the end of their InlinedAt chain. In
-  // this case, we don't create a new InlinedCall, but rather overwrite each of
-  // these transient InlinedCalls with TheCall's source location.
 
   // Check if we are not generating inline line tables and want to use
   // the call site location instead.
@@ -2081,18 +1981,19 @@ static void fixupLineNumbers(Function *Caller, Function::iterator FI,
   // not-nodebug instructions. FIXME: Possibly worth transferring/generating
   // an atom for the returned value, otherwise we miss stepping on inlined
   // nodebug functions (which is different to existing behaviour).
-  DIFunctionLocalMetadata *CallerFL = getFLMDForFunction(Caller);
-  DebugLoc TheCallDL = TheCall->getFullDebugLoc().getWithoutAtom();
-  FLDebugLoc TheCallFLDL = TheCallDL.getUnderlyingStorage();
+  FLDebugLoc TheCallFLDL = TheCall->getDebugLocStorage().getWithoutAtom().get();
+
+  // Snapshot the callee tables before modifying the caller, which may be the
+  // same function.
+  DebugLocMap DLMap(CalleeFL, CallerFL);
   FLIndex<uint16_t> NewInlinedAt;
-  if (CalleeHasDebugInfo) {
+  if (CalleeHasDebugInfo)
     NewInlinedAt = CallerFL->addInlinedCall(FLInlinedCall(
-      TheCallFLDL.SrcLocIdx, TheCallFLDL.InlinedAtIdx, CalleeFL,
-      false, CalleeFL->MaxAtomGroup));
-  }
-  uint16_t InlinedCallOffset = CallerFL->InlinedCalls.size();
+      TheCallFLDL.SrcLocIdx, TheCallFLDL.InlinedAtIdx, false,
+      CalleeFL->MaxAtomGroup));
+
   SmallDenseMap<uint16_t, uint16_t> InlinedCallMap;
-  auto GetNewInlinedAt = [&InlinedCallMap, CalleeFL, CallerFL, NewInlinedAt, TheCallFLDL](uint16_t InlinedAt) {
+  auto GetNewInlinedAt = [&](uint16_t InlinedAt) {
     if (auto Existing = InlinedCallMap.find(InlinedAt); Existing != InlinedCallMap.end())
       return Existing->second;
     SmallVector<std::pair<uint16_t, FLInlinedCall>> InlinedCallChain;
@@ -2119,8 +2020,11 @@ static void fixupLineNumbers(Function *Caller, Function::iterator FI,
     // InlinedCallChain and must be handled specifically here.
     if (!Last.InlinedAtIdx) {
       if (NewInlinedAt) {
+        Last.SrcLocIdx = DLMap.mapSrcLoc(Last.SrcLocIdx);
         Last.InlinedAtIdx = NewInlinedAt;
       } else {
+        assert(!Last.SrcLocIdx && "Expected all non-inlined InlinedCalls in a "
+                                  "nodebug function to have no source location.");
         Last.SrcLocIdx = TheCallFLDL.SrcLocIdx;
         Last.InlinedAtIdx = TheCallFLDL.InlinedAtIdx;
       }
@@ -2131,6 +2035,7 @@ static void fixupLineNumbers(Function *Caller, Function::iterator FI,
     // InlinedCallChain; keep this invariant going as we remap every inlined
     // call in the chain.
     for (auto [OldIdx, InlinedCall] : reverse(InlinedCallChain)) {
+      InlinedCall.SrcLocIdx = DLMap.mapSrcLoc(InlinedCall.SrcLocIdx);
       InlinedCall.InlinedAtIdx = UpdatedInlinedAt;
       UpdatedInlinedAt = CallerFL->addInlinedCall(InlinedCall);
       InlinedCallMap.insert({OldIdx, UpdatedInlinedAt.get()});
@@ -2138,14 +2043,18 @@ static void fixupLineNumbers(Function *Caller, Function::iterator FI,
     // UpdatedInlinedAt is now the InlinedCallIdx of the remapped original call.
     return UpdatedInlinedAt.get();
   };
-  auto UpdateLoc = [TheCallFLDL, NewInlinedAt, &GetNewInlinedAt](auto &Loc) {
+  auto UpdateLoc = [&](FLDebugLoc &Loc) {
     if (Loc.InlinedAtIdx) {
+      Loc.SrcLocIdx = DLMap.mapSrcLoc(Loc.SrcLocIdx);
       Loc.InlinedAtIdx = GetNewInlinedAt(Loc.InlinedAtIdx.get());
     } else if (NewInlinedAt) {
+      Loc.SrcLocIdx = DLMap.mapSrcLoc(Loc.SrcLocIdx);
       Loc.InlinedAtIdx = NewInlinedAt;
-    } else {
+    } else if (TheCallFLDL) {
       Loc.SrcLocIdx = TheCallFLDL.SrcLocIdx;
       Loc.InlinedAtIdx = TheCallFLDL.InlinedAtIdx;
+    } else {
+      Loc.SrcLocIdx = DLMap.mapSrcLoc(Loc.SrcLocIdx);
     }
   };
   auto UpdateDebugLoc = [&UpdateLoc](FLDebugLoc DL) -> FLDebugLoc {
@@ -2154,6 +2063,8 @@ static void fixupLineNumbers(Function *Caller, Function::iterator FI,
   };
   auto UpdateLoopInfoLoc = [&](Metadata *MD) -> Metadata * {
     if (DILocation *Loc = dyn_cast_or_null<DILocation>(MD)) {
+      assert(Loc->getFLContext() == CalleeFL &&
+             "Loop location is not from the callee.");
       FLDebugLoc DL = Loc->getAsDebugLoc().getUnderlyingStorage();
       DebugLoc NewDL(UpdateDebugLoc(DL), CallerFL);
       return DILocation::get(NewDL.getContext(), NewDL);
@@ -2181,16 +2092,9 @@ static void fixupLineNumbers(Function *Caller, Function::iterator FI,
         I.setDebugLoc(UpdateDebugLoc(I.getDebugLocStorage().get()));
       else if (InstCanUseCallLoc(I))
         I.setDebugLoc(TheCallFLDL);
-      else if (I.hasDebugLoc()) {
-        // FIXME: The above clauses appear to potentially avoid updating a
-        // DebugLoc attached to a pseudoprobe or static alloca, which would seem
-        // to violate the (pre-existing) rule of every Instruction's
-        // InlinedAtScope belonging to its parent Function's subprogram, a
-        // verifier error. This looks to be an accurate preservation of existing
-        // behaviour, and the main compiler isn't crashing all the time already
-        // so it might be safe for some reason, but revisit this later.
-        // llvm_unreachable("This probably results in a verifier error");
-      }
+      else if (I.hasDebugLoc())
+        // A location left in callee indices would be misread in the caller.
+        I.setDebugLoc(UpdateDebugLoc(I.getDebugLocStorage().get()));
       if (NoInlineLineTables) {
         I.dropDbgRecords();
       } else {
@@ -2229,7 +2133,7 @@ static void fixupLineNumbers(Function *Fn, Function::iterator FI,
   // Create a unique call site, not to be confused with any other call from the
   // same location.
   InlinedAtNode = DebugLoc::getDistinctInlinedCall(
-      CalleeFn, Fn, TheCallDL.getLine(), TheCallDL.getColumn(),
+      Fn, TheCallDL.getLine(), TheCallDL.getColumn(),
       TheCallDL.getScope(), TheCallDL.getInlinedAt());
 
   // Check if we are not generating inline line tables and want to use

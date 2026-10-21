@@ -1637,23 +1637,11 @@ struct FLMDDILocationConversionContext {
     DISubprogram *InlineeSP = InlineeScope->getSubprogram();
     // Reference into LastInlineeFLMD->InlinedCalls.
     FLIndex<uint16_t> InlinedAtIdx = getInlineCallDILocationToFLIndex(DIL->getInlinedAt(), InlineeSP);
-    // Get inlinedAtIdx...
-    // For a given FLInlinedCall `IC`, there are 2-3 relevant DIFunctionLocalMetadata:
-    // - InlinedFLMD: The inlined function, which `IC` was a call of.
-    // - InlineeFLMD: The inlinee function, which `IC` was in.
-    // - LastInlineeFLMD: The outermost function of the chain of inlined calls
-    //   containing `IC`.
-    // Indexes for the created FLInlinedCall `IC` are as follows
-    // - SrcLocIdx references LastInlineeFLMD->InlinedCalls[IC.InlinedAtIdx]->getInlinee().
-    // - InlinedAtIdx references LastInlineeFLMD->InlinedCalls.
-    // - Any FLDebugLocs or FLInlinedCalls inlined at `IC` have SrcLocIdx referring to InlineeFLMD.
-    // Relevant FLMD contexts: 
-    DIFunctionLocalMetadata *InlineeFLMD = getFLMDForSP(InlineeSP);
+    // All indices refer to the context of the outermost function of the chain,
+    // LastInlineeFLMD.
     DIFunctionLocalMetadata *LastInlineeFLMD = getFLMDForSP(DIL->getInlinedAtScope()->getSubprogram());
-    DIFunctionLocalMetadata *InlinedFLMD = getFLMDForSP(InlinedSP);
-    // Get SrcLocIdx for this call, which references InlineeFLMD->SrcLocs
-    FLIndex<uint32_t> SrcLocIdx = InlineeFLMD->getFLSrcLocIdx(DIL->getLine(), DIL->getColumn(), InlineeScope);
-    FLIndex<uint16_t> NewIdx = LastInlineeFLMD->addInlinedCall(FLInlinedCall(SrcLocIdx, InlinedAtIdx, InlinedFLMD, !DIL->isDistinct()));
+    FLIndex<uint32_t> SrcLocIdx = LastInlineeFLMD->getFLSrcLocIdx(DIL->getLine(), DIL->getColumn(), InlineeScope);
+    FLIndex<uint16_t> NewIdx = LastInlineeFLMD->addInlinedCall(FLInlinedCall(SrcLocIdx, InlinedAtIdx, !DIL->isDistinct()));
     if (DIL->isDistinct()) {
       InlinedCallDILocationToFLMDMap.insert({DIL, {NewIdx, LastInlineeFLMD}});
       InlinedCallFLMDToDILocationMap.insert({{NewIdx, LastInlineeFLMD}, DIL});
@@ -1679,7 +1667,7 @@ struct FLMDDILocationConversionContext {
       return FLDebugLoc::getInlinedCallLoc(getInlineCallDILocationToFLIndex(const_cast<DILocation*>(DIL), InlinedSP));
     DILocalScope *OrigScope = DIL->getScope();
     FLIndex<uint16_t> InlinedAtIdx = getInlineCallDILocationToFLIndex(DIL->getInlinedAt(), OrigScope->getSubprogram());
-    DIFunctionLocalMetadata *OrigFLMD = getFLMDForSP(OrigScope->getSubprogram());
+    DIFunctionLocalMetadata *OrigFLMD = getFLMDForSP(DIL->getInlinedAtScope()->getSubprogram());
     FLIndex<uint32_t> SrcLocIdx = OrigFLMD->getFLSrcLocIdx(DIL->getLine(), DIL->getColumn(), OrigScope);
     return FLDebugLoc(SrcLocIdx, InlinedAtIdx, DIL->getAtomGroup(), DIL->getAtomRank());
   }

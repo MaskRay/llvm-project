@@ -1477,9 +1477,6 @@ void SlotTracker::CreateMetadataSlot(const MDNode *N) {
     for (FLScope Scope : FLContext->Scopes) {
       CreateMetadataSlot(Scope.get());
     }
-    for (FLInlinedCall InlinedCall : FLContext->InlinedCalls) {
-      CreateMetadataSlot(InlinedCall.InlineeFLMD);
-    }
   }
 }
 
@@ -2184,8 +2181,6 @@ static void writeFLInlinedCall(raw_ostream &Out, FLInlinedCall InlinedCall, AsmW
     Out << ", inlinedAt: " << InlinedCall.InlinedAtIdx.get();
   if (InlinedCall.MaxAtomGroup)
     Out << ", maxAtomGroup: " << InlinedCall.MaxAtomGroup;
-  Out << ", inlineeFLMD: ";
-  writeMetadataAsOperand(Out, InlinedCall.InlineeFLMD, WriterCtx);
   Out << ")";
 }
 static void writeFLLoop(raw_ostream &Out, FLLoop Loop, AsmWriterContext &WriterCtx) {

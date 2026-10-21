@@ -549,8 +549,8 @@ LLVM_C_ABI LLVMDebugLoc LLVMDIBuilderCreateDebugLocation2(
     LLVMMetadataRef FnCtx, unsigned Line, unsigned Column, LLVMMetadataRef Scope,
     LLVMDebugLoc InlinedAt);
 LLVM_C_ABI LLVMDebugLoc LLVMDIBuilderCreateInlineCallDebugLocation(
-    LLVMMetadataRef CallerCtx, LLVMMetadataRef CalleeCtx, unsigned Line,
-    unsigned Column, LLVMMetadataRef Scope, LLVMDebugLoc InlinedAt);
+    LLVMMetadataRef CallerCtx, unsigned Line, unsigned Column,
+    LLVMMetadataRef Scope, LLVMDebugLoc InlinedAt);
 LLVM_C_ABI unsigned LLVMDebugLocGetLine(LLVMDebugLoc Location);
 LLVM_C_ABI unsigned LLVMDebugLocGetColumn(LLVMDebugLoc Location);
 LLVM_C_ABI LLVMMetadataRef LLVMDebugLocGetScope(LLVMDebugLoc Location);

@@ -676,11 +676,6 @@ void ValueEnumerator::dropFunctionFromMetadata(
       if (MD != MetadataMap.end())
         push(*MD);
     }
-    for (auto InlinedCall : FLContext->InlinedCalls) {
-      auto MD = MetadataMap.find(InlinedCall.getInlinee());
-      if (MD != MetadataMap.end())
-        push(*MD);
-    }
   };
   while (!Worklist.empty()) {
     const MDNode *Next = Worklist.pop_back_val();
@@ -738,11 +733,9 @@ void ValueEnumerator::EnumerateMetadata(unsigned F, const Metadata *MD) {
     if (auto *FLContext = dyn_cast<DIFunctionLocalMetadata>(N)) {
       size_t NumOps = FLContext->getNumOperands();
       size_t NumScopes = FLContext->Scopes.size();
-      size_t NumInlinedCalls = FLContext->InlinedCalls.size();
       size_t ScopesStart = NumOps;
       size_t ScopesEnd = ScopesStart + NumScopes;
       assert(Worklist.back().second >= ScopesStart);
-      // First try to add scopes, then try to add inlineeFLMDs.
       if (Worklist.back().second < ScopesEnd) {
         size_t ScopeOffset = Worklist.back().second - ScopesStart;
         auto *ScopeIt = std::find_if(
@@ -764,31 +757,7 @@ void ValueEnumerator::EnumerateMetadata(unsigned F, const Metadata *MD) {
         }
         Worklist.back().second = ScopesEnd;
       }
-      size_t InlinedCallsStart = ScopesEnd;
-      size_t InlinedCallsEnd = InlinedCallsStart + NumInlinedCalls;
-      assert(Worklist.back().second >= InlinedCallsStart);
-      if (Worklist.back().second < InlinedCallsEnd) {
-        size_t InlinedCallsOffset = Worklist.back().second - InlinedCallsStart;
-        auto *InlinedCallIt = std::find_if(
-          FLContext->InlinedCalls.begin() + InlinedCallsOffset, FLContext->InlinedCalls.end(),
-          [&](const FLInlinedCall &InlinedCall) {
-            return enumerateMetadataImpl(F, InlinedCall.InlineeFLMD);
-          });
-        if (InlinedCallIt != FLContext->InlinedCalls.end()) {
-          auto *Op = InlinedCallIt->InlineeFLMD;
-          size_t OpInlinedCallOffset = InlinedCallIt - FLContext->InlinedCalls.begin();
-          Worklist.back().second = InlinedCallsStart + OpInlinedCallOffset + 1;
-
-          // Delay traversing Op if it's a distinct node and N is uniqued.
-          if (Op->isDistinct() && !N->isDistinct())
-            DelayedDistinctNodes.push_back(Op);
-          else
-            Worklist.push_back(std::make_pair(Op, 0));
-          continue;
-        }
-        Worklist.back().second = InlinedCallsEnd;
-      }
-      assert(Worklist.back().second >= InlinedCallsEnd);
+      assert(Worklist.back().second >= ScopesEnd);
     }
 
     // All the operands have been visited.  Now assign an ID.
