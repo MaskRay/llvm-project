@@ -72,15 +72,28 @@ void FLTableSubset::addSrcLoc(FLIndex<uint32_t> Idx) {
   ScopeMap[Table.getSrcLoc(Idx).ScopeIdx.get()] = 1;
 }
 
-void FLTableSubset::add(FLIndex<uint32_t> SrcLocIdx,
-                        FLIndex<uint32_t> InlinedAtIdx) {
+void FLTableSubset::add(FLDebugLoc DL) {
   assert(!Finalized && "Subset is already numbered");
-  addSrcLoc(SrcLocIdx);
-  for (FLIndex<uint32_t> IA = InlinedAtIdx; IA && !InlinedCallMap[IA.get()];
+  addSrcLoc(DL.SrcLocIdx);
+  for (FLIndex<uint32_t> IA = DL.InlinedAtIdx; IA && !InlinedCallMap[IA.get()];
        IA = Table.getInlinedCall(IA).InlinedAtIdx) {
     InlinedCallMap[IA.get()] = 1;
     addSrcLoc(Table.getInlinedCall(IA).SrcLocIdx);
   }
+}
+
+void FLTableSubset::add(const DILocation &Loc) {
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  add(Loc.getAsDebugLoc().getUnderlyingStorage());
+#endif
+}
+
+void FLTableSubset::addInstruction(const Instruction &I) {
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  add(I.getDebugLocStorage().get());
+  for (const DbgRecord &DR : I.getDbgRecordRange())
+    add(DR.getDebugLocStorage().get());
+#endif
 }
 
 void FLTableSubset::finalize() {
@@ -100,31 +113,33 @@ void FLTableSubset::finalize() {
 FLTableSubset FLTableSubset::collect(const DIFunctionLocalMetadata &Table,
                                      const Module &M) {
   FLTableSubset Subset(Table);
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  auto AddLoc = [&](const DILocation *Loc) {
-    FLDebugLoc DL = Loc->getAsDebugLoc().getUnderlyingStorage();
-    Subset.add(DL.SrcLocIdx, DL.InlinedAtIdx);
-  };
   SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
   for (const Function &F : M)
     for (const Instruction &I : instructions(F)) {
-      FLDebugLoc DL = I.getDebugLocStorage().get();
-      Subset.add(DL.SrcLocIdx, DL.InlinedAtIdx);
-      for (const DbgRecord &DR : I.getDbgRecordRange()) {
-        FLDebugLoc RDL = DR.getDebugLocStorage().get();
-        Subset.add(RDL.SrcLocIdx, RDL.InlinedAtIdx);
-      }
+      Subset.addInstruction(I);
       MDs.clear();
       I.getAllMetadataOtherThanDebugLoc(MDs);
       for (auto [Kind, N] : MDs) {
         if (auto *Loc = dyn_cast<DILocation>(N))
-          AddLoc(Loc);
+          Subset.add(*Loc);
         for (const MDOperand &Op : N->operands())
           if (auto *Loc = dyn_cast_or_null<DILocation>(Op.get()))
-            AddLoc(Loc);
+            Subset.add(*Loc);
       }
     }
-#endif
   Subset.finalize();
   return Subset;
+}
+
+FLTableSubset FLTableSubset::all(const DIFunctionLocalMetadata &Table) {
+  FLTableSubset Subset(Table);
+  for (auto *Map :
+       {&Subset.ScopeMap, &Subset.SrcLocMap, &Subset.InlinedCallMap})
+    std::fill(Map->begin(), Map->end(), 1);
+  Subset.finalize();
+  return Subset;
+}
+
+FLDebugLoc FLTableSubset::map(FLDebugLoc DL) const {
+  return FLDebugLoc(mapSrcLoc(DL.SrcLocIdx), mapInlinedCall(DL.InlinedAtIdx));
 }

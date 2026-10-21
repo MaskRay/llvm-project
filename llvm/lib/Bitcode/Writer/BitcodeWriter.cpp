@@ -344,12 +344,7 @@ private:
   /// The raw handle of \p DL, renumbered for this module's location table.
   uint64_t mapFLDebugLoc(const DebugLoc &DL) const {
     FLDebugLoc Loc = DL.getUnderlyingStorage();
-    if (!Loc)
-      return 0;
-    const FLTableSubset &Subset = *VE.getFLSubset();
-    return FLDebugLoc(Subset.mapSrcLoc(Loc.SrcLocIdx),
-                      Subset.mapInlinedCall(Loc.InlinedAtIdx))
-        .asRawInt();
+    return Loc ? VE.getFLSubset()->map(Loc).asRawInt() : 0;
   }
 #endif
   void writeDILocation(const DILocation *N, SmallVectorImpl<uint64_t> &Record,

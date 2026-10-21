@@ -30,8 +30,11 @@
 namespace llvm {
 
 class DILocalScope;
+class DILocation;
 class DIFunctionLocalMetadata;
+class Instruction;
 class Module;
+struct FLDebugLoc;
 
 /// Small wrapper class for an FLMD index, which may be "no index".
 /// Should be checked to see if value is present before using, otherwise the
@@ -252,8 +255,13 @@ public:
   /// attached to instructions (e.g. in llvm.loop), then finalize.
   static FLTableSubset collect(const DIFunctionLocalMetadata &Table,
                                const Module &M);
+  /// A subset holding every entry, numbered as in the table.
+  static FLTableSubset all(const DIFunctionLocalMetadata &Table);
 
-  void add(FLIndex<uint32_t> SrcLocIdx, FLIndex<uint32_t> InlinedAtIdx);
+  void add(FLDebugLoc DL);
+  void add(const DILocation &Loc);
+  /// Add the locations of \p I and its debug records.
+  void addInstruction(const Instruction &I);
   void finalize();
 
   bool empty() const { return SrcLocs.empty() && InlinedCalls.empty(); }
@@ -271,6 +279,7 @@ public:
   FLIndex<uint32_t> mapInlinedCall(FLIndex<uint32_t> Idx) const {
     return mapIdx(InlinedCallMap, Idx);
   }
+  FLDebugLoc map(FLDebugLoc DL) const;
 
 private:
   FLIndex<uint32_t> mapIdx(const std::vector<uint32_t> &Map,

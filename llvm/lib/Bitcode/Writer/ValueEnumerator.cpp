@@ -455,16 +455,8 @@ ValueEnumerator::ValueEnumerator(const Module &M,
             EnumerateMetadata(&F, MD);
         };
 
-#if LLVM_USE_FLMD_SOURCE_LOCS
-        if (FLSubset) {
-          FLDebugLoc DL = I.getDebugLocStorage().get();
-          FLSubset->add(DL.SrcLocIdx, DL.InlinedAtIdx);
-          for (DbgRecord &DR : I.getDbgRecordRange()) {
-            FLDebugLoc RDL = DR.getDebugLocStorage().get();
-            FLSubset->add(RDL.SrcLocIdx, RDL.InlinedAtIdx);
-          }
-        }
-#endif
+        if (FLSubset)
+          FLSubset->addInstruction(I);
 
         for (DbgRecord &DR : I.getDbgRecordRange()) {
           if (DbgLabelRecord *DLR = dyn_cast<DbgLabelRecord>(&DR)) {
@@ -517,13 +509,11 @@ ValueEnumerator::ValueEnumerator(const Module &M,
       EnumerateMetadata(nullptr, I.second);
   }
 
-#if LLVM_USE_FLMD_SOURCE_LOCS
   if (FLSubset) {
+    // DILocations can appear anywhere in the module's metadata.
     for (const Metadata *MD : this->MDs)
-      if (auto *Loc = dyn_cast<DILocation>(MD)) {
-        FLDebugLoc DL = Loc->getAsDebugLoc().getUnderlyingStorage();
-        FLSubset->add(DL.SrcLocIdx, DL.InlinedAtIdx);
-      }
+      if (auto *Loc = dyn_cast<DILocation>(MD))
+        FLSubset->add(*Loc);
     FLSubset->finalize();
     if (FLSubset->empty()) {
       FLSubset.reset();
@@ -533,7 +523,6 @@ ValueEnumerator::ValueEnumerator(const Module &M,
       EnumerateMetadata(nullptr, &FLSubset->getTable());
     }
   }
-#endif
 
   // Optimize constant ordering.
   OptimizeConstants(FirstConstant, Values.size());
