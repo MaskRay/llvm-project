@@ -232,6 +232,11 @@ private:
                           SmallVectorImpl<uint64_t> &Record, unsigned &Abbrev) {
     llvm_unreachable("DXIL cannot contain GenericDI Nodes");
   }
+  void writeDIFunctionLocalMetadata(const DIFunctionLocalMetadata *N,
+                                    SmallVectorImpl<uint64_t> &Record,
+                                    unsigned &Abbrev) {
+    llvm_unreachable("DXIL cannot contain location tables");
+  }
   void writeDISubrange(const DISubrange *N, SmallVectorImpl<uint64_t> &Record,
                        unsigned Abbrev);
   void writeDIGenericSubrange(const DIGenericSubrange *N,

@@ -409,8 +409,9 @@ class MetadataLoader::MetadataLoaderImpl {
   Module &TheModule;
   MetadataLoaderCallbacks Callbacks;
 
-  // Location table entries whose scope was a forward reference.
-  std::vector<std::pair<uint32_t, TrackingMDRef>> FLMDScopeFwdRefs;
+  // Location table entries whose scope was a forward reference, with the
+  // scope's metadata ID.
+  SmallVector<std::pair<uint32_t, unsigned>, 0> FLMDScopeFwdRefs;
   SmallVector<bool, 0> FLMDUniquableInlinedCalls;
   bool FLMDTableLoaded = false;
 
@@ -1293,8 +1294,8 @@ void MetadataLoader::MetadataLoaderImpl::resolveForwardRefsAndPlaceholders(
   // uniquing indexes.
   if (FLMDTableLoaded) {
     DIFunctionLocalMetadata *FLContext = Context.getFLContext();
-    for (auto &[Idx, Ref] : FLMDScopeFwdRefs)
-      FLContext->Scopes[Idx].Scope = cast<DILocalScope>(Ref.get());
+    for (auto [Idx, ID] : FLMDScopeFwdRefs)
+      FLContext->Scopes[Idx].Scope = cast<DILocalScope>(MetadataList.lookup(ID));
     FLContext->rebuildIndexes(FLMDUniquableInlinedCalls);
     FLMDScopeFwdRefs.clear();
     FLMDUniquableInlinedCalls.clear();
@@ -2558,11 +2559,13 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
       Expected<uint64_t> Scope = Next();
       if (!Scope)
         return Scope.takeError();
-      auto *ScopeMD = getMD(*Scope);
-      if (auto *ScopeNode = dyn_cast<MDNode>(ScopeMD)) {
+      // A placeholder cannot be tracked from outside an MDNode, so look the
+      // scope up again once forward references are resolved.
+      auto *ScopeNode = dyn_cast<MDNode>(getMD(*Scope));
+      if (ScopeNode && !ScopeNode->isTemporary()) {
         FLContext->Scopes.push_back(FLScope(ScopeNode));
       } else {
-        FLMDScopeFwdRefs.emplace_back(ScopeIdx, ScopeMD);
+        FLMDScopeFwdRefs.emplace_back(ScopeIdx, *Scope);
         FLContext->Scopes.push_back(FLScope((MDNode*)nullptr));
       }
     }
