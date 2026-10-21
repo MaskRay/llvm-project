@@ -114,11 +114,13 @@ struct FLSrcLoc {
   FLIndex<uint32_t> ScopeIdx;
   uint32_t AtomGroup = 0;
   FLSrcLoc() = default;
-  FLSrcLoc(uint32_t Line, uint16_t Column, FLIndex<uint32_t> ScopeIdx,
+  // A column that does not fit becomes unknown, as for DILocation.
+  FLSrcLoc(uint32_t Line, unsigned Column, FLIndex<uint32_t> ScopeIdx,
            uint32_t AtomGroup = 0, uint8_t AtomRank = 0,
            bool ImplicitCode = false)
-      : Line(Line), Column(Column), AtomRank(AtomRank),
-        ImplicitCode(ImplicitCode), ScopeIdx(ScopeIdx), AtomGroup(AtomGroup) {
+      : Line(Line), Column(Column < (1u << 16) ? Column : 0),
+        AtomRank(AtomRank), ImplicitCode(ImplicitCode), ScopeIdx(ScopeIdx),
+        AtomGroup(AtomGroup) {
     assert(ScopeIdx && "SrcLoc needs valid scope!");
   }
   bool operator==(const FLSrcLoc &Other) const {
@@ -211,7 +213,7 @@ public:
 
   FLIndex<uint32_t> getFLScopeIdx(const MDNode *Scope);
   FLIndex<uint32_t> getFLSrcLocIdx(const FLSrcLoc &SrcLoc);
-  FLIndex<uint32_t> getFLSrcLocIdx(uint32_t Line, uint16_t Column,
+  FLIndex<uint32_t> getFLSrcLocIdx(uint32_t Line, unsigned Column,
                                    const MDNode *Scope, uint32_t AtomGroup = 0,
                                    uint8_t AtomRank = 0,
                                    bool ImplicitCode = false) {

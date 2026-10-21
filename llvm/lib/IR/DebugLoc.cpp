@@ -142,9 +142,6 @@ static FLIndex<uint32_t> getSrcLocIdx(DIFunctionLocalMetadata *Context,
                                       unsigned Line, unsigned Column,
                                       Metadata *Scope, bool ImplicitCode,
                                       uint64_t AtomGroup, uint8_t AtomRank) {
-  // Set to unknown on overflow, as DILocation does.
-  if (Column >= (1u << 16))
-    Column = 0;
   assert(AtomGroup <= UINT32_MAX && "Atom group does not fit in FLSrcLoc");
   assert(AtomRank <= 7 && "AtomRank number should fit in 3 bits");
   return Context->getFLSrcLocIdx(Line, Column, cast<DILocalScope>(Scope),
