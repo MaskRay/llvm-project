@@ -627,6 +627,10 @@ void Function::deleteBodyImpl(bool ShouldDrop) {
     setValueSubclassData(getSubclassDataFromValue() & ~0xe);
   }
 
+  // Nothing outside the body refers to its FLMD context, so the tables can go
+  // with it.
+  if (FLContext && FLContext->NumOwners == 1)
+    FLContext->releaseStorage();
   // Metadata is stored in a side-table.
   clearMetadata();
 }

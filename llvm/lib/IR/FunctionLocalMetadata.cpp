@@ -24,6 +24,20 @@ FLIndex<uint16_t> DIFunctionLocalMetadata::getFLScopeIdx(DILocalScope *Scope) {
   return Scopes.size() - 1;
 }
 
+// SmallVector has no shrink_to_fit; recreate the vector to free its buffer.
+template <typename T> static void freeVector(T &V) {
+  V.~T();
+  new (&V) T();
+}
+
+void DIFunctionLocalMetadata::releaseStorage() {
+  freeVector(Scopes);
+  freeVector(SrcLocs);
+  freeVector(InlinedCalls);
+  freeVector(Loops);
+  InstrLoops.shrink_and_clear();
+}
+
 FLMDBuilder::FLMDBuilder(DIFunctionLocalMetadata *FLContext, const DISubprogram *SP) : FLContext(FLContext) {
   /// If FLContext is already populated, load its contents into the builder map.
   if (!FLContext->Scopes.empty() || !FLContext->SrcLocs.empty()) {

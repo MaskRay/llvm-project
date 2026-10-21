@@ -330,6 +330,10 @@ public:
   // ignored. If this leads to problems, then we need a more sophisticated
   // solution.
   bool IsNonDebugFn = false;
+  // Number of Functions this context is attached to. More than one only while
+  // a body moves to another Function (e.g. Function::copyMetadata, or IRMover
+  // reusing distinct nodes).
+  unsigned NumOwners = 0;
 
   // FIXME: FLMD is a funny case where it takes no arguments and can only be
   // created Distinct. Decide later whether this needs to change.
@@ -424,6 +428,9 @@ public:
       SrcLoc, InlinedAtIdx.get(), InlinedCall.MaxAtomGroup,
       InlinedCall.Uniquable, std::move(InlinedAt) };
   }
+
+  /// Free the tables; nothing may refer to this context afterwards.
+  void releaseStorage();
 
   static bool classof(const Metadata *MD) {
     return MD->getMetadataID() == DIFunctionLocalMetadataKind;

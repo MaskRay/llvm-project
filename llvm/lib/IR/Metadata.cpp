@@ -1725,7 +1725,7 @@ void Instruction::eraseMetadataIf(function_ref<bool(unsigned, MDNode *)> Pred) {
 }
 void Function::eraseMetadataIf(function_ref<bool(unsigned, MDNode *)> Pred) {
   if (FLContext && Pred(LLVMContext::MD_flmd, FLContext))
-    FLContext = nullptr;
+    setFLContext(nullptr);
 
   Value::eraseMetadataIf(Pred);
 }
@@ -1803,7 +1803,7 @@ void Instruction::setMetadata(unsigned KindID, MDNode *Node) {
 void Function::setMetadata(unsigned KindID, MDNode *Node) {
   // Handle 'flmd' as a special case since it is not stored in the hash table.
   if (KindID == LLVMContext::MD_flmd) {
-    FLContext = cast_if_present<DIFunctionLocalMetadata>(Node);
+    setFLContext(cast_if_present<DIFunctionLocalMetadata>(Node));
     return;
   }
 
@@ -1816,7 +1816,7 @@ void Function::setMetadata(unsigned KindID, MDNode *Node) {
 void Function::addMetadata(unsigned KindID, MDNode &MD) {
   // Handle 'flmd' as a special case since it is not stored in the hash table.
   if (KindID == LLVMContext::MD_flmd) {
-    FLContext = cast<DIFunctionLocalMetadata>(&MD);
+    setFLContext(cast<DIFunctionLocalMetadata>(&MD));
     return;
   }
   GlobalValue::addMetadata(KindID, MD);
@@ -1986,7 +1986,7 @@ void GlobalObject::copyMetadata(const GlobalObject *Other, unsigned Offset) {
 }
 void Function::copyMetadata(const Function *Other, unsigned Offset) {
   if (Other->FLContext)
-    FLContext = Other->FLContext;
+    setFLContext(Other->FLContext);
   GlobalObject::copyMetadata(Other, Offset);
 }
 

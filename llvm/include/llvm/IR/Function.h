@@ -1002,6 +1002,10 @@ public:
     return FLContext;
   }
   void setFLContext(DIFunctionLocalMetadata *NewFLContext) {
+    if (NewFLContext)
+      ++NewFLContext->NumOwners;
+    if (FLContext)
+      --FLContext->NumOwners;
     FLContext = NewFLContext;
   }
 
@@ -1035,13 +1039,13 @@ public:
   LLVM_ABI void addMetadata(unsigned KindID, MDNode &MD);
   LLVM_ABI void addMetadata(StringRef Kind, MDNode &MD);
   LLVM_ABI void clearMetadata() {
-    FLContext = nullptr;
+    setFLContext(nullptr);
     GlobalValue::clearMetadata();
   }
   LLVM_ABI bool eraseMetadata(unsigned KindID) {
     if (KindID == LLVMContext::MD_flmd) {
       bool Removed = FLContext;
-      FLContext = nullptr;
+      setFLContext(nullptr);
       return Removed;
     }
     return GlobalValue::eraseMetadata(KindID);
