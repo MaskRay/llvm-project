@@ -292,6 +292,11 @@ private:
                       unsigned Abbrev) {
     llvm_unreachable("DXIL cannot contain DIArgList Nodes");
   }
+  void writeDIFunctionLocalMetadata(const DIFunctionLocalMetadata *N,
+                                    SmallVectorImpl<uint64_t> &Record,
+                                    unsigned Abbrev) {
+    llvm_unreachable("DXIL cannot contain DIFunctionLocalMetadata Nodes");
+  }
   void writeDIAssignID(const DIAssignID *N, SmallVectorImpl<uint64_t> &Record,
                        unsigned Abbrev) {
     // DIAssignID is experimental feature to track variable location in IR..
