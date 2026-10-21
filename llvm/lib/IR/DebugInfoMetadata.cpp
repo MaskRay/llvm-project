@@ -447,18 +447,13 @@ DILocation *DILocation::getImpl(LLVMContext &Context, unsigned Line,
                                 Metadata *InlinedAt, bool ImplicitCode,
                                 uint64_t AtomGroup, uint8_t AtomRank,
                                 StorageType Storage, bool ShouldCreate) {
-  DILocalScope *LocalScope = dyn_cast_or_null<DILocalScope>(Scope);
   DILocation *InlinedAtLoc = dyn_cast_or_null<DILocation>(InlinedAt);
-  // Question: how do we replace inlinedAt forward references? This shouldn't be
-  // impossible to resolve, but we need some special storage to track and later
-  // resolve forward references. Performance is not important: this is the "bad"
-  // case, we don't long-term care about the costs of parsing non-FLMD IR into
-  // FLMD storage.
-  assert(LocalScope && (!InlinedAt || InlinedAtLoc) && "TODO: Handle this failstate gracefully.");
-  DIFunctionLocalMetadata *FLContext = Context.getFLMD(LocalScope);
-  DebugLoc DL = DebugLoc::get(DebugLoc::DebugLocContext(FLContext), Line,
-    Column, Scope, InlinedAtLoc->getAsDebugLoc(), ImplicitCode, AtomGroup,
-    AtomRank);
+  assert(isa<DILocalScope>(Scope) && (!InlinedAt || InlinedAtLoc) &&
+         "TODO: Handle this failstate gracefully.");
+  DebugLoc DL = DebugLoc::get(
+      DebugLoc::DebugLocContext(Context.getFLContext()), Line, Column, Scope,
+      InlinedAtLoc ? InlinedAtLoc->getAsDebugLoc() : DebugLoc(), ImplicitCode,
+      AtomGroup, AtomRank);
   return getImpl(Context, DL, Storage, ShouldCreate);
 }
 #endif
@@ -1570,8 +1565,6 @@ FLScope::operator DILocalScope*() { return cast<DILocalScope>(Scope); }
 DILocalScope *FLScope::get() { return cast<DILocalScope>(Scope); }
 FLScope::operator const DILocalScope*() const { return cast<DILocalScope>(Scope); }
 const DILocalScope *FLScope::get() const { return cast<DILocalScope>(Scope); }
-FLLoop::FLLoop(FLIndex<uint32_t> StartSrcLocIdx, FLIndex<uint32_t> EndSrcLocIdx, FLIndex<uint16_t> InlinedAtIdx, MDNodeArray Properties)
-    : StartSrcLocIdx(StartSrcLocIdx), EndSrcLocIdx(EndSrcLocIdx), StartInlinedAtIdx(InlinedAtIdx), EndInlinedAtIdx(InlinedAtIdx), Properties(Properties.get()) {}
 
 TempDIFunctionLocalMetadata DIFunctionLocalMetadata::getTemporary(LLVMContext &Context) {
   return TempDIFunctionLocalMetadata(new (0u, Temporary) DIFunctionLocalMetadata(Context, Temporary));

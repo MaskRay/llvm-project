@@ -38,7 +38,6 @@ class StringRef;
 class Twine;
 class LLVMRemarkStreamer;
 class DIFunctionLocalMetadata;
-class Metadata;
 
 namespace remarks {
 class RemarkStreamer;
@@ -355,7 +354,11 @@ public:
   /// the global tracker.
   LLVM_ABI uint64_t incNextDILocationAtomGroup();
 
-  LLVM_ABI DIFunctionLocalMetadata *getFLMD(const Metadata *MD);
+  /// Get the source location table shared by every function in this context,
+  /// creating it on first use.
+  LLVM_ABI DIFunctionLocalMetadata *getFLContext();
+  /// Get the source location table if it has been created, otherwise null.
+  LLVM_ABI DIFunctionLocalMetadata *getFLContextIfExists() const;
 private:
   // Module needs access to the add/removeModule methods.
   friend class Module;

@@ -138,9 +138,6 @@ void DIBuilder::finalize() {
   // Can't handle unresolved nodes anymore.
   AllowUnresolvedNodes = false;
 
-  // Also verify that we've finalized all function contexts, and then clear out the maps.
-  assert(FunctionLocBuilders.empty() && "Non-finalized functions remain!");
-  InlinedCallContexts.clear();
 }
 
 /// If N is compile unit return NULL otherwise return N.
@@ -1062,64 +1059,25 @@ static DISubprogram *getSubprogram(bool IsDistinct, Ts &&...Args) {
 #if LLVM_USE_FLMD_SOURCE_LOCS
 DebugLoc::DebugLocContext DIBuilder::startFunctionContext(Function *F, DISubprogram *SP) {
   assert(SP->isDefinition() && "Function context must only be created for definitions, not declarations.");
-  assert(!F->getFLContext() && "Tried to create context for function that already has one!");
-  DIFunctionLocalMetadata *FLContext = DIFunctionLocalMetadata::getDistinct(F->getContext());
-  F->addMetadata(LLVMContext::MD_flmd, *FLContext);
-  FunctionLocBuilders.try_emplace(FLContext, FLContext, SP);
-  return DebugLoc::DebugLocContext(FLContext);
+  return DebugLoc::DebugLocContext(F);
 }
-
 DebugLoc DIBuilder::addInlinedFunctionContext(DISubprogram *CalleeSP, DebugLoc CallLoc) {
   assert(CalleeSP->isDefinition() && "Function context must only be created for definitions, not declarations.");
-  DIFunctionLocalMetadata *CalleeContext;
-  if (auto ExistingContextIt = InlinedCallContexts.find(CalleeSP);
-      ExistingContextIt != InlinedCallContexts.end()) {
-    CalleeContext = ExistingContextIt->second.first;
-    ExistingContextIt->second.second += 1;
-  } else {
-    CalleeContext = DIFunctionLocalMetadata::getDistinct(CalleeSP->getContext());
-    FunctionLocBuilders.try_emplace(CalleeContext, CalleeContext, CalleeSP);
-    InlinedCallContexts.insert({CalleeSP, {CalleeContext, 1}});
-  }
-  // FIXME: If we use FLMDBuilder to create new Source Locations, do so here.
-  DIFunctionLocalMetadata *CallerContext = CallLoc.getFLContext();
-  FLIndex<uint16_t> NewCallIdx = CallerContext->addInlinedCall(FLInlinedCall(
-    CallLoc.getUnderlyingStorage().SrcLocIdx,
-    CallLoc.getUnderlyingStorage().InlinedAtIdx, CalleeContext, false));
-  DebugLoc InlinedAt(FLDebugLoc::getInlinedCallLoc(NewCallIdx), CallerContext);
-  return InlinedAt;
+  if (!CallLoc)
+    return DebugLoc();
+  FLDebugLoc Call = CallLoc.getUnderlyingStorage();
+  DIFunctionLocalMetadata *FLContext = CallLoc.getFLContext();
+  FLIndex<uint32_t> NewCallIdx = FLContext->addInlinedCall(
+      FLInlinedCall(Call.SrcLocIdx, Call.InlinedAtIdx), /*Uniquable=*/true);
+  return DebugLoc(FLDebugLoc::getInlinedCallLoc(NewCallIdx), FLContext);
 }
-
-void DIBuilder::finalizeFunctionContext(Function *F) {
-  DIFunctionLocalMetadata *FLContext = F->getFLContext();
-  FunctionLocBuilders.erase(FLContext);
-  for (auto &InlinedCall : FLContext->InlinedCalls) {
-    DIFunctionLocalMetadata *CalleeContext = InlinedCall.getInlinee();
-    DISubprogram *InlinedSP = cast<DISubprogram>(CalleeContext->Scopes[0].get());
-    auto CallContextIt = InlinedCallContexts.find(InlinedSP);
-    assert(CallContextIt != InlinedCallContexts.end() &&
-      "Inlined Call was not tracked by DIBuilder.");
-    CallContextIt->second.second -= 1;
-    assert(CallContextIt->second.second >= 0);
-    if (CallContextIt->second.second == 0)
-      FunctionLocBuilders.erase(CalleeContext);
-  }
-}
+void DIBuilder::finalizeFunctionContext(Function *F) {}
 DebugLoc DIBuilder::getLoc(
     DebugLoc::DebugLocContext Context, unsigned Line, unsigned Column,
     MDNode *Scope, DebugLoc InlinedAt, bool ImplicitCode, uint64_t AtomGroup,
     uint8_t AtomRank) {
-  DIFunctionLocalMetadata *FLContext = Context.Context;
-  FLIndex<uint16_t> InlinedAtIdx;
-  if (InlinedAt)
-    InlinedAtIdx = InlinedAt.getIdxForInlinedCall();
-  auto *SrcLocContext = InlinedAtIdx ? FLContext->getInlinedCall(InlinedAtIdx).getInlinee() : FLContext;
-  auto BuilderIt = FunctionLocBuilders.find(SrcLocContext);
-  assert(BuilderIt != FunctionLocBuilders.end() && "Trying to insert location for finished/not-started FLContext!");
-  FLMDBuilder &Builder = BuilderIt->second;
-  auto SrcLocIdx = Builder.getSrcLoc(Line, Column, cast<MDNode>(Scope));
-  FLContext->updateAtomGroupWaterline(InlinedAtIdx, AtomGroup);
-  return DebugLoc(FLDebugLoc(SrcLocIdx, InlinedAtIdx, AtomGroup, AtomRank), FLContext);
+  return DebugLoc::get(Context, Line, Column, Scope, InlinedAt, ImplicitCode,
+                       AtomGroup, AtomRank);
 }
 #else
 DebugLoc::DebugLocContext DIBuilder::startFunctionContext(Function *F, DISubprogram *SP) {
@@ -1127,9 +1085,7 @@ DebugLoc::DebugLocContext DIBuilder::startFunctionContext(Function *F, DISubprog
 }
 
 DebugLoc DIBuilder::addInlinedFunctionContext(DISubprogram *CalleeSP, DebugLoc CallLoc) {
-  DebugLoc InlinedCall = DebugLoc::getDistinctInlinedCall(
-    DebugLoc::DebugLocContext(CalleeSP->getContext()), CallLoc.getDLContext(),
-    CallLoc.getLine(), CallLoc.getColumn(), CallLoc.getScope());
+  return CallLoc;
 }
 
 void DIBuilder::finalizeFunctionContext(Function *F) {

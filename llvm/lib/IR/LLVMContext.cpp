@@ -390,6 +390,10 @@ uint64_t LLVMContext::incNextDILocationAtomGroup() {
   return pImpl->NextAtomGroup++;
 }
 
-DIFunctionLocalMetadata *LLVMContext::getFLMD(const Metadata *MD) {
-  return pImpl->getFLMD(*this, MD);
+DIFunctionLocalMetadata *LLVMContext::getFLContext() {
+  return pImpl->getFLContext(*this);
+}
+
+DIFunctionLocalMetadata *LLVMContext::getFLContextIfExists() const {
+  return pImpl->FLContext;
 }

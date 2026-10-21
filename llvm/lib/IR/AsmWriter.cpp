@@ -983,9 +983,6 @@ private:
 
   /// Add the metadata directly attached to a GlobalObject.
   void processGlobalObjectMetadata(const GlobalObject &GO);
-  /// Function may contain specially-stored metadata that must be enumerated
-  /// specifically.
-  void processGlobalObjectMetadata(const Function &F);
 
   /// Add all of the metadata from a function.
   void processFunctionMetadata(const Function &F);
@@ -1150,6 +1147,12 @@ void SlotTracker::processModule() {
       CreateMetadataSlot(N);
   }
 
+  // Instruction locations index into the context-wide location table.
+  if (const DIFunctionLocalMetadata *FLContext =
+          TheModule->getContext().getFLContextIfExists();
+      FLContext && !FLContext->empty())
+    CreateMetadataSlot(FLContext);
+
   for (const Function &F : *TheModule) {
     if (!F.hasName())
       // Add all the unnamed functions to the table.
@@ -1255,12 +1258,6 @@ int SlotTracker::processIndex() {
 void SlotTracker::processGlobalObjectMetadata(const GlobalObject &GO) {
   SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
   GO.getAllMetadata(MDs);
-  for (auto &MD : MDs)
-    CreateMetadataSlot(MD.second);
-}
-void SlotTracker::processGlobalObjectMetadata(const Function &F) {
-  SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
-  F.getAllMetadata(MDs);
   for (auto &MD : MDs)
     CreateMetadataSlot(MD.second);
 }
@@ -1476,9 +1473,6 @@ void SlotTracker::CreateMetadataSlot(const MDNode *N) {
     assert(FLContext && FLContext->isResolved());
     for (FLScope Scope : FLContext->Scopes) {
       CreateMetadataSlot(Scope.get());
-    }
-    for (FLInlinedCall InlinedCall : FLContext->InlinedCalls) {
-      CreateMetadataSlot(InlinedCall.InlineeFLMD);
     }
   }
 }
@@ -1958,8 +1952,6 @@ struct MDFieldPrinter {
                           bool ShouldSkipZero = true);
   template <class IntTy>
   void printInt(StringRef Name, IntTy Int, bool ShouldSkipZero = true);
-  template <class IntTy>
-  void printIntArray(StringRef Name, ArrayRef<IntTy> Ints, bool ShouldSkipEmpty = true);
   void printAPInt(StringRef Name, const APInt &Int, bool IsUnsigned,
                   bool ShouldSkipZero);
   void printBool(StringRef Name, bool Value,
@@ -2051,17 +2043,6 @@ void MDFieldPrinter::printInt(StringRef Name, IntTy Int, bool ShouldSkipZero) {
     return;
 
   Out << FS << Name << ": " << Int;
-}
-template <class IntTy>
-void MDFieldPrinter::printIntArray(StringRef Name, ArrayRef<IntTy> Ints, bool ShouldSkipEmpty) {
-  if (ShouldSkipEmpty && Ints.empty())
-    return;
-
-  ListSeparator AS;
-  Out << FS << Name << ": " << "[";
-  for (IntTy Int : Ints)
-    Out << AS << Int;
-  Out << "]";
 }
 
 void MDFieldPrinter::printAPInt(StringRef Name, const APInt &Int,
@@ -2176,29 +2157,22 @@ static void writeFLSrcLoc(raw_ostream &Out, FLSrcLoc SrcLoc, AsmWriterContext &W
   Out << "  (line: " << SrcLoc.Line;
   if (SrcLoc.Column)
     Out << ", column: " << SrcLoc.Column;
-  Out << ", scope: " << SrcLoc.ScopeIdx.get() << ")";
+  Out << ", scope: " << SrcLoc.ScopeIdx.get();
+  if (SrcLoc.ImplicitCode)
+    Out << ", isImplicitCode: true";
+  if (SrcLoc.AtomGroup)
+    Out << ", atomGroup: " << SrcLoc.AtomGroup;
+  if (SrcLoc.AtomRank)
+    Out << ", atomRank: " << unsigned(SrcLoc.AtomRank);
+  Out << ")";
 }
-static void writeFLInlinedCall(raw_ostream &Out, FLInlinedCall InlinedCall, AsmWriterContext &WriterCtx) {
+static void writeFLInlinedCall(raw_ostream &Out, FLInlinedCall InlinedCall,
+                               bool Uniqued) {
   Out << "  (srcLoc: " << InlinedCall.SrcLocIdx.get();
   if (InlinedCall.InlinedAtIdx)
     Out << ", inlinedAt: " << InlinedCall.InlinedAtIdx.get();
-  if (InlinedCall.MaxAtomGroup)
-    Out << ", maxAtomGroup: " << InlinedCall.MaxAtomGroup;
-  Out << ", inlineeFLMD: ";
-  writeMetadataAsOperand(Out, InlinedCall.InlineeFLMD, WriterCtx);
-  Out << ")";
-}
-static void writeFLLoop(raw_ostream &Out, FLLoop Loop, AsmWriterContext &WriterCtx) {
-  Out << "  (properties: ";
-  writeMetadataAsOperand(Out, Loop.getProperties().get(), WriterCtx);
-  if (Loop.StartSrcLocIdx)
-    Out << ", startSrcLoc: " << Loop.StartSrcLocIdx.get();
-  if (Loop.StartInlinedAtIdx)
-    Out << ", startInlinedAt: " << Loop.StartInlinedAtIdx.get();
-  if (Loop.EndSrcLocIdx)
-    Out << ", endSrcLoc: " << Loop.EndSrcLocIdx.get();
-  if (Loop.EndInlinedAtIdx)
-    Out << ", endInlinedAt: " << Loop.EndInlinedAtIdx.get();
+  if (!Uniqued)
+    Out << ", distinct: true";
   Out << ")";
 }
 
@@ -2227,15 +2201,7 @@ static void writeDIFunctionLocalMetadata(raw_ostream &Out, const DIFunctionLocal
   if (FLMD->InlinedCalls.size()) {
     Out << LS << "inlinedCalls: [\n";
     for (auto [Index, InlinedCall] : enumerate(FLMD->InlinedCalls)) {
-      writeFLInlinedCall(Out, InlinedCall, WriterCtx);
-      Out << ", ; " << Index << "\n";
-    }
-    Out << "]";
-  }
-  if (FLMD->Loops.size()) {
-    Out << LS << "loops: [\n";
-    for (auto [Index, Loop] : enumerate(FLMD->Loops)) {
-      writeFLLoop(Out, Loop, WriterCtx);
+      writeFLInlinedCall(Out, InlinedCall, FLMD->isUniquedInlinedCall(Index));
       Out << ", ; " << Index << "\n";
     }
     Out << "]";
@@ -2249,8 +2215,6 @@ static void writeFLDebugLoc(raw_ostream &Out, FLDebugLoc DL, AsmWriterContext &W
   Printer.printInt("srcLoc", DL.SrcLocIdx.get(), false);
   if (DL.InlinedAtIdx)
     Printer.printInt("inlinedAt", DL.InlinedAtIdx.get(), false);
-  if (DL.AtomGroup != 0)
-    Printer.printIntArray<uint16_t>("atom", {DL.AtomGroup, DL.AtomRank});
   Out << ")";
 }
 

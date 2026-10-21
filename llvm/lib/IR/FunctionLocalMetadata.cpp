@@ -12,59 +12,65 @@
 
 #include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/LLVMContext.h"
 
 using namespace llvm;
 
-
-FLInlinedCall FLInlinedCall::fromRawParts(uint64_t RawInt, DIFunctionLocalMetadata *Inlinee) {
-  FLInlinedCall Result;
-  Result.SrcLocIdx = FLIndex<uint32_t>::fromRaw(RawInt >> 32);
-  Result.InlinedAtIdx = FLIndex<uint16_t>::fromRaw(RawInt >> 16);
-  Result.MaxAtomGroup = (RawInt & 0xfffe) >> 1;
-  Result.Uniquable = (RawInt & 1);
-  Result.InlineeFLMD = Inlinee;
-  return Result;
+FLIndex<uint32_t> DIFunctionLocalMetadata::getFLScopeIdx(const MDNode *Scope) {
+  auto [It, Inserted] = ScopeIndex.try_emplace(Scope, Scopes.size());
+  if (Inserted)
+    Scopes.push_back(FLScope(const_cast<MDNode *>(Scope)));
+  return It->second;
 }
 
-FLIndex<uint16_t> DIFunctionLocalMetadata::getFLScopeIdx(DILocalScope *Scope) {
-  for (uint16_t Idx = 0; Idx < Scopes.size(); ++Idx)
-    if (Scopes[Idx].get() == Scope)
-    return Idx;
-  if (Scopes.size() > 0)
-    assert(Scope->getSubprogram() == Scopes[0]);
-  Scopes.push_back(FLScope(Scope));
-  return Scopes.size() - 1;
+FLIndex<uint32_t>
+DIFunctionLocalMetadata::getFLSrcLocIdx(const FLSrcLoc &SrcLoc) {
+  unsigned Hash = SrcLoc.getHash();
+  uint32_t NewIdx = SrcLocs.size();
+  auto [It, Inserted] = SrcLocIndex.insert_as(
+      (uint64_t)Hash << 32 | NewIdx,
+      FLSrcLocIndexInfo::Key{SrcLoc, SrcLocs, Hash});
+  if (!Inserted)
+    return uint32_t(*It);
+  SrcLocs.push_back(SrcLoc);
+  if (SrcLoc.AtomGroup)
+    getContext().updateDILocationAtomGroupWaterline(SrcLoc.AtomGroup + 1);
+  return NewIdx;
 }
 
-
-FLMDBuilder::FLMDBuilder(DIFunctionLocalMetadata *FLContext, const DISubprogram *SP) : FLContext(FLContext) {
-  /// If FLContext is already populated, load its contents into the builder map.
-  if (!FLContext->Scopes.empty() || !FLContext->SrcLocs.empty()) {
-    assert(FLContext->Scopes[0].Scope == SP &&
-      "FLContext already contains non-matching subprogram?");
-    assert(FLContext->SrcLocs[0] == FLSrcLoc(0, 0, 0) &&
-      "FLContext already contains non-matching srcLocs?");
-    assert(FLContext->SrcLocs[1] == FLSrcLoc(SP->getLine(), 0, 0) &&
-      "FLContext already contains non-matching srcLocs?");
-    assert(FLContext->SrcLocs[2] == FLSrcLoc(SP->getScopeLine(), 0, 0) &&
-      "FLContext already contains non-matching srcLocs?");
-    for (auto [Idx, SrcLoc] : enumerate(FLContext->SrcLocs))
-      SrcLocMap.insert({SrcLoc, Idx});
-    for (auto [Idx, Scope] : enumerate(FLContext->Scopes))
-      ScopeMap.insert({Scope, Idx});
-    for (auto [Idx, InlinedCall] : enumerate(FLContext->InlinedCalls))
-      if (InlinedCall.Uniquable)
-        UniqueInlinedCalls.insert({InlinedCall, Idx});
-    return;
+FLIndex<uint32_t>
+DIFunctionLocalMetadata::addInlinedCall(FLInlinedCall InlinedCall,
+                                        bool Uniquable) {
+  uint32_t NewIdx = InlinedCalls.size();
+  if (Uniquable) {
+    auto [It, Inserted] =
+        UniquedInlinedCalls.try_emplace(InlinedCall.asRawInt(), NewIdx);
+    if (!Inserted)
+      return It->second;
   }
-  assert(FLContext->Scopes.empty() && FLContext->SrcLocs.empty()
-    && "Creating a builder for an already-exinst FLContext currently unsupported.");
-  FLContext->Scopes.push_back(FLScope{ const_cast<DISubprogram*>(SP) });
-  ScopeMap.insert({FLScope{ const_cast<DISubprogram*>(SP) }, 0});
-  FLContext->SrcLocs.push_back(FLSrcLoc(0, 0, 0));
-  FLContext->SrcLocs.push_back(FLSrcLoc(SP->getLine(), 0, 0));
-  FLContext->SrcLocs.push_back(FLSrcLoc(SP->getScopeLine(), 0, 0));
-  SrcLocMap.insert({FLSrcLoc(0, 0, 0), 0});
-  SrcLocMap.insert({FLSrcLoc(SP->getLine(), 0, 0), 1});
-  SrcLocMap.insert({FLSrcLoc(SP->getScopeLine(), 0, 0), 2});
+  InlinedCalls.push_back(InlinedCall);
+  return NewIdx;
+}
+
+bool DIFunctionLocalMetadata::isUniquedInlinedCall(
+    FLIndex<uint32_t> Idx) const {
+  auto It = UniquedInlinedCalls.find(getInlinedCall(Idx).asRawInt());
+  return It != UniquedInlinedCalls.end() && It->second == Idx.get();
+}
+
+void DIFunctionLocalMetadata::rebuildIndexes(
+    ArrayRef<bool> UniquableInlinedCalls) {
+  ScopeIndex.clear();
+  SrcLocIndex.clear();
+  UniquedInlinedCalls.clear();
+  for (auto [Idx, Scope] : enumerate(Scopes))
+    ScopeIndex.try_emplace(Scope.Scope, Idx);
+  for (auto [Idx, SrcLoc] : enumerate(SrcLocs)) {
+    unsigned Hash = SrcLoc.getHash();
+    SrcLocIndex.insert_as((uint64_t)Hash << 32 | Idx,
+                          FLSrcLocIndexInfo::Key{SrcLoc, SrcLocs, Hash});
+  }
+  for (auto [Idx, InlinedCall] : enumerate(InlinedCalls))
+    if (UniquableInlinedCalls[Idx])
+      UniquedInlinedCalls.try_emplace(InlinedCall.asRawInt(), Idx);
 }

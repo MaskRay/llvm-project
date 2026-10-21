@@ -27,7 +27,6 @@
 #include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instruction.h"
@@ -522,10 +521,6 @@ Function::~Function() {
 
   // Remove the function from the on-the-side GC table.
   clearGC();
-
-  // Clear metadata here (instead of in ~GlobalObject) to ensure FLContext is
-  // included.
-  clearMetadata();
 }
 
 void Function::BuildLazyArguments() const {

@@ -429,10 +429,6 @@ private:
   void writeFunctionMetadataAttachment(const Function &F);
   void pushGlobalMetadataAttachment(SmallVectorImpl<uint64_t> &Record,
                                     const GlobalObject &GO);
-  // Function may contain locally-stored metadata attachments, so needs a
-  // separate overload.
-  void pushGlobalMetadataAttachment(SmallVectorImpl<uint64_t> &Record,
-                                    const Function &F);
   void writeModuleMetadataKinds();
   void writeOperandBundleTags();
   void writeSyncScopeNames();
@@ -1895,33 +1891,28 @@ void ModuleBitcodeWriter::writeDIFunctionLocalMetadata(const DIFunctionLocalMeta
                                           SmallVectorImpl<uint64_t> &Record,
                                           unsigned &Abbrev) {
   // No abbreviation for this type.
-  const uint64_t Version = 1 << 1;
+  const uint64_t Version = 2 << 1;
   Record.push_back((uint64_t)N->isDistinct() | Version);
-  Record.push_back(N->MaxAtomGroup);
   // Print each array separately, leading with a length-field.
   // Scopes
   Record.push_back(N->Scopes.size());
   for (const FLScope &Scope : N->Scopes)
-    Record.push_back(VE.getMetadataID(Scope.get()));
+    Record.push_back(VE.getMetadataID(Scope.Scope));
   // SrcLocs
   Record.push_back(N->SrcLocs.size());
   for (const FLSrcLoc &SrcLoc : N->SrcLocs) {
-    Record.push_back(SrcLoc.asRawInt());
+    Record.push_back(SrcLoc.Line);
+    Record.push_back(SrcLoc.Column);
+    Record.push_back(SrcLoc.ScopeIdx.asRaw());
+    Record.push_back(SrcLoc.AtomGroup);
+    Record.push_back(SrcLoc.AtomRank | SrcLoc.ImplicitCode << 3);
   }
-  // InlinedCalls
+  // InlinedCalls, with the uniqued flag in the low bit.
   Record.push_back(N->InlinedCalls.size());
-  for (const FLInlinedCall &InlinedCall : N->InlinedCalls) {
-    auto [RawInt, MDPtr] = InlinedCall.asRawParts();
-    Record.push_back(RawInt);
-    Record.push_back(VE.getMetadataID(MDPtr));
-  }
-  // Loops
-  Record.push_back(N->Loops.size());
-  for (const FLLoop &Loop : N->Loops) {
-    auto [RawInt1, RawInt2, MDPtr] = Loop.asRawParts();
-    Record.push_back(RawInt1);
-    Record.push_back(RawInt2);
-    Record.push_back(VE.getMetadataID(MDPtr));
+  for (auto [Idx, InlinedCall] : enumerate(N->InlinedCalls)) {
+    Record.push_back(InlinedCall.SrcLocIdx.asRaw());
+    Record.push_back((uint64_t)InlinedCall.InlinedAtIdx.asRaw() << 1 |
+                     N->isUniquedInlinedCall(Idx));
   }
   Stream.EmitRecord(bitc::METADATA_FLMD, Record, Abbrev);
   Record.clear();
@@ -2806,23 +2797,9 @@ void ModuleBitcodeWriter::writeFunctionMetadata(const Function &F) {
 
 void ModuleBitcodeWriter::pushGlobalMetadataAttachment(
     SmallVectorImpl<uint64_t> &Record, const GlobalObject &GO) {
-  if (auto *F = dyn_cast<Function>(&GO)) {
-    pushGlobalMetadataAttachment(Record, *F);
-    return;
-  }
   // [n x [id, mdnode]]
   SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
   GO.getAllMetadata(MDs);
-  for (const auto &I : MDs) {
-    Record.push_back(I.first);
-    Record.push_back(VE.getMetadataID(I.second));
-  }
-}
-void ModuleBitcodeWriter::pushGlobalMetadataAttachment(
-    SmallVectorImpl<uint64_t> &Record, const Function &F) {
-  // [n x [id, mdnode]]
-  SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
-  F.getAllMetadata(MDs);
   for (const auto &I : MDs) {
     Record.push_back(I.first);
     Record.push_back(VE.getMetadataID(I.second));

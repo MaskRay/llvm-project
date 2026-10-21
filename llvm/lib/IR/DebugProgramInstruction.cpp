@@ -539,6 +539,20 @@ BasicBlock *DbgRecord::getBlock() { return Marker->getParent(); }
 
 const BasicBlock *DbgRecord::getBlock() const { return Marker->getParent(); }
 
+DebugLoc DbgRecord::getFullDebugLoc() const {
+#if LLVM_USE_FLMD_SOURCE_LOCS
+  if (!DbgLoc)
+    return DebugLoc();
+  // Use the record's own metadata so that unattached records work too.
+  const MDNode *MD = isa<DbgLabelRecord>(this)
+                         ? cast<DbgLabelRecord>(this)->getRawLabel()
+                         : cast<DbgVariableRecord>(this)->getRawVariable();
+  return DebugLoc(DbgLoc, MD->getContext().getFLContext());
+#else
+  return DebugLoc(DbgLoc);
+#endif
+}
+
 Function *DbgRecord::getFunction() { return getBlock()->getParent(); }
 
 const Function *DbgRecord::getFunction() const {

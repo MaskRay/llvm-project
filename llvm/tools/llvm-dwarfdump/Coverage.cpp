@@ -283,7 +283,7 @@ static void addModuleLines(Instruction *I, VarState &Var,
                            DenseSet<std::pair<StringRef, uint32_t>> &Lines) {
   auto *VarScope = Var.DVR.getVariable()->getScope();
   do {
-    DebugLoc Loc = I->getDebugLoc(); // TODO: Backport this change to the reference patch.
+    DebugLoc Loc = I->getFullDebugLoc(); // TODO: Backport this change to the reference patch.
     DIScope *Scope;
     if (Loc && isInScope(VarScope, Loc) && Loc.getLine() &&
         (Scope = dyn_cast_if_present<DIScope>(Loc.getScope()))) {
@@ -311,7 +311,7 @@ static BitcodeLineMap processModule(Module *Mod) {
             Vars.push_back(VarState{DVR, VarDefinitionMap()});
           } else if (DVR.isDbgValue()) {
             // For #dbg_value, the variable is live immediately from this point.
-            if (DVR.getDebugLoc().getInlinedAt() != nullptr) {
+            if (DVR.getFullDebugLoc().getInlinedAt() != nullptr) {
               assert(0 && "Variable in bitcode has been inlined");
               continue;
             }

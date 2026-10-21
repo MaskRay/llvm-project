@@ -26,7 +26,6 @@
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -59,18 +58,11 @@ void llvm::mapAtomInstance(DebugLoc DL, ValueToValueMapTy &VMap) {
     return;
 
   // Map entry to a new atom group.
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  uint64_t NewGroup = DL.getNewAtomGroup();
-#else
   uint64_t NewGroup = DL.getContext().incNextDILocationAtomGroup();
-#endif
-  assert(NewGroup != 0);
-  if (NewGroup <= CurGroup)
-    dbgs() << "Atom error: " << NewGroup << " <= " << CurGroup << "\n";
   assert(NewGroup > CurGroup && "Next should always be greater than current");
   It->second = NewGroup;
 
-  // RemappedAtomMax = std::max<uint64_t>(NewGroup, RemappedAtomMax);
+  RemappedAtomMax = std::max<uint64_t>(NewGroup, RemappedAtomMax);
 }
 
 static void collectDebugInfoFromInstructions(const Function &F,
@@ -163,13 +155,7 @@ BasicBlock *llvm::CloneBasicBlock(const BasicBlock *BB, ValueToValueMapTy &VMap,
     VMap[&I] = NewInst; // Add instruction map to value.
 
     if (MapAtoms) {
-      // FIXME: The logic behind this ternary is that if we are creating a new
-      // function with its own FLContext, we will have passed `F`. If we are
-      // not creating a new function, then the FLContext is not changing, and so
-      // we can use the existing basic block. However, this needs verifying, and
-      // also  there is a good argument that if we are inserting into a new
-      // function then we don't need to map atoms at all.
-      if (DebugLoc DL = NewInst->getFullDebugLoc(F ? F : BB->getParent()))
+      if (const DebugLoc &DL = NewInst->getFullDebugLoc())
         mapAtomInstance(DL, VMap);
     }
 
@@ -295,18 +281,6 @@ void llvm::CloneFunctionBodyInto(Function &NewFunc, const Function &OldFunc,
     if (ReturnInst *RI = dyn_cast<ReturnInst>(CBB->getTerminator()))
       Returns.push_back(RI);
   }
-
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  for (Function::iterator
-           BB = cast<BasicBlock>(VMap[&OldFunc.front()])->getIterator(),
-           BE = NewFunc.end();
-       BB != BE; ++BB)
-    for (Instruction &II : *BB) {
-      II.setDebugLoc(II.getFullDebugLoc(&NewFunc));
-      for (auto &DVR : II.getDbgRecordRange())
-        DVR.setDebugLoc(DVR.getFullDebugLoc(&NewFunc));
-    }
-#endif
 
   // Loop over all of the instructions in the new function, fixing up operand
   // references as we go. This uses VMap to do all the hard work.

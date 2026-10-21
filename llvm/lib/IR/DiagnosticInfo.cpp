@@ -155,7 +155,9 @@ DiagnosticLocation::DiagnosticLocation(const DISubprogram *SP) {
     return;
 
 #if LLVM_USE_FLMD_SOURCE_LOCS
-  DL = FLDebugLoc(DIFunctionLocalMetadata::SPScopeLineSrcLocIdx, {});
+  DL = DebugLoc::get(DebugLocContext(SP->getContext()), SP->getScopeLine(), 0,
+                     const_cast<DISubprogram *>(SP))
+           .getStorage();
 #else
   DL = DILocation::get(SP->getContext(), SP->getLine(), SP->getColumn(), SP);
 #endif

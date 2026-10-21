@@ -55,7 +55,6 @@
 #include <deque>
 #include <iterator>
 #include <limits>
-#include <list>
 #include <map>
 #include <optional>
 #include <string>
@@ -410,8 +409,10 @@ class MetadataLoader::MetadataLoaderImpl {
   Module &TheModule;
   MetadataLoaderCallbacks Callbacks;
 
-  DenseMap<DIFunctionLocalMetadata *, std::list<std::pair<uint32_t, TrackingMDRef>>> FLMDScopeFwdRefs;
-  DenseMap<DIFunctionLocalMetadata *, std::list<std::pair<uint32_t, TrackingMDRef>>> FLMDInlineeFwdRefs;
+  // Location table entries whose scope was a forward reference.
+  std::vector<std::pair<uint32_t, TrackingMDRef>> FLMDScopeFwdRefs;
+  SmallVector<bool, 0> FLMDUniquableInlinedCalls;
+  bool FLMDTableLoaded = false;
 
   /// Cursor associated with the lazy-loading of Metadata. This is the easy way
   /// to keep around the right "context" (Abbrev list) to be able to jump in
@@ -1288,26 +1289,17 @@ void MetadataLoader::MetadataLoaderImpl::resolveForwardRefsAndPlaceholders(
   // with the final node they refer to.
   Placeholders.flush(MetadataList);
 
-  // Now that we've flushed, we can resolve the awkward FLMD fwd refs too.
-  // FIXME: This is a bit of a hack, but may not be too far off the final
-  // implementation - think about it.
-  for (auto &[FLMD, ScopeFwdRefs] : FLMDScopeFwdRefs) {
-    while (!ScopeFwdRefs.empty()) {
-      auto &[Idx, Ref] = ScopeFwdRefs.front();
-      FLMD->Scopes[Idx].Scope = cast<DILocalScope>(Ref.get());
-      ScopeFwdRefs.pop_front();
-    }
+  // Now that we've flushed, resolve the location table's scopes and build its
+  // uniquing indexes.
+  if (FLMDTableLoaded) {
+    DIFunctionLocalMetadata *FLContext = Context.getFLContext();
+    for (auto &[Idx, Ref] : FLMDScopeFwdRefs)
+      FLContext->Scopes[Idx].Scope = cast<DILocalScope>(Ref.get());
+    FLContext->rebuildIndexes(FLMDUniquableInlinedCalls);
+    FLMDScopeFwdRefs.clear();
+    FLMDUniquableInlinedCalls.clear();
+    FLMDTableLoaded = false;
   }
-  for (auto &[FLMD, InlineeFwdRefs] : FLMDInlineeFwdRefs) {
-    while (!InlineeFwdRefs.empty()) {
-      auto &[Idx, Ref] = InlineeFwdRefs.front();
-      FLMD->InlinedCalls[Idx].InlineeFLMD = cast<DIFunctionLocalMetadata>(Ref.get());
-      // dbgs() << "Resolved 1 fwd ref: " << Ref.get() << "\n";
-      InlineeFwdRefs.pop_front();
-    }
-  }
-  FLMDScopeFwdRefs.clear();
-  FLMDInlineeFwdRefs.clear();
 }
 
 static Value *getValueFwdRef(BitcodeReaderValueList &ValueList, unsigned Idx,
@@ -1537,10 +1529,10 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
     if (Record.size() != 2)
       return error("Invalid record");
 
+    // The table operand is always the context-wide one.
     FLDebugLoc DL = FLDebugLoc::fromRawInt(Record[0]);
-    Metadata *FLContext = getMD(Record[1]);
     MetadataList.assignValue(
-        DILocation::get(Context, DL, FLContext),
+        DILocation::get(Context, DL, Context.getFLContext()),
         NextMetadataNo);
     NextMetadataNo++;
     break;
@@ -2545,64 +2537,83 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
   case bitc::METADATA_FLMD: {
     IsDistinct = Record[0] & 1;
     uint64_t Version = Record[0] >> 1;
-    if (!IsDistinct)
-      return error(
-          "Invalid record: DIFunctionLocalMetadata must be distinct");
-    // FIXME: This should be transient, do we really want to serialize it? If
-    // we do, we could also easily combine it with Record[0].
-    uint16_t MaxAtomGroup = Record[1];
-    // FLMD comprises 4 arrays with a leading length field.
-    uint64_t CurrentRecord = 2;
-    DIFunctionLocalMetadata *NewFLMD = DIFunctionLocalMetadata::getDistinct(Context);
-    NewFLMD->MaxAtomGroup = MaxAtomGroup;
+    if (!IsDistinct || Version != 2)
+      return error("Invalid record: unsupported location table");
+    // The table is context-wide; merging into a non-empty one would need the
+    // module's indexes to be remapped.
+    DIFunctionLocalMetadata *FLContext = Context.getFLContext();
+    if (!FLContext->empty())
+      return error("Invalid record: location table already populated");
+    uint64_t CurrentRecord = 1;
+    auto Next = [&]() -> Expected<uint64_t> {
+      if (CurrentRecord >= Record.size())
+        return error("Invalid record: truncated location table");
+      return Record[CurrentRecord++];
+    };
     // Scopes
-    uint64_t NumScopes = Record[CurrentRecord++];
-    for (uint64_t ScopeIdx = 0; ScopeIdx < NumScopes; ++ScopeIdx) {
-      uint64_t Scope = Record[CurrentRecord++];
-      auto *ScopeMD = getMD(Scope);
+    Expected<uint64_t> NumScopes = Next();
+    if (!NumScopes)
+      return NumScopes.takeError();
+    for (uint64_t ScopeIdx = 0; ScopeIdx < *NumScopes; ++ScopeIdx) {
+      Expected<uint64_t> Scope = Next();
+      if (!Scope)
+        return Scope.takeError();
+      auto *ScopeMD = getMD(*Scope);
       if (auto *ScopeNode = dyn_cast<MDNode>(ScopeMD)) {
-        NewFLMD->Scopes.push_back(FLScope(ScopeNode));
+        FLContext->Scopes.push_back(FLScope(ScopeNode));
       } else {
-        auto &ScopeFwdRefs = FLMDScopeFwdRefs.try_emplace(NewFLMD).first->getSecond();
-        ScopeFwdRefs.emplace_back(ScopeIdx, ScopeMD);
-        NewFLMD->Scopes.push_back(FLScope((MDNode*)nullptr));
+        FLMDScopeFwdRefs.emplace_back(ScopeIdx, ScopeMD);
+        FLContext->Scopes.push_back(FLScope((MDNode*)nullptr));
       }
     }
     // SrcLocs
-    uint64_t NumSrcLocs = Record[CurrentRecord++];
-    for (uint64_t SrcLocIdx = 0; SrcLocIdx < NumSrcLocs; ++SrcLocIdx) {
-      uint64_t RawInt = Record[CurrentRecord++];
-      NewFLMD->SrcLocs.push_back(FLSrcLoc::fromRawInt(RawInt));
+    Expected<uint64_t> NumSrcLocs = Next();
+    if (!NumSrcLocs)
+      return NumSrcLocs.takeError();
+    FLContext->SrcLocs.reserve(*NumSrcLocs);
+    for (uint64_t SrcLocIdx = 0; SrcLocIdx < *NumSrcLocs; ++SrcLocIdx) {
+      uint64_t Fields[5];
+      for (uint64_t &Field : Fields) {
+        Expected<uint64_t> V = Next();
+        if (!V)
+          return V.takeError();
+        Field = *V;
+      }
+      FLSrcLoc SrcLoc;
+      SrcLoc.Line = Fields[0];
+      SrcLoc.Column = Fields[1];
+      SrcLoc.ScopeIdx = FLIndex<uint32_t>::fromRaw(Fields[2]);
+      SrcLoc.AtomGroup = Fields[3];
+      SrcLoc.AtomRank = Fields[4] & 7;
+      SrcLoc.ImplicitCode = (Fields[4] >> 3) & 1;
+      if (!SrcLoc.ScopeIdx || SrcLoc.ScopeIdx.get() >= *NumScopes)
+        return error("Invalid record: bad location table scope");
+      if (SrcLoc.AtomGroup)
+        Context.updateDILocationAtomGroupWaterline(SrcLoc.AtomGroup + 1);
+      FLContext->SrcLocs.push_back(SrcLoc);
     }
     // InlinedCalls
-    uint64_t NumInlinedCalls = Record[CurrentRecord++];
-    // dbgs() << "Reading " << NumInlinedCalls << " Inlined calls for FLContext: " << NewFLMD << "\n";
-    for (uint64_t InlinedCallIdx = 0; InlinedCallIdx < NumInlinedCalls; ++InlinedCallIdx) {
-      uint64_t RawInt = Record[CurrentRecord++];
-      uint64_t RawInlineeID = Record[CurrentRecord++];
-      auto *InlineeMD = getMD(RawInlineeID);
-      if (DIFunctionLocalMetadata *InlineeFLMD = dyn_cast<DIFunctionLocalMetadata>(InlineeMD)) {
-        // dbgs() << "Read 1 pre-loaded: " << RawInlineeID << " = " << InlineeFLMD << "\n";
-        NewFLMD->InlinedCalls.push_back(FLInlinedCall::fromRawParts(RawInt, InlineeFLMD));
-      } else {
-        // dbgs() << "Read 1 fwd ref: " << RawInlineeID << " = " << InlineeFLMD << "\n";
-        auto &InlineeFwdRefs = FLMDInlineeFwdRefs.try_emplace(NewFLMD).first->getSecond();
-        InlineeFwdRefs.emplace_back(InlinedCallIdx, InlineeMD);
-        NewFLMD->InlinedCalls.push_back(FLInlinedCall::fromRawParts(RawInt, nullptr));
-      }
+    Expected<uint64_t> NumInlinedCalls = Next();
+    if (!NumInlinedCalls)
+      return NumInlinedCalls.takeError();
+    FLContext->InlinedCalls.reserve(*NumInlinedCalls);
+    FLMDUniquableInlinedCalls.reserve(*NumInlinedCalls);
+    for (uint64_t Idx = 0; Idx < *NumInlinedCalls; ++Idx) {
+      Expected<uint64_t> SrcLoc = Next();
+      if (!SrcLoc)
+        return SrcLoc.takeError();
+      Expected<uint64_t> InlinedAt = Next();
+      if (!InlinedAt)
+        return InlinedAt.takeError();
+      FLContext->InlinedCalls.push_back(
+          FLInlinedCall(FLIndex<uint32_t>::fromRaw(*SrcLoc),
+                        FLIndex<uint32_t>::fromRaw(*InlinedAt >> 1)));
+      FLMDUniquableInlinedCalls.push_back(*InlinedAt & 1);
     }
-    // Loops
-    uint64_t NumLoops = Record[CurrentRecord++];
-    for (uint64_t LoopIdx = 0; LoopIdx < NumLoops; ++LoopIdx) {
-      uint64_t RawSrcLocs = Record[CurrentRecord++];
-      uint64_t RawInlinedAts = Record[CurrentRecord++];
-      uint64_t PropertiesID = Record[CurrentRecord++];
-      MDNode *PropertiesNode = dyn_cast<MDNode>(getMD(PropertiesID));
-      if (!PropertiesNode)
-        return error("Invalid record: Loop Properties must be an MDNode");
-      NewFLMD->Loops.push_back(FLLoop::fromRawParts(RawSrcLocs, RawInlinedAts, PropertiesNode));
-    }
-    MetadataList.assignValue(NewFLMD, NextMetadataNo);
+    // Scope forward references are resolved, and the indexes built, once
+    // the block is done.
+    FLMDTableLoaded = true;
+    MetadataList.assignValue(FLContext, NextMetadataNo);
     NextMetadataNo++;
     break;
   }
@@ -2659,10 +2670,7 @@ Error MetadataLoader::MetadataLoaderImpl::parseGlobalObjectAttachment(
         dyn_cast_or_null<MDNode>(getMetadataFwdRefOrLoad(Record[I + 1]));
     if (!MD)
       return error("Invalid metadata attachment: expect fwd ref to MDNode");
-    if (auto *F = dyn_cast<Function>(&GO))
-      F->addMetadata(K->second, *MD);
-    else
-      GO.addMetadata(K->second, *MD);
+    GO.addMetadata(K->second, *MD);
   }
   return Error::success();
 }

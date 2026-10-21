@@ -218,34 +218,12 @@ public:
   DbgLocStorage getDebugLocStorage() const {
     return DbgLoc;
   }
-  DbgLocStorage getDebugLoc() const {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-    return DebugLoc(DbgLoc, getFLMDForFunction(getFunction()));
-#else
-    return DebugLoc(DbgLoc);
-#endif
+  DbgLocStorage getDebugLoc() const { return DbgLoc; }
+  [[deprecated]] DebugLoc getDebugLoc(Function *) const {
+    return getFullDebugLoc();
   }
-  [[deprecated]] DebugLoc getDebugLoc(Function *FunctionContext) const {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-    return DebugLoc(DbgLoc, getFLMDForFunction(FunctionContext));
-#else
-    return DebugLoc(DbgLoc);
-#endif
-  }
-  DebugLoc getFullDebugLoc() const {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-    return DebugLoc(DbgLoc, getFLMDForFunction(getFunction()));
-#else
-    return DebugLoc(DbgLoc);
-#endif
-  }
-  DebugLoc getFullDebugLoc(Function *FunctionContext) const {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-    return DebugLoc(DbgLoc, getFLMDForFunction(FunctionContext));
-#else
-    return DebugLoc(DbgLoc);
-#endif
-  }
+  LLVM_ABI DebugLoc getFullDebugLoc() const;
+  DebugLoc getFullDebugLoc(Function *) const { return getFullDebugLoc(); }
   void setDebugLoc(DebugLoc Loc) { DbgLoc = Loc.getStorage(); }
   void setDebugLoc(DbgLocStorage Loc) { DbgLoc = Loc.getCopied(); }
   void setDebugLocIfPresent(DebugLoc Loc) { DbgLoc = Loc.getStorage().orElse(DbgLoc); }

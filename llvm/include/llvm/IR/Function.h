@@ -27,7 +27,6 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/GlobalObject.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/OperandTraits.h"
@@ -92,8 +91,6 @@ private:
   std::unique_ptr<ValueSymbolTable>
       SymTab;                             ///< Symbol table of args/instructions
   AttributeList AttributeSets;            ///< Parameter attributes
-
-  DIFunctionLocalMetadata *FLContext = nullptr;  ///< Cached function-local context
 
   /*
    * Value::SubclassData
@@ -987,65 +984,6 @@ public:
   /// setjmp or other function that gcc recognizes as "returning twice".
   bool callsFunctionThatReturnsTwice() const;
 
-  //===--------------------------------------------------------------------===//
-  // Metadata manipulation.
-  //===--------------------------------------------------------------------===//
-
-private:
-  // These are all implemented in Metadata.cpp.
-  LLVM_ABI MDNode *getMetadataImpl(StringRef Kind) const;
-  LLVM_ABI void
-  getAllMetadataImpl(SmallVectorImpl<std::pair<unsigned, MDNode *>> &) const;
-public:
-
-  DIFunctionLocalMetadata *getFLContext() const {
-    return FLContext;
-  }
-  void setFLContext(DIFunctionLocalMetadata *NewFLContext) {
-    FLContext = NewFLContext;
-  }
-
-  MDNode *getMetadata(StringRef Kind) const {
-    if (!hasMetadata()) return nullptr;
-    return getMetadataImpl(Kind);
-  }
-  MDNode *getMetadata(unsigned KindID) const {
-    // Handle 'flmd' as a special case since it is not stored in the hash table.
-    if (KindID == LLVMContext::MD_flmd)
-      return FLContext;
-    return hasMetadataOtherThanFLContext() != 0
-      ? Value::getMetadataImpl(KindID)
-      : nullptr;
-  }
-  LLVM_ABI void getMetadata(unsigned KindID,
-                            SmallVectorImpl<MDNode *> &MDs) const {
-    if (KindID == LLVMContext::MD_flmd) {
-      if (FLContext)
-        MDs.push_back(FLContext);
-      return;
-    }
-    GlobalObject::getMetadata(KindID, MDs);
-  }
-  LLVM_ABI void getMetadata(StringRef Kind,
-                            SmallVectorImpl<MDNode *> &MDs) const;
-
-  LLVM_ABI void setMetadata(unsigned KindID, MDNode *Node);
-  LLVM_ABI void setMetadata(StringRef Kind, MDNode *Node);
-
-  LLVM_ABI void addMetadata(unsigned KindID, MDNode &MD);
-  LLVM_ABI void addMetadata(StringRef Kind, MDNode &MD);
-  LLVM_ABI void clearMetadata() {
-    FLContext = nullptr;
-    GlobalValue::clearMetadata();
-  }
-  LLVM_ABI bool eraseMetadata(unsigned KindID) {
-    if (KindID == LLVMContext::MD_flmd) {
-      bool Removed = FLContext;
-      FLContext = nullptr;
-      return Removed;
-    }
-    return GlobalValue::eraseMetadata(KindID);
-  }
   /// Set the attached subprogram.
   ///
   /// Calls \a setMetadata() with \a LLVMContext::MD_dbg.
@@ -1056,53 +994,6 @@ public:
   /// Calls \a getMetadata() with \a LLVMContext::MD_dbg and casts the result
   /// to \a DISubprogram.
   DISubprogram *getSubprogram() const;
-
-  
-  /// Return true if this instruction has any metadata attached to it.
-  bool hasMetadata() const { return FLContext || MetadataIndex != 0; }
-
-  /// Return true if this instruction has metadata attached to it other than a
-  /// debug location.
-  bool hasMetadataOtherThanFLContext() const { return MetadataIndex != 0; }
-
-  /// Return true if this instruction has the given type of metadata attached.
-  bool hasMetadata(unsigned KindID) const {
-    return getMetadata(KindID) != nullptr;
-  }
-
-  /// Return true if this instruction has the given type of metadata attached.
-  bool hasMetadata(StringRef Kind) const {
-    return getMetadata(Kind) != nullptr;
-  }
-
-  /// Get all metadata attached to this Instruction. The first element of each
-  /// pair returned is the KindID, the second element is the metadata value.
-  /// This list is returned sorted by the KindID.
-  void
-  getAllMetadata(SmallVectorImpl<std::pair<unsigned, MDNode *>> &MDs) const {
-    if (hasMetadata())
-      getAllMetadataImpl(MDs);
-  }
-
-  /// This does the same thing as getAllMetadata, except that it filters out the
-  /// debug location.
-  void getAllMetadataOtherThanFLMD(
-      SmallVectorImpl<std::pair<unsigned, MDNode *>> &MDs) const {
-    Value::getAllMetadata(MDs);
-  }
-
-  /// Copy metadata from \p SrcInst to this instruction. \p WL, if not empty,
-  /// specifies the list of meta data that needs to be copied. If \p WL is
-  /// empty, all meta data will be copied.
-  LLVM_ABI void copyMetadata(const Function *SrcFunc, unsigned Offset);
-
-  /// Erase all metadata that matches the predicate.
-  LLVM_ABI void eraseMetadataIf(function_ref<bool(unsigned, MDNode *)> Pred);
-
-
-  //===--------------------------------------------------------------------===//
-  // Metadata manipulation end.
-  //===--------------------------------------------------------------------===//
 
   /// Returns true if we should emit debug info for profiling.
   bool shouldEmitDebugInfoForProfiling() const;

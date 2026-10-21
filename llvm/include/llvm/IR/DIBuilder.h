@@ -22,7 +22,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/DebugInfoMetadata.h"
-#include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/TrackingMDRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
@@ -64,17 +63,6 @@ namespace llvm {
     /// Track nodes that may be unresolved.
     SmallVector<TrackingMDNodeRef, 4> UnresolvedNodes;
     bool AllowUnresolvedNodes;
-
-#if LLVM_USE_FLMD_SOURCE_LOCS
-    /// Maps FLContexts to their associated FLMDBuilders.
-    DenseMap<DIFunctionLocalMetadata *, FLMDBuilder> FunctionLocBuilders;
-    /// Maps Subprograms for inlined calls to their associated FLContext, and
-    /// a reference count: when we finalize a function containing inlined calls,
-    /// we decrease the reference count, and if it reaches 0 then we finalize
-    /// the inlined subprogram as well (but keep this map entry in case we reuse
-    /// the inlined function later).
-    DenseMap<DISubprogram *, std::pair<DIFunctionLocalMetadata *, unsigned>> InlinedCallContexts;
-#endif
 
     /// Each subprogram's preserved local variables, labels, imported entities,
     /// and types.

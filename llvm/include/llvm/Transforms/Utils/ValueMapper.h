@@ -304,9 +304,6 @@ inline void RemapInstruction(Instruction *I, ValueToValueMapTy &VM,
 /// llvm::mapAtomInstance), which is necessary to distinguish source code
 /// atoms on duplicated code paths.
 LLVM_ABI void RemapSourceAtom(Instruction *I, ValueToValueMapTy &VM);
-// Version that takes a function, for cases where FLMD is enabled and I is
-// inserted.
-LLVM_ABI void RemapSourceAtom(Instruction *I, ValueToValueMapTy &VM, Function *F);
 
 /// Remap the Values used in the DbgRecord \a DR using the value map \a
 /// VM.

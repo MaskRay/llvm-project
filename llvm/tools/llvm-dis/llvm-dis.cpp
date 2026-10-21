@@ -130,7 +130,7 @@ public:
       OS << "; [#uses=" << V.getNumUses() << " type=" << *V.getType() << "]";
     }
     if (const Instruction *I = dyn_cast<Instruction>(&V)) {
-      if (DebugLoc DL = I->getDebugLoc()) {
+      if (DebugLoc DL = I->getFullDebugLoc()) {
         if (!Padded) {
           OS.PadToColumn(50);
           Padded = true;

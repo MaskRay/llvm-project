@@ -36,7 +36,6 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/FunctionLocalMetadata.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstrTypes.h"
@@ -1353,7 +1352,7 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
   SmallDenseMap<DINode *, DINode *> RemappedMetadata;
   SmallVector<DbgVariableRecord *, 4> DVRsToDelete;
   DenseMap<const MDNode *, MDNode *> Cache;
-  DebugLocMap DLMap(&OldFunc, &NewFunc);
+  DebugLocMap DLMap;
 
   auto GetUpdatedDIVariable = [&](DILocalVariable *OldVar) {
     DINode *&NewVar = RemappedMetadata[OldVar];
@@ -1425,25 +1424,12 @@ static void fixupDebugInfoPostExtraction(Function &OldFunc, Function &NewFunc,
   // debug assignment metadata in the new function.
   DenseMap<DIAssignID *, DIAssignID *> AssignmentIDMap;
   for (Instruction &I : instructions(NewFunc)) {
-    // If FLMD source locs are in use, we don't need to renumber each
-    // instruction - the indices will transfer. We only need to remap scopes
-    // from the new FLMD context.
-#if LLVM_USE_FLMD_SOURCE_LOCS
-    if (DebugLoc DL = I.getFullDebugLoc())
-    
+    if (const DebugLoc &DL = I.getFullDebugLoc())
       I.setDebugLoc(
           DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, &NewFunc, Cache, DLMap));
     for (DbgRecord &DR : I.getDbgRecordRange())
       DR.setDebugLoc(DebugLoc::replaceInlinedAtSubprogram(DR.getFullDebugLoc(),
                                                           *NewSP, &NewFunc, Cache, DLMap));
-#else
-    if (DebugLoc DL = I.getDebugLoc())
-      I.setDebugLoc(
-          DebugLoc::replaceInlinedAtSubprogram(DL, *NewSP, &NewFunc, Cache, DLMap));
-    for (DbgRecord &DR : I.getDbgRecordRange())
-      DR.setDebugLoc(DebugLoc::replaceInlinedAtSubprogram(DR.getDebugLoc(),
-                                                          *NewSP, &NewFunc, Cache, DLMap));
-#endif
 
     // Loop info metadata may contain line locations. Fix them up.
     auto updateLoopInfoLoc = [&Cache, &DLMap, &NewFunc, NewSP](Metadata *MD) -> Metadata * {

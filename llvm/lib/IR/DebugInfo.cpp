@@ -847,33 +847,22 @@ private:
   DILocation *getReplacementMDLocation(DILocation *MLD) {
     auto *Scope = map(MLD->getScope());
     auto *InlinedAt = map(MLD->getInlinedAt());
-    /// FIXME: Instead of actually creating new DebugLocs, we should actually be
-    /// able to perform all these updates by iterating through the FLMD arrays
-    /// and not changing any indexes.
 #if LLVM_USE_FLMD_SOURCE_LOCS
     DebugLoc DL = MLD->getAsDebugLoc();
-    if (DL.isInlinedCall()) {
-      FLInlinedCall InlinedCall = DL.getAsInlinedCall();
-      if (InlinedCall.Uniquable) {
-        return DILocation::get(MLD->getContext(),
-          DebugLoc::getUniquedInlinedCall(
-            DebugLoc::DebugLocContext(InlinedCall.getInlinee()),
-            DebugLoc::DebugLocContext(DL.getFLContext()), DL.getLine(),
-            DL.getColumn(), Scope,
-            cast<DILocation>(InlinedAt)->getAsDebugLoc()));
-      }
-      return DILocation::get(MLD->getContext(),
-        DebugLoc::getDistinctInlinedCall(
-          DebugLoc::DebugLocContext(InlinedCall.getInlinee()),
-          DebugLoc::DebugLocContext(DL.getFLContext()), DL.getLine(),
-          DL.getColumn(), Scope, cast<DILocation>(InlinedAt)->getAsDebugLoc()));
-    }
-    return DILocation::get(MLD->getContext(),
-      DebugLoc::get(
-          DebugLoc::DebugLocContext(DL.getFLContext()), DL.getLine(),
-          DL.getColumn(), Scope,
-          cast<DILocation>(InlinedAt)->getAsDebugLoc(), false,
-          DL.getAtomGroup(), DL.getAtomRank()));
+    DebugLoc IA = InlinedAt ? cast<DILocation>(InlinedAt)->getAsDebugLoc()
+                            : DebugLoc();
+    DebugLoc NewDL;
+    if (!DL.isInlinedCall())
+      NewDL = DebugLoc::get(DL, DL.getLine(), DL.getColumn(), Scope, IA,
+                            DL.isImplicitCode(), DL.getAtomGroup(),
+                            DL.getAtomRank());
+    else if (DL.isDistinct())
+      NewDL = DebugLoc::getDistinctInlinedCall(DL, DL.getLine(), DL.getColumn(),
+                                               Scope, IA);
+    else
+      NewDL = DebugLoc::getUniquedInlinedCall(DL, DL.getLine(), DL.getColumn(),
+                                              Scope, IA);
+    return DILocation::get(MLD->getContext(), NewDL);
 #else
     if (MLD->isDistinct())
       return DILocation::getDistinct(MLD->getContext(), MLD->getLine(),
@@ -1390,7 +1379,6 @@ LLVMDebugLoc LLVMDIBuilderCreateInlineCallDebugLocation(
     LLVMMetadataRef CallerCtx, LLVMMetadataRef CalleeCtx, unsigned Line,
     unsigned Column, LLVMMetadataRef Scope, LLVMDebugLoc InlinedAt) {
   return wrap(DebugLoc::getDistinctInlinedCall(
-    DebugLoc::DebugLocContext(unwrapDI<DIFunctionLocalMetadata>(CalleeCtx)),
     DebugLoc::DebugLocContext(unwrapDI<DIFunctionLocalMetadata>(CallerCtx)),
     Line, Column, unwrap(Scope), unwrap(InlinedAt)));
 }
@@ -1413,19 +1401,8 @@ LLVMMetadataRef
 LLVMDIBuilderCreateDebugLocation(LLVMContextRef Ctx, unsigned Line,
                                  unsigned Column, LLVMMetadataRef Scope,
                                  LLVMMetadataRef InlinedAt) {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  LLVMContext *UnwrappedCtx = unwrap(Ctx);
-  DIFunctionLocalMetadata *FLContext = UnwrappedCtx->getFLMD(unwrap(Scope));
-  DebugLoc DLInlinedAt = cast<DILocation>(unwrap(InlinedAt))->getAsDebugLoc();
-  return wrap(DILocation::get(
-    *unwrap(Ctx),
-    DebugLoc::get(
-      DebugLoc::DebugLocContext(FLContext), Line, Column, unwrap(Scope),
-      DLInlinedAt)));
-#else
   return wrap(DILocation::get(*unwrap(Ctx), Line, Column, unwrap(Scope),
                               unwrap(InlinedAt)));
-#endif
 }
 
 unsigned LLVMDILocationGetLine(LLVMMetadataRef Location) {

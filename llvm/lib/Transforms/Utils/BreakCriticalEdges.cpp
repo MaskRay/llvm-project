@@ -412,7 +412,7 @@ bool llvm::SplitIndirectBrCriticalEdges(Function &F,
     BasicBlock *DirectSucc = CloneBasicBlock(Target, VMap, ".clone", &F);
     if (!VMap.AtomMap.empty())
       for (Instruction &I : *DirectSucc)
-        RemapSourceAtom(&I, VMap, Target->getParent());
+        RemapSourceAtom(&I, VMap);
 
     BlockFrequency BlockFreqForDirectSucc;
     SmallVector<DominatorTree::UpdateType, 8> DTUpdates;

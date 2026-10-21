@@ -1004,14 +1004,11 @@ void Verifier::visitMDNode(const MDNode &BaseMD,
 }
 
 void Verifier::visitDebugLoc(DebugLoc DL) {
-#if LLVM_USE_FLMD_SOURCE_LOCS
-  if (DL.getAtomGroup()) {
-    CheckDI(DL.getAtomGroup() <= DL.getFLContext()->getAtomGroupWaterline(DL.getInlinedAtIdx()),
-      "AtomGroup is above the InlinedAt waterline!",
-      DL, DL.getAtomGroup(),
-      DL.getFLContext()->getAtomGroupWaterline(DL.getInlinedAtIdx()));
-  }
-#endif
+  if (DL.getAtomGroup())
+    CheckDI(DL.getScope()->getSubprogram()->getKeyInstructionsEnabled(),
+            "DbgLoc uses atomGroup but DISubprogram doesn't have Key "
+            "Instructions enabled",
+            DL, DL.getScope()->getSubprogram());
 }
 
 void Verifier::visitValueAsMetadata(const ValueAsMetadata &MD, Function *F) {
@@ -1071,26 +1068,9 @@ static bool isDINode(const Metadata *MD) { return !MD || isa<DINode>(MD); }
 static bool isMDTuple(const Metadata *MD) { return !MD || isa<MDTuple>(MD); }
 
 void Verifier::visitDIFunctionLocalMetadata(const DIFunctionLocalMetadata &N) {
-  FLScope RootScope = N.getScope(0);
-
-  // CheckDI(DL.getInlinedAtScope()->getSubprogram() == DL.getFLContext()->Scopes[0],
-  //   "InlinedAtScope for DebugLoc does not point at root function scope!",
-  //   DL.getFLContext(), DL.getFLContext()->Scopes[0], DL.getInlinedAtScope(),
-  //   DL.getInlinedAtScope()->getSubprogram());
-  // if (DL.getAtomGroup()) {
-  //   if (auto InlinedAtIdx = DL.getInlinedAtIdx()) {
-  //     CheckDI(DL.getAtomGroup() <= DL.getFLContext()->getInlinedCall(InlinedAtIdx).MaxAtomGroup,
-  //       "AtomGroup is above the InlinedAt waterline!",
-  //       DL, DL.getAtomGroup(),
-  //       DL.getFLContext()->getInlinedCall(InlinedAtIdx).MaxAtomGroup,
-  //       DL.getFLContext());
-  //   } else {
-  //     CheckDI(DL.getAtomGroup() <= DL.getFLContext()->MaxAtomGroup,
-  //       "AtomGroup is above the FLContext waterline!", 
-  //       DL, DL.getAtomGroup(), DL.getFLContext()->MaxAtomGroup,
-  //       DL.getFLContext());
-  //   }
-  // }
+  for (const FLScope &Scope : N.Scopes)
+    CheckDI(isa_and_nonnull<DILocalScope>(Scope.Scope),
+            "location table scope must be a DILocalScope", &N, Scope.Scope);
 }
 
 void Verifier::visitDILocation(const DILocation &N) {
@@ -3348,22 +3328,22 @@ void Verifier::visitFunction(const Function &F) {
             "!dbg attachment points at wrong subprogram for function", N, &F,
             &I, DL, Scope, SP);
   };
-  // Now do the same check, but check FLMD instead.
-  // MDNode *RawFLContext = F.getMetadata(LLVMContext::MD_flmd);
-  // if (RawFLContext) {
-  //   CheckDI(isa<DIFunctionLocalMetadata>(RawFLContext), "Unexepected !flmd attachment to function", &F, RawFLContext);
-  //   auto *FLContext = cast<DIFunctionLocalMetadata>(RawFLContext);
-  //   visitDIFunctionLocalMetadata(*FLContext);
-  //   CheckDI(!FLContext->Scopes.empty(),
-  //     "FLMD context should contain a subprogram pointing at the function", FLContext, &F);
-  //   CheckDI(!FLContext->Scopes.empty() && isa<DISubprogram>(FLContext->Scopes[0].get()) && cast<DISubprogram>(FLContext->Scopes[0].get())->describes(&F),
-  //     "First scope in FLMD context should be subprogram pointing at the function", FLContext, &F, FLContext->Scopes[0].get());
-  //   DISubprogram *FnSP = cast<DISubprogram>(FLContext->Scopes[0].get());
-  //   for (DILocalScope *LS : drop_begin(FLContext->Scopes))
-  //     CheckDI(LS->getSubprogram() == FnSP, "scope in FLMD context points at wrong subprogram for function", LS, FnSP, &F, FLContext);
-  // }
+  auto VisitDebugLoc = [&](const Instruction &I, DebugLoc DL) {
+    if (!DL)
+      return;
+    DILocalScope *Scope = DL.getInlinedAtScope();
+    if (!Seen.insert(Scope).second)
+      return;
+    DISubprogram *SP = Scope->getSubprogram();
+    if ((Scope != SP) && !Seen.insert(SP).second)
+      return;
+    CheckDI(SP->describes(&F),
+            "!dbg attachment points at wrong subprogram for function", N, &F,
+            &I, DL, Scope, SP);
+  };
   for (auto &BB : F)
     for (auto &I : BB) {
+      VisitDebugLoc(I, I.getFullDebugLoc());
       // The llvm.loop annotations also contain two DILocations.
       if (auto MD = I.getMetadata(LLVMContext::MD_loop))
         for (unsigned i = 1; i < MD->getNumOperands(); ++i)
@@ -5916,6 +5896,9 @@ void Verifier::visitInstruction(Instruction &I) {
 
   if (MDNode *MD = I.getMetadata(LLVMContext::MD_mem_cache_hint))
     visitMemCacheHintMetadata(I, MD);
+
+  if (DebugLoc DL = I.getFullDebugLoc())
+    visitDebugLoc(DL);
 
   SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
   I.getAllMetadata(MDs);

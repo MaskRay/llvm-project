@@ -3182,8 +3182,7 @@ MCSymbol *AsmPrinter::createCallsiteEndSymbol(const MachineBasicBlock &MBB) {
 
 void AsmPrinter::SetupMachineFunction(MachineFunction &MF) {
   this->MF = &MF;
-  if (MF.getFunction().getFLContext())
-    this->DbgLocCtx = DebugLocContext(&MF.getFunction());
+  this->DbgLocCtx = DebugLocContext(&MF.getFunction());
   const Function &F = MF.getFunction();
 
   // Record that there are split-stack functions, so we will emit a special
