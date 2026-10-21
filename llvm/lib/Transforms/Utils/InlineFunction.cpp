@@ -1974,9 +1974,9 @@ static void fixupLineNumbers(Function *Fn, Function::iterator FI,
 
   // Create a unique call site, not to be confused with any other call from the
   // same location.
-  InlinedAtNode = DebugLoc::getDistinctInlinedCall(
-      Fn, TheCallDL.getLine(), TheCallDL.getColumn(),
-      TheCallDL.getScope(), TheCallDL.getInlinedAt());
+  InlinedAtNode = DebugLoc::getInlinedCall(
+      Fn, TheCallDL.getLine(), TheCallDL.getColumn(), TheCallDL.getScope(),
+      TheCallDL.getInlinedAt(), /*ImplicitCode=*/false, /*Uniquable=*/false);
 
   // Check if we are not generating inline line tables and want to use
   // the call site location instead.

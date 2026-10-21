@@ -498,34 +498,26 @@ operator DbgLocStorage() const { return Storage; }
     DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false, uint64_t AtomGroup = 0,
     uint8_t AtomRank = 0);
+  /// A distinct or uniqued call site to inline code at. An instruction
+  /// location passed as \p InlinedAt here or to get() becomes a uniqued call
+  /// site, as a DILocation used as inlinedAt would be.
   static DebugLoc getInlinedCall(
     DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
     DebugLoc InlinedAt, bool ImplicitCode, bool Uniquable);
-  static DebugLoc getDistinctInlinedCall(
-    DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
-    DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false) {
-    return DebugLoc::getInlinedCall(Context, Line, Column, Scope, InlinedAt, ImplicitCode, /*Uniquable=*/false);
-  }
-  static DebugLoc getUniquedInlinedCall(
-    DebugLocContext Context, unsigned Line, unsigned Column, Metadata *Scope,
-    DebugLoc InlinedAt = DebugLoc(), bool ImplicitCode = false) {
-    return DebugLoc::getInlinedCall(Context, Line, Column, Scope, InlinedAt, ImplicitCode, /*Uniquable=*/true);
-  }
   DebugLocContext getDLContext() const {
     assert((bool)*this && "Can only get DL Context from a valid DebugLoc.");
     return DebugLocContext(getContext());
   }
 
-  /// Creates a DebugLoc representing the same location as this DebugLoc, but
-  /// as a uniqued inlined call, as using a DILocation as inlinedAt would.
-  DebugLoc convertToInlinedCall() const;
   /// FIXME: Just replace this with `getAsDILocation` later.
   DILocation *convertToDILocation() const;
 
+  /// The location a DILocation stands for, as an inlinedAt.
   static DebugLoc getFromMDNode(const MDNode *L);
   /// Create a DebugLoc from the equivalent DILocation. If the DILocation is an
   /// inlined call location, the inlined DISubprogram must also be provided.
-  static DebugLoc getFromDILocation(const DILocation *L, DISubprogram *InlinedSP = nullptr);
+  /// The location a DILocation stands for, as an instruction's !dbg.
+  static DebugLoc getFromDILocation(const DILocation *L);
   DILocation *getAsDILocation() const;
 
   /// Return \c this as a bar \a MDNode.

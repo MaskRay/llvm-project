@@ -5173,10 +5173,8 @@ void CGDebugInfo::EmitInlineFunctionStart(CGBuilderTy &Builder, GlobalDecl GD) {
   if (!SP || !SP->isDefinition())
     SP = getFunctionStub(GD);
   FnBeginRegionCount.push_back(LexicalBlockStack.size());
-  auto InlinedAt = DBuilder.addInlinedFunctionContext(
-    SP, Builder.getCurrentDebugLocation());
   LexicalBlockStack.emplace_back(SP);
-  setInlinedAt(InlinedAt);
+  setInlinedAt(Builder.getCurrentDebugLocation());
   EmitLocation(Builder, FD->getLocation());
 }
 

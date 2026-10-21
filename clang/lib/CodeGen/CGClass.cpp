@@ -1805,7 +1805,7 @@ public:
     if (!DI)
       return;
     InlinedAt = DI->getInlinedAt();
-    DI->setInlinedAt(CGF.Builder.getCurrentDebugLocation().convertToInlinedCall());
+    DI->setInlinedAt(CGF.Builder.getCurrentDebugLocation());
     Location.emplace(CGF, Decl.getLocation());
   }
 

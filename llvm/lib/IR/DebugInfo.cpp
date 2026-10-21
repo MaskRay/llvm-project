@@ -851,17 +851,13 @@ private:
     DebugLoc DL = MLD->getAsDebugLoc();
     DebugLoc IA = InlinedAt ? cast<DILocation>(InlinedAt)->getAsDebugLoc()
                             : DebugLoc();
-    DebugLoc NewDL;
-    if (!DL.isInlinedCall())
-      NewDL = DebugLoc::get(DL, DL.getLine(), DL.getColumn(), Scope, IA,
+    DebugLoc NewDL =
+        DL.isInlinedCall()
+            ? DebugLoc::getInlinedCall(DL, DL.getLine(), DL.getColumn(), Scope,
+                                       IA, DL.isImplicitCode(), !DL.isDistinct())
+            : DebugLoc::get(DL, DL.getLine(), DL.getColumn(), Scope, IA,
                             DL.isImplicitCode(), DL.getAtomGroup(),
                             DL.getAtomRank());
-    else if (DL.isDistinct())
-      NewDL = DebugLoc::getDistinctInlinedCall(DL, DL.getLine(), DL.getColumn(),
-                                               Scope, IA);
-    else
-      NewDL = DebugLoc::getUniquedInlinedCall(DL, DL.getLine(), DL.getColumn(),
-                                              Scope, IA);
     return DILocation::get(MLD->getContext(), NewDL);
 #else
     if (MLD->isDistinct())
@@ -1006,7 +1002,7 @@ bool llvm::stripNonLineTableDebugInfo(Module &M) {
           InlinedAt = remap(InlinedAt);
           return DebugLoc::get(
             DL, DL.getLine(), DL.getCol(), Scope,
-            DebugLoc::getFromDILocation(cast_or_null<DILocation>(InlinedAt)));
+            DebugLoc::getFromMDNode(InlinedAt));
         };
 
         if (I.getFullDebugLoc() != DebugLoc())
@@ -1378,9 +1374,10 @@ LLVMDebugLoc LLVMDIBuilderCreateDebugLocation2(
 LLVMDebugLoc LLVMDIBuilderCreateInlineCallDebugLocation(
     LLVMMetadataRef CallerCtx, LLVMMetadataRef CalleeCtx, unsigned Line,
     unsigned Column, LLVMMetadataRef Scope, LLVMDebugLoc InlinedAt) {
-  return wrap(DebugLoc::getDistinctInlinedCall(
-    DebugLoc::DebugLocContext(unwrapDI<DIFunctionLocalMetadata>(CallerCtx)->getContext()),
-    Line, Column, unwrap(Scope), unwrap(InlinedAt)));
+  return wrap(DebugLoc::getInlinedCall(
+    unwrapDI<DIFunctionLocalMetadata>(CallerCtx)->getContext(), Line, Column,
+    unwrap(Scope), unwrap(InlinedAt), /*ImplicitCode=*/false,
+    /*Uniquable=*/false));
 }
 
 unsigned LLVMDebugLocGetLine(LLVMDebugLoc Location) {

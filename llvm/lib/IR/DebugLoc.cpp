@@ -68,10 +68,19 @@ DIFunctionLocalMetadata *llvm::getFLMDForFunction(const Function *F) {
   return F->getContext().getFLContext();
 }
 
-DebugLoc DebugLoc::getFromDILocation(const DILocation *DIL, DISubprogram *) {
+DebugLoc DebugLoc::getFromDILocation(const DILocation *DIL) {
   if (!DIL)
     return DebugLoc();
-  return DIL->getAsDebugLoc();
+  // A distinct DILocation is an inline site; attached to an instruction, it
+  // stands for the call's own location.
+  DebugLoc DL = DIL->getAsDebugLoc();
+  return DL.isInlinedCall() ? DL.getLocForInlinedCall() : DL;
+}
+
+DebugLoc DebugLoc::getFromMDNode(const MDNode *MD) {
+  if (auto *DIL = dyn_cast_or_null<DILocation>(MD))
+    return DIL->getAsDebugLoc();
+  return DebugLoc();
 }
 
 std::pair<FLDebugLoc, DIFunctionLocalMetadata *> DebugLoc::getAsFLDebugLoc() const {
@@ -107,7 +116,7 @@ DILocation &DebugLoc::operator*() const {
 //   return DebugLoc(FLDL, FLContext);
 // }
 
-DebugLoc DebugLoc::getFromDILocation(const DILocation *DIL, DISubprogram *InlinedSP) {
+DebugLoc DebugLoc::getFromDILocation(const DILocation *DIL) {
   DebugLoc DL;
   DL.Storage = DbgLocStorage(const_cast<DILocation*>(DIL));
   return DL;
@@ -207,13 +216,12 @@ DebugLocContext::DebugLocContext(const Instruction *I)
 DebugLocContext::DebugLocContext(const Function *F)
     : Context(F->getContext()) {}
 
+#if !LLVM_USE_FLMD_SOURCE_LOCS
 DebugLoc DebugLoc::getFromMDNode(const MDNode *MD) {
   return DebugLoc::getFromDILocation(dyn_cast_or_null<DILocation>(MD));
 }
+#endif
 
-DebugLoc DebugLoc::convertToInlinedCall() const {
-  return DebugLoc::getUniquedInlinedCall(getDLContext(), getLine(), getColumn(), getScope(), getInlinedAt(), isImplicitCode());
-}
 
 #if LLVM_USE_FLMD_SOURCE_LOCS
 unsigned DebugLoc::getLine() const {
@@ -588,8 +596,8 @@ static DebugLoc getMergedDebugLoc(DebugLoc LocA, DebugLoc LocB) {
                        bool IsImplicitCode, uint64_t Group,
                        uint8_t Rank) -> DebugLoc {
       if (IsCall)
-        return DebugLoc::getUniquedInlinedCall(C, Line, Col, Scope, InlinedAt,
-                                               IsImplicitCode);
+        return DebugLoc::getInlinedCall(C, Line, Col, Scope, InlinedAt,
+                                        IsImplicitCode, /*Uniquable=*/true);
       return DebugLoc::get(C, Line, Col, Scope, InlinedAt, IsImplicitCode,
                            Group, Rank);
     };

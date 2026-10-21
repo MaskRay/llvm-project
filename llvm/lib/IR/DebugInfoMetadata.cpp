@@ -448,10 +448,15 @@ DILocation *DILocation::getImpl(LLVMContext &Context, unsigned Line,
   DILocation *InlinedAtLoc = dyn_cast_or_null<DILocation>(InlinedAt);
   assert(isa<DILocalScope>(Scope) && (!InlinedAt || InlinedAtLoc) &&
          "TODO: Handle this failstate gracefully.");
-  DebugLoc DL = DebugLoc::get(
-      DebugLoc::DebugLocContext(Context), Line, Column, Scope,
-      InlinedAtLoc ? InlinedAtLoc->getAsDebugLoc() : DebugLoc(), ImplicitCode,
-      AtomGroup, AtomRank);
+  DebugLoc IA = InlinedAtLoc ? InlinedAtLoc->getAsDebugLoc() : DebugLoc();
+  // Only an inline site is ever distinct; it must not be uniqued with another
+  // site of the same fields when it is used as an inlinedAt.
+  DebugLoc DL =
+      Storage == Distinct
+          ? DebugLoc::getInlinedCall(Context, Line, Column, Scope, IA,
+                                     ImplicitCode, /*Uniquable=*/false)
+          : DebugLoc::get(Context, Line, Column, Scope, IA, ImplicitCode,
+                          AtomGroup, AtomRank);
   return getImpl(Context, DL, Storage, ShouldCreate);
 }
 #endif
