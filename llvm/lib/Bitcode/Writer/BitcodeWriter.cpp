@@ -2763,6 +2763,15 @@ void ModuleBitcodeWriter::writeModuleMetadata() {
   // Write the named metadata now.
   writeNamedMetadata(Record);
 
+  // Name the location table so that lazy loading can load it up front.
+  if (const DIFunctionLocalMetadata *FLContext =
+          M.getContext().getFLContextIfExists();
+      FLContext && VE.getMetadataOrNullID(FLContext)) {
+    Record.push_back(VE.getMetadataID(FLContext));
+    Stream.EmitRecord(bitc::METADATA_FLMD_TABLE, Record);
+    Record.clear();
+  }
+
   auto AddDeclAttachedMetadata = [&](const GlobalObject &GO) {
     SmallVector<uint64_t, 4> Record;
     Record.push_back(VE.getValueID(&GO));

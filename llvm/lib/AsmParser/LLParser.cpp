@@ -5964,7 +5964,7 @@ bool LLParser::parseDIFunctionLocalMetadata(MDNode *&Result, bool IsDistinct) {
     FLMD->InlinedCalls.push_back(InlinedCall);
     Uniquable.push_back(IsUniqued);
   }
-  FLMD->rebuildIndexes(Uniquable);
+  FLMD->indexEntries(0, 0, 0, Uniquable);
   Result = FLMD;
   return false;
 }

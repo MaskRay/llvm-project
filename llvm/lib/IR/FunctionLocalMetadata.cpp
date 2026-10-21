@@ -58,19 +58,18 @@ bool DIFunctionLocalMetadata::isUniquedInlinedCall(
   return It != UniquedInlinedCalls.end() && It->second == Idx.get();
 }
 
-void DIFunctionLocalMetadata::rebuildIndexes(
+void DIFunctionLocalMetadata::indexEntries(
+    uint32_t FirstScope, uint32_t FirstSrcLoc, uint32_t FirstInlinedCall,
     ArrayRef<bool> UniquableInlinedCalls) {
-  ScopeIndex.clear();
-  SrcLocIndex.clear();
-  UniquedInlinedCalls.clear();
-  for (auto [Idx, Scope] : enumerate(Scopes))
-    ScopeIndex.try_emplace(Scope.Scope, Idx);
-  for (auto [Idx, SrcLoc] : enumerate(SrcLocs)) {
-    unsigned Hash = SrcLoc.getHash();
+  assert(UniquableInlinedCalls.size() == InlinedCalls.size() - FirstInlinedCall);
+  for (uint32_t Idx = FirstScope; Idx != Scopes.size(); ++Idx)
+    ScopeIndex.try_emplace(Scopes[Idx].Scope, Idx);
+  for (uint32_t Idx = FirstSrcLoc; Idx != SrcLocs.size(); ++Idx) {
+    unsigned Hash = SrcLocs[Idx].getHash();
     SrcLocIndex.insert_as((uint64_t)Hash << 32 | Idx,
-                          FLSrcLocIndexInfo::Key{SrcLoc, SrcLocs, Hash});
+                          FLSrcLocIndexInfo::Key{SrcLocs[Idx], SrcLocs, Hash});
   }
-  for (auto [Idx, InlinedCall] : enumerate(InlinedCalls))
-    if (UniquableInlinedCalls[Idx])
-      UniquedInlinedCalls.try_emplace(InlinedCall.asRawInt(), Idx);
+  for (uint32_t Idx = FirstInlinedCall; Idx != InlinedCalls.size(); ++Idx)
+    if (UniquableInlinedCalls[Idx - FirstInlinedCall])
+      UniquedInlinedCalls.try_emplace(InlinedCalls[Idx].asRawInt(), Idx);
 }

@@ -225,8 +225,12 @@ public:
   FLIndex<uint32_t> addInlinedCall(FLInlinedCall InlinedCall, bool Uniquable);
   bool isUniquedInlinedCall(FLIndex<uint32_t> Idx) const;
 
-  /// Rebuild the uniquing indexes after the tables were filled directly.
-  void rebuildIndexes(ArrayRef<bool> UniquableInlinedCalls);
+  /// Add the entries from the given positions on, which were appended to the
+  /// tables directly, to the uniquing indexes. \p UniquableInlinedCalls has
+  /// one element per appended inlined call.
+  void indexEntries(uint32_t FirstScope, uint32_t FirstSrcLoc,
+                    uint32_t FirstInlinedCall,
+                    ArrayRef<bool> UniquableInlinedCalls);
 
   static bool classof(const Metadata *MD) {
     return MD->getMetadataID() == DIFunctionLocalMetadataKind;

@@ -26,6 +26,7 @@ class DISubprogram;
 class Function;
 class Instruction;
 class Metadata;
+struct FLDebugLoc;
 class Module;
 class Type;
 template <typename T> class ArrayRef;
@@ -72,6 +73,10 @@ public:
 
   // Return true there are remaining unresolved forward references.
   bool hasFwdRefs() const;
+
+  /// Offset a location read from this module past the entries that other
+  /// modules already added to the context's location table.
+  FLDebugLoc rebaseFLDebugLoc(FLDebugLoc DL) const;
 
   /// Return the given metadata, creating a replaceable forward reference if
   /// necessary.

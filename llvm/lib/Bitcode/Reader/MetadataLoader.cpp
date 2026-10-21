@@ -414,6 +414,11 @@ class MetadataLoader::MetadataLoaderImpl {
   SmallVector<std::pair<uint32_t, unsigned>, 0> FLMDScopeFwdRefs;
   SmallVector<bool, 0> FLMDUniquableInlinedCalls;
   bool FLMDTableLoaded = false;
+  bool FLMDTableSeen = false;
+  // Metadata ID of this module's location table, if any, and where its
+  // entries start in the context-wide table.
+  std::optional<unsigned> FLMDTableID;
+  uint32_t FLMDScopeBase = 0, FLMDSrcLocBase = 0, FLMDInlinedCallBase = 0;
 
   /// Cursor associated with the lazy-loading of Metadata. This is the easy way
   /// to keep around the right "context" (Abbrev list) to be able to jump in
@@ -492,6 +497,20 @@ class MetadataLoader::MetadataLoaderImpl {
 
   void resolveForwardRefsAndPlaceholders(PlaceholderQueue &Placeholders);
 
+  FLIndex<uint32_t> rebaseSrcLoc(uint64_t Raw) const {
+    return FLIndex<uint32_t>::fromRaw(Raw ? Raw + FLMDSrcLocBase : 0);
+  }
+  FLIndex<uint32_t> rebaseInlinedCall(uint64_t Raw) const {
+    return FLIndex<uint32_t>::fromRaw(Raw ? Raw + FLMDInlinedCallBase : 0);
+  }
+
+public:
+  FLDebugLoc rebaseFLDebugLoc(FLDebugLoc DL) const {
+    return FLDebugLoc(rebaseSrcLoc(DL.SrcLocIdx.asRaw()),
+                      rebaseInlinedCall(DL.InlinedAtIdx.asRaw()));
+  }
+
+private:
   /// Upgrade old-style CU <-> SP pointers to point from SP to CU.
   void upgradeCUSubprograms() {
     for (auto CU_SP : CUSubprograms)
@@ -975,6 +994,17 @@ MetadataLoader::MetadataLoaderImpl::lazyLoadModuleMetadataBlock() {
         }
         break;
       }
+      case bitc::METADATA_FLMD_TABLE: {
+        if (Error Err = IndexCursor.JumpToBit(CurrentPos))
+          return std::move(Err);
+        Record.clear();
+        if (Error Err = IndexCursor.readRecord(Entry.ID, Record).takeError())
+          return std::move(Err);
+        if (Record.size() != 1)
+          return error("Invalid record");
+        FLMDTableID = Record[0];
+        break;
+      }
       case bitc::METADATA_GLOBAL_DECL_ATTACHMENT: {
         if (!GlobalDeclAttachmentPos)
           GlobalDeclAttachmentPos = SavedPos;
@@ -1020,6 +1050,8 @@ MetadataLoader::MetadataLoaderImpl::lazyLoadModuleMetadataBlock() {
       case bitc::METADATA_IMPORTED_ENTITY:
       case bitc::METADATA_GLOBAL_VAR_EXPR:
       case bitc::METADATA_GENERIC_SUBRANGE:
+      case bitc::METADATA_FLMD:
+      case bitc::METADATA_FL_LOCATION:
         // We don't expect to see any of these, if we see one, give up on
         // lazy-loading and fallback.
         MDStringRef.clear();
@@ -1149,6 +1181,14 @@ Error MetadataLoader::MetadataLoaderImpl::parseMetadata(bool ModuleLevel) {
       // on-demand.
       MetadataList.resize(MDStringRef.size() +
                           GlobalMetadataBitPosIndex.size());
+
+      // Function bodies index into the location table, so load it now.
+      if (FLMDTableID) {
+        if (*FLMDTableID < MDStringRef.size() ||
+            *FLMDTableID >= MetadataList.size())
+          return error("Invalid location table ID");
+        lazyLoadOneMetadata(*FLMDTableID, Placeholders);
+      }
 
       // Now that we have built the index, load the global decl attachments
       // that were deferred during that process. This avoids creating
@@ -1296,7 +1336,8 @@ void MetadataLoader::MetadataLoaderImpl::resolveForwardRefsAndPlaceholders(
     DIFunctionLocalMetadata *FLContext = Context.getFLContext();
     for (auto [Idx, ID] : FLMDScopeFwdRefs)
       FLContext->Scopes[Idx].Scope = cast<DILocalScope>(MetadataList.lookup(ID));
-    FLContext->rebuildIndexes(FLMDUniquableInlinedCalls);
+    FLContext->indexEntries(FLMDScopeBase, FLMDSrcLocBase, FLMDInlinedCallBase,
+                            FLMDUniquableInlinedCalls);
     FLMDScopeFwdRefs.clear();
     FLMDUniquableInlinedCalls.clear();
     FLMDTableLoaded = false;
@@ -1531,7 +1572,7 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
       return error("Invalid record");
 
     // The table operand is always the context-wide one.
-    FLDebugLoc DL = FLDebugLoc::fromRawInt(Record[0]);
+    FLDebugLoc DL = rebaseFLDebugLoc(FLDebugLoc::fromRawInt(Record[0]));
     MetadataList.assignValue(
         DILocation::get(Context, DL, Context.getFLContext()),
         NextMetadataNo);
@@ -2535,16 +2576,23 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
     NextMetadataNo++;
     break;
   }
+  case bitc::METADATA_FLMD_TABLE:
+    // Only needed to find the table when lazy loading.
+    break;
   case bitc::METADATA_FLMD: {
     IsDistinct = Record[0] & 1;
     uint64_t Version = Record[0] >> 1;
     if (!IsDistinct || Version != 2)
       return error("Invalid record: unsupported location table");
-    // The table is context-wide; merging into a non-empty one would need the
-    // module's indexes to be remapped.
+    // The table is context-wide: append this module's entries, offsetting
+    // its indexes past those already present.
     DIFunctionLocalMetadata *FLContext = Context.getFLContext();
-    if (!FLContext->empty())
-      return error("Invalid record: location table already populated");
+    if (FLMDTableSeen)
+      return error("Invalid record: more than one location table");
+    FLMDTableSeen = true;
+    FLMDScopeBase = FLContext->Scopes.size();
+    FLMDSrcLocBase = FLContext->SrcLocs.size();
+    FLMDInlinedCallBase = FLContext->InlinedCalls.size();
     uint64_t CurrentRecord = 1;
     auto Next = [&]() -> Expected<uint64_t> {
       if (CurrentRecord >= Record.size())
@@ -2565,7 +2613,7 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
       if (ScopeNode && !ScopeNode->isTemporary()) {
         FLContext->Scopes.push_back(FLScope(ScopeNode));
       } else {
-        FLMDScopeFwdRefs.emplace_back(ScopeIdx, *Scope);
+        FLMDScopeFwdRefs.emplace_back(FLMDScopeBase + ScopeIdx, *Scope);
         FLContext->Scopes.push_back(FLScope((MDNode*)nullptr));
       }
     }
@@ -2591,6 +2639,7 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
       SrcLoc.ImplicitCode = (Fields[4] >> 3) & 1;
       if (!SrcLoc.ScopeIdx || SrcLoc.ScopeIdx.get() >= *NumScopes)
         return error("Invalid record: bad location table scope");
+      SrcLoc.ScopeIdx = FLIndex<uint32_t>::fromRaw(Fields[2] + FLMDScopeBase);
       if (SrcLoc.AtomGroup)
         Context.updateDILocationAtomGroupWaterline(SrcLoc.AtomGroup + 1);
       FLContext->SrcLocs.push_back(SrcLoc);
@@ -2609,8 +2658,7 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
       if (!InlinedAt)
         return InlinedAt.takeError();
       FLContext->InlinedCalls.push_back(
-          FLInlinedCall(FLIndex<uint32_t>::fromRaw(*SrcLoc),
-                        FLIndex<uint32_t>::fromRaw(*InlinedAt >> 1)));
+          FLInlinedCall(rebaseSrcLoc(*SrcLoc), rebaseInlinedCall(*InlinedAt >> 1)));
       FLMDUniquableInlinedCalls.push_back(*InlinedAt & 1);
     }
     // Scope forward references are resolved, and the indexes built, once
@@ -2846,6 +2894,10 @@ Error MetadataLoader::parseMetadata(bool ModuleLevel) {
 }
 
 bool MetadataLoader::hasFwdRefs() const { return Pimpl->hasFwdRefs(); }
+
+FLDebugLoc MetadataLoader::rebaseFLDebugLoc(FLDebugLoc DL) const {
+  return Pimpl->rebaseFLDebugLoc(DL);
+}
 
 /// Return the given metadata, creating a replaceable forward reference if
 /// necessary.
