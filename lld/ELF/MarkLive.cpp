@@ -378,7 +378,7 @@ void MarkLive<ELFT, TrackWhyLive>::run() {
   }
 
   if (ctx.inDynDbgLink)
-    for (const StringRef &s : ctx.dynDbgGCRoots)
+    for (const StringRef &s : ctx.dynDbgInnerGCRoots)
       markSymbol(ctx.symtab->find(s), "dynamic debugging");
 
   // Mark .eh_frame sections as live because there are usually no relocations
@@ -477,6 +477,14 @@ void MarkLive<ELFT, TrackWhyLive>::run() {
   }
 }
 
+static const DynDbgGCInfo *getDynDbgGCInfo(Ctx &ctx, InputSectionBase &sec) {
+  if (ctx.hasDynDbg)
+    if (InputSection *is = dyn_cast<InputSection>(&sec))
+      return is->getDynDbgGCInfo();
+
+  return nullptr;
+}
+
 template <class ELFT, bool TrackWhyLive>
 void MarkLive<ELFT, TrackWhyLive>::mark() {
   while (!queue.empty()) {
@@ -490,21 +498,17 @@ void MarkLive<ELFT, TrackWhyLive>::mark() {
     for (const typename ELFT::Crel &rel : rels.crels)
       resolveReloc(sec, rel, false);
 
-    if (ctx.hasDynDbg) {
-      if (InputSection *is = dyn_cast<InputSection>(&sec)) {
-        if (const DynDbgGCInfo *gi = is->getDynDbgGCInfo()) {
-          ctx.dynDbgGCRoots.append(gi->roots);
+    if (const DynDbgGCInfo *gi = getDynDbgGCInfo(ctx, sec)) {
+      ctx.dynDbgInnerGCRoots.append(gi->roots);
 
-          for (Symbol *sym : gi->refs) {
-            sym->setFlags(USED);
-            if (auto *ss = dyn_cast<SharedSymbol>(sym)) {
-              if (!ss->isWeak())
-                whyLive.try_emplace(sym, LiveReason{is, "dynamic debugging"});
-            } else if (auto *d = dyn_cast<Defined>(sym)) {
-              if (auto *isec = dyn_cast_or_null<InputSectionBase>(d->section))
-                enqueue(isec, d->value, sym, {is, "dynamic debugging"});
-            }
-          }
+      for (Symbol *sym : gi->refs) {
+        sym->setFlags(USED);
+        if (auto *ss = dyn_cast<SharedSymbol>(sym)) {
+          if (!ss->isWeak())
+            whyLive.try_emplace(sym, LiveReason{&sec, "dynamic debugging"});
+        } else if (auto *d = dyn_cast<Defined>(sym)) {
+          if (auto *isec = dyn_cast_or_null<InputSectionBase>(d->section))
+            enqueue(isec, d->value, sym, {&sec, "dynamic debugging"});
         }
       }
     }
@@ -573,21 +577,17 @@ static void processSectionEdges(
   if (sec.nextInSectionGroup)
     fn(sec.nextInSectionGroup, 0);
 
-  if (ctx.hasDynDbg) {
-    if (InputSection *is = dyn_cast<InputSection>(&sec)) {
-      if (const DynDbgGCInfo *gi = is->getDynDbgGCInfo()) {
-        ddGCRoots.append(gi->roots);
+  if (const DynDbgGCInfo *gi = getDynDbgGCInfo(ctx, sec)) {
+    ddGCRoots.append(gi->roots);
 
-        for (Symbol *sym : gi->refs) {
-          if (!sym->hasFlag(USED))
-            sym->setFlags(USED);
-          if (auto *d = dyn_cast<Defined>(sym)) {
-            if (auto *isec = dyn_cast_or_null<InputSectionBase>(d->section)) {
-              uint64_t offset = d->value;
-              markIfSectionPiece(isec, offset);
-              fn(isec, offset);
-            }
-          }
+    for (Symbol *sym : gi->refs) {
+      if (!sym->hasFlag(USED))
+        sym->setFlags(USED);
+      if (auto *d = dyn_cast<Defined>(sym)) {
+        if (auto *isec = dyn_cast_or_null<InputSectionBase>(d->section)) {
+          uint64_t offset = d->value;
+          markIfSectionPiece(isec, offset);
+          fn(isec, offset);
         }
       }
     }
@@ -640,7 +640,7 @@ void MarkLive<ELFT, TrackWhyLive>::markParallel() {
       queue.append(std::move(localStates[t].queue));
 
       if (ctx.hasDynDbg)
-        ctx.dynDbgGCRoots.append(std::move(localStates[t].ddGCRoots));
+        ctx.dynDbgInnerGCRoots.append(std::move(localStates[t].ddGCRoots));
     }
   }
 }
