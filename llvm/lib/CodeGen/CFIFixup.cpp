@@ -36,7 +36,10 @@
 // which is set for the entry point of the function and for every block
 // reachable from the entry along a path that does not execute the prologue. If
 // this property holds, it takes precedence over the "has a call frame"
-// property.
+// property. The epilogue of a return block may leave some prologue rules in
+// place (e.g. X86 omits .cfi_restore for callee-saved registers there), so a
+// block with this property is reset to the initial state when it follows such
+// a return block in the layout.
 
 // From the point of view of the unwind tables, the "has/does not have call
 // frame" state at beginning of each block is determined by the state at the end
@@ -104,6 +107,27 @@ static bool containsEpilogue(const MachineBasicBlock &MBB) {
     return MI.getOpcode() == TargetOpcode::CFI_INSTRUCTION &&
            MI.getFlag(MachineInstr::FrameDestroy);
   });
+}
+
+// Returns true if MBB contains an epilogue that does not restore the rule of
+// some register in PrologueRegs.
+static bool hasPartialEpilogue(const MachineBasicBlock &MBB,
+                               ArrayRef<unsigned> PrologueRegs) {
+  const auto &CFIs = MBB.getParent()->getFrameInstructions();
+  SmallVector<unsigned, 8> Restored;
+  bool HasEpilogue = false;
+  for (const MachineInstr &MI : MBB) {
+    if (MI.getOpcode() != TargetOpcode::CFI_INSTRUCTION ||
+        !MI.getFlag(MachineInstr::FrameDestroy))
+      continue;
+    HasEpilogue = true;
+    const MCCFIInstruction &CFI = CFIs[MI.getOperand(0).getCFIIndex()];
+    if (CFI.getOperation() == MCCFIInstruction::OpRestore)
+      Restored.push_back(CFI.getRegister());
+  }
+  return HasEpilogue && llvm::any_of(PrologueRegs, [&](unsigned Reg) {
+           return !llvm::is_contained(Restored, Reg);
+         });
 }
 
 static MachineBasicBlock *
@@ -238,13 +262,44 @@ static InsertionPoint cloneCfiPrologue(const InsertionPoint &PrologueEnd,
   return DstInsertPt;
 }
 
+// Returns the registers that the prologue CFI instructions give a rule.
+static SmallVector<unsigned, 8>
+getPrologueRegs(const InsertionPoint &PrologueEnd) {
+  MachineFunction &MF = *PrologueEnd.MBB->getParent();
+  SmallVector<unsigned, 8> Regs;
+  auto Collect = [&](MachineBasicBlock::const_iterator Begin,
+                     MachineBasicBlock::const_iterator End) {
+    for (const MachineInstr &MI : make_range(Begin, End)) {
+      if (!isPrologueCFIInstruction(MI))
+        continue;
+      const MCCFIInstruction &CFI =
+          MF.getFrameInstructions()[MI.getOperand(0).getCFIIndex()];
+      switch (CFI.getOperation()) {
+      case MCCFIInstruction::OpOffset:
+      case MCCFIInstruction::OpRelOffset:
+      case MCCFIInstruction::OpValOffset:
+      case MCCFIInstruction::OpRegister:
+        Regs.push_back(CFI.getRegister());
+        break;
+      default:
+        break;
+      }
+    }
+  };
+  for (const MachineBasicBlock &MBB :
+       make_range(MF.begin(), PrologueEnd.MBB->getIterator()))
+    Collect(MBB.begin(), MBB.end());
+  Collect(PrologueEnd.MBB->begin(), PrologueEnd.Iterator);
+  return Regs;
+}
+
 // Fixes up the CFI instructions in a basic block to be consistent with the
 // intended frame state, adding or removing CFI instructions as necessary.
 // Returns true if a change was made and false otherwise.
 static bool
 fixupBlock(MachineBasicBlock &CurrBB, const BlockFlagsVector &BlockInfo,
            SmallDenseMap<MBBSectionID, InsertionPoint> &InsertionPts,
-           const InsertionPoint &Prologue) {
+           const InsertionPoint &Prologue, ArrayRef<unsigned> PrologueRegs) {
   const MachineFunction &MF = *CurrBB.getParent();
   const TargetFrameLowering &TFL = *MF.getSubtarget().getFrameLowering();
   const BlockFlags &Info = BlockInfo[CurrBB.getNumber()];
@@ -259,8 +314,8 @@ fixupBlock(MachineBasicBlock &CurrBB, const BlockFlagsVector &BlockInfo,
 
   // If the previous block and the current block are in the same section,
   // the frame info will propagate from the previous block to the current one.
-  const BlockFlags &PrevInfo =
-      BlockInfo[std::prev(CurrBB.getIterator())->getNumber()];
+  const MachineBasicBlock &PrevBB = *std::prev(CurrBB.getIterator());
+  const BlockFlags &PrevInfo = BlockInfo[PrevBB.getNumber()];
   bool HasFrame = PrevInfo.HasFrameOnExit && !CurrBB.isBeginSection();
   bool NeedsFrame = Info.HasFrameOnEntry && !Info.StrongNoFrameOnEntry;
 
@@ -275,7 +330,10 @@ fixupBlock(MachineBasicBlock &CurrBB, const BlockFlagsVector &BlockInfo,
   }
 #endif
 
-  if (HasFrame == NeedsFrame)
+  bool AfterPartialEpilogue = Info.StrongNoFrameOnEntry &&
+                              !CurrBB.isBeginSection() && PrevBB.succ_empty() &&
+                              hasPartialEpilogue(PrevBB, PrologueRegs);
+  if (HasFrame == NeedsFrame && !AfterPartialEpilogue)
     return false;
 
   if (!NeedsFrame) {
@@ -334,10 +392,12 @@ static bool runImpl(MachineFunction &MF) {
   // No point starting before the prologue block.
   // TODO: the unwind tables will still be incorrect if an epilogue physically
   // preceeds the prologue.
+  SmallVector<unsigned, 8> PrologueRegs =
+      getPrologueRegs({PrologueBlock, PrologueEnd});
   for (MachineBasicBlock &MBB :
        make_range(std::next(PrologueBlock->getIterator()), MF.end())) {
-    Change |=
-        fixupBlock(MBB, BlockInfo, InsertionPts, {PrologueBlock, PrologueEnd});
+    Change |= fixupBlock(MBB, BlockInfo, InsertionPts,
+                         {PrologueBlock, PrologueEnd}, PrologueRegs);
   }
 
   return Change;
