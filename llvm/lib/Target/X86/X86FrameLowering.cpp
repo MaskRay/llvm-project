@@ -607,11 +607,13 @@ void X86FrameLowering::emitCalleeSavedFrameMoves(
                  MachineInstr::FrameSetup);
       } else {
         BuildCFI(MBB, MBBI, DL,
-                 MCCFIInstruction::createOffset(nullptr, DwarfReg, Offset));
+                 MCCFIInstruction::createOffset(nullptr, DwarfReg, Offset),
+                 MachineInstr::FrameSetup);
       }
     } else {
       BuildCFI(MBB, MBBI, DL,
-               MCCFIInstruction::createRestore(nullptr, DwarfReg));
+               MCCFIInstruction::createRestore(nullptr, DwarfReg),
+               MachineInstr::FrameDestroy);
     }
   }
   if (auto *MI = X86FI->getStackPtrSaveMI()) {
@@ -838,7 +840,8 @@ void X86FrameLowering::emitStackProbeInlineGenericBlock(
     if (!HasFP && NeedsDwarfCFI) {
       BuildCFI(
           MBB, MBBI, DL,
-          MCCFIInstruction::createAdjustCfaOffset(nullptr, StackAdjustment));
+          MCCFIInstruction::createAdjustCfaOffset(nullptr, StackAdjustment),
+          MachineInstr::FrameSetup);
     }
 
     addRegOffset(BuildMI(MBB, MBBI, DL, TII.get(MovMIOpc))
@@ -856,9 +859,9 @@ void X86FrameLowering::emitStackProbeInlineGenericBlock(
         .setMIFlag(MachineInstr::FrameSetup);
 
     if (!HasFP && NeedsDwarfCFI) {
-      BuildCFI(
-          MBB, MBBI, DL,
-          MCCFIInstruction::createAdjustCfaOffset(nullptr, StackProbeSize));
+      BuildCFI(MBB, MBBI, DL,
+               MCCFIInstruction::createAdjustCfaOffset(nullptr, StackProbeSize),
+               MachineInstr::FrameSetup);
     }
     addRegOffset(BuildMI(MBB, MBBI, DL, TII.get(MovMIOpc))
                      .setMIFlag(MachineInstr::FrameSetup),
@@ -986,9 +989,11 @@ void X86FrameLowering::emitStackProbeInlineGenericLoop(
 
       BuildCFI(MBB, MBBI, DL,
                MCCFIInstruction::createDefCfaRegister(
-                   nullptr, TRI->getDwarfRegNum(DwarfFinalStackProbed, true)));
+                   nullptr, TRI->getDwarfRegNum(DwarfFinalStackProbed, true)),
+               MachineInstr::FrameSetup);
       BuildCFI(MBB, MBBI, DL,
-               MCCFIInstruction::createAdjustCfaOffset(nullptr, BoundOffset));
+               MCCFIInstruction::createAdjustCfaOffset(nullptr, BoundOffset),
+               MachineInstr::FrameSetup);
     }
   }
 
@@ -1043,7 +1048,8 @@ void X86FrameLowering::emitStackProbeInlineGenericLoop(
 
     BuildCFI(*tailMBB, TailMBBIter, DL,
              MCCFIInstruction::createDefCfaRegister(
-                 nullptr, TRI->getDwarfRegNum(DwarfStackPtr, true)));
+                 nullptr, TRI->getDwarfRegNum(DwarfStackPtr, true)),
+             MachineInstr::FrameSetup);
   }
 
   // Update Live In information
