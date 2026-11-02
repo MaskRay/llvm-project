@@ -6,6 +6,7 @@ define ptr @large_loop_switch(ptr %p) {
 ; CHECK-NEXT:    pushq %rbx
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    .cfi_offset %rbx, -16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movq %rdi, %rax
 ; CHECK-NEXT:    movl $6, %ebx
 ; CHECK-NEXT:    movl %ebx, %ecx
@@ -19,7 +20,7 @@ define ptr @large_loop_switch(ptr %p) {
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_2: # %sw.bb1
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    movl $531, %edi # imm = 0x213
 ; CHECK-NEXT:    movq %rax, %rsi
 ; CHECK-NEXT:    callq ccc@PLT

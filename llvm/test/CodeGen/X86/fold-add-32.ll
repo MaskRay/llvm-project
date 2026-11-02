@@ -13,6 +13,7 @@ define i32 @foo(i1 %b) #0 {
 ; CHECK-NEXT:    .cfi_offset %ebp, -8
 ; CHECK-NEXT:    movl %esp, %ebp
 ; CHECK-NEXT:    .cfi_def_cfa_register %ebp
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    subl $8, %esp
 ; CHECK-NEXT:    movl __stack_chk_guard, %eax
 ; CHECK-NEXT:    movl %eax, -4(%ebp)
@@ -34,7 +35,7 @@ define i32 @foo(i1 %b) #0 {
 ; CHECK-NEXT:    .cfi_def_cfa %esp, 4
 ; CHECK-NEXT:    retl
 ; CHECK-NEXT:  .LBB0_5: # %entry
-; CHECK-NEXT:    .cfi_def_cfa %ebp, 8
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    calll __stack_chk_fail
 entry:
   %a = alloca i8, align 1

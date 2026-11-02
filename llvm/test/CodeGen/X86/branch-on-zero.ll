@@ -539,6 +539,7 @@ define i32 @xor_branch_imm_ret(i32 %x) {
 ; CHECK32:       # %bb.0: # %entry
 ; CHECK32-NEXT:    subl $12, %esp
 ; CHECK32-NEXT:    .cfi_def_cfa_offset 16
+; CHECK32-NEXT:    .cfi_remember_state
 ; CHECK32-NEXT:    movl $-1365, %eax # imm = 0xFAAB
 ; CHECK32-NEXT:    xorl {{[0-9]+}}(%esp), %eax
 ; CHECK32-NEXT:    je .LBB14_2
@@ -547,7 +548,7 @@ define i32 @xor_branch_imm_ret(i32 %x) {
 ; CHECK32-NEXT:    .cfi_def_cfa_offset 4
 ; CHECK32-NEXT:    retl
 ; CHECK32-NEXT:  .LBB14_2: # %if.end
-; CHECK32-NEXT:    .cfi_def_cfa_offset 16
+; CHECK32-NEXT:    .cfi_restore_state
 ; CHECK32-NEXT:    calll other@PLT
 entry:
   %cmp.not = icmp eq i32 %x, -1365
@@ -577,6 +578,7 @@ define i32 @xor_branch_ret(i32 %x) {
 ; CHECK32:       # %bb.0: # %entry
 ; CHECK32-NEXT:    subl $12, %esp
 ; CHECK32-NEXT:    .cfi_def_cfa_offset 16
+; CHECK32-NEXT:    .cfi_remember_state
 ; CHECK32-NEXT:    movl $2048, %eax # imm = 0x800
 ; CHECK32-NEXT:    xorl {{[0-9]+}}(%esp), %eax
 ; CHECK32-NEXT:    je .LBB15_2
@@ -585,7 +587,7 @@ define i32 @xor_branch_ret(i32 %x) {
 ; CHECK32-NEXT:    .cfi_def_cfa_offset 4
 ; CHECK32-NEXT:    retl
 ; CHECK32-NEXT:  .LBB15_2: # %if.end
-; CHECK32-NEXT:    .cfi_def_cfa_offset 16
+; CHECK32-NEXT:    .cfi_restore_state
 ; CHECK32-NEXT:    calll other@PLT
 entry:
   %cmp.not = icmp eq i32 %x, 2048

@@ -273,6 +273,7 @@ define i32 @test12() ssp uwtable {
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax # encoding: [0x50]
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    callq test12b@PLT # encoding: [0xe8,A,A,A,A]
 ; CHECK-NEXT:    # fixup A - offset: 1, value: test12b@PLT, kind: FK_PCRel_4
 ; CHECK-NEXT:    testb %al, %al # encoding: [0x84,0xc0]
@@ -284,7 +285,7 @@ define i32 @test12() ssp uwtable {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq # encoding: [0xc3]
 ; CHECK-NEXT:  .LBB12_2: # %F
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    movl $2, %eax # encoding: [0xb8,0x02,0x00,0x00,0x00]
 ; CHECK-NEXT:    popq %rcx # encoding: [0x59]
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8

@@ -202,6 +202,7 @@ X86TargetMachine::X86TargetMachine(const Target &T, const Triple &TT,
 
   // x86 supports the debug entry values.
   setSupportsDebugEntryValues(true);
+  setCFIFixup(!TT.isOSDarwin() && !CLOpts.enable_cfi_instr_inserter);
 
   initAsmInfo();
 }
@@ -601,11 +602,7 @@ void X86PassConfig::addPreEmitPass2() {
   if (TT.isOSWindows() && TT.isX86_64())
     addPass(createX86AvoidTrailingCallLegacyPass());
 
-  // Verify basic block incoming and outgoing cfa offset and register values and
-  // correct CFA calculation rule where needed by inserting appropriate CFI
-  // instructions. CFIInstrInserter self-skips targets that do not use DWARF
-  // CFI.
-  if (!TT.isOSDarwin())
+  if (getX86TargetMachine().getCLOpts().enable_cfi_instr_inserter)
     addPass(createCFIInstrInserterLegacy());
 
   if (TT.isOSWindows()) {

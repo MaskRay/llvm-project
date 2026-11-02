@@ -23,7 +23,7 @@ lpad:		; preds = %cont, %entry
 }
 
 ; CHECK: lpad
-; CHECK-NEXT: .cfi_def_cfa_offset 16
+; CHECK-NEXT: .cfi_restore_state
 ; CHECK-NEXT: Ltmp
 
 declare i32 @__gxx_personality_v0(...)

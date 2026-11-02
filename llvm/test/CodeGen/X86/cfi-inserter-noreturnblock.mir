@@ -1,6 +1,6 @@
-# RUN: llc -o - %s -mtriple=x86_64-- -verify-cfiinstrs \
+# RUN: llc -o - %s -mtriple=x86_64-- -x86-enable-cfi-instr-inserter -verify-cfiinstrs \
 # RUN:     -run-pass=cfi-instr-inserter
-# RUN: llc -o - %s -mtriple=x86_64-- -verify-cfiinstrs \
+# RUN: llc -o - %s -mtriple=x86_64-- -x86-enable-cfi-instr-inserter -verify-cfiinstrs \
 # RUN:     -passes=cfi-instr-inserter
 
 # Test that CFI verifier does not report inconsistent offset for the

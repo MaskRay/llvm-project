@@ -14,7 +14,7 @@
 ; X86_64-NEXT:  # %bb.1:                                # %try.cont
 ; X86_64:               retq
 ; X86_64-NEXT:  .LBB0_2:                                # %lpad
-; X86_64-NEXT:          .cfi_def_cfa_offset 16
+; X86_64-NEXT:          .cfi_restore_state
 ; X86_64-NEXT:  .Ltmp2:
 ; X86_64-NEXT:          endbr64
 ; X86_64:               callq   __cxa_begin_catch

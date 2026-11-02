@@ -34,6 +34,7 @@ define void @test() personality ptr @__gxx_personality_v0  {
 ; CHECK-NEXT:    .cfi_offset %r14, -32
 ; CHECK-NEXT:    .cfi_offset %r15, -24
 ; CHECK-NEXT:    .cfi_offset %rbp, -16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movq external_bool@GOTPCREL(%rip), %rax
 ; CHECK-NEXT:    cmpb $1, (%rax)
 ; CHECK-NEXT:    jne .LBB0_3
@@ -79,7 +80,7 @@ define void @test() personality ptr @__gxx_personality_v0  {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB0_2: # %lpad
-; CHECK-NEXT:    .cfi_def_cfa_offset 64
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp4:
 ; CHECK-NEXT:    movq %rax, %rbx
 ; CHECK-NEXT:    movl {{[-0-9]+}}(%r{{[sb]}}p), %edi # 4-byte Reload

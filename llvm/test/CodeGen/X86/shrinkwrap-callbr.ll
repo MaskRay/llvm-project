@@ -15,6 +15,7 @@ define i32 @test1(i32 %v) {
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    testl %edi, %edi
 ; CHECK-NEXT:    je .LBB0_3
 ; CHECK-NEXT:  # %bb.1: # %if.end
@@ -28,7 +29,8 @@ define i32 @test1(i32 %v) {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB0_3: # %ret0
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    xorl %eax, %eax
 ; CHECK-NEXT:    popq %rcx
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
@@ -36,7 +38,7 @@ define i32 @test1(i32 %v) {
 ; CHECK-NEXT:  .LBB0_4: # Inline asm indirect target
 ; CHECK-NEXT:    # %two
 ; CHECK-NEXT:    # Label of block must be emitted
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    popq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    jmp fn # TAILCALL

@@ -156,6 +156,7 @@ define ghccc void @test5() {
 ; CHECK-NEXT:    .cfi_offset %rbp, -16
 ; CHECK-NEXT:    movq %rsp, %rbp
 ; CHECK-NEXT:    .cfi_def_cfa_register %rbp
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    andq $-8, %rsp
 ; CHECK-NEXT:    testb %al, %al
 ; CHECK-NEXT:    jne .LBB3_2
@@ -166,7 +167,7 @@ define ghccc void @test5() {
 ; CHECK-NEXT:    .cfi_def_cfa %rsp, 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB3_2: # %else
-; CHECK-NEXT:    .cfi_def_cfa %rbp, 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    movq %rbp, %rsp
 ; CHECK-NEXT:    popq %rbp
 ; CHECK-NEXT:    .cfi_def_cfa %rsp, 8

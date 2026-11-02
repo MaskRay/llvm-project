@@ -162,6 +162,8 @@ defm : BoolField<"x86-enable-apx-for-relocation", "false",
   "Enable APX features (EGPR, NDD and NF) for instructions with relocations on x86-64 ELF">;
 
 // X86TargetMachine.cpp
+defm : BoolField<"x86-enable-cfi-instr-inserter", "false",
+  "Use CFIInstrInserter instead of CFIFixup">;
 defm : BoolField<"x86-machine-combiner", "true",
   "Enable the machine combiner pass">;
 defm : BoolField<"x86-tile-ra", "true",

@@ -9,6 +9,7 @@ define i64 @foo(ptr %ptr, i64 %p2, i64 %p3, i64 %p4, i64 %p5, i64 %p6) optsize {
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    subq $40, %rsp
 ; CHECK-NEXT:    .cfi_def_cfa_offset 48
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movq %r8, %rax
 ; CHECK-NEXT:    testq %rdi, %rdi
 ; CHECK-NEXT:    je .LBB0_1
@@ -26,7 +27,7 @@ define i64 @foo(ptr %ptr, i64 %p2, i64 %p3, i64 %p4, i64 %p5, i64 %p6) optsize {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB0_1: # %if.then
-; CHECK-NEXT:    .cfi_def_cfa_offset 48
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    movq %rax, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; CHECK-NEXT:    movq %r9, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill
 ; CHECK-NEXT:    movq %rdx, {{[-0-9]+}}(%r{{[sb]}}p) # 8-byte Spill

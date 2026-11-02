@@ -4154,15 +4154,18 @@ MachineBasicBlock::iterator X86FrameLowering::eliminateCallFramePseudoInstr(
     // Add Amount to SP to destroy a frame, or subtract to setup.
     int64_t StackAdjustment = isDestroy ? Amount : -Amount;
     int64_t CfaAdjustment = StackAdjustment;
+    MachineInstr::MIFlag Flag = MachineInstr::NoFlags;
 
     if (StackAdjustment) {
       // Merge with any previous or following adjustment instruction. Note: the
       // instructions merged with here do not have CFI, so their stack
       // adjustments do not feed into CfaAdjustment
 
-      auto CalcCfaAdjust = [&CfaAdjustment](MachineBasicBlock::iterator PI,
-                                            int64_t Offset) {
+      auto CalcCfaAdjust = [&](MachineBasicBlock::iterator PI, int64_t Offset) {
         CfaAdjustment += Offset;
+        // An SP update that absorbs the epilogue's is part of the epilogue.
+        if (PI->getFlag(MachineInstr::FrameDestroy))
+          Flag = MachineInstr::FrameDestroy;
       };
       auto CalcNewOffset = [&StackAdjustment](int64_t Offset) {
         return StackAdjustment + Offset;
@@ -4176,7 +4179,8 @@ MachineBasicBlock::iterator X86FrameLowering::eliminateCallFramePseudoInstr(
         if (!(F.hasMinSize() &&
               adjustStackWithPops(MBB, InsertPos, DL, StackAdjustment)))
           BuildStackAdjustment(MBB, InsertPos, DL, StackAdjustment,
-                               /*InEpilogue=*/false);
+                               /*InEpilogue=*/false)
+              .setMIFlag(Flag);
       }
     }
 
@@ -4190,9 +4194,9 @@ MachineBasicBlock::iterator X86FrameLowering::eliminateCallFramePseudoInstr(
 
       // TODO: When not using precise CFA, we also need to adjust for the
       // InternalAmt here.
-      BuildCFI(
-          MBB, InsertPos, DL,
-          MCCFIInstruction::createAdjustCfaOffset(nullptr, -CfaAdjustment));
+      BuildCFI(MBB, InsertPos, DL,
+               MCCFIInstruction::createAdjustCfaOffset(nullptr, -CfaAdjustment),
+               Flag);
     }
 
     return I;
@@ -4338,6 +4342,29 @@ int X86FrameLowering::getInitialCFAOffset(const MachineFunction &MF) const {
 Register
 X86FrameLowering::getInitialCFARegister(const MachineFunction &MF) const {
   return StackPtr;
+}
+
+void X86FrameLowering::resetCFIToInitialState(MachineBasicBlock &MBB) const {
+  MachineFunction &MF = *MBB.getParent();
+  MachineBasicBlock::iterator MBBI = MBB.begin();
+  DebugLoc DL;
+  unsigned DwarfStackPtr =
+      TRI->getDwarfRegNum(Is64Bit ? X86::RSP : X86::ESP, true);
+  BuildCFI(MBB, MBBI, DL,
+           MCCFIInstruction::cfiDefCfa(nullptr, DwarfStackPtr, SlotSize));
+  if (hasFP(MF)) {
+    Register MachineFramePtr =
+        STI.isTarget64BitILP32()
+            ? Register(getX86SubSuperRegister(TRI->getFrameRegister(MF), 64))
+            : TRI->getFrameRegister(MF);
+    BuildCFI(MBB, MBBI, DL,
+             MCCFIInstruction::createRestore(
+                 nullptr, TRI->getDwarfRegNum(MachineFramePtr, true)));
+  }
+  for (const CalleeSavedInfo &I : MF.getFrameInfo().getCalleeSavedInfo())
+    BuildCFI(MBB, MBBI, DL,
+             MCCFIInstruction::createRestore(
+                 nullptr, TRI->getDwarfRegNum(I.getReg(), true)));
 }
 
 TargetFrameLowering::DwarfFrameBase

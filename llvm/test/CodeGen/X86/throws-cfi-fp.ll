@@ -18,7 +18,7 @@ define void @_Z6throwsv() #0 personality ptr @__gxx_personality_v0 {
 ; CHECK-NEXT:    .cfi_def_cfa %rsp, 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:    .LBB0_1:
-; CHECK-NEXT:    .cfi_def_cfa %rbp, 16
+; CHECK-NEXT:    .cfi_restore_state
 
 ; PEI-LABEL: name: _Z6throwsv
 ; PEI:         frame-setup PUSH64r killed $rbp, implicit-def $rsp, implicit $rsp

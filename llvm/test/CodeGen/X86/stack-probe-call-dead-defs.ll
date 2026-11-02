@@ -81,8 +81,8 @@ define void @large_frame() "probe-stack"="__chkstk" {
   ; X86-NEXT:   PUSH32r killed renamable $eax, implicit-def $esp, implicit $esp :: (store (s32) into stack)
   ; X86-NEXT:   CFI_INSTRUCTION adjust_cfa_offset 4
   ; X86-NEXT:   CALLpcrel32 @use, csr_32, implicit $esp, implicit $ssp, implicit-def $esp, implicit-def $ssp
-  ; X86-NEXT:   $esp = ADD32ri $esp, 40004, implicit-def dead $eflags
-  ; X86-NEXT:   CFI_INSTRUCTION adjust_cfa_offset -40004
+  ; X86-NEXT:   $esp = frame-destroy ADD32ri $esp, 40004, implicit-def dead $eflags
+  ; X86-NEXT:   frame-destroy CFI_INSTRUCTION adjust_cfa_offset -40004
   ; X86-NEXT:   RET 0
   ;
   ; X64-LABEL: name: large_frame

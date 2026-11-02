@@ -15,6 +15,7 @@ define ptr addrspace(1) @relocate_constant_in_landing_pad() gc "statepoint-examp
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:  .Ltmp0: # EH_LABEL
 ; CHECK-NEXT:    xorl %eax, %eax
 ; CHECK-NEXT:    xorl %edi, %edi
@@ -27,7 +28,7 @@ define ptr addrspace(1) @relocate_constant_in_landing_pad() gc "statepoint-examp
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB0_2: # %exceptional_return
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp2: # EH_LABEL
 ; CHECK-NEXT:    movl $1, %eax
 ; CHECK-NEXT:    popq %rcx
@@ -53,6 +54,7 @@ define ptr addrspace(1) @relocate_alloca_in_landing_pad() gc "statepoint-example
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:  .Ltmp4: # EH_LABEL
 ; CHECK-NEXT:    callq foo@PLT
 ; CHECK-NEXT:  .Ltmp7:
@@ -63,7 +65,7 @@ define ptr addrspace(1) @relocate_alloca_in_landing_pad() gc "statepoint-example
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB1_2: # %lpad
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp6: # EH_LABEL
 ; CHECK-NEXT:    leaq {{[0-9]+}}(%rsp), %rax
 ; CHECK-NEXT:    popq %rcx
@@ -92,6 +94,7 @@ define ptr addrspace(1) @relocate_poison_in_landing_pad() gc "statepoint-example
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:  .Ltmp8: # EH_LABEL
 ; CHECK-NEXT:    callq foo@PLT
 ; CHECK-NEXT:  .Ltmp11:
@@ -102,7 +105,7 @@ define ptr addrspace(1) @relocate_poison_in_landing_pad() gc "statepoint-example
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB2_2: # %lpad
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp10: # EH_LABEL
 ; CHECK-NEXT:    movl $4278124286, %eax # imm = 0xFEFEFEFE
 ; CHECK-NEXT:    popq %rcx

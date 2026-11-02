@@ -26,6 +26,7 @@ define i32 @decode_sb(ptr %t, i32 %bl, i32 %_msprop1966, i32 %sub.i, i64 %idxpro
 ; CHECK-NEXT:    .cfi_offset %r13, -40
 ; CHECK-NEXT:    .cfi_offset %r14, -32
 ; CHECK-NEXT:    .cfi_offset %r15, -24
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movl %r9d, %ebx
 ; CHECK-NEXT:    # kill: def $edx killed $edx def $rdx
 ; CHECK-NEXT:    movabsq $87960930222080, %r15 # imm = 0x500000000000

@@ -3043,6 +3043,7 @@ define <4 x i64> @test_pr28312(<4 x ptr> %p1, <4 x i1> %k, <4 x i1> %k2,<4 x i64
 ; X86-KNL-NEXT:    subl $32, %esp
 ; X86-KNL-NEXT:    .cfi_offset %esi, -16
 ; X86-KNL-NEXT:    .cfi_offset %ebx, -12
+; X86-KNL-NEXT:    .cfi_remember_state
 ; X86-KNL-NEXT:    vpslld $31, %xmm1, %xmm1
 ; X86-KNL-NEXT:    vptestmd %zmm1, %zmm1, %k0
 ; X86-KNL-NEXT:    kmovw %k0, %ebx
@@ -3126,7 +3127,7 @@ define <4 x i64> @test_pr28312(<4 x ptr> %p1, <4 x i1> %k, <4 x i1> %k2,<4 x i64
 ; X86-KNL-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-KNL-NEXT:    retl
 ; X86-KNL-NEXT:  .LBB42_9: # %cond.load11
-; X86-KNL-NEXT:    .cfi_def_cfa %ebp, 8
+; X86-KNL-NEXT:    .cfi_restore_state
 ; X86-KNL-NEXT:    vmovq {{.*#+}} xmm0 = mem[0],zero
 ; X86-KNL-NEXT:    testb $2, %bl
 ; X86-KNL-NEXT:    je .LBB42_12

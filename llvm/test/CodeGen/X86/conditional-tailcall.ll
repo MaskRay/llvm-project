@@ -59,6 +59,7 @@ define void @f_non_leaf(i32 %x, i32 %y) optsize {
 ; CHECK32-NEXT:    pushl %ebx # encoding: [0x53]
 ; CHECK32-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK32-NEXT:    .cfi_offset %ebx, -8
+; CHECK32-NEXT:    .cfi_remember_state
 ; CHECK32-NEXT:    movl {{[0-9]+}}(%esp), %eax # encoding: [0x8b,0x44,0x24,0x08]
 ; CHECK32-NEXT:    #APP
 ; CHECK32-NEXT:    #NO_APP
@@ -72,7 +73,7 @@ define void @f_non_leaf(i32 %x, i32 %y) optsize {
 ; CHECK32-NEXT:    # encoding: [0xeb,A]
 ; CHECK32-NEXT:    # fixup A - offset: 1, value: foo, kind: FK_PCRel_1
 ; CHECK32-NEXT:  .LBB1_2: # %bb2
-; CHECK32-NEXT:    .cfi_def_cfa_offset 8
+; CHECK32-NEXT:    .cfi_restore_state
 ; CHECK32-NEXT:    popl %ebx # encoding: [0x5b]
 ; CHECK32-NEXT:    .cfi_def_cfa_offset 4
 ; CHECK32-NEXT:    jmp bar # TAILCALL
@@ -84,6 +85,7 @@ define void @f_non_leaf(i32 %x, i32 %y) optsize {
 ; CHECK64-NEXT:    pushq %rbx # encoding: [0x53]
 ; CHECK64-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK64-NEXT:    .cfi_offset %rbx, -16
+; CHECK64-NEXT:    .cfi_remember_state
 ; CHECK64-NEXT:    #APP
 ; CHECK64-NEXT:    #NO_APP
 ; CHECK64-NEXT:    cmpl %esi, %edi # encoding: [0x39,0xf7]
@@ -96,7 +98,7 @@ define void @f_non_leaf(i32 %x, i32 %y) optsize {
 ; CHECK64-NEXT:    # encoding: [0xeb,A]
 ; CHECK64-NEXT:    # fixup A - offset: 1, value: foo, kind: FK_PCRel_1
 ; CHECK64-NEXT:  .LBB1_2: # %bb2
-; CHECK64-NEXT:    .cfi_def_cfa_offset 16
+; CHECK64-NEXT:    .cfi_restore_state
 ; CHECK64-NEXT:    popq %rbx # encoding: [0x5b]
 ; CHECK64-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK64-NEXT:    jmp bar # TAILCALL
@@ -248,6 +250,7 @@ define zeroext i1 @pr31257(ptr nocapture readonly dereferenceable(8) %s) minsize
 ; CHECK32-NEXT:    .cfi_offset %edi, -16
 ; CHECK32-NEXT:    .cfi_offset %ebx, -12
 ; CHECK32-NEXT:    .cfi_offset %ebp, -8
+; CHECK32-NEXT:    .cfi_remember_state
 ; CHECK32-NEXT:    movl {{[0-9]+}}(%esp), %eax # encoding: [0x8b,0x44,0x24,0x20]
 ; CHECK32-NEXT:    movl (%eax), %eax # encoding: [0x8b,0x00]
 ; CHECK32-NEXT:    movl -24(%eax), %edx # encoding: [0x8b,0x50,0xe8]
@@ -345,7 +348,7 @@ define zeroext i1 @pr31257(ptr nocapture readonly dereferenceable(8) %s) minsize
 ; CHECK32-NEXT:    .cfi_def_cfa_offset 4
 ; CHECK32-NEXT:    retl # encoding: [0xc3]
 ; CHECK32-NEXT:  .LBB3_13: # %if.else28
-; CHECK32-NEXT:    .cfi_def_cfa_offset 32
+; CHECK32-NEXT:    .cfi_restore_state
 ; CHECK32-NEXT:    subl $8, %esp # encoding: [0x83,0xec,0x08]
 ; CHECK32-NEXT:    .cfi_adjust_cfa_offset 8
 ; CHECK32-NEXT:    pushl %ecx # encoding: [0x51]

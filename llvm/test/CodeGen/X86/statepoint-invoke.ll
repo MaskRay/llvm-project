@@ -13,6 +13,7 @@ define ptr addrspace(1) @test_basic(ptr addrspace(1) %obj,
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    subq $24, %rsp
 ; CHECK-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movq %rdi, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:    movq %rsi, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:  .Ltmp0:
@@ -25,7 +26,7 @@ define ptr addrspace(1) @test_basic(ptr addrspace(1) %obj,
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB0_2: # %exceptional_return
-; CHECK-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp2:
 ; CHECK-NEXT:    movq {{[0-9]+}}(%rsp), %rax
 ; CHECK-NEXT:    addq $24, %rsp
@@ -63,6 +64,7 @@ define ptr addrspace(1) @test_result(ptr addrspace(1) %obj,
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movq %rdi, (%rsp)
 ; CHECK-NEXT:  .Ltmp4:
 ; CHECK-NEXT:    callq some_other_call@PLT
@@ -73,7 +75,7 @@ define ptr addrspace(1) @test_result(ptr addrspace(1) %obj,
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB1_2: # %exceptional_return
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp6:
 ; CHECK-NEXT:    movq (%rsp), %rax
 ; CHECK-NEXT:    popq %rcx
@@ -109,6 +111,7 @@ define ptr addrspace(1) @test_same_val(i1 %cond, ptr addrspace(1) %val1, ptr add
 ; CHECK-NEXT:    subq $16, %rsp
 ; CHECK-NEXT:    .cfi_def_cfa_offset 32
 ; CHECK-NEXT:    .cfi_offset %rbx, -16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movl %edi, %ebx
 ; CHECK-NEXT:    testb $1, %bl
 ; CHECK-NEXT:    je .LBB2_3
@@ -145,7 +148,7 @@ define ptr addrspace(1) @test_same_val(i1 %cond, ptr addrspace(1) %val1, ptr add
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB2_9: # %exceptional_return.right
-; CHECK-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp10:
 ; CHECK-NEXT:    movq (%rsp), %rax
 ; CHECK-NEXT:    jmp .LBB2_6
@@ -199,6 +202,7 @@ define ptr addrspace(1) @test_null_undef(ptr addrspace(1) %val1)
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:  .Ltmp16:
 ; CHECK-NEXT:    callq some_call@PLT
 ; CHECK-NEXT:  .Ltmp19:
@@ -209,7 +213,7 @@ define ptr addrspace(1) @test_null_undef(ptr addrspace(1) %val1)
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB3_2: # %exceptional_return
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp18:
 ; CHECK-NEXT:    jmp .LBB3_1
        gc "statepoint-example" personality ptr @"personality_function" {
@@ -235,6 +239,7 @@ define ptr addrspace(1) @test_alloca_and_const(ptr addrspace(1) %val1)
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:  .Ltmp20:
 ; CHECK-NEXT:    callq some_call@PLT
 ; CHECK-NEXT:  .Ltmp23:
@@ -245,7 +250,7 @@ define ptr addrspace(1) @test_alloca_and_const(ptr addrspace(1) %val1)
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB4_2: # %exceptional_return
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp22:
 ; CHECK-NEXT:    movl $15, %eax
 ; CHECK-NEXT:    popq %rcx

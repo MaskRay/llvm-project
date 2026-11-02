@@ -295,11 +295,7 @@ void X86CodeGenPassBuilder::addPreEmitPass2(PassManagerWrapper &PMW) {
   if (TT.isOSWindows() && TT.isX86_64())
     addMachineFunctionPass(X86AvoidTrailingCallPass(), PMW);
 
-  // Verify basic block incoming and outgoing cfa offset and register values and
-  // correct CFA calculation rule where needed by inserting appropriate CFI
-  // instructions. CFIInstrInserter self-skips targets that do not use DWARF
-  // CFI.
-  if (!TT.isOSDarwin())
+  if (getTM().getCLOpts().enable_cfi_instr_inserter)
     addMachineFunctionPass(CFIInstrInserterPass(), PMW);
 
   if (TT.isOSWindows()) {

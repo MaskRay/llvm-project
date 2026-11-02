@@ -17,7 +17,7 @@ define void @_Z6throwsv() personality ptr @__gxx_personality_v0 {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:    .LBB0_1:
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 
 entry:
   %.b5 = load i1, ptr @_ZL11ShouldThrow, align 1
