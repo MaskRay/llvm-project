@@ -61,6 +61,7 @@ define i32 @test_basic(i32 %l) #0 {
 ; X86-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_1:
+; X86-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-NEXT:    .cfi_restore %ebp
 ; X86-NEXT:    .cfi_restore %esi
 ; X86-NEXT:    pushl $4
@@ -116,8 +117,9 @@ define i32 @test_basic(i32 %l) #0 {
 ; X64-NEXT:    .cfi_def_cfa %rsp, 8
 ; X64-NEXT:    retq
 ; X64-NEXT:  .LBB0_1:
-; X64-NEXT:    .cfi_restore %rbx
+; X64-NEXT:    .cfi_def_cfa %rsp, 8
 ; X64-NEXT:    .cfi_restore %rbp
+; X64-NEXT:    .cfi_restore %rbx
 ; X64-NEXT:    movl $24, %r10d
 ; X64-NEXT:    movl $0, %r11d
 ; X64-NEXT:    callq __morestack
@@ -170,9 +172,9 @@ define i32 @test_basic(i32 %l) #0 {
 ; X32ABI-NEXT:    .cfi_def_cfa %rsp, 8
 ; X32ABI-NEXT:    retq
 ; X32ABI-NEXT:  .LBB0_1:
-; X32ABI-NEXT:    .cfi_def_cfa_register 4294967294
-; X32ABI-NEXT:    .cfi_restore %rbx
+; X32ABI-NEXT:    .cfi_def_cfa %rsp, 8
 ; X32ABI-NEXT:    .cfi_restore %rbp
+; X32ABI-NEXT:    .cfi_restore %rbx
 ; X32ABI-NEXT:    movl $24, %r10d
 ; X32ABI-NEXT:    movl $0, %r11d
 ; X32ABI-NEXT:    callq __morestack

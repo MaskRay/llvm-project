@@ -8,6 +8,7 @@ define void @_Z7catchesv() #0 personality ptr null {
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movq %fs:40, %rax
 ; CHECK-NEXT:    movq %rax, (%rsp)
 ; CHECK-NEXT:  .Ltmp0:
@@ -38,13 +39,14 @@ define void @_Z7catchesv() #0 personality ptr null {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB0_6: # %CallStackCheckFailBlk
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    callq __stack_chk_fail@PLT
 ;
 ; DISNOTET-LABEL: _Z7catchesv:
 ; DISNOTET:       # %bb.0: # %entry
 ; DISNOTET-NEXT:    pushq %rax
 ; DISNOTET-NEXT:    .cfi_def_cfa_offset 16
+; DISNOTET-NEXT:    .cfi_remember_state
 ; DISNOTET-NEXT:    movq %fs:40, %rax
 ; DISNOTET-NEXT:    movq %rax, (%rsp)
 ; DISNOTET-NEXT:  .Ltmp0:
@@ -71,7 +73,7 @@ define void @_Z7catchesv() #0 personality ptr null {
 ; DISNOTET-NEXT:    .cfi_def_cfa_offset 8
 ; DISNOTET-NEXT:    retq
 ; DISNOTET-NEXT:  .LBB0_5: # %CallStackCheckFailBlk
-; DISNOTET-NEXT:    .cfi_def_cfa_offset 16
+; DISNOTET-NEXT:    .cfi_restore_state
 ; DISNOTET-NEXT:    callq __stack_chk_fail@PLT
 entry:
   %call = invoke i64 null(i32 0, ptr null, i64 0)

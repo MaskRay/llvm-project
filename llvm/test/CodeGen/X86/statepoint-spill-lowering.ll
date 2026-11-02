@@ -13,6 +13,7 @@ define ptr addrspace(1) @test_invoke(ptr addrspace(1) %a, ptr addrspace(1) %b, p
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movq {{[0-9]+}}(%rsp), %rdi
 ; CHECK-NEXT:    movq %rdi, (%rsp)
 ; CHECK-NEXT:  .Ltmp0:
@@ -25,7 +26,7 @@ define ptr addrspace(1) @test_invoke(ptr addrspace(1) %a, ptr addrspace(1) %b, p
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB0_2: # %exceptional_return
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:  .Ltmp2:
 ; CHECK-NEXT:    xorl %eax, %eax
 ; CHECK-NEXT:    popq %rcx

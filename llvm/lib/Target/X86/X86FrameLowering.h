@@ -232,6 +232,8 @@ public:
 
   Register getInitialCFARegister(const MachineFunction &MF) const override;
 
+  void resetCFIToInitialState(MachineBasicBlock &MBB) const override;
+
   DwarfFrameBase getDwarfFrameBase(const MachineFunction &MF) const override;
 
   /// Return true if the function has a redzone (accessible bytes past the

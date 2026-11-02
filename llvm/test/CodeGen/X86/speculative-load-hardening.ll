@@ -37,6 +37,7 @@ define void @test_basic_conditions(i32 %a, i32 %b, i32 %c, ptr %ptr1, ptr %ptr2,
 ; X64-NEXT:    subq $16, %rsp
 ; X64-NEXT:    .cfi_def_cfa_offset 32
 ; X64-NEXT:    .cfi_offset %rbx, -16
+; X64-NEXT:    .cfi_remember_state
 ; X64-NEXT:    movq %rsp, %rax
 ; X64-NEXT:    movq $-1, %r10
 ; X64-NEXT:    sarq $63, %rax
@@ -57,7 +58,7 @@ define void @test_basic_conditions(i32 %a, i32 %b, i32 %c, ptr %ptr1, ptr %ptr2,
 ; X64-NEXT:    .cfi_def_cfa_offset 8
 ; X64-NEXT:    retq
 ; X64-NEXT:  .LBB1_4: # %then2
-; X64-NEXT:    .cfi_def_cfa_offset 32
+; X64-NEXT:    .cfi_restore_state
 ; X64-NEXT:    cmovneq %r10, %rax
 ; X64-NEXT:    testl %edx, %edx
 ; X64-NEXT:    je .LBB1_6
@@ -505,6 +506,7 @@ define void @test_basic_eh(i32 %a, ptr %ptr1, ptr %ptr2) speculative_load_harden
 ; X64-NEXT:    .cfi_def_cfa_offset 48
 ; X64-NEXT:    .cfi_offset %rbx, -24
 ; X64-NEXT:    .cfi_offset %rbp, -16
+; X64-NEXT:    .cfi_remember_state
 ; X64-NEXT:    movq %rsp, %rax
 ; X64-NEXT:    movq $-1, %rbx
 ; X64-NEXT:    sarq $63, %rax
@@ -556,7 +558,7 @@ define void @test_basic_eh(i32 %a, ptr %ptr1, ptr %ptr2) speculative_load_harden
 ; X64-NEXT:    .cfi_def_cfa_offset 8
 ; X64-NEXT:    retq
 ; X64-NEXT:  .LBB4_4: # %lpad
-; X64-NEXT:    .cfi_def_cfa_offset 48
+; X64-NEXT:    .cfi_restore_state
 ; X64-NEXT:  .Ltmp2: # EH_LABEL
 ; X64-NEXT:    movq %rsp, %rcx
 ; X64-NEXT:    sarq $63, %rcx
@@ -589,6 +591,7 @@ define void @test_basic_eh(i32 %a, ptr %ptr1, ptr %ptr2) speculative_load_harden
 ; X64-LFENCE-NEXT:    .cfi_offset %rbx, -32
 ; X64-LFENCE-NEXT:    .cfi_offset %r14, -24
 ; X64-LFENCE-NEXT:    .cfi_offset %rbp, -16
+; X64-LFENCE-NEXT:    .cfi_remember_state
 ; X64-LFENCE-NEXT:    cmpl $41, %edi
 ; X64-LFENCE-NEXT:    jg .LBB4_2
 ; X64-LFENCE-NEXT:  # %bb.1: # %thrower
@@ -616,7 +619,7 @@ define void @test_basic_eh(i32 %a, ptr %ptr1, ptr %ptr2) speculative_load_harden
 ; X64-LFENCE-NEXT:    .cfi_def_cfa_offset 8
 ; X64-LFENCE-NEXT:    retq
 ; X64-LFENCE-NEXT:  .LBB4_3: # %lpad
-; X64-LFENCE-NEXT:    .cfi_def_cfa_offset 32
+; X64-LFENCE-NEXT:    .cfi_restore_state
 ; X64-LFENCE-NEXT:  .Ltmp2: # EH_LABEL
 ; X64-LFENCE-NEXT:    movl (%rax), %eax
 ; X64-LFENCE-NEXT:    addl (%r14), %eax

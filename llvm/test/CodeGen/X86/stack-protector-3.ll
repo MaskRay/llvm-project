@@ -25,7 +25,7 @@
 ; CHECK-TLS-FS-40-NEXT:  cmpq    16(%rsp), %rax
 ; CHECK-TLS-FS-40-NEXT:  jne     .LBB0_2
 ; CHECK-TLS-FS-40:       .LBB0_2:
-; CHECK-TLS-FS-40-NEXT:  .cfi_def_cfa_offset 32
+; CHECK-TLS-FS-40-NEXT:  .cfi_restore_state
 ; CHECK-TLS-FS-40-NEXT:  callq   __stack_chk_fail
 
 ; CHECK-GS:       movq    %gs:40, %rax
@@ -33,7 +33,7 @@
 ; CHECK-GS-NEXT:  cmpq    16(%rsp), %rax
 ; CHECK-GS-NEXT:  jne     .LBB0_2
 ; CHECK-GS:       .LBB0_2:
-; CHECK-GS-NEXT:  .cfi_def_cfa_offset 32
+; CHECK-GS-NEXT:  .cfi_restore_state
 ; CHECK-GS-NEXT:  callq   __stack_chk_fail
 
 ; CHECK-OFFSET:       movq    %fs:20, %rax
@@ -41,7 +41,7 @@
 ; CHECK-OFFSET-NEXT:  cmpq    16(%rsp), %rax
 ; CHECK-OFFSET-NEXT:  jne     .LBB0_2
 ; CHECK-OFFSET:       .LBB0_2:
-; CHECK-OFFSET-NEXT:  .cfi_def_cfa_offset 32
+; CHECK-OFFSET-NEXT:  .cfi_restore_state
 ; CHECK-OFFSET-NEXT:  callq   __stack_chk_fail
 
 ; CHECK-NEGATIVE-OFFSET:       movl    $4294967276, %eax               # imm = 0xFFFFFFEC
@@ -50,7 +50,7 @@
 ; CHECK-NEGATIVE-OFFSET-NEXT:  cmpq    16(%rsp), %rax
 ; CHECK-NEGATIVE-OFFSET-NEXT:  jne     .LBB0_2
 ; CHECK-NEGATIVE-OFFSET:       .LBB0_2:
-; CHECK-NEGATIVE-OFFSET-NEXT:  .cfi_def_cfa_offset 32
+; CHECK-NEGATIVE-OFFSET-NEXT:  .cfi_restore_state
 ; CHECK-NEGATIVE-OFFSET-NEXT:  callq   __stack_chk_fail
 
 ; CHECK-GLOBAL:       movq    __stack_chk_guard(%rip), %rax
@@ -58,7 +58,7 @@
 ; CHECK-GLOBAL-NEXT:  cmpq    16(%rsp), %rax
 ; CHECK-GLOBAL-NEXT:  jne     .LBB0_2
 ; CHECK-GLOBAL:       .LBB0_2:
-; CHECK-GLOBAL-NEXT:  .cfi_def_cfa_offset 32
+; CHECK-GLOBAL-NEXT:  .cfi_restore_state
 ; CHECK-GLOBAL-NEXT:  callq   __stack_chk_fail
 
 ; CHECK-SYM:         movq    __woof@GOTPCREL(%rip), %rax
@@ -68,7 +68,7 @@
 ; CHECK-SYM-NEXT:    cmpq    16(%rsp), %rax
 ; CHECK-SYM-NEXT:    jne     .LBB0_2
 ; CHECK-SYM:         .LBB0_2:
-; CHECK-SYM-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-SYM-NEXT:    .cfi_restore_state
 ; CHECK-SYM-NEXT:    callq   __stack_chk_fail
 
 ; CHECK-SYMGV:       movq    __woof(%rip), %rax
@@ -76,7 +76,7 @@
 ; CHECK-SYMGV:       cmpq    16(%rsp), %rax
 ; CHECK-SYMGV-NEXT:  jne     .LBB0_2
 ; CHECK-SYMGV:       .LBB0_2:
-; CHECK-SYMGV-NEXT:  .cfi_def_cfa_offset 32
+; CHECK-SYMGV-NEXT:  .cfi_restore_state
 ; CHECK-SYMGV-NEXT:  callq   __stack_chk_fail
 
 ; CHECK-SYM2:         movq    %fs:__woof(%rip), %rax
@@ -85,7 +85,7 @@
 ; CHECK-SYM2-NEXT:    cmpq    16(%rsp), %rax
 ; CHECK-SYM2-NEXT:    jne     .LBB0_2
 ; CHECK-SYM2:         .LBB0_2:
-; CHECK-SYM2-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-SYM2-NEXT:    .cfi_restore_state
 ; CHECK-SYM2-NEXT:    callq   __stack_chk_fai
 
 ; ModuleID = 't.c'

@@ -130,6 +130,7 @@ define i32 @test3() personality ptr undef {
 ; CHECK-O0-NEXT:    .cfi_offset %r14, -32
 ; CHECK-O0-NEXT:    .cfi_offset %r15, -24
 ; CHECK-O0-NEXT:    .cfi_offset %rbp, -16
+; CHECK-O0-NEXT:    .cfi_remember_state
 ; CHECK-O0-NEXT:  .Ltmp0:
 ; CHECK-O0-NEXT:    callq no_csr@PLT
 ; CHECK-O0-NEXT:  .Ltmp1:
@@ -152,7 +153,7 @@ define i32 @test3() personality ptr undef {
 ; CHECK-O0-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-O0-NEXT:    retq
 ; CHECK-O0-NEXT:  .LBB3_2: # %lpad
-; CHECK-O0-NEXT:    .cfi_def_cfa_offset 64
+; CHECK-O0-NEXT:    .cfi_restore_state
 ; CHECK-O0-NEXT:  .Ltmp2:
 ; CHECK-O0-NEXT:    xorl %eax, %eax
 ; CHECK-O0-NEXT:    addq $8, %rsp
@@ -193,6 +194,7 @@ define i32 @test3() personality ptr undef {
 ; CHECK-O3-NEXT:    .cfi_offset %r14, -32
 ; CHECK-O3-NEXT:    .cfi_offset %r15, -24
 ; CHECK-O3-NEXT:    .cfi_offset %rbp, -16
+; CHECK-O3-NEXT:    .cfi_remember_state
 ; CHECK-O3-NEXT:  .Ltmp0:
 ; CHECK-O3-NEXT:    callq no_csr@PLT
 ; CHECK-O3-NEXT:  .Ltmp1:
@@ -215,7 +217,7 @@ define i32 @test3() personality ptr undef {
 ; CHECK-O3-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-O3-NEXT:    retq
 ; CHECK-O3-NEXT:  .LBB3_3: # %lpad
-; CHECK-O3-NEXT:    .cfi_def_cfa_offset 64
+; CHECK-O3-NEXT:    .cfi_restore_state
 ; CHECK-O3-NEXT:  .Ltmp2:
 ; CHECK-O3-NEXT:    xorl %eax, %eax
 ; CHECK-O3-NEXT:    jmp .LBB3_2

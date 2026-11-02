@@ -2600,6 +2600,7 @@ define void @range_with_unreachable_fallthrough(i32 %i) {
 ; NOOPT:       # %bb.0: # %entry
 ; NOOPT-NEXT:    pushq %rax
 ; NOOPT-NEXT:    .cfi_def_cfa_offset 16
+; NOOPT-NEXT:    .cfi_remember_state
 ; NOOPT-NEXT:    decl %edi
 ; NOOPT-NEXT:    subl $3, %edi
 ; NOOPT-NEXT:    jb .LBB25_1
@@ -2615,9 +2616,8 @@ define void @range_with_unreachable_fallthrough(i32 %i) {
 ; NOOPT-NEXT:    callq g@PLT
 ; NOOPT-NEXT:    jmp .LBB25_4
 ; NOOPT-NEXT:  # %bb.3: # %default
-; NOOPT-NEXT:    .cfi_def_cfa_offset 8
 ; NOOPT-NEXT:  .LBB25_4: # %return
-; NOOPT-NEXT:    .cfi_def_cfa_offset 16
+; NOOPT-NEXT:    .cfi_restore_state
 ; NOOPT-NEXT:    popq %rax
 ; NOOPT-NEXT:    .cfi_def_cfa_offset 8
 ; NOOPT-NEXT:    retq

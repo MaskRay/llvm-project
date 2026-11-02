@@ -733,6 +733,7 @@ define dso_local void @merge_aborts() {
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    callq qux@PLT
 ; CHECK-NEXT:    testb $1, %al
 ; CHECK-NEXT:    je .LBB12_5
@@ -753,7 +754,7 @@ define dso_local void @merge_aborts() {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB12_5: # %abort1
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    callq abort
 entry:
   %c1 = call i1 @qux()
@@ -793,6 +794,7 @@ define dso_local void @merge_alternating_aborts() {
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    callq qux@PLT
 ; CHECK-NEXT:    testb $1, %al
 ; CHECK-NEXT:    je .LBB13_5
@@ -813,7 +815,7 @@ define dso_local void @merge_alternating_aborts() {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB13_5: # %abort1
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    callq abort
 ; CHECK-NEXT:  .LBB13_6: # %abort2
 ; CHECK-NEXT:    callq alt_abort

@@ -29,6 +29,7 @@ define dso_local signext i32 @test1(ptr %b) local_unnamed_addr  {
 ; X86:       # %bb.0: # %entry
 ; X86-NEXT:    subl $12, %esp
 ; X86-NEXT:    .cfi_def_cfa_offset 16
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    movl {{[0-9]+}}(%esp), %eax
 ; X86-NEXT:    cmpl %eax, a
 ; X86-NEXT:    je .LBB0_2
@@ -37,7 +38,7 @@ define dso_local signext i32 @test1(ptr %b) local_unnamed_addr  {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_2: # %if.then
-; X86-NEXT:    .cfi_def_cfa_offset 16
+; X86-NEXT:    .cfi_restore_state
 ; X86-NEXT:    calll callVoid@PLT
 ; X86-NEXT:    addl $12, %esp
 ; X86-NEXT:    .cfi_def_cfa_offset 4
@@ -90,6 +91,7 @@ define dso_local signext i32 @test2(ptr %p1) local_unnamed_addr  {
 ; X86:       # %bb.0: # %entry
 ; X86-NEXT:    subl $12, %esp
 ; X86-NEXT:    .cfi_def_cfa_offset 16
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    movl {{[0-9]+}}(%esp), %eax
 ; X86-NEXT:    testl %eax, %eax
 ; X86-NEXT:    je .LBB1_2
@@ -102,7 +104,7 @@ define dso_local signext i32 @test2(ptr %p1) local_unnamed_addr  {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB1_3: # %if.then2
-; X86-NEXT:    .cfi_def_cfa_offset 16
+; X86-NEXT:    .cfi_restore_state
 ; X86-NEXT:    calll callVoid@PLT
 ; X86-NEXT:    addl $12, %esp
 ; X86-NEXT:    .cfi_def_cfa_offset 4

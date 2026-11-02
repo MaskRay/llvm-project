@@ -15,6 +15,7 @@ define void @foo() personality ptr @__gxx_personality_v0 {
 ; X86:       # %bb.0: # %entry
 ; X86-NEXT:    subl $12, %esp
 ; X86-NEXT:    .cfi_def_cfa_offset 16
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:  .Ltmp0: # EH_LABEL
 ; X86-NEXT:    calll bar@PLT
 ; X86-NEXT:  .Ltmp1: # EH_LABEL
@@ -23,7 +24,7 @@ define void @foo() personality ptr @__gxx_personality_v0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_2: # %lpad
-; X86-NEXT:    .cfi_def_cfa_offset 16
+; X86-NEXT:    .cfi_restore_state
 ; X86-NEXT:  .Ltmp2: # EH_LABEL
 ; X86-NEXT:    movl $0, (%esp)
 ; X86-NEXT:    calll _Unwind_Resume@PLT
@@ -32,6 +33,7 @@ define void @foo() personality ptr @__gxx_personality_v0 {
 ; GISEL-X86:       # %bb.0: # %entry
 ; GISEL-X86-NEXT:    subl $12, %esp
 ; GISEL-X86-NEXT:    .cfi_def_cfa_offset 16
+; GISEL-X86-NEXT:    .cfi_remember_state
 ; GISEL-X86-NEXT:  .Ltmp0: # EH_LABEL
 ; GISEL-X86-NEXT:    calll bar
 ; GISEL-X86-NEXT:  .Ltmp1: # EH_LABEL
@@ -40,7 +42,7 @@ define void @foo() personality ptr @__gxx_personality_v0 {
 ; GISEL-X86-NEXT:    .cfi_def_cfa_offset 4
 ; GISEL-X86-NEXT:    retl
 ; GISEL-X86-NEXT:  .LBB0_2: # %lpad
-; GISEL-X86-NEXT:    .cfi_def_cfa_offset 16
+; GISEL-X86-NEXT:    .cfi_restore_state
 ; GISEL-X86-NEXT:  .Ltmp2: # EH_LABEL
 ; GISEL-X86-NEXT:    movl $0, %eax
 ; GISEL-X86-NEXT:    movl %eax, (%esp)
@@ -50,6 +52,7 @@ define void @foo() personality ptr @__gxx_personality_v0 {
 ; X64:       # %bb.0: # %entry
 ; X64-NEXT:    pushq %rax
 ; X64-NEXT:    .cfi_def_cfa_offset 16
+; X64-NEXT:    .cfi_remember_state
 ; X64-NEXT:  .Ltmp0: # EH_LABEL
 ; X64-NEXT:    callq bar@PLT
 ; X64-NEXT:  .Ltmp1: # EH_LABEL
@@ -58,7 +61,7 @@ define void @foo() personality ptr @__gxx_personality_v0 {
 ; X64-NEXT:    .cfi_def_cfa_offset 8
 ; X64-NEXT:    retq
 ; X64-NEXT:  .LBB0_2: # %lpad
-; X64-NEXT:    .cfi_def_cfa_offset 16
+; X64-NEXT:    .cfi_restore_state
 ; X64-NEXT:  .Ltmp2: # EH_LABEL
 ; X64-NEXT:    xorl %edi, %edi
 ; X64-NEXT:    callq _Unwind_Resume@PLT
@@ -67,6 +70,7 @@ define void @foo() personality ptr @__gxx_personality_v0 {
 ; GISEL-X64:       # %bb.0: # %entry
 ; GISEL-X64-NEXT:    pushq %rax
 ; GISEL-X64-NEXT:    .cfi_def_cfa_offset 16
+; GISEL-X64-NEXT:    .cfi_remember_state
 ; GISEL-X64-NEXT:  .Ltmp0: # EH_LABEL
 ; GISEL-X64-NEXT:    callq bar
 ; GISEL-X64-NEXT:  .Ltmp1: # EH_LABEL
@@ -75,7 +79,7 @@ define void @foo() personality ptr @__gxx_personality_v0 {
 ; GISEL-X64-NEXT:    .cfi_def_cfa_offset 8
 ; GISEL-X64-NEXT:    retq
 ; GISEL-X64-NEXT:  .LBB0_2: # %lpad
-; GISEL-X64-NEXT:    .cfi_def_cfa_offset 16
+; GISEL-X64-NEXT:    .cfi_restore_state
 ; GISEL-X64-NEXT:  .Ltmp2: # EH_LABEL
 ; GISEL-X64-NEXT:    movl $0, %edi
 ; GISEL-X64-NEXT:    callq _Unwind_Resume

@@ -59,6 +59,7 @@ define void @f_non_leaf(i32 %x, i32 %y) !prof !14 {
 ; CHECK32-NEXT:    pushl %ebx # encoding: [0x53]
 ; CHECK32-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK32-NEXT:    .cfi_offset %ebx, -8
+; CHECK32-NEXT:    .cfi_remember_state
 ; CHECK32-NEXT:    movl {{[0-9]+}}(%esp), %eax # encoding: [0x8b,0x44,0x24,0x08]
 ; CHECK32-NEXT:    #APP
 ; CHECK32-NEXT:    #NO_APP
@@ -72,7 +73,7 @@ define void @f_non_leaf(i32 %x, i32 %y) !prof !14 {
 ; CHECK32-NEXT:    # encoding: [0xeb,A]
 ; CHECK32-NEXT:    # fixup A - offset: 1, value: foo@PLT, kind: FK_PCRel_1
 ; CHECK32-NEXT:  .LBB1_2: # %bb2
-; CHECK32-NEXT:    .cfi_def_cfa_offset 8
+; CHECK32-NEXT:    .cfi_restore_state
 ; CHECK32-NEXT:    popl %ebx # encoding: [0x5b]
 ; CHECK32-NEXT:    .cfi_def_cfa_offset 4
 ; CHECK32-NEXT:    jmp bar@PLT # TAILCALL
@@ -84,6 +85,7 @@ define void @f_non_leaf(i32 %x, i32 %y) !prof !14 {
 ; CHECK64-NEXT:    pushq %rbx # encoding: [0x53]
 ; CHECK64-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK64-NEXT:    .cfi_offset %rbx, -16
+; CHECK64-NEXT:    .cfi_remember_state
 ; CHECK64-NEXT:    #APP
 ; CHECK64-NEXT:    #NO_APP
 ; CHECK64-NEXT:    cmpl %esi, %edi # encoding: [0x39,0xf7]
@@ -96,7 +98,7 @@ define void @f_non_leaf(i32 %x, i32 %y) !prof !14 {
 ; CHECK64-NEXT:    # encoding: [0xeb,A]
 ; CHECK64-NEXT:    # fixup A - offset: 1, value: foo@PLT, kind: FK_PCRel_1
 ; CHECK64-NEXT:  .LBB1_2: # %bb2
-; CHECK64-NEXT:    .cfi_def_cfa_offset 16
+; CHECK64-NEXT:    .cfi_restore_state
 ; CHECK64-NEXT:    popq %rbx # encoding: [0x5b]
 ; CHECK64-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK64-NEXT:    jmp bar@PLT # TAILCALL

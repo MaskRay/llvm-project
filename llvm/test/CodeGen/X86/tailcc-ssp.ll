@@ -37,6 +37,7 @@ define tailcc void @tailcall_frame(ptr %0, i64 %1) sspreq {
 ; LINUX:       # %bb.0:
 ; LINUX-NEXT:    subq $24, %rsp
 ; LINUX-NEXT:    .cfi_def_cfa_offset 32
+; LINUX-NEXT:    .cfi_remember_state
 ; LINUX-NEXT:    movq %fs:40, %rax
 ; LINUX-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
 ; LINUX-NEXT:    movq %fs:40, %rax
@@ -50,7 +51,7 @@ define tailcc void @tailcall_frame(ptr %0, i64 %1) sspreq {
 ; LINUX-NEXT:    .cfi_def_cfa_offset 8
 ; LINUX-NEXT:    jmp h@PLT # TAILCALL
 ; LINUX-NEXT:  .LBB0_2: # %CallStackCheckFailBlk
-; LINUX-NEXT:    .cfi_def_cfa_offset 32
+; LINUX-NEXT:    .cfi_restore_state
 ; LINUX-NEXT:    callq __stack_chk_fail@PLT
    tail call tailcc void @h(ptr null, i64 0, ptr null)
    ret void
@@ -88,6 +89,7 @@ define void @tailcall_unrelated_frame() sspreq {
 ; LINUX:       # %bb.0:
 ; LINUX-NEXT:    pushq %rax
 ; LINUX-NEXT:    .cfi_def_cfa_offset 16
+; LINUX-NEXT:    .cfi_remember_state
 ; LINUX-NEXT:    movq %fs:40, %rax
 ; LINUX-NEXT:    movq %rax, (%rsp)
 ; LINUX-NEXT:    callq bar@PLT
@@ -99,7 +101,7 @@ define void @tailcall_unrelated_frame() sspreq {
 ; LINUX-NEXT:    .cfi_def_cfa_offset 8
 ; LINUX-NEXT:    jmp bar@PLT # TAILCALL
 ; LINUX-NEXT:  .LBB1_2: # %CallStackCheckFailBlk
-; LINUX-NEXT:    .cfi_def_cfa_offset 16
+; LINUX-NEXT:    .cfi_restore_state
 ; LINUX-NEXT:    callq __stack_chk_fail@PLT
 
 
@@ -141,6 +143,7 @@ define void @caller() sspreq {
 ; LINUX:       # %bb.0:
 ; LINUX-NEXT:    pushq %rax
 ; LINUX-NEXT:    .cfi_def_cfa_offset 16
+; LINUX-NEXT:    .cfi_remember_state
 ; LINUX-NEXT:    movq %fs:40, %rax
 ; LINUX-NEXT:    movq %rax, (%rsp)
 ; LINUX-NEXT:    callq callee@PLT
@@ -153,7 +156,7 @@ define void @caller() sspreq {
 ; LINUX-NEXT:    .cfi_def_cfa_offset 8
 ; LINUX-NEXT:    retq
 ; LINUX-NEXT:  .LBB2_2: # %CallStackCheckFailBlk
-; LINUX-NEXT:    .cfi_def_cfa_offset 16
+; LINUX-NEXT:    .cfi_restore_state
 ; LINUX-NEXT:    callq __stack_chk_fail@PLT
 
 

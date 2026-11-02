@@ -26,6 +26,7 @@ define void @cmpxchg_flow(ptr %addr, i128 %desired, i128 %new) {
 ; CHECK-NEXT:    pushq %rbx
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    .cfi_offset %rbx, -16
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movq %rcx, %rbx
 ; CHECK-NEXT:    movq %rsi, %rax
 ; CHECK-NEXT:    movq %r8, %rcx
@@ -37,7 +38,7 @@ define void @cmpxchg_flow(ptr %addr, i128 %desired, i128 %new) {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB1_2: # %false
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    callq bar@PLT
 ; CHECK-NEXT:    popq %rbx
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8

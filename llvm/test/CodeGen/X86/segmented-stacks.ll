@@ -305,6 +305,7 @@ define i32 @test_nested(ptr nest %closure, i32 %other) #0 {
 ; X86-Linux-NEXT:    .cfi_def_cfa_offset 4
 ; X86-Linux-NEXT:    retl
 ; X86-Linux-NEXT:  .LBB1_1:
+; X86-Linux-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-Linux-NEXT:    .cfi_restore %esi
 ; X86-Linux-NEXT:    pushl $4
 ; X86-Linux-NEXT:    pushl $44
@@ -334,6 +335,7 @@ define i32 @test_nested(ptr nest %closure, i32 %other) #0 {
 ; X64-Linux-NEXT:    .cfi_def_cfa_offset 8
 ; X64-Linux-NEXT:    retq
 ; X64-Linux-NEXT:  .LBB1_1:
+; X64-Linux-NEXT:    .cfi_def_cfa %rsp, 8
 ; X64-Linux-NEXT:    .cfi_restore %rbx
 ; X64-Linux-NEXT:    movq %r10, %rax
 ; X64-Linux-NEXT:    movl $56, %r10d
@@ -366,6 +368,7 @@ define i32 @test_nested(ptr nest %closure, i32 %other) #0 {
 ; X64-Linux-Large-NEXT:    .cfi_def_cfa_offset 8
 ; X64-Linux-Large-NEXT:    retq
 ; X64-Linux-Large-NEXT:  .LBB1_1:
+; X64-Linux-Large-NEXT:    .cfi_def_cfa %rsp, 8
 ; X64-Linux-Large-NEXT:    .cfi_restore %rbx
 ; X64-Linux-Large-NEXT:    movq %r10, %rax
 ; X64-Linux-Large-NEXT:    movl $56, %r10d
@@ -397,6 +400,7 @@ define i32 @test_nested(ptr nest %closure, i32 %other) #0 {
 ; X32ABI-NEXT:    .cfi_def_cfa_offset 8
 ; X32ABI-NEXT:    retq
 ; X32ABI-NEXT:  .LBB1_1:
+; X32ABI-NEXT:    .cfi_def_cfa %rsp, 8
 ; X32ABI-NEXT:    .cfi_restore %rbx
 ; X32ABI-NEXT:    movl %r10d, %eax
 ; X32ABI-NEXT:    movl $56, %r10d
@@ -487,7 +491,7 @@ define i32 @test_nested(ptr nest %closure, i32 %other) #0 {
 ; X86-MinGW-NEXT:    popl %esi
 ; X86-MinGW-NEXT:    retl
 ; X86-MinGW-NEXT:  LBB1_1:
-; X86-MinGW-NEXT:    .cfi_def_cfa_offset 4
+; X86-MinGW-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-MinGW-NEXT:    .cfi_restore %esi
 ; X86-MinGW-NEXT:    pushl $4
 ; X86-MinGW-NEXT:    pushl $44
@@ -517,6 +521,7 @@ define i32 @test_nested(ptr nest %closure, i32 %other) #0 {
 ; X64-FreeBSD-NEXT:    .cfi_def_cfa_offset 8
 ; X64-FreeBSD-NEXT:    retq
 ; X64-FreeBSD-NEXT:  .LBB1_1:
+; X64-FreeBSD-NEXT:    .cfi_def_cfa %rsp, 8
 ; X64-FreeBSD-NEXT:    .cfi_restore %rbx
 ; X64-FreeBSD-NEXT:    movq %r10, %rax
 ; X64-FreeBSD-NEXT:    movl $56, %r10d
@@ -553,6 +558,7 @@ define i32 @test_nested(ptr nest %closure, i32 %other) #0 {
 ; X86-DFlyBSD-NEXT:    .cfi_def_cfa_offset 4
 ; X86-DFlyBSD-NEXT:    retl
 ; X86-DFlyBSD-NEXT:  .LBB1_1:
+; X86-DFlyBSD-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-DFlyBSD-NEXT:    .cfi_restore %esi
 ; X86-DFlyBSD-NEXT:    pushl $4
 ; X86-DFlyBSD-NEXT:    pushl $44
@@ -582,6 +588,7 @@ define i32 @test_nested(ptr nest %closure, i32 %other) #0 {
 ; X64-DFlyBSD-NEXT:    .cfi_def_cfa_offset 8
 ; X64-DFlyBSD-NEXT:    retq
 ; X64-DFlyBSD-NEXT:  .LBB1_1:
+; X64-DFlyBSD-NEXT:    .cfi_def_cfa %rsp, 8
 ; X64-DFlyBSD-NEXT:    .cfi_restore %rbx
 ; X64-DFlyBSD-NEXT:    movq %r10, %rax
 ; X64-DFlyBSD-NEXT:    movl $56, %r10d
@@ -2014,7 +2021,7 @@ define i32 @test_nested_unused(ptr nest %unused) #0 {
 ; X86-MinGW-NEXT:    addl $40, %esp
 ; X86-MinGW-NEXT:    retl
 ; X86-MinGW-NEXT:  LBB9_1:
-; X86-MinGW-NEXT:    .cfi_def_cfa_offset 4
+; X86-MinGW-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-MinGW-NEXT:    pushl $0
 ; X86-MinGW-NEXT:    pushl $40
 ; X86-MinGW-NEXT:    calll ___morestack

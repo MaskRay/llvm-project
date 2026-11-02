@@ -226,6 +226,7 @@ define zeroext i1 @segmentedStack(ptr readonly %vk1, ptr readonly %vk2, i64 %key
 ; NOCOMPACTUNWIND-NEXT:  .LBB3_1: # %entry
 ; NOCOMPACTUNWIND-NEXT:    pushq %rax
 ; NOCOMPACTUNWIND-NEXT:    .cfi_def_cfa_offset 16
+; NOCOMPACTUNWIND-NEXT:    .cfi_remember_state
 ; NOCOMPACTUNWIND-NEXT:    movq %rdi, %rax
 ; NOCOMPACTUNWIND-NEXT:    orq %rsi, %rax
 ; NOCOMPACTUNWIND-NEXT:    sete %al
@@ -250,7 +251,7 @@ define zeroext i1 @segmentedStack(ptr readonly %vk1, ptr readonly %vk2, i64 %key
 ; NOCOMPACTUNWIND-NEXT:    .cfi_def_cfa_offset 8
 ; NOCOMPACTUNWIND-NEXT:    retq
 ; NOCOMPACTUNWIND-NEXT:  .LBB3_6:
-; NOCOMPACTUNWIND-NEXT:    .cfi_def_cfa_offset 16
+; NOCOMPACTUNWIND-NEXT:    .cfi_restore_state
 ; NOCOMPACTUNWIND-NEXT:    xorl %eax, %eax
 ; NOCOMPACTUNWIND-NEXT:    # kill: def $al killed $al killed $eax
 ; NOCOMPACTUNWIND-NEXT:    popq %rcx
@@ -328,6 +329,7 @@ define void @with_nounwind(i1 %cond) nounwind personality ptr @my_personality {
 ; NOCOMPACTUNWIND:       # %bb.0: # %entry
 ; NOCOMPACTUNWIND-NEXT:    pushq %rax
 ; NOCOMPACTUNWIND-NEXT:    .cfi_def_cfa_offset 16
+; NOCOMPACTUNWIND-NEXT:    .cfi_remember_state
 ; NOCOMPACTUNWIND-NEXT:    testb $1, %dil
 ; NOCOMPACTUNWIND-NEXT:    jne .LBB4_1
 ; NOCOMPACTUNWIND-NEXT:  # %bb.4: # %return
@@ -335,7 +337,7 @@ define void @with_nounwind(i1 %cond) nounwind personality ptr @my_personality {
 ; NOCOMPACTUNWIND-NEXT:    .cfi_def_cfa_offset 8
 ; NOCOMPACTUNWIND-NEXT:    retq
 ; NOCOMPACTUNWIND-NEXT:  .LBB4_1: # %throw
-; NOCOMPACTUNWIND-NEXT:    .cfi_def_cfa_offset 16
+; NOCOMPACTUNWIND-NEXT:    .cfi_restore_state
 ; NOCOMPACTUNWIND-NEXT:  .Ltmp0: # EH_LABEL
 ; NOCOMPACTUNWIND-NEXT:    callq throw_exception@PLT
 ; NOCOMPACTUNWIND-NEXT:  .Ltmp1: # EH_LABEL
@@ -397,6 +399,7 @@ define void @with_nounwind_same_succ(i1 %cond) nounwind personality ptr @my_pers
 ; NOCOMPACTUNWIND-NEXT:  # %bb.1: # %throw
 ; NOCOMPACTUNWIND-NEXT:    pushq %rax
 ; NOCOMPACTUNWIND-NEXT:    .cfi_def_cfa_offset 16
+; NOCOMPACTUNWIND-NEXT:    .cfi_remember_state
 ; NOCOMPACTUNWIND-NEXT:  .Ltmp3: # EH_LABEL
 ; NOCOMPACTUNWIND-NEXT:    callq throw_exception@PLT
 ; NOCOMPACTUNWIND-NEXT:  .Ltmp4: # EH_LABEL
@@ -409,7 +412,7 @@ define void @with_nounwind_same_succ(i1 %cond) nounwind personality ptr @my_pers
 ; NOCOMPACTUNWIND-NEXT:  .LBB5_4: # %return
 ; NOCOMPACTUNWIND-NEXT:    retq
 ; NOCOMPACTUNWIND-NEXT:  .LBB5_2: # %landing
-; NOCOMPACTUNWIND-NEXT:    .cfi_def_cfa_offset 16
+; NOCOMPACTUNWIND-NEXT:    .cfi_restore_state
 ; NOCOMPACTUNWIND-NEXT:  .Ltmp5: # EH_LABEL
 ; NOCOMPACTUNWIND-NEXT:    jmp .LBB5_3
 entry:

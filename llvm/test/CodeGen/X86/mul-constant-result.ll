@@ -12,6 +12,7 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    pushl %esi
 ; X86-NEXT:    .cfi_def_cfa_offset 8
 ; X86-NEXT:    .cfi_offset %esi, -8
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    movl {{[0-9]+}}(%esp), %edx
 ; X86-NEXT:    cmpl $2, %edx
 ; X86-NEXT:    movl $1, %eax
@@ -37,7 +38,8 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_7:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    leal (%eax,%eax,8), %ecx
 ; X86-NEXT:    leal (%ecx,%ecx,2), %ecx
 ; X86-NEXT:    jmp .LBB0_9
@@ -70,25 +72,29 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_20:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    shll $2, %eax
 ; X86-NEXT:    popl %esi
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_21:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    shll $3, %eax
 ; X86-NEXT:    popl %esi
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_22:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    shll $5, %eax
 ; X86-NEXT:    popl %esi
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_23:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    addl %eax, %eax
 ; X86-NEXT:  .LBB0_33:
 ; X86-NEXT:    leal (%eax,%eax,8), %eax
@@ -96,7 +102,8 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_24:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    leal (%eax,%eax,4), %ecx
 ; X86-NEXT:  .LBB0_14:
 ; X86-NEXT:    leal (%eax,%ecx,4), %eax
@@ -104,7 +111,8 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_25:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    addl %eax, %eax
 ; X86-NEXT:    jmp .LBB0_18
 ; X86-NEXT:  .LBB0_26:
@@ -129,7 +137,8 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_34:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    movl %eax, %ecx
 ; X86-NEXT:    shll $5, %ecx
 ; X86-NEXT:    jmp .LBB0_38
@@ -140,7 +149,8 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_37:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    leal (%eax,%eax,2), %ecx
 ; X86-NEXT:    shll $3, %ecx
 ; X86-NEXT:  .LBB0_38:
@@ -150,7 +160,8 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_39:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    shll $2, %eax
 ; X86-NEXT:  .LBB0_12:
 ; X86-NEXT:    leal (%eax,%eax,4), %eax
@@ -158,7 +169,8 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_40:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    shll $3, %eax
 ; X86-NEXT:    jmp .LBB0_18
 ; X86-NEXT:  .LBB0_41:
@@ -171,7 +183,8 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_42:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
+; X86-NEXT:    .cfi_remember_state
 ; X86-NEXT:    leal (%eax,%eax), %ecx
 ; X86-NEXT:    shll $5, %eax
 ; X86-NEXT:  .LBB0_28:
@@ -180,7 +193,7 @@ define i32 @mult(i32, i32) local_unnamed_addr #0 {
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
 ; X86-NEXT:  .LBB0_43:
-; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    .cfi_restore_state
 ; X86-NEXT:    leal (%eax,%eax,8), %eax
 ; X86-NEXT:  .LBB0_18:
 ; X86-NEXT:    leal (%eax,%eax,2), %eax

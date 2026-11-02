@@ -6,6 +6,7 @@ define void @test_phi_diff_size(i1 %c) sspstrong {
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    subq $24, %rsp
 ; CHECK-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    movq %fs:40, %rax
 ; CHECK-NEXT:    movq %rax, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:    testb $1, %dil
@@ -25,7 +26,7 @@ define void @test_phi_diff_size(i1 %c) sspstrong {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB0_5: # %CallStackCheckFailBlk
-; CHECK-NEXT:    .cfi_def_cfa_offset 32
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    callq __stack_chk_fail@PLT
 entry:
   %a = alloca i64
@@ -49,6 +50,7 @@ define void @test_phi_loop(i1 %c) sspstrong {
 ; CHECK-NEXT:    .cfi_offset %rbp, -16
 ; CHECK-NEXT:    movq %rsp, %rbp
 ; CHECK-NEXT:    .cfi_def_cfa_register %rbp
+; CHECK-NEXT:    .cfi_remember_state
 ; CHECK-NEXT:    andq $-131072, %rsp # imm = 0xFFFE0000
 ; CHECK-NEXT:    subq $262144, %rsp # imm = 0x40000
 ; CHECK-NEXT:    movq %fs:40, %rax
@@ -71,7 +73,7 @@ define void @test_phi_loop(i1 %c) sspstrong {
 ; CHECK-NEXT:    .cfi_def_cfa %rsp, 8
 ; CHECK-NEXT:    retq
 ; CHECK-NEXT:  .LBB1_4: # %CallStackCheckFailBlk
-; CHECK-NEXT:    .cfi_def_cfa %rbp, 16
+; CHECK-NEXT:    .cfi_restore_state
 ; CHECK-NEXT:    callq __stack_chk_fail@PLT
 entry:
   %a = alloca <10000 x i64>
