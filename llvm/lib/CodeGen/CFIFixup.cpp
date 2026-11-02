@@ -41,6 +41,13 @@
 // block with this property is reset to the initial state when it follows such
 // a return block in the layout.
 
+// When SP is the CFA register, a call frame set up by unflagged
+// .cfi_adjust_cfa_offset instructions may cross block boundaries, e.g. a block
+// ending with a noreturn call leaves its arguments pushed. We track the size of
+// this call frame relative to the state defined by the prologue or epilogue and
+// emit a compensating .cfi_adjust_cfa_offset where the layout predecessor
+// leaves a different size.
+
 // From the point of view of the unwind tables, the "has/does not have call
 // frame" state at beginning of each block is determined by the state at the end
 // of the previous block, in layout order. Where these states differ, we insert
@@ -64,8 +71,6 @@
 // Known limitations:
 //  * the pass cannot handle an epilogue preceding the prologue in the basic
 //    block layout
-//  * the pass does not handle functions where SP is used as a frame pointer and
-//    SP adjustments up and down are done in different basic blocks (TODO)
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/CFIFixup.h"
@@ -155,6 +160,9 @@ struct BlockFlags {
   bool StrongNoFrameOnEntry : 1;
   bool HasFrameOnEntry : 1;
   bool HasFrameOnExit : 1;
+  // The CFA offset change by call frame adjustments.
+  int64_t CallFrameOnEntry = 0;
+  int64_t CallFrameOnExit = 0;
   BlockFlags()
       : Reachable(false), StrongNoFrameOnEntry(false), HasFrameOnEntry(false),
         HasFrameOnExit(false) {}
@@ -162,6 +170,25 @@ struct BlockFlags {
 
 // Most functions will have <= 32 basic blocks.
 using BlockFlagsVector = SmallVector<BlockFlags, 32>;
+
+// Returns the CFA offset change by call frame adjustments at the end of MBB.
+// Prologue and epilogue CFI instructions define the state without them.
+static int64_t getCallFrameOnExit(const MachineBasicBlock &MBB,
+                                  int64_t OnEntry) {
+  const auto &CFIs = MBB.getParent()->getFrameInstructions();
+  int64_t Size = OnEntry;
+  for (const MachineInstr &MI : MBB) {
+    if (MI.getOpcode() != TargetOpcode::CFI_INSTRUCTION)
+      continue;
+    const MCCFIInstruction &CFI = CFIs[MI.getOperand(0).getCFIIndex()];
+    if (MI.getFlag(MachineInstr::FrameSetup) ||
+        MI.getFlag(MachineInstr::FrameDestroy))
+      Size = 0;
+    else if (CFI.getOperation() == MCCFIInstruction::OpAdjustCfaOffset)
+      Size += CFI.getOffset();
+  }
+  return Size;
+}
 
 // Computes the frame information for each block in the function. Frame info
 // for a block is inferred from its predecessors.
@@ -189,6 +216,7 @@ computeBlockInfo(const MachineFunction &MF,
     // current block contains the prologue, then the function has a call frame
     // at the exit of the block, unless the block contains the epilogue.
     Info.HasFrameOnExit = (Info.HasFrameOnEntry || HasPrologue) && !HasEpilogue;
+    Info.CallFrameOnExit = getCallFrameOnExit(*MBB, Info.CallFrameOnEntry);
 
     // Set the successors' state on entry.
     for (MachineBasicBlock *Succ : MBB->successors()) {
@@ -197,6 +225,7 @@ computeBlockInfo(const MachineFunction &MF,
       SuccInfo.StrongNoFrameOnEntry |=
           Info.StrongNoFrameOnEntry && !HasPrologue;
       SuccInfo.HasFrameOnEntry = Info.HasFrameOnExit;
+      SuccInfo.CallFrameOnEntry = Info.CallFrameOnExit;
     }
   }
 
@@ -359,6 +388,49 @@ fixupBlock(MachineBasicBlock &CurrBB, const BlockFlagsVector &BlockInfo,
   return true;
 }
 
+// Inserts a `.cfi_adjust_cfa_offset` instruction before Begin if the call frame
+// size at the end of the previous block differs from that at the start of
+// CurrBB. Reset is true if fixupBlock reset the state before Begin.
+static bool
+fixupCallFrame(MachineBasicBlock &CurrBB, MachineBasicBlock::iterator Begin,
+               const BlockFlagsVector &BlockInfo,
+               SmallDenseMap<MBBSectionID, InsertionPoint> &InsertionPts,
+               bool Reset) {
+  const BlockFlags &Info = BlockInfo[CurrBB.getNumber()];
+  if (!Info.Reachable)
+    return false;
+
+#ifndef NDEBUG
+  for (auto *Pred : CurrBB.predecessors()) {
+    const BlockFlags &PredInfo = BlockInfo[Pred->getNumber()];
+    assert((!PredInfo.Reachable ||
+            Info.CallFrameOnEntry == PredInfo.CallFrameOnExit) &&
+           "Inconsistent call frame size");
+  }
+#endif
+
+  const BlockFlags &PrevInfo =
+      BlockInfo[std::prev(CurrBB.getIterator())->getNumber()];
+  int64_t CallFrame =
+      Reset || CurrBB.isBeginSection() ? 0 : PrevInfo.CallFrameOnExit;
+  if (Info.CallFrameOnEntry == CallFrame)
+    return false;
+
+  MachineFunction &MF = *CurrBB.getParent();
+  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+  unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createAdjustCfaOffset(
+      nullptr, Info.CallFrameOnEntry - CallFrame));
+  MachineInstr *MI =
+      BuildMI(CurrBB, Begin, DebugLoc(), TII.get(TargetOpcode::CFI_INSTRUCTION))
+          .addCFIIndex(CFIIndex);
+  // A `.cfi_remember_state` inserted here later must precede the adjustment.
+  auto It = InsertionPts.find(CurrBB.getSectionID());
+  if (It != InsertionPts.end() && It->second.MBB == &CurrBB &&
+      It->second.Iterator == Begin)
+    It->second.Iterator = MI->getIterator();
+  return true;
+}
+
 static bool runImpl(MachineFunction &MF) {
   if (!MF.getSubtarget().getFrameLowering()->enableCFIFixup(MF))
     return false;
@@ -370,9 +442,6 @@ static bool runImpl(MachineFunction &MF) {
   // `.cfi_remember_state`.
   MachineBasicBlock::iterator PrologueEnd;
   MachineBasicBlock *PrologueBlock = findPrologueEnd(MF, PrologueEnd);
-  if (PrologueBlock == nullptr)
-    return false;
-
   BlockFlagsVector BlockInfo = computeBlockInfo(MF, PrologueBlock);
 
   // Walk the blocks of the function in "physical" order.
@@ -384,20 +453,26 @@ static bool runImpl(MachineFunction &MF) {
   // we have to insert a `.cfi_remember_state`, in the case that the current
   // block needs a `.cfi_restore_state`.
   SmallDenseMap<MBBSectionID, InsertionPoint> InsertionPts;
-  InsertionPts[PrologueBlock->getSectionID()] = {PrologueBlock, PrologueEnd};
+  SmallVector<unsigned, 8> PrologueRegs;
+  if (PrologueBlock) {
+    InsertionPts[PrologueBlock->getSectionID()] = {PrologueBlock, PrologueEnd};
+    assert(PrologueEnd != PrologueBlock->begin() &&
+           "Inconsistent notion of \"prologue block\"");
+    PrologueRegs = getPrologueRegs({PrologueBlock, PrologueEnd});
+  }
 
-  assert(PrologueEnd != PrologueBlock->begin() &&
-         "Inconsistent notion of \"prologue block\"");
-
-  // No point starting before the prologue block.
+  // No point fixing the frame state before the prologue block.
   // TODO: the unwind tables will still be incorrect if an epilogue physically
   // preceeds the prologue.
-  SmallVector<unsigned, 8> PrologueRegs =
-      getPrologueRegs({PrologueBlock, PrologueEnd});
-  for (MachineBasicBlock &MBB :
-       make_range(std::next(PrologueBlock->getIterator()), MF.end())) {
-    Change |= fixupBlock(MBB, BlockInfo, InsertionPts,
-                         {PrologueBlock, PrologueEnd}, PrologueRegs);
+  bool AfterPrologue = PrologueBlock == &MF.front();
+  for (MachineBasicBlock &MBB : drop_begin(MF)) {
+    MachineBasicBlock::iterator Begin = MBB.begin();
+    bool Reset =
+        AfterPrologue && fixupBlock(MBB, BlockInfo, InsertionPts,
+                                    {PrologueBlock, PrologueEnd}, PrologueRegs);
+    Change |= Reset;
+    Change |= fixupCallFrame(MBB, Begin, BlockInfo, InsertionPts, Reset);
+    AfterPrologue |= &MBB == PrologueBlock;
   }
 
   return Change;
