@@ -213,9 +213,7 @@ InputFile::InputFile(Ctx &ctx, Kind k, MemoryBufferRef m)
 
 InputFile::~InputFile() {}
 
-std::optional<MemoryBufferRef> elf::readFile(Ctx &ctx, StringRef path) {
-  llvm::TimeTraceScope timeScope("Load input files", path);
-
+static StringRef mapInputPath(Ctx &ctx, StringRef path) {
   // The --chroot option changes our virtual root directory.
   // This is useful when you are dealing with files created by --reproduce.
   if (!ctx.arg.chroot.empty() && path.starts_with("/"))
@@ -243,12 +241,24 @@ std::optional<MemoryBufferRef> elf::readFile(Ctx &ctx, StringRef path) {
       path = "NUL";
 #endif
   }
+  return path;
+}
 
+std::optional<MemoryBufferRef> elf::readFile(Ctx &ctx, StringRef path) {
+  llvm::TimeTraceScope timeScope("Load input files", path);
+  path = mapInputPath(ctx, path);
   Log(ctx) << path;
   ctx.arg.dependencyFiles.insert(llvm::CachedHashString(path));
 
-  auto mbOrErr = MemoryBuffer::getFile(path, /*IsText=*/false,
-                                       /*RequiresNullTerminator=*/false);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> mbOrErr = nullptr;
+  auto opened = ctx.openedFiles.find(path);
+  if (opened != ctx.openedFiles.end() && opened->second) {
+    mbOrErr = std::move(opened->second);
+    ctx.openedFiles.erase(opened);
+  } else {
+    mbOrErr = MemoryBuffer::getFile(path, /*IsText=*/false,
+                                    /*RequiresNullTerminator=*/false);
+  }
   if (auto ec = mbOrErr.getError()) {
     ErrAlways(ctx) << "cannot open " << path << ": " << ec.message();
     return std::nullopt;
@@ -260,6 +270,26 @@ std::optional<MemoryBufferRef> elf::readFile(Ctx &ctx, StringRef path) {
   if (ctx.tar)
     ctx.tar->append(relativeToRoot(path), mbref.getBuffer());
   return mbref;
+}
+
+// Open input files in parallel, as opening tens of thousands of files one at a
+// time is slow. Only regular files are opened, and each path once, so that
+// reading a pipe is not split between two buffers.
+void elf::openFiles(Ctx &ctx, ArrayRef<StringRef> paths) {
+  SmallVector<StringMapEntry<std::unique_ptr<MemoryBuffer>> *, 0> entries;
+  for (StringRef path : paths) {
+    auto [it, inserted] = ctx.openedFiles.try_emplace(mapInputPath(ctx, path));
+    if (inserted)
+      entries.push_back(&*it);
+  }
+  parallelForEach(entries, [](auto *e) {
+    sys::fs::file_status st;
+    if (sys::fs::status(e->first(), st) || !sys::fs::is_regular_file(st))
+      return;
+    if (auto mbOrErr = MemoryBuffer::getFile(e->first(), /*IsText=*/false,
+                                             /*RequiresNullTerminator=*/false))
+      e->second = std::move(*mbOrErr);
+  });
 }
 
 // All input object files must be for the same architecture

@@ -722,6 +722,8 @@ struct Ctx : CommonLinkerContext {
   SmallVector<Defined *, 0> irelativeSyms;
 
   SmallVector<std::unique_ptr<MemoryBuffer>> memoryBuffers;
+  // Input files opened by openFiles, to be taken by readFile.
+  llvm::StringMap<std::unique_ptr<MemoryBuffer>> openedFiles;
   SmallVector<ELFFileBase *, 0> objectFiles;
   SmallVector<SharedFile *, 0> sharedFiles;
   SmallVector<BinaryFile *, 0> binaryFiles;

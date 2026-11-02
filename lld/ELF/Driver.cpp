@@ -2221,6 +2221,11 @@ void LinkerDriver::createFiles(opt::InputArgList &args) {
   // -r implies -Bstatic and has precedence over -Bdynamic.
   ctx.arg.isStatic = ctx.arg.relocatable;
 
+  SmallVector<StringRef, 0> paths;
+  for (auto *arg : args.filtered(OPT_INPUT))
+    paths.push_back(arg->getValue());
+  openFiles(ctx, paths);
+
   // Iterate over argv to process input files and positional arguments.
   std::optional<MemoryBufferRef> defaultScript;
   nextGroupId = 0;
@@ -2334,6 +2339,7 @@ void LinkerDriver::createFiles(opt::InputArgList &args) {
     }
   }
 
+  ctx.openedFiles.clear();
   if (defaultScript && !hasScript)
     readLinkerScript(ctx, *defaultScript);
   loadFiles();

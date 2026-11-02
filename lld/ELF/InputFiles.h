@@ -42,6 +42,7 @@ const ELFSyncStream &operator<<(const ELFSyncStream &, const InputFile *);
 
 // Opens a given file.
 std::optional<MemoryBufferRef> readFile(Ctx &, StringRef path);
+void openFiles(Ctx &, ArrayRef<StringRef> paths);
 
 // Add symbols in File to the symbol table.
 void parseFile(Ctx &, InputFile *file);
