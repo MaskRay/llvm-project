@@ -1,0 +1,52 @@
+# RUN: llc -mtriple=aarch64-linux-gnu -O3 -run-pass=block-placement %s -o - | FileCheck %s
+## CFIFixup requires a single prologue. If bb.3 were tail duplicated into its
+## predecessors, the frame-setup CFI instructions laid out before bb.2 would
+## describe w30 as saved at the start of bb.2.
+
+# CHECK-LABEL: name: f
+# CHECK-COUNT-1: frame-setup CFI_INSTRUCTION def_cfa_offset 16
+# CHECK-NOT:     frame-setup CFI_INSTRUCTION def_cfa_offset 16
+
+--- |
+  define i1 @f() { ret i1 false }
+  declare void @g()
+...
+---
+name: f
+tracksRegLiveness: true
+body: |
+  bb.0:
+    successors: %bb.1, %bb.2
+    liveins: $w0, $x1
+    TBZW killed renamable $w0, 0, %bb.2
+
+  bb.1:
+    successors: %bb.3
+    liveins: $x1
+    renamable $x0 = MOVZXi 0, 0
+    B %bb.3
+
+  bb.2:
+    successors: %bb.3
+    liveins: $x1
+    renamable $x0 = LDRXui killed renamable $x1, 0
+
+  bb.3:
+    successors: %bb.5, %bb.4
+    liveins: $x0, $lr
+    early-clobber $sp = frame-setup STRXpre killed $lr, $sp, -16
+    frame-setup CFI_INSTRUCTION def_cfa_offset 16
+    frame-setup CFI_INSTRUCTION offset $w30, -16
+    CBZX killed renamable $x0, %bb.5
+
+  bb.4:
+    successors: %bb.5
+    BL @g, csr_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit-def $sp
+
+  bb.5:
+    early-clobber $sp, $lr = frame-destroy LDRXpost $sp, 16
+    frame-destroy CFI_INSTRUCTION def_cfa_offset 0
+    frame-destroy CFI_INSTRUCTION restore $w30
+    $w0 = MOVZWi 0, 0
+    RET undef $lr, implicit $w0
+...

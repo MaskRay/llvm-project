@@ -28,6 +28,7 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineSSAUpdater.h"
 #include "llvm/CodeGen/MachineSizeOpts.h"
+#include "llvm/CodeGen/TargetFrameLowering.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
@@ -634,6 +635,12 @@ bool TailDuplicator::shouldTailDuplicate(bool IsSimple,
                                      ->getTargetTriple()
                                      .isOSDarwin() ||
                                  !MI.isCFIInstruction()))
+      return false;
+
+    // CFIFixup requires the prologue CFI instructions to dominate each other.
+    if (MI.isCFIInstruction() && MI.getFlag(MachineInstr::FrameSetup) &&
+        MF->getTarget().Options.EnableCFIFixup &&
+        MF->getSubtarget().getFrameLowering()->enableCFIFixup(*MF))
       return false;
 
     // Convergent instructions can be duplicated only if doing so doesn't add
