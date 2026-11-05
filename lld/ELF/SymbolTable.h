@@ -78,9 +78,12 @@ public:
   llvm::DenseMap<llvm::CachedHashStringRef, SharedFile *> soNames;
 
   // Comdat groups define "link once" sections. If two comdat groups have the
-  // same name, only one of them is linked, and the other is ignored. This map
-  // is used to uniquify them.
-  llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *> comdatGroups;
+  // same name, only one of them is linked, and the other is ignored. Return the
+  // owner slot of a group, which is null until a file claims the group. This is
+  // thread-safe while `concurrent` is true, but only the parse loop may access
+  // the slot.
+  const InputFile *&getComdatOwner(llvm::CachedHashStringRef signature);
+  const InputFile *findComdatOwner(llvm::CachedHashStringRef signature);
 
   // The Map of __acle_se_<sym>, <sym> pairs found in the input objects.
   // Key is the <sym> name.
@@ -106,6 +109,8 @@ private:
   struct Shard {
     // A map from symbol name to the symbol.
     llvm::DenseMap<llvm::CachedHashStringRef, Symbol *> map;
+    // A map from comdat group signature to the owner slot.
+    llvm::DenseMap<llvm::CachedHashStringRef, const InputFile **> comdatGroups;
     std::mutex mu;
     std::unique_lock<std::mutex> getLock(bool concurrent) {
       return concurrent ? std::unique_lock<std::mutex>(mu)

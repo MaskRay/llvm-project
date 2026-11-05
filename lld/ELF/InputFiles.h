@@ -256,7 +256,8 @@ public:
   void parse(bool ignoreComdats = false);
   void parseLazy();
 
-  // Intern global symbol names on a worker thread and then set `interned`.
+  // Intern global symbol names and comdat group signatures on a worker thread
+  // and then set `interned`.
   void internSymbols();
   std::atomic<bool> interned = false;
 
@@ -325,6 +326,10 @@ private:
   // Section indices of kept SHT_GROUP sections, recorded by parse() in
   // ascending order, to be used by the parallel initializeSections().
   SmallVector<uint32_t, 0> keptGroups;
+
+  // Owner slots of SHT_GROUP sections, computed by internSymbols. An element
+  // is null if the signature is invalid.
+  SmallVector<const InputFile **, 0> comdatOwners;
 };
 
 class BitcodeFile : public InputFile {

@@ -109,6 +109,21 @@ Symbol *SymbolTable::intern(CachedHashStringRef name) {
   return sym;
 }
 
+const InputFile *&SymbolTable::getComdatOwner(CachedHashStringRef signature) {
+  Shard &shard = getShard(signature);
+  auto l = shard.getLock(concurrent);
+  const InputFile **&owner = shard.comdatGroups[signature];
+  if (!owner)
+    owner = makeThreadLocal<const InputFile *>();
+  return *owner;
+}
+
+const InputFile *SymbolTable::findComdatOwner(CachedHashStringRef signature) {
+  assert(!concurrent);
+  const InputFile **owner = getShard(signature).comdatGroups.lookup(signature);
+  return owner ? *owner : nullptr;
+}
+
 // This variant of addSymbol is used by BinaryFile::parse to check duplicate
 // symbol errors.
 Symbol *SymbolTable::addAndCheckDuplicate(Ctx &ctx, const Defined &newSym) {
