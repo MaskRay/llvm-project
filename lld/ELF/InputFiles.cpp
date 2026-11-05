@@ -376,13 +376,20 @@ doParseFiles(Ctx &ctx,
   // addDependentLibrary.
   for (size_t i = 0, j = 0; i < files.size(); ++i) {
     llvm::TimeTraceScope timeScope("Parse input files", files[i]->getName());
-    // Claim the file unless a worker has claimed it. If one has, wait for it.
+    // Claim the file unless a worker has. If one has, intern later files until
+    // it finishes, since with few threads this loop often outruns the workers.
     if (j < queue->files.size() && files[i].get() == queue->files[j]) {
       size_t expected = j;
       if (!queue->next.compare_exchange_strong(expected, j + 1,
-                                               std::memory_order_relaxed))
+                                               std::memory_order_relaxed)) {
+        size_t k;
+        while (!queue->files[j]->interned &&
+               (k = queue->next.fetch_add(1, std::memory_order_relaxed)) <
+                   queue->files.size())
+          queue->files[k]->internSymbols();
         while (!queue->files[j]->interned)
           std::this_thread::yield();
+      }
       ++j;
     }
     doParseFile<ELFT>(ctx, files[i].get());
@@ -577,6 +584,19 @@ template <class ELFT> void ObjFile<ELFT>::internSymbols() {
     else if (!name->contains('@'))
       symbols[i] = ctx.symtab->intern(CachedHashStringRef(*name));
   }
+  for (const Elf_Shdr &sec : this->getELFShdrs<ELFT>()) {
+    if (sec.sh_type != SHT_GROUP)
+      continue;
+    const InputFile **owner = nullptr;
+    if (sec.sh_info < eSyms.size()) {
+      Expected<StringRef> name = eSyms[sec.sh_info].getName(stringTable);
+      if (name)
+        owner = &ctx.symtab->getComdatOwner(CachedHashStringRef(*name));
+      else
+        consumeError(name.takeError());
+    }
+    comdatOwners.push_back(owner);
+  }
   interned = true;
 }
 
@@ -640,13 +660,21 @@ template <class ELFT> void ObjFile<ELFT>::parse(bool ignoreComdats) {
   StringRef shstrtab = CHECK2(obj.getSectionStringTable(objSections), this);
   uint64_t size = objSections.size();
   sections.resize(size);
+  // Empty unless a worker interned this file.
+  SmallVector<const InputFile **, 0> owners = std::move(comdatOwners);
+  size_t groupIdx = 0;
   for (size_t i = 0; i != size; ++i) {
     const Elf_Shdr &sec = objSections[i];
 
     if (LLVM_LIKELY(sec.sh_type == SHT_PROGBITS))
       continue;
     if (LLVM_LIKELY(sec.sh_type == SHT_GROUP)) {
-      StringRef signature = getShtGroupSignature(objSections, sec);
+      const InputFile **owner =
+          groupIdx < owners.size() ? owners[groupIdx] : nullptr;
+      ++groupIdx;
+      if (!owner)
+        owner = &ctx.symtab->getComdatOwner(
+            CachedHashStringRef(getShtGroupSignature(objSections, sec)));
       ArrayRef<Elf_Word> entries =
           CHECK2(obj.template getSectionContentsAsArray<Elf_Word>(sec), this);
       if (entries.empty())
@@ -656,10 +684,11 @@ template <class ELFT> void ObjFile<ELFT>::parse(bool ignoreComdats) {
       if (flag && flag != GRP_COMDAT)
         Fatal(ctx) << this << ": unsupported SHT_GROUP format";
 
-      bool keepGroup = !flag || ignoreComdats ||
-                       ctx.symtab->comdatGroups
-                           .try_emplace(CachedHashStringRef(signature), this)
-                           .second;
+      bool keepGroup = !flag || ignoreComdats;
+      if (!keepGroup && !*owner) {
+        *owner = this;
+        keepGroup = true;
+      }
       if (keepGroup) {
         keptGroups.push_back(i);
         if (!ctx.arg.resolveGroups)
@@ -1966,10 +1995,16 @@ static void createBitcodeSymbol(Ctx &ctx, Symbol *&sym,
 
 void BitcodeFile::parse() {
   for (std::pair<StringRef, Comdat::SelectionKind> s : obj->getComdatTable()) {
-    keptComdats.push_back(
-        s.second == Comdat::NoDeduplicate ||
-        ctx.symtab->comdatGroups.try_emplace(CachedHashStringRef(s.first), this)
-            .second);
+    bool keep = s.second == Comdat::NoDeduplicate;
+    if (!keep) {
+      const InputFile *&owner =
+          ctx.symtab->getComdatOwner(CachedHashStringRef(s.first));
+      if (!owner) {
+        owner = this;
+        keep = true;
+      }
+    }
+    keptComdats.push_back(keep);
   }
 
   if (numSymbols == 0) {
