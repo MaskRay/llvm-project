@@ -191,7 +191,6 @@ void scanSection1(Target &target, InputSectionBase &sec, unsigned shard) {
   else
     target.template scanSectionImpl<ELFT>(sec, rels.relas, shard);
 }
-
 } // namespace lld::elf
 
 #endif
