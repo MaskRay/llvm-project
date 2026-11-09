@@ -48,14 +48,16 @@
 
 ## Check `--why-live=.str.*`.
 # WL:      live symbol: foo.o:(.str.cat.dyndbg.foo)
-# WL-NEXT: >>> dynamic debugging: foo.o:(.text.foo)
+# WL-NEXT: >>> referenced by: foo.o:(.text.__dyndbg.foo)
+# WL-NEXT: >>> depended on by section: foo.o:(.text.foo)
 # WL-NEXT: >>> contained live symbol: foo.o:(foo)
 # WL-NEXT: >>> referenced by: main.o:(.text.main)
 # WL-NEXT: >>> contained live symbol: main.o:(main) (entry point)
 # WL-NEXT: live symbol: foo.o:(.str.dog.dyndbg.foo)
 # WL-NEXT: >>> in live section: foo.o:(.rodata.str1.1)
 # WL-NEXT: >>> contained live symbol: foo.o:(.str.cat.dyndbg.foo)
-# WL-NEXT: >>> dynamic debugging: foo.o:(.text.foo)
+# WL-NEXT: >>> referenced by: foo.o:(.text.__dyndbg.foo)
+# WL-NEXT: >>> depended on by section: foo.o:(.text.foo)
 # WL-NEXT: >>> contained live symbol: foo.o:(foo)
 # WL-NEXT: >>> referenced by: main.o:(.text.main)
 # WL-NEXT: >>> contained live symbol: main.o:(main) (entry point)

@@ -207,8 +207,6 @@ public:
     return getELFSyms<ELFT>().slice(firstGlobal);
   }
 
-  uint32_t getFirstGlobal() const { return firstGlobal; }
-
   // Get cached DWARF information.
   DWARFCache *getDwarf();
 
@@ -232,28 +230,15 @@ protected:
   std::unique_ptr<DWARFCache> dwarf;
 
 public:
+  // With --gc-sections, the parsed embedded dynamic debugging object. Its
+  // sections are GC nodes of the outer link but are never output.
+  std::unique_ptr<ELFFileBase> dynDbgObj;
+
   // Name of source file obtained from STT_FILE, if present.
   StringRef sourceFile;
   uint32_t andFeatures = 0;
   bool hasCommonSyms = false;
   std::optional<AArch64PauthAbiCoreInfo> aarch64PauthAbiCoreInfo;
-};
-
-// Dynamic debugging info.
-struct DynDbgGCInfo;
-
-struct DynDbgInfo {
-  // Embedded unoptimized dynamic debug input section.
-  std::unique_ptr<InputSection> inputSec;
-
-  // The following are used for `--gc-sections` support.
-  std::atomic<bool> gcInfoCreated = false;
-  std::unique_ptr<ELFFileBase> elf;
-  // Lifetime control of DynDbgGCInfo in InputSection is not straightforward, so
-  // do so from here instead.
-  SmallVector<std::unique_ptr<DynDbgGCInfo>, 0> gcInfos;
-
-  DynDbgInfo(InputSection *is);
 };
 
 // .o file.
@@ -288,9 +273,8 @@ public:
   // Pointer to this input file's .llvm_addrsig section, if it has one.
   const Elf_Shdr *addrsigSec = nullptr;
 
-  // Dynamic debugging info.
-  std::unique_ptr<DynDbgInfo> dynDbgInfo;
-  void maybeCreateDynDbgGCInfo();
+  // Embedded unoptimized dynamic debug input section.
+  std::unique_ptr<InputSection> dynDbgSec;
 
   // SHT_LLVM_CALL_GRAPH_PROFILE section index.
   uint32_t cgProfileSectionIndex = 0;
@@ -320,6 +304,8 @@ private:
   Symbol *insertGlobal(size_t i);
   void initializeSymbols(const llvm::object::ELFFile<ELFT> &obj);
   void initDynDbgSymbols();
+  void initDynDbgSections();
+  void initLocalSymbols();
   void initializeJustSymbols();
 
   InputSectionBase *getRelocTarget(uint32_t idx, uint32_t info);

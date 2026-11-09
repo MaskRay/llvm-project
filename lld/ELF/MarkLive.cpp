@@ -377,16 +377,29 @@ void MarkLive<ELFT, TrackWhyLive>::run() {
     markSymbol(entry.acleSeSym, "ARM CMSE symbol");
   }
 
-  if (ctx.inDynDbgLink)
-    for (const StringRef &s : ctx.dynDbgInnerGCRoots)
-      markSymbol(ctx.symtab->find(s), "dynamic debugging");
-
   // Mark .eh_frame sections as live because there are usually no relocations
   // that point to .eh_frames. Otherwise, the garbage collector would drop
   // all of them. We also want to preserve personality routines and LSDA
   // referenced by .eh_frame sections, so we scan them for that here.
   for (EhInputSection *eh : ctx.ehInputSections)
     scanEhFrameSection(*eh);
+  // Embedded dynamic debugging objects are GC nodes (see initDynDbgSections).
+  // Their LSDAs may reference outer symbols. In the inner link, the roots are
+  // the embedded sections the outer link found live.
+  if (ctx.hasDynDbg) {
+    for (ELFFileBase *file : ctx.objectFiles)
+      if (file->dynDbgObj)
+        for (InputSectionBase *sec : file->dynDbgObj->getSections())
+          if (auto *eh = dyn_cast_or_null<EhInputSection>(sec))
+            scanEhFrameSection(*eh);
+  } else if (ctx.inDynDbgLink) {
+    for (auto [file, live] :
+         llvm::zip_equal(ctx.objectFiles, ctx.dynDbgLiveSections))
+      for (uint32_t i : live)
+        if (InputSectionBase *sec = file->getSections()[i];
+            sec && sec != &InputSection::discarded)
+          enqueue(sec, 0, nullptr, {std::nullopt, "dynamic debugging"});
+  }
   // See markUsedSymbols.
   bool markUsed =
       ctx.arg.copyRelocs && !ctx.dynDbgRelocatable &&
@@ -448,9 +461,6 @@ void MarkLive<ELFT, TrackWhyLive>::run() {
     }
   }
 
-  if (ctx.hasDynDbg && ctx.dynDbgGCMutexPool.empty())
-    ctx.dynDbgGCMutexPool = std::vector<std::mutex>(ctx.arg.threadCount);
-
   if constexpr (TrackWhyLive)
     mark();
   else
@@ -477,14 +487,6 @@ void MarkLive<ELFT, TrackWhyLive>::run() {
   }
 }
 
-static const DynDbgGCInfo *getDynDbgGCInfo(Ctx &ctx, InputSectionBase &sec) {
-  if (ctx.hasDynDbg)
-    if (InputSection *is = dyn_cast<InputSection>(&sec))
-      return is->getDynDbgGCInfo();
-
-  return nullptr;
-}
-
 template <class ELFT, bool TrackWhyLive>
 void MarkLive<ELFT, TrackWhyLive>::mark() {
   while (!queue.empty()) {
@@ -497,21 +499,6 @@ void MarkLive<ELFT, TrackWhyLive>::mark() {
       resolveReloc(sec, rel, false);
     for (const typename ELFT::Crel &rel : rels.crels)
       resolveReloc(sec, rel, false);
-
-    if (const DynDbgGCInfo *gi = getDynDbgGCInfo(ctx, sec)) {
-      ctx.dynDbgInnerGCRoots.append(gi->roots);
-
-      for (Symbol *sym : gi->refs) {
-        sym->setFlags(USED);
-        if (auto *ss = dyn_cast<SharedSymbol>(sym)) {
-          if (!ss->isWeak())
-            whyLive.try_emplace(sym, LiveReason{&sec, "dynamic debugging"});
-        } else if (auto *d = dyn_cast<Defined>(sym)) {
-          if (auto *isec = dyn_cast_or_null<InputSectionBase>(d->section))
-            enqueue(isec, d->value, sym, {&sec, "dynamic debugging"});
-        }
-      }
-    }
 
     for (InputSectionBase *isec : sec.dependentSections)
       enqueue(isec, /*offset=*/0, /*sym=*/nullptr,
@@ -533,17 +520,7 @@ static void processSectionEdges(
     Ctx &ctx, InputSectionBase &sec,
     const DenseMap<StringRef, SmallVector<InputSectionBase *, 0>>
         &cNamedSections,
-    SmallVector<StringRef, 0> &ddGCRoots, Fn fn) {
-  auto markIfSectionPiece = [&](auto *isec, uint64_t offset) {
-    if (auto *ms = dyn_cast<MergeInputSection>(isec)) {
-      auto &piece = ms->getSectionPiece(offset);
-      auto *word =
-          reinterpret_cast<std::atomic<uint32_t> *>(&piece.inputOff + 1);
-      constexpr uint32_t liveBit = sys::IsBigEndianHost ? (1U << 31) : 1U;
-      word->fetch_or(liveBit, std::memory_order_relaxed);
-    }
-  };
-
+    Fn fn) {
   auto resolveEdge = [&](const auto &rel) {
     Symbol &sym = sec.file->getRelocTargetSym(rel);
     if (!sym.hasFlag(USED))
@@ -557,7 +534,13 @@ static void processSectionEdges(
               ms && offset >= ms->content().size())
             return;
         }
-        markIfSectionPiece(relSec, offset);
+        if (auto *ms = dyn_cast<MergeInputSection>(relSec)) {
+          auto &piece = ms->getSectionPiece(offset);
+          auto *word =
+              reinterpret_cast<std::atomic<uint32_t> *>(&piece.inputOff + 1);
+          constexpr uint32_t liveBit = sys::IsBigEndianHost ? (1U << 31) : 1U;
+          word->fetch_or(liveBit, std::memory_order_relaxed);
+        }
         fn(relSec, offset);
       }
       return;
@@ -576,22 +559,6 @@ static void processSectionEdges(
     fn(isec, 0);
   if (sec.nextInSectionGroup)
     fn(sec.nextInSectionGroup, 0);
-
-  if (const DynDbgGCInfo *gi = getDynDbgGCInfo(ctx, sec)) {
-    ddGCRoots.append(gi->roots);
-
-    for (Symbol *sym : gi->refs) {
-      if (!sym->hasFlag(USED))
-        sym->setFlags(USED);
-      if (auto *d = dyn_cast<Defined>(sym)) {
-        if (auto *isec = dyn_cast_or_null<InputSectionBase>(d->section)) {
-          uint64_t offset = d->value;
-          markIfSectionPiece(isec, offset);
-          fn(isec, offset);
-        }
-      }
-    }
-  }
 }
 
 // Parallel mark using level-synchronized BFS with depth-limited inline
@@ -599,16 +566,12 @@ static void processSectionEdges(
 // (DFS for cache locality), then queues deeper discoveries for the next level.
 template <class ELFT, bool TrackWhyLive>
 void MarkLive<ELFT, TrackWhyLive>::markParallel() {
-  struct LocalState {
-    SmallVector<InputSection *, 0> queue;
-    SmallVector<StringRef, 0> ddGCRoots;
-  };
-
   const size_t numThreads = parallel::getThreadCount();
-  auto visit = [&](InputSection &sec, int depth, LocalState &localState,
+  auto visit = [&](InputSection &sec, int depth,
+                   SmallVector<InputSection *, 0> &localQueue,
                    auto &self) -> void {
     processSectionEdges<ELFT>(
-        ctx, sec, cNamedSections, localState.ddGCRoots,
+        ctx, sec, cNamedSections,
         [&](InputSectionBase *target, uint64_t offset) {
           auto &part =
               reinterpret_cast<std::atomic<uint8_t> &>(target->partition);
@@ -619,29 +582,26 @@ void MarkLive<ELFT, TrackWhyLive>::markParallel() {
             return;
           if (auto *s = dyn_cast<InputSection>(target)) {
             if (depth < 3)
-              self(*s, depth + 1, localState, self);
+              self(*s, depth + 1, localQueue, self);
             else
-              localState.queue.push_back(s);
+              localQueue.push_back(s);
           }
         });
   };
 
   while (!queue.empty()) {
-    auto localStates = std::make_unique<LocalState[]>(numThreads);
+    auto queues =
+        std::make_unique<SmallVector<InputSection *, 0>[]>(numThreads);
     // Workers claim items off a shared counter and accumulate deeper
     // discoveries into their own local queue, merged into `queue` below.
     std::atomic<ptrdiff_t> next{ptrdiff_t(queue.size())};
     parallelFor(0, numThreads, [&](size_t shard) {
       for (ptrdiff_t i; (i = next.fetch_sub(1, std::memory_order_relaxed)) > 0;)
-        visit(*queue[i - 1], 0, localStates[shard], visit);
+        visit(*queue[i - 1], 0, queues[shard], visit);
     });
     queue.clear();
-    for (size_t t = 0; t < numThreads; ++t) {
-      queue.append(std::move(localStates[t].queue));
-
-      if (ctx.hasDynDbg)
-        ctx.dynDbgInnerGCRoots.append(std::move(localStates[t].ddGCRoots));
-    }
+    for (size_t t = 0; t < numThreads; ++t)
+      queue.append(std::move(queues[t]));
   }
 }
 

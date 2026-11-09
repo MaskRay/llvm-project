@@ -2986,9 +2986,11 @@ static void redirectSymbols(Ctx &ctx, ArrayRef<WrappedSymbol> wrapped) {
 
   // Update pointers in input files.
   parallelForEach(ctx.objectFiles, [&](ELFFileBase *file) {
-    for (Symbol *&sym : file->getMutableGlobalSymbols())
-      if (Symbol *s = map.lookup(sym))
-        sym = s;
+    for (ELFFileBase *f : {file, file->dynDbgObj.get()})
+      if (f)
+        for (Symbol *&sym : f->getMutableGlobalSymbols())
+          if (Symbol *s = map.lookup(sym))
+            sym = s;
   });
 
   // Update pointers in the symbol table.
@@ -3255,11 +3257,17 @@ static void linkDynamicDebug(Ctx &ctx, ArrayRef<WrappedSymbol> wrapped) {
 
   for (auto *file : ctx.objectFiles) {
     auto *obj = cast<ObjFile<ELFT>>(file);
-    if (obj->dynDbgInfo) {
-      MemoryBufferRef mb(
-          toStringRef(obj->dynDbgInfo->inputSec->contentMaybeDecompress()),
-          obj->mb.getBufferIdentifier());
+    if (obj->dynDbgSec) {
+      MemoryBufferRef mb(toStringRef(obj->dynDbgSec->contentMaybeDecompress()),
+                         obj->mb.getBufferIdentifier());
       dctx.driver.addFile(createObjFile(dctx, mb));
+      if (ctx.arg.gcSections) {
+        SmallVector<uint32_t, 0> &live = dctx.dynDbgLiveSections.emplace_back();
+        if (obj->dynDbgObj)
+          for (auto [i, sec] : llvm::enumerate(obj->dynDbgObj->getSections()))
+            if (isa_and_nonnull<InputSection>(sec) && sec->isLive())
+              live.push_back(i);
+      }
     }
   }
 
@@ -3272,10 +3280,8 @@ static void linkDynamicDebug(Ctx &ctx, ArrayRef<WrappedSymbol> wrapped) {
       saveArg(Twine("-O") + Twine(ctx.arg.optimize))};
   if (ctx.arg.resolveGroups)
     args.push_back("--force-group-allocation");
-  if (ctx.arg.gcSections) {
-    dctx.dynDbgInnerGCRoots = std::move(ctx.dynDbgInnerGCRoots);
+  if (ctx.arg.gcSections)
     args.push_back("--gc-sections");
-  }
   for (const auto &ws : wrapped)
     args.push_back(saveArg(Twine("--wrap=") + ws.sym->getName()));
   dctx.driver.linkerMain(args);

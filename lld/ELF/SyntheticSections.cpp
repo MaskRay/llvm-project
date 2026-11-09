@@ -3821,7 +3821,7 @@ template <class ELFT> void elf::splitSections(Ctx &ctx) {
   llvm::TimeTraceScope timeScope("Split sections");
   // splitIntoPieces needs to be called on each MergeInputSection
   // before calling finalizeContents().
-  parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
+  auto split = [](ELFFileBase *file) {
     for (InputSectionBase *sec : file->getSections()) {
       if (!sec)
         continue;
@@ -3853,6 +3853,11 @@ template <class ELFT> void elf::splitSections(Ctx &ctx) {
     for (Symbol *sym : file->getGlobalSymbols())
       if (auto *d = dyn_cast<Defined>(sym); d && d->file == file)
         resolve(d);
+  };
+  parallelForEach(ctx.objectFiles, [&](ELFFileBase *file) {
+    split(file);
+    if (file->dynDbgObj)
+      split(file->dynDbgObj.get());
   });
 }
 

@@ -1,0 +1,110 @@
+# REQUIRES: x86
+## Test --gc-sections with dynamic debugging: embedded sections are nodes of the
+## outer GC graph, so their transitive references keep outer sections live.
+
+# RUN: rm -rf %t && split-file %s %t && cd %t
+# RUN: llvm-mc -filetype=obj -triple=x86_64 a.s -o a.o
+# RUN: llvm-mc -filetype=obj -triple=x86_64 a-unopt.s -o a-unopt.o
+# RUN: llvm-objcopy --add-section=.debug_llvm_dyndbg=a-unopt.o --set-section-type=.debug_llvm_dyndbg=0x6fff4c10 --set-section-alignment=.debug_llvm_dyndbg=8 a.o
+# RUN: llvm-mc -filetype=obj -triple=x86_64 b.s -o b.o
+# RUN: llvm-mc -filetype=obj -triple=x86_64 b-unopt.s -o b-unopt.o
+# RUN: llvm-objcopy --add-section=.debug_llvm_dyndbg=b-unopt.o --set-section-type=.debug_llvm_dyndbg=0x6fff4c10 --set-section-alignment=.debug_llvm_dyndbg=8 b.o
+
+# RUN: ld.lld -e main --gc-sections a.o -o out
+# RUN: llvm-readelf -s out | FileCheck %s --check-prefix=OUT --implicit-check-not=aaa_unused
+# RUN: llvm-objcopy --dump-section=.debug_llvm_dyndbg=in.o out /dev/null
+# RUN: llvm-readelf -Ss in.o | FileCheck %s --check-prefix=IN
+
+## x is reached from the live __dyndbg.foo through the inner-only helper. ti is
+## only referenced by the LSDA of __dyndbg.foo.
+# OUT:     Symbol table '.symtab'
+# OUT:     OBJECT  LOCAL  HIDDEN  [[#]] x.dyndbg.foo
+# OUT:     OBJECT  GLOBAL DEFAULT [[#]] ti
+
+## The inner .text holds both __dyndbg.aaa_unused and the live __dyndbg.main.
+# IN:      .gcc_except_table
+# IN:      Symbol table '.symtab'
+# IN-DAG:  FUNC    LOCAL  DEFAULT [[#]] helper
+# IN-DAG:  FUNC    GLOBAL HIDDEN  [[#]] __dyndbg.aaa_unused
+# IN-DAG:  FUNC    GLOBAL HIDDEN  [[#]] __dyndbg.main
+# IN-DAG:  FUNC    GLOBAL HIDDEN  [[#]] __dyndbg.foo
+# IN-DAG:  NOTYPE  GLOBAL DEFAULT UND   x.dyndbg.foo
+# IN-DAG:  NOTYPE  GLOBAL DEFAULT UND   ti
+
+## An undefined symbol referenced by live inner code is reported.
+# RUN: not ld.lld -e main --gc-sections b.o 2>&1 | FileCheck %s --check-prefix=ERR --implicit-check-not=error:
+# ERR:      error: undefined symbol: missing
+# ERR-NEXT: >>> referenced by b.o:(.debug_llvm_dyndbg+0x0)
+
+#--- a.s
+.globl main, aaa_unused, foo, ti
+.type main,@function; .type aaa_unused,@function; .type foo,@function
+.section .text.main,"ax",@progbits
+main:
+  call foo
+  ret
+.section .text.aaa_unused,"ax",@progbits
+aaa_unused:
+  ret
+.section .text.foo,"ax",@progbits
+foo:
+  ret
+
+.section .data.x,"aw",@progbits
+.type x,@object
+x:
+  .quad 0
+.globl x.dyndbg.foo
+.hidden x.dyndbg.foo
+x.dyndbg.foo = x
+
+.section .data.ti,"aw",@progbits
+.type ti,@object
+ti:
+  .quad 0
+
+#--- a-unopt.s
+.globl __dyndbg.aaa_unused, __dyndbg.main, __dyndbg.foo
+.hidden __dyndbg.aaa_unused, __dyndbg.main, __dyndbg.foo
+.type __dyndbg.aaa_unused,@function; .type __dyndbg.main,@function; .type __dyndbg.foo,@function
+.text
+__dyndbg.aaa_unused:
+  ret
+__dyndbg.main:
+  call foo
+  ret
+
+.section .text.__dyndbg.foo,"ax",@progbits
+__dyndbg.foo:
+  .cfi_startproc
+  .cfi_lsda 0x1b, .Lexcept
+  call helper
+  ret
+  .cfi_endproc
+
+## Not in the optimized code, e.g. a static function that was inlined.
+.section .text.helper,"ax",@progbits
+.type helper,@function
+helper:
+  mov x.dyndbg.foo(%rip), %rax
+  ret
+
+.section .gcc_except_table.foo,"a",@progbits
+.Lexcept:
+  .quad ti
+
+#--- b.s
+.globl main
+.type main,@function
+.section .text.main,"ax",@progbits
+main:
+  ret
+
+#--- b-unopt.s
+.globl __dyndbg.main
+.hidden __dyndbg.main
+.type __dyndbg.main,@function
+.section .text.__dyndbg.main,"ax",@progbits
+__dyndbg.main:
+  call missing
+  ret

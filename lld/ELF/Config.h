@@ -798,14 +798,12 @@ struct Ctx : CommonLinkerContext {
   bool dynDbgRelocatable = false;
   // True if the link contains dynamic debugging.
   bool hasDynDbg = false;
+  // With --gc-sections, the indices of the sections of each embedded object
+  // that the outer link found live. These are the inner link's GC roots.
+  SmallVector<SmallVector<uint32_t, 0>, 0> dynDbgLiveSections;
   // Pointer to the output of the embedded unoptimized dynamic debugging
   // relocatable link.
   std::unique_ptr<llvm::FileOutputBuffer> dynDbgOutput;
-  // The "inner" GC roots for the dynamic debugging relocatable link.
-  SmallVector<llvm::StringRef, 0> dynDbgInnerGCRoots;
-  // Mutex pool used by ObjFile::maybeCreateDynDbgGCInfo(). Use a pool of
-  // mutexes rather than one per object file.
-  std::vector<std::mutex> dynDbgGCMutexPool;
 };
 
 // The first two elements of versionDefinitions represent VER_NDX_LOCAL and
