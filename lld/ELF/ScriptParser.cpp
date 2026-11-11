@@ -58,7 +58,6 @@ private:
   void readAsNeeded();
   void readEntry();
   void readExtern();
-  void readGroup();
   void readInclude(llvm::function_ref<void()> parse);
   void readInput();
   void readLinkerScriptStmt(StringRef tok);
@@ -251,12 +250,10 @@ void ScriptParser::readLinkerScriptStmt(StringRef tok) {
     readEntry();
   } else if (tok == "EXTERN") {
     readExtern();
-  } else if (tok == "GROUP") {
-    readGroup();
   } else if (tok == "INCLUDE") {
     readInclude(
         [&] { readStmts([&](StringRef t) { readLinkerScriptStmt(t); }); });
-  } else if (tok == "INPUT") {
+  } else if (tok == "GROUP" || tok == "INPUT") {
     readInput();
   } else if (tok == "MEMORY") {
     readMemory();
@@ -386,13 +383,6 @@ void ScriptParser::readExtern() {
   expect("(");
   while (auto tok = till(")"))
     ctx.arg.undefined.push_back(unquote(tok));
-}
-
-void ScriptParser::readGroup() {
-  SaveAndRestore saved(ctx.driver.isInGroup, true);
-  readInput();
-  if (!saved.get())
-    ++ctx.driver.nextGroupId;
 }
 
 void ScriptParser::readInclude(llvm::function_ref<void()> parse) {

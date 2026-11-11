@@ -197,7 +197,6 @@ struct LoadJob {
   bool lazy;
   bool asNeeded;
   bool withLOption;
-  uint32_t groupId;
   SmallVector<std::unique_ptr<InputFile>, 0> out;
   std::vector<std::unique_ptr<llvm::MemoryBuffer>> thinBufs;
   SmallVector<std::pair<std::string, llvm::StringRef>, 0> tarEntries;
@@ -234,9 +233,6 @@ private:
   SmallVector<std::unique_ptr<InputFile>, 0> files, ltoObjectFiles;
 
 public:
-  // See InputFile::groupId.
-  uint32_t nextGroupId;
-  bool isInGroup;
   std::unique_ptr<InputFile> armCmseImpLib;
   SmallVector<std::pair<StringRef, unsigned>, 0> archiveFiles;
 };
@@ -424,8 +420,6 @@ struct Config {
   bool undefinedVersion;
   bool unique;
   bool useAndroidRelrTags = false;
-  bool warnBackrefs;
-  llvm::SmallVector<llvm::GlobPattern, 0> warnBackrefsExclude;
   bool warnCommon;
   bool warnMissingEntry;
   bool warnSymbolOrdering;
@@ -744,11 +738,6 @@ struct Ctx : CommonLinkerContext {
   // A tuple of (reference, extractedFile, sym). Used by --why-extract=.
   SmallVector<std::tuple<std::string, const InputFile *, const Symbol &>, 0>
       whyExtractRecords;
-  // A mapping from a symbol to an InputFile referencing it backward. Used by
-  // --warn-backrefs.
-  llvm::DenseMap<const Symbol *,
-                 std::pair<const InputFile *, const InputFile *>>
-      backwardReferences;
   llvm::SmallSet<llvm::StringRef, 0> auxiliaryFiles;
   // If --reproduce is specified, all input files are written to this tar
   // archive.

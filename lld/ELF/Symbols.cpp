@@ -444,73 +444,10 @@ void Symbol::resolve(Ctx &ctx, const Undefined &other) {
       return;
     }
 
-    // Do extra check for --warn-backrefs.
-    //
-    // --warn-backrefs is an option to prevent an undefined reference from
-    // extracting an archive member written earlier in the command line. It can
-    // be used to keep compatibility with GNU linkers to some degree. I'll
-    // explain the feature and why you may find it useful in this comment.
-    //
-    // lld's symbol resolution semantics is more relaxed than traditional Unix
-    // linkers. For example,
-    //
-    //   ld.lld foo.a bar.o
-    //
-    // succeeds even if bar.o contains an undefined symbol that has to be
-    // resolved by some object file in foo.a. Traditional Unix linkers don't
-    // allow this kind of backward reference, as they visit each file only once
-    // from left to right in the command line while resolving all undefined
-    // symbols at the moment of visiting.
-    //
-    // In the above case, since there's no undefined symbol when a linker visits
-    // foo.a, no files are pulled out from foo.a, and because the linker forgets
-    // about foo.a after visiting, it can't resolve undefined symbols in bar.o
-    // that could have been resolved otherwise.
-    //
-    // That lld accepts more relaxed form means that (besides it'd make more
-    // sense) you can accidentally write a command line or a build file that
-    // works only with lld, even if you have a plan to distribute it to wider
-    // users who may be using GNU linkers. With --warn-backrefs, you can detect
-    // a library order that doesn't work with other Unix linkers.
-    //
-    // The option is also useful to detect cyclic dependencies between static
-    // archives. Again, lld accepts
-    //
-    //   ld.lld foo.a bar.a
-    //
-    // even if foo.a and bar.a depend on each other. With --warn-backrefs, it is
-    // handled as an error.
-    //
-    // Here is how the option works. We assign a group ID to each file. A file
-    // with a smaller group ID can pull out object files from an archive file
-    // with an equal or greater group ID. Otherwise, it is a reverse dependency
-    // and an error.
-    //
-    // A file outside --{start,end}-group gets a fresh ID when instantiated. All
-    // files within the same --{start,end}-group get the same group ID. E.g.
-    //
-    //   ld.lld A B --start-group C D --end-group E
-    //
-    // A forms group 0. B form group 1. C and D (including their member object
-    // files) form group 2. E forms group 3. I think that you can see how this
-    // group assignment rule simulates the traditional linker's semantics.
-    bool backref = ctx.arg.warnBackrefs && file->groupId < other.file->groupId;
     extract(ctx);
 
     if (!ctx.arg.whyExtract.empty())
       recordWhyExtract(ctx, other.file, *file, *this);
-
-    // We don't report backward references to weak symbols as they can be
-    // overridden later.
-    //
-    // A traditional linker does not error for -ldef1 -lref -ldef2 (linking
-    // sandwich), where def2 may or may not be the same as def1. We don't want
-    // to warn for this case, so dismiss the warning if we see a subsequent lazy
-    // definition. this->file needs to be saved because in the case of LTO it
-    // may be reset to internalFile or be replaced with a file named lto.tmp.
-    if (backref && !isWeak())
-      ctx.backwardReferences.try_emplace(this,
-                                         std::make_pair(other.file, file));
     return;
   }
 
@@ -651,12 +588,8 @@ void Symbol::resolve(Ctx &ctx, const LazySymbol &other) {
     return;
   }
 
-  if (LLVM_UNLIKELY(!isUndefined())) {
-    // See the comment in resolve(Ctx &, const Undefined &).
-    if (isDefined())
-      ctx.backwardReferences.erase(this);
+  if (LLVM_UNLIKELY(!isUndefined()))
     return;
-  }
 
   // An undefined weak will not extract archive members. See comment on Lazy in
   // Symbols.h for the details.

@@ -34,6 +34,8 @@ from the [LLVM releases web site](https://llvm.org/releases/).
 
 ### Breaking changes
 
+* ELF: `--warn-backrefs` and `--warn-backrefs-exclude` are now ignored.
+
 ### COFF Improvements
 
 ### MinGW Improvements

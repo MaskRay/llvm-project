@@ -269,12 +269,9 @@ void LinkerDriver::addFile(StringRef path, bool withLOption) {
                       inLib,
                       ctx.arg.asNeeded,
                       withLOption,
-                      nextGroupId,
                       {},
                       {},
                       {}});
-  if (!isInGroup)
-    ++nextGroupId;
   if (!deferLoad)
     loadFiles();
 }
@@ -1640,8 +1637,6 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
   ctx.arg.unique = args.hasArg(OPT_unique);
   ctx.arg.useAndroidRelrTags = args.hasFlag(
       OPT_use_android_relr_tags, OPT_no_use_android_relr_tags, false);
-  ctx.arg.warnBackrefs =
-      args.hasFlag(OPT_warn_backrefs, OPT_no_warn_backrefs, false);
   ctx.arg.warnCommon = args.hasFlag(OPT_warn_common, OPT_no_warn_common, false);
   ctx.arg.warnSymbolOrdering =
       args.hasFlag(OPT_warn_symbol_ordering, OPT_no_warn_symbol_ordering, true);
@@ -1987,15 +1982,6 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
         ctx.arg.retainSymbols->insert(s);
   }
 
-  for (opt::Arg *arg : args.filtered(OPT_warn_backrefs_exclude)) {
-    StringRef pattern(arg->getValue());
-    if (Expected<GlobPattern> pat = GlobPattern::create(pattern))
-      ctx.arg.warnBackrefsExclude.push_back(std::move(*pat));
-    else
-      ErrAlways(ctx) << arg->getSpelling() << ": " << pat.takeError() << ": "
-                     << pattern;
-  }
-
   // For -no-pie and -pie, --export-dynamic-symbol specifies defined symbols
   // which should be exported. For -shared, references to matched non-local
   // STV_DEFAULT symbols are not bound to definitions within the shared object,
@@ -2154,9 +2140,7 @@ void LinkerDriver::loadFiles() {
       case LoadJob::Archive: {
         // Scan all archive members rather than using the archive symbol
         // index. We assume the archive symbol table order matches the order
-        // of symbols in the member symbol tables. All files within the
-        // archive share the same group ID to allow mutual references for
-        // --warn-backrefs.
+        // of symbols in the member symbol tables.
         auto members = getArchiveMembers(ctx, job);
         job.out.reserve(members.size());
         bool lazy = !job.inWholeArchive;
@@ -2189,8 +2173,6 @@ void LinkerDriver::loadFiles() {
         job.out.push_back(std::make_unique<BinaryFile>(ctx, job.mbref));
         break;
       }
-      for (auto &m : job.out)
-        m->groupId = job.groupId;
     });
   }
 
@@ -2223,8 +2205,7 @@ void LinkerDriver::createFiles(opt::InputArgList &args) {
 
   // Iterate over argv to process input files and positional arguments.
   std::optional<MemoryBufferRef> defaultScript;
-  nextGroupId = 0;
-  isInGroup = false;
+  bool isInGroup = false;
   bool hasInput = false, hasScript = false;
   for (auto *arg : args) {
     switch (arg->getOption().getID()) {
@@ -2302,7 +2283,6 @@ void LinkerDriver::createFiles(opt::InputArgList &args) {
       if (!isInGroup)
         ErrAlways(ctx) << "stray --end-group";
       isInGroup = false;
-      ++nextGroupId;
       break;
     case OPT_start_lib:
       if (inLib)
@@ -2317,7 +2297,6 @@ void LinkerDriver::createFiles(opt::InputArgList &args) {
         ErrAlways(ctx) << "stray --end-lib";
       inLib = false;
       isInGroup = false;
-      ++nextGroupId;
       break;
     case OPT_push_state:
       stack.emplace_back(ctx.arg.asNeeded, ctx.arg.isStatic, inWholeArchive);
@@ -2561,25 +2540,6 @@ static void writeWhyExtract(Ctx &ctx) {
   for (auto &entry : ctx.whyExtractRecords) {
     os << std::get<0>(entry) << '\t' << toStr(ctx, std::get<1>(entry)) << '\t'
        << toStr(ctx, std::get<2>(entry)) << '\n';
-  }
-}
-
-static void reportBackrefs(Ctx &ctx) {
-  for (auto &ref : ctx.backwardReferences) {
-    const Symbol &sym = *ref.first;
-    std::string to = toStr(ctx, ref.second.second);
-    // Some libraries have known problems and can cause noise. Filter them out
-    // with --warn-backrefs-exclude=. The value may look like (for --start-lib)
-    // *.o or (archive member) *.a(*.o).
-    bool exclude = false;
-    for (const llvm::GlobPattern &pat : ctx.arg.warnBackrefsExclude)
-      if (pat.match(to)) {
-        exclude = true;
-        break;
-      }
-    if (!exclude)
-      Warn(ctx) << "backward reference detected: " << sym.getName() << " in "
-                << ref.second.first << " refers to " << to;
   }
 }
 
@@ -3421,9 +3381,8 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   const size_t numInputFilesBeforeLTO = ctx.driver.files.size();
   compileBitcodeFiles<ELFT>(skipLinkedOutput);
 
-  // Symbol resolution finished. Report backward reference problems,
-  // --print-archive-stats=, and --why-extract=.
-  reportBackrefs(ctx);
+  // Symbol resolution finished. Report --print-archive-stats= and
+  // --why-extract=.
   writeArchiveStats(ctx);
   writeWhyExtract(ctx);
   if (errCount(ctx))

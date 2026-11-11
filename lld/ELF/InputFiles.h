@@ -123,12 +123,6 @@ public:
   // Index of MIPS GOT built for this file.
   uint32_t mipsGotIndex = -1;
 
-  // groupId is used for --warn-backrefs which is an optional error
-  // checking feature. All files within the same --{start,end}-group or
-  // --{start,end}-lib get the same group ID. Otherwise, each file gets a new
-  // group ID. For more info, see checkDependency() in SymbolTable.cpp.
-  uint32_t groupId = 0;
-
   // If this is an architecture-specific file, the following members
   // have ELF type (i.e. ELF{32,64}{LE,BE}) and target machine type.
   uint16_t emachine = llvm::ELF::EM_NONE;
