@@ -311,9 +311,10 @@ void elf::printTraceSymbol(const Symbol &sym, StringRef name) {
   Msg(sym.file->ctx) << sym.file << s << name;
 }
 
-static void recordWhyExtract(Ctx &ctx, const InputFile *reference,
-                             const InputFile &extracted, const Symbol &sym) {
-  ctx.whyExtractRecords.emplace_back(toStr(ctx, reference), &extracted, sym);
+void elf::recordWhyExtract(Ctx &ctx, const InputFile *reference,
+                           const InputFile &extracted, const Symbol &sym) {
+  if (!ctx.arg.whyExtract.empty())
+    ctx.whyExtractRecords.emplace_back(toStr(ctx, reference), &extracted, sym);
 }
 
 void elf::maybeWarnUnorderableSymbol(Ctx &ctx, const Symbol *sym) {
@@ -420,73 +421,75 @@ void Symbol::mergeProperties(const Symbol &other) {
   }
 }
 
-void Symbol::resolve(Ctx &ctx, const Undefined &other) {
-  if (other.visibility() != STV_DEFAULT) {
-    uint8_t v = visibility(), ov = other.visibility();
-    setVisibility(v == STV_DEFAULT ? ov : std::min(v, ov));
-  }
-  // An undefined symbol with non default visibility must be resolved
-  // within the component being linked. Demote SharedSymbol to Undefined.
-  if (isPlaceholder() || (isShared() && other.visibility() != STV_DEFAULT)) {
-    other.overwrite(*this);
-    return;
-  }
-
-  if (traced)
-    printTraceSymbol(other, getName());
-
-  if (isLazy()) {
-    // An undefined weak will not extract archive members. See comment on Lazy
-    // in Symbols.h for the details.
-    if (other.binding == STB_WEAK) {
-      binding = STB_WEAK;
-      type = other.type;
-      return;
-    }
-
-    extract(ctx);
-
-    if (!ctx.arg.whyExtract.empty())
-      recordWhyExtract(ctx, other.file, *file, *this);
-    return;
-  }
-
-  // Undefined symbols in a SharedFile do not change the binding.
-  if (isa<SharedFile>(other.file))
-    return;
-
-  if (isUndefined() || isShared()) {
-    // The binding will be weak if there is at least one reference and all are
-    // weak. The binding has one opportunity to change to weak: if the first
-    // reference is weak.
-    if (other.binding != STB_WEAK || !referenced)
-      binding = other.binding;
-    // -u creates a placeholder Undefined (internalFile, STT_NOTYPE).
-    // Adopt the real file and type from the object file's undefined.
-    if (file == ctx.internalFile) {
-      file = other.file;
-      type = other.type;
-    }
-  }
+bool SharedSymbol::precededByLazy() const {
+  return lazyPriority && lazyPriority < file->priority;
 }
 
-// Compare two symbols. Return true if the new symbol should win.
-bool Symbol::shouldReplace(Ctx &ctx, const Defined &other) const {
-  if (LLVM_UNLIKELY(isCommon())) {
-    if (ctx.arg.warnCommon)
-      Warn(ctx) << "common " << getName() << " is overridden";
-    return !other.isWeak();
+uint64_t Symbol::getRank() const {
+  unsigned tier;
+  switch (kind()) {
+  case DefinedKind:
+    // Treat STB_GNU_UNIQUE like STB_WEAK so that the first copy wins, which is
+    // the one in the prevailing COMDAT group.
+    tier = isGlobal() ? 0 : 2;
+    break;
+  case CommonKind:
+    tier = 1;
+    break;
+  case SharedKind:
+    tier = 3;
+    break;
+  case LazyKind:
+    tier = 4;
+    break;
+  case UndefinedKind:
+    // References in a SharedFile do not change the binding.
+    tier = isa_and_nonnull<SharedFile>(file) ? 7 : isWeak() ? 6 : 5;
+    break;
+  case PlaceholderKind:
+    return UINT64_MAX;
   }
-  if (!isDefined())
-    return true;
+  return uint64_t(tier) << 32 | (file ? file->priority : UINT32_MAX);
+}
 
-  // Incoming STB_GLOBAL overrides STB_WEAK/STB_GNU_UNIQUE. -fgnu-unique changes
-  // some vague linkage data in COMDAT from STB_WEAK to STB_GNU_UNIQUE. Treat
-  // STB_GNU_UNIQUE like STB_WEAK so that we prefer the first among all
-  // STB_WEAK/STB_GNU_UNIQUE copies. If we prefer an incoming STB_GNU_UNIQUE to
-  // an existing STB_WEAK, there may be discarded section errors because the
-  // selected copy may be in a non-prevailing COMDAT.
-  return !isGlobal() && other.isGlobal();
+bool Symbol::resolve(Ctx &ctx, const Undefined &other) {
+  mergeProperties(other);
+  if (other.getRank() < getRank()) {
+    other.overwrite(*this);
+    return false;
+  }
+  if (traced)
+    printTraceSymbol(other, getName());
+  if (isLazy()) {
+    // A weak reference does not extract an archive member. See the comment on
+    // Lazy in Symbols.h for the details.
+    if (other.binding != STB_WEAK)
+      return true;
+    binding = STB_WEAK;
+    if (other.type != STT_NOTYPE)
+      type = other.type;
+    return false;
+  }
+  if (isShared()) {
+    // An undefined symbol with non default visibility must be resolved within
+    // the component being linked. Like a traditional linker, a non-weak
+    // reference that precedes the shared object prefers a lazy definition
+    // that precedes the shared object as well.
+    if (other.visibility() != STV_DEFAULT ||
+        (cast<SharedSymbol>(this)->precededByLazy() &&
+         other.binding != STB_WEAK && other.file->priority < file->priority))
+      return true;
+    // The binding is weak if all references in relocatable files are weak.
+    if (!isa<SharedFile>(other.file) &&
+        (other.binding != STB_WEAK || !referenced))
+      binding = other.binding;
+  }
+  return false;
+}
+
+void Symbol::demote(const Undefined &ref) {
+  ref.overwrite(*this);
+  flags.fetch_and(uint16_t(~SYM_REF_NOP), std::memory_order_relaxed);
 }
 
 void elf::reportDuplicate(Ctx &ctx, const Symbol &sym, const InputFile *newFile,
@@ -538,93 +541,87 @@ void Symbol::checkDuplicate(Ctx &ctx, const Defined &other) const {
 }
 
 void Symbol::resolve(Ctx &ctx, const CommonSymbol &other) {
-  if (other.visibility() != STV_DEFAULT) {
-    uint8_t v = visibility(), ov = other.visibility();
-    setVisibility(v == STV_DEFAULT ? ov : std::min(v, ov));
+  mergeProperties(other);
+  if (CommonSymbol *oldSym = dyn_cast<CommonSymbol>(this)) {
+    if (ctx.arg.warnCommon)
+      Warn(ctx) << "multiple common of " << getName();
+    oldSym->alignment = std::max(oldSym->alignment, other.alignment);
+    if (oldSym->size < other.size ||
+        (oldSym->size == other.size &&
+         other.file->priority < oldSym->file->priority)) {
+      oldSym->file = other.file;
+      oldSym->size = other.size;
+      oldSym->type = other.type;
+      oldSym->binding = other.binding;
+    }
+    return;
   }
-  if (isDefined() && !isWeak()) {
+  if (getRank() < other.getRank()) {
     if (ctx.arg.warnCommon)
       Warn(ctx) << "common " << getName() << " is overridden";
     return;
   }
 
-  if (CommonSymbol *oldSym = dyn_cast<CommonSymbol>(this)) {
-    if (ctx.arg.warnCommon)
-      Warn(ctx) << "multiple common of " << getName();
-    oldSym->alignment = std::max(oldSym->alignment, other.alignment);
-    if (oldSym->size < other.size) {
-      oldSym->file = other.file;
-      oldSym->size = other.size;
-    }
-    return;
-  }
-
-  if (auto *s = dyn_cast<SharedSymbol>(this)) {
-    // Increase st_size if the shared symbol has a larger st_size. The shared
-    // symbol may be created from common symbols. The fact that some object
-    // files were linked into a shared object first should not change the
-    // regular rule that picks the largest st_size.
-    uint64_t size = s->size;
-    other.overwrite(*this);
-    if (size > cast<CommonSymbol>(this)->size)
-      cast<CommonSymbol>(this)->size = size;
-  } else {
-    other.overwrite(*this);
-  }
+  // replaceCommonSymbols increases st_size if the shared symbol has a larger
+  // st_size. The shared symbol may be created from common symbols. The fact
+  // that some object files were linked into a shared object first should
+  // not change the regular rule that picks the largest st_size.
+  auto *s = dyn_cast<SharedSymbol>(this);
+  uint64_t dsoSize = s ? s->size : 0;
+  other.overwrite(*this);
+  cast<CommonSymbol>(this)->dsoSize = dsoSize;
 }
 
 void Symbol::resolve(Ctx &ctx, const Defined &other) {
-  if (other.visibility() != STV_DEFAULT) {
-    uint8_t v = visibility(), ov = other.visibility();
-    setVisibility(v == STV_DEFAULT ? ov : std::min(v, ov));
-  }
-  if (shouldReplace(ctx, other))
+  mergeProperties(other);
+  if (LLVM_UNLIKELY(isCommon()) && ctx.arg.warnCommon)
+    Warn(ctx) << "common " << getName() << " is overridden";
+  if (other.getRank() < getRank())
     other.overwrite(*this);
 }
 
 void Symbol::resolve(Ctx &ctx, const LazySymbol &other) {
+  if (other.getRank() >= getRank()) {
+    // A shared definition satisfies weak references, which do not extract
+    // archive members. Just record the lazy file.
+    if (auto *s = dyn_cast<SharedSymbol>(this))
+      if (s->lazyPriority - 1 >= other.file->priority)
+        s->lazyPriority = other.file->priority;
+    return;
+  }
   if (isPlaceholder()) {
     other.overwrite(*this);
     return;
   }
-
-  if (LLVM_UNLIKELY(!isUndefined()))
-    return;
-
-  // An undefined weak will not extract archive members. See comment on Lazy in
-  // Symbols.h for the details.
-  if (isWeak()) {
-    uint8_t ty = type;
-    other.overwrite(*this);
-    type = ty;
-    binding = STB_WEAK;
-    return;
-  }
-
-  const InputFile *oldFile = file;
-  other.extract(ctx);
-  if (!ctx.arg.whyExtract.empty())
-    recordWhyExtract(ctx, oldFile, *file, *this);
+  // Keep the binding and type of the references. The binding of a lazy symbol
+  // is weak if all references are weak.
+  uint8_t b = binding, ty = type;
+  other.overwrite(*this);
+  binding = b;
+  type = ty;
 }
 
 void Symbol::resolve(Ctx &ctx, const SharedSymbol &other) {
   isExported = true;
-  if (isPlaceholder()) {
-    other.overwrite(*this);
+  if (auto *c = dyn_cast<CommonSymbol>(this)) {
+    // See the comment in resolve(Ctx &, const CommonSymbol &) above.
+    c->dsoSize = std::max(c->dsoSize, other.size);
     return;
   }
-  if (isCommon()) {
-    // See the comment in resolveCommon() above.
-    if (other.size > cast<CommonSymbol>(this)->size)
-      cast<CommonSymbol>(this)->size = other.size;
-    return;
-  }
-  if (visibility() == STV_DEFAULT && (isUndefined() || isLazy())) {
-    // An undefined symbol with non default visibility must be satisfied
-    // in the same DSO.
-    uint8_t bind = binding;
+  // An undefined symbol with non default visibility must be satisfied in the
+  // same DSO.
+  if (visibility() == STV_DEFAULT && other.getRank() < getRank()) {
+    uint32_t lazyPriority = 0;
+    if (isLazy())
+      lazyPriority = file->priority;
+    else if (auto *s = dyn_cast<SharedSymbol>(this))
+      lazyPriority = s->lazyPriority;
+    // Keep the binding if it has been set by a reference in a relocatable
+    // file.
+    uint8_t bind = isPlaceholder() || !referenced ? other.binding : binding;
     other.overwrite(*this);
     binding = bind;
+    cast<SharedSymbol>(this)->lazyPriority = lazyPriority;
   } else if (traced)
     printTraceSymbol(other, getName());
 }

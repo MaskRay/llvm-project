@@ -31,12 +31,13 @@ using namespace lld::elf;
 
 void SymbolTable::wrap(Symbol *sym, Symbol *real, Symbol *wrap) {
   // Redirect __real_foo to the original foo and foo to the original __wrap_foo.
-  auto lookup = [&](StringRef name) -> Symbol *& {
+  auto rebind = [&](StringRef name, Symbol *to) {
     CachedHashStringRef key(name);
-    return getShard(key).map[key];
+    internRaw(key);
+    getShard(key).table.load()->probe(key).sym = to;
   };
-  lookup(real->getName()) = sym;
-  lookup(sym->getName()) = wrap;
+  rebind(real->getName(), sym);
+  rebind(sym->getName(), wrap);
 
   // Propagate symbol usage information to the redirected symbols.
   if (sym->isUsedInRegularObj)
@@ -69,8 +70,7 @@ void SymbolTable::wrap(Symbol *sym, Symbol *real, Symbol *wrap) {
   real->isUsedInRegularObj = false;
 }
 
-// Find an existing symbol or create a new one.
-Symbol *SymbolTable::insert(StringRef name) {
+SymbolTable::Name SymbolTable::parseName(StringRef name) {
   // <name>@@<version> means the symbol is the default version. In that
   // case <name>@@<version> will be used to resolve references to <name>.
   //
@@ -81,28 +81,76 @@ Symbol *SymbolTable::insert(StringRef name) {
   size_t pos = name.find('@');
   if (pos != StringRef::npos && pos + 1 < name.size() && name[pos + 1] == '@')
     stem = name.take_front(pos);
+  return {CachedHashStringRef(stem), uint32_t(name.size()),
+          pos != StringRef::npos};
+}
 
-  Symbol *sym = insert(intern(CachedHashStringRef(stem)));
-  if (pos != StringRef::npos) {
-    if (stem.size() != name.size())
-      sym->setName(name);
+Symbol *SymbolTable::intern(const Name &name) {
+  Symbol *sym = internRaw(name.stem);
+  if (name.versioned) {
+    auto l = lockIf(concurrent, *sym);
+    // If files disagree on the default version, keep the smallest name so
+    // that the result does not depend on the order.
+    StringRef full(name.stem.val().data(), name.size);
+    if (name.stem.size() != name.size &&
+        (sym->getName().size() == name.stem.size() || full < sym->getName()))
+      sym->setName(full);
     sym->hasVersionSuffix = true;
   }
   return sym;
 }
 
-Symbol *SymbolTable::intern(CachedHashStringRef name) {
+Symbol *SymbolTable::internRaw(CachedHashStringRef name) {
   Shard &shard = getShard(name);
-  auto l = shard.getLock(concurrent);
-  Symbol *&sym = shard.map[name];
+  Table *t = shard.table.load(std::memory_order_acquire);
+  if (t)
+    if (Symbol *sym = t->find(name))
+      return sym;
+
+  auto l = lockIf(concurrent, shard.mu);
+  t = shard.table.load(std::memory_order_relaxed);
+  if (!t || (shard.numEntries + 1) * 2 > t->mask + 1) {
+    auto newTable =
+        std::make_unique<Table>(t ? (t->mask + 1) * 2 : initialCapacity);
+    if (t) {
+      for (size_t i = 0; i <= t->mask; ++i) {
+        Slot &from = t->slots[i];
+        Symbol *sym = from.sym.load(std::memory_order_relaxed);
+        if (!sym)
+          continue;
+        Slot &to = newTable->probe(
+            CachedHashStringRef(StringRef(from.name, from.size), from.hash));
+        to.name = from.name;
+        to.size = from.size;
+        to.hash = from.hash;
+        to.sym.store(sym, std::memory_order_relaxed);
+      }
+    }
+    t = newTable.get();
+    shard.tables.push_back(std::move(newTable));
+    shard.table.store(t, std::memory_order_release);
+  }
+  Slot &slot = t->probe(name);
+  Symbol *sym = slot.sym.load(std::memory_order_relaxed);
   if (!sym) {
     // The storage is value-initialized, so the Symbol fields are zero. Set the
     // ones that need a non-zero value.
     sym = reinterpret_cast<Symbol *>(makeThreadLocal<SymbolUnion>());
     sym->setName(name.val());
     sym->versionId = VER_NDX_GLOBAL;
+    slot.name = name.val().data();
+    slot.size = name.size();
+    slot.hash = name.hash();
+    slot.sym.store(sym, std::memory_order_release);
+    ++shard.numEntries;
   }
   return sym;
+}
+
+void SymbolTable::freeRetiredTables() {
+  for (Shard &shard : shards)
+    if (shard.tables.size() > 1)
+      shard.tables.erase(shard.tables.begin(), shard.tables.end() - 1);
 }
 
 // This variant of addSymbol is used by BinaryFile::parse to check duplicate
@@ -116,10 +164,50 @@ Symbol *SymbolTable::addAndCheckDuplicate(const Defined &newSym) {
   return sym;
 }
 
+void SymbolTable::append(
+    ArrayRef<std::pair<uint32_t, ArrayRef<Symbol *>>> segs) {
+  SmallVector<size_t, 0> offsets(segs.size());
+  size_t n = symVector.size();
+  for (size_t i = 0, e = segs.size(); i != e; ++i) {
+    offsets[i] = n;
+    n += segs[i].second.size();
+  }
+  symVector.resize_for_overwrite(n);
+  parallelFor(0, segs.size(), [&](size_t i) {
+    llvm::copy(segs[i].second, symVector.data() + offsets[i]);
+  });
+}
+
+Symbol *SymbolTable::addSymbol(const Undefined &newSym) {
+  assert(!curPriority && "files being resolved follow up by themselves");
+  Symbol *sym = insert(newSym.getName());
+  if (sym->resolve(ctx, newSym)) {
+    if (InputFile *f = getLazyFile(*sym)) {
+      if (f->lazy) {
+        f->lazy = false;
+        parseFile(ctx, f);
+        recordWhyExtract(ctx, newSym.file, *f, *sym);
+      }
+    } else {
+      sym->demote(newSym);
+    }
+  }
+  return sym;
+}
+
+InputFile *SymbolTable::getLazyFile(const Symbol &sym) const {
+  if (sym.isLazy())
+    return sym.file;
+  auto *s = dyn_cast<SharedSymbol>(&sym);
+  return s && s->lazyPriority ? ctx.driver.files[s->lazyPriority - 1].get()
+                              : nullptr;
+}
+
 Symbol *SymbolTable::find(StringRef name) {
-  assert(!concurrent && "find() must not run while workers intern symbols");
+  assert(!curPriority && "find() must not run while files are resolved");
   CachedHashStringRef key(name);
-  Symbol *sym = getShard(key).map.lookup(key);
+  Table *t = getShard(key).table.load(std::memory_order_relaxed);
+  Symbol *sym = t ? t->find(key) : nullptr;
   return sym && sym->inserted ? sym : nullptr;
 }
 

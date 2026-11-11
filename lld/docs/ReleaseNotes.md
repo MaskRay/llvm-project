@@ -31,6 +31,10 @@ from the [LLVM releases web site](https://llvm.org/releases/).
 
 * `--mmap-output-file` and `--no-mmap-output-file` were swapped in LLVM 21 and 22.
   They now mean what they say again; the default behavior is unchanged.
+* Symbol resolution no longer depends on the order in which input files are processed, and relocatable object files are resolved in parallel.
+  Among definitions of the same kind (e.g. weak definitions or COMDAT groups), the file that comes first on the command line wins, where an archive member takes the position of its archive.
+  A definition in a relocatable object file suppresses the extraction of an archive member that defines the same symbol, even if the archive comes first.
+  Input sections and symbols are ordered by the command line order of their files instead of the order of archive member extraction.
 
 ### Breaking changes
 

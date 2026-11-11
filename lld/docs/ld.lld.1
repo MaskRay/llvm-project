@@ -1052,13 +1052,12 @@ may be used to have the linker loop over the files in the group until no new
 symbols are added to the set.
 .Pp
 .Nm
-records all symbols found in objects and archives as it iterates over
-command line arguments.
-When
-.Nm
-encounters an undefined symbol that can be resolved by an object file
-contained in a previously processed archive file, it immediately extracts
-and links it into the output object.
+reads the symbols of all objects and archives before it resolves them.
+An archive member is extracted if it defines a symbol that a linked object references with a non-weak reference, wherever the archive is on the command line.
+The result does not depend on the order in which the files are processed.
+Among definitions of the same kind, such as two weak definitions or two COMDAT groups with the same signature, the one in the file that comes first on the command line is used, where an archive member takes the position of its archive.
+A definition in a relocatable object file is preferred to a definition in an archive member that has not been extracted, so it suppresses the extraction.
+A definition in a shared object is preferred likewise, unless the reference and the archive both precede the shared object.
 .Pp
 With certain archive inputs
 .Nm

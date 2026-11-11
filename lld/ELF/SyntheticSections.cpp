@@ -2026,7 +2026,7 @@ void SymbolTableBaseSection::finalizeContents() {
   // lookup table; see getSymbolIndex.
   size_t i = 0;
   for (const SymbolTableEntry &s : symbols)
-    s.sym->dynsymIndex = ++i;
+    s.sym->dynsymIndex.store(++i, std::memory_order_relaxed);
 }
 
 // The ELF spec requires local symbols to precede globals. We additionally group

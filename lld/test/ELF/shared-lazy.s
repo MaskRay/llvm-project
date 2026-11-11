@@ -43,6 +43,16 @@
 # CHECK4:       1: 0000000000000000     0 NOTYPE  WEAK   DEFAULT UND x2
 # CHECK4-EMPTY:
 
+## A hidden reference cannot be satisfied by a shared object. The archive member
+## is extracted regardless of the order of the files.
+# RUN: llvm-mc -filetype=obj -triple=x86_64 hidden.s -o hidden.o
+# RUN: ld.lld hidden.o b.so a.a -o 5 && llvm-readelf -s 5 | FileCheck %s --check-prefix=HIDDEN
+# RUN: ld.lld b.so hidden.o a.a -o 5 && llvm-readelf -s 5 | FileCheck %s --check-prefix=HIDDEN
+# RUN: ld.lld b.so a.a hidden.o -o 5 && llvm-readelf -s 5 | FileCheck %s --check-prefix=HIDDEN
+# RUN: ld.lld a.a b.so hidden.o -o 5 && llvm-readelf -s 5 | FileCheck %s --check-prefix=HIDDEN
+
+# HIDDEN: NOTYPE LOCAL HIDDEN [[#]] x1
+
 # RUN: ld.lld a.a --as-needed a.so -o noneeded.so -shared
 # RUN: llvm-readelf -d noneeded.so | FileCheck %s --check-prefix=NONEEDED
 
@@ -67,3 +77,8 @@ x2:
 .globl x2
 #--- weakref2.s
 .weak x2
+#--- hidden.s
+.globl _start
+.hidden x1
+_start:
+  call x1

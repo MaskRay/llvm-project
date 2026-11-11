@@ -43,9 +43,26 @@ const ELFSyncStream &operator<<(const ELFSyncStream &, const InputFile *);
 // Opens a given file.
 std::optional<MemoryBufferRef> readFile(Ctx &, StringRef path);
 
-// Add symbols in File to the symbol table.
+// Add the symbols of the input files that have not been parsed to the symbol
+// table. Lazy files are parsed if they define a symbol referenced by a parsed
+// file.
+void parseFiles(Ctx &);
+// Parse a lazy file that is being extracted or an LTO-generated object file.
 void parseFile(Ctx &, InputFile *file);
-void parseFiles(Ctx &, const SmallVector<std::unique_ptr<InputFile>, 0> &);
+
+// Return the file that keeps the COMDAT group `signature`. This is slow and
+// only used by diagnostics.
+const InputFile *findComdatOwner(Ctx &, StringRef signature);
+
+// A reference to a lazy or shared symbol that needs a serial follow-up. See
+// Symbol::resolve.
+struct PendingRef {
+  Symbol *sym;
+  InputFile *file;
+  uint8_t binding;
+  uint8_t stOther;
+  uint8_t type;
+};
 
 // The root class of input files.
 class InputFile {
@@ -122,6 +139,13 @@ public:
 
   // Index of MIPS GOT built for this file.
   uint32_t mipsGotIndex = -1;
+
+  // The position on the command line (an archive member takes the position of
+  // its archive), assigned when the file is first seen by parseFiles. Among
+  // definitions of the same kind, the file with the lowest priority wins.
+  // A file parsed after the others have selected their COMDAT groups takes the
+  // next number from LinkerDriver::latePriority instead.
+  uint32_t priority = 0;
 
   // If this is an architecture-specific file, the following members
   // have ELF type (i.e. ELF{32,64}{LE,BE}) and target machine type.
@@ -247,12 +271,20 @@ public:
     this->archiveName = archiveName;
   }
 
-  void parse(bool ignoreComdats = false);
-  void parseLazy();
+  // The steps of parseFiles. They may run on a worker thread, in parallel
+  // with the same step of other files.
+  void resolveDefs();
+  void resolveUndefs(llvm::SmallVectorImpl<PendingRef> &pending);
+  void scanSections();
+  // Handle the sections that scanSections left alone because they update
+  // global state.
+  void parseSerialSections();
+  bool hasSerialSections = false;
+  void initDynDbgSymbols();
 
-  // Intern global symbol names on a worker thread and then set `interned`.
-  void internSymbols();
-  std::atomic<bool> interned = false;
+  // True for an LTO-generated object file, whose group selection has been
+  // done on the bitcode files.
+  bool ignoreComdats = false;
 
   StringRef getShtGroupSignature(ArrayRef<Elf_Shdr> sections,
                                  const Elf_Shdr &sec);
@@ -290,10 +322,8 @@ public:
 
 private:
   void initializeSections(const llvm::object::ELFFile<ELFT> &obj);
-  Symbol *insertGlobal(size_t i);
-  void initializeSymbols(const llvm::object::ELFFile<ELFT> &obj);
-  void initDynDbgSymbols();
-  void initializeJustSymbols();
+  void discardGroupMembers(ArrayRef<Elf_Word> entries);
+  template <class Fn> void forEachGlobal(bool undefined, Fn fn);
 
   InputSectionBase *getRelocTarget(uint32_t idx, uint32_t info);
   InputSectionBase *createInputSection(uint32_t idx, const Elf_Shdr &sec,
@@ -315,9 +345,15 @@ private:
   // If the section does not exist (which is common), the array is empty.
   ArrayRef<Elf_Word> shndxTable;
 
-  // Section indices of kept SHT_GROUP sections, recorded by parse() in
-  // ascending order, to be used by the parallel initializeSections().
-  SmallVector<uint32_t, 0> keptGroups;
+  // True if a global symbol name contains '@'.
+  bool hasVersionedName = false;
+
+public:
+  // SHT_GROUP section indices in ascending order, recorded by scanSections.
+  // For a COMDAT group that takes part in group selection, the second member
+  // is the symbol of its signature. initializeSections removes the groups
+  // that another file keeps.
+  SmallVector<std::pair<uint32_t, Symbol *>, 0> groups;
 };
 
 class BitcodeFile : public InputFile {
@@ -326,9 +362,13 @@ public:
               uint64_t offsetInArchive, bool lazy);
   static bool classof(const InputFile *f) { return f->kind() == BitcodeKind; }
   void parse();
+  void resolveUndefs(llvm::SmallVectorImpl<PendingRef> &pending);
   void parseLazy();
   void postParse();
   std::unique_ptr<llvm::lto::InputFile> obj;
+  // For each COMDAT, the symbol of its signature, or null if the COMDAT does
+  // not take part in group selection.
+  SmallVector<Symbol *, 0> comdatSigs;
   std::vector<bool> keptComdats;
 };
 
@@ -361,8 +401,8 @@ public:
   // Used for --as-needed
   std::atomic<bool> isNeeded;
 
-  // Non-weak undefined symbols which are not yet resolved when the SO is
-  // parsed. Only filled for `--no-allow-shlib-undefined`.
+  // Non-weak undefined symbols. They extract archive members and are checked
+  // for `--no-allow-shlib-undefined`.
   SmallVector<Symbol *, 0> requiredSymbols;
 
 private:

@@ -6,8 +6,8 @@
 # RUN: ld.lld --version-script %t.ver %t.o %t.so -o /dev/null -y f@v1 | \
 # RUN:   FileCheck --check-prefix=TRACE %s --implicit-check-not=f@v1
 
-## TRACE:      {{.*}}.o: definition of f@v1
-## TRACE-NEXT: {{.*}}.so: shared definition of f@v1
+## TRACE:      {{.*}}.so: shared definition of f@v1
+## TRACE-NEXT: {{.*}}.o: definition of f@v1
 
 # RUN: echo '.symver f,f@v1; .symver g,g@v2; call f; call g' | \
 # RUN:   llvm-mc -filetype=obj -triple=x86_64 - -o %t1.o

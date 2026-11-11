@@ -2627,11 +2627,12 @@ static void replaceCommonSymbols(Ctx &ctx) {
       if (!s)
         continue;
 
-      auto *bss = make<BssSection>(ctx, "COMMON", s->size, s->alignment);
+      uint64_t size = std::max(s->size, s->dsoSize);
+      auto *bss = make<BssSection>(ctx, "COMMON", size, s->alignment);
       bss->file = s->file;
       ctx.inputSections.push_back(bss);
       Defined(s->file, StringRef(), s->binding, s->stOther, s->type,
-              /*value=*/0, s->size, bss)
+              /*value=*/0, size, bss)
           .overwrite(*s);
     }
   }
@@ -2772,7 +2773,8 @@ void LinkerDriver::compileBitcodeFiles(bool skipLinkedOutput) {
   ltoObjectFiles = lto->compile();
   for (auto &file : ltoObjectFiles) {
     auto *obj = cast<ObjFile<ELFT>>(file.get());
-    obj->parse(/*ignoreComdats=*/true);
+    obj->ignoreComdats = true;
+    parseFile(ctx, obj);
 
     // This is only needed for AArch64 PAuth to set correct key in AUTH GOT
     // entry based on symbol type (STT_FUNC or not).
@@ -2797,7 +2799,6 @@ void LinkerDriver::compileBitcodeFiles(bool skipLinkedOutput) {
         if (sym->hasVersionSuffix)
           sym->parseSymbolVersion(ctx);
       }
-    ctx.objectFiles.push_back(obj);
   }
 }
 
@@ -3217,7 +3218,7 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
   // Handle --trace-symbol.
   for (auto *arg : args.filtered(OPT_trace_symbol))
-    ctx.symtab->insert(arg->getValue())->traced = true;
+    ctx.symtab->insert(arg->getValue())->traced = ctx.symtab->hasTraced = true;
 
   ctx.internalFile = createInternalFile(ctx, "<internal>");
   ctx.dummySym = make<Undefined>(ctx.internalFile, "", STB_LOCAL, 0, 0);
@@ -3227,7 +3228,7 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   for (StringRef name : ctx.arg.undefined)
     ctx.symtab->addUnusedUndefined(name)->referenced = true;
 
-  parseFiles(ctx, files);
+  parseFiles(ctx);
 
   // ICF is incompatible with dynamic debugging: the inner ELF references outer
   // symbols that folding would merge away.
@@ -3300,6 +3301,7 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
   // No more lazy bitcode can be extracted at this point. Do post parse work
   // like checking duplicate symbols.
+  latePriority = 1u << 31;
   parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
     cast<ObjFile<ELFT>>(file)->initSectionsAndLocalSyms();
   });
@@ -3403,6 +3405,17 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   });
   for (const DuplicateSymbol &d : ctx.duplicates)
     reportDuplicate(ctx, *d.sym, d.file, d.section, d.value);
+
+  // Symbol::dynsymIndex no longer holds the owners of COMDAT groups.
+  parallelForEach(ctx.objectFiles, [](ELFFileBase *file) {
+    for (auto [i, sig] : cast<ObjFile<ELFT>>(file)->groups)
+      if (sig)
+        sig->dynsymIndex.store(0, std::memory_order_relaxed);
+  });
+  for (BitcodeFile *file : ctx.bitcodeFiles)
+    for (Symbol *sig : file->comdatSigs)
+      if (sig)
+        sig->dynsymIndex.store(0, std::memory_order_relaxed);
 
   // ELF dependent libraries may have introduced new input files after LTO has
   // completed. This is an error if the files haven't already been parsed, since

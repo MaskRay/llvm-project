@@ -230,9 +230,17 @@ private:
   SmallVector<LoadJob, 0> loadJobs;
 
   std::unique_ptr<BitcodeCompiler> lto;
-  SmallVector<std::unique_ptr<InputFile>, 0> files, ltoObjectFiles;
+  SmallVector<std::unique_ptr<InputFile>, 0> ltoObjectFiles;
 
 public:
+  SmallVector<std::unique_ptr<InputFile>, 0> files;
+  // The number of `files` that parseFiles has processed.
+  size_t numParsedFiles = 0;
+  // If nonzero, the priority of the next file to be parsed. This is set once
+  // the parsed files have selected their COMDAT groups and LTO has been told
+  // which definitions prevail, so that a file parsed later does not change
+  // either.
+  uint32_t latePriority = 0;
   std::unique_ptr<InputFile> armCmseImpLib;
   SmallVector<std::pair<StringRef, unsigned>, 0> archiveFiles;
 };

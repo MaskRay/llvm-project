@@ -19,6 +19,9 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/Compiler.h"
+#include <atomic>
+#include <mutex>
+#include <thread>
 #include <tuple>
 
 namespace lld::elf {
@@ -38,6 +41,11 @@ std::string toStr(Ctx &, const Symbol &);
 const ELFSyncStream &operator<<(const ELFSyncStream &, const Symbol *);
 
 void printTraceSymbol(const Symbol &sym, StringRef name);
+
+// Lock `m` if `concurrent`, i.e. if other threads may be using it.
+template <class T> std::unique_lock<T> lockIf(bool concurrent, T &m) {
+  return concurrent ? std::unique_lock<T>(m) : std::unique_lock<T>();
+}
 
 enum {
   // True if an undefined or shared symbol is used from a live section.
@@ -59,6 +67,11 @@ enum {
   // 1 << 10 unused
   NEEDS_TLSDESC_AUTH = 1 << 11,
   // 1 << 12 unused
+  // Set during symbol resolution if a non-weak reference of default
+  // visibility in a relocatable object file no longer changes the symbol.
+  SYM_REF_NOP = 1 << 14,
+  // Spin lock held while a thread resolves the symbol.
+  SYM_LOCKED = 1 << 15,
 };
 
 // The base class for real symbol classes.
@@ -223,8 +236,15 @@ public:
   //
   // For example, if "this" is an undefined symbol and a new symbol is
   // a defined symbol, "this" is replaced with the new symbol.
+  //
+  // Resolution is order-independent: the definition with the lowest rank
+  // wins, so files can be resolved in parallel and in any order. resolve()
+  // never extracts an archive member. The Undefined overload returns true if
+  // the caller has to follow up serially: a non-weak reference to a lazy
+  // symbol (extract the member) or a non-default visibility reference to a
+  // shared symbol (demote it to Undefined).
   void mergeProperties(const Symbol &other);
-  void resolve(Ctx &, const Undefined &other);
+  bool resolve(Ctx &, const Undefined &other);
   void resolve(Ctx &, const CommonSymbol &other);
   void resolve(Ctx &, const Defined &other);
   void resolve(Ctx &, const LazySymbol &other);
@@ -237,8 +257,24 @@ public:
 
   void checkDuplicate(Ctx &, const Defined &other) const;
 
+  // Replace a shared symbol with `ref`, a reference that it cannot satisfy.
+  void demote(const Undefined &ref);
+
+  void lock() {
+    while (flags.fetch_or(SYM_LOCKED, std::memory_order_acquire) & SYM_LOCKED)
+      while (flags.load(std::memory_order_relaxed) & SYM_LOCKED)
+        std::this_thread::yield();
+  }
+  // Only the lock holder changes the other bits.
+  void unlock() {
+    flags.store(flags.load(std::memory_order_relaxed) & ~SYM_LOCKED,
+                std::memory_order_release);
+  }
+
 private:
-  bool shouldReplace(Ctx &, const Defined &other) const;
+  // Lower is better. The high bits are the kind of definition and the low 32
+  // bits are the priority of the file.
+  uint64_t getRank() const;
 
 protected:
   Symbol(Kind k, InputFile *file, StringRef name, uint8_t binding,
@@ -313,8 +349,15 @@ public:
 
   // A ctx.symAux index used to access GOT/PLT entry indexes. This is allocated
   // in postScanRelocations().
-  uint32_t auxIdx = 0;
-  uint32_t dynsymIndex = 0;
+  //
+  // While input files are parsed, and before the symbol is added to
+  // SymbolTable::getSymbols(), this is the lowest priority among the files
+  // that touch the symbol.
+  std::atomic<uint32_t> auxIdx = 0;
+  // Until the last file has been parsed, if the name is a COMDAT group
+  // signature, this is the lowest priority among the files that contain the
+  // group.
+  std::atomic<uint32_t> dynsymIndex = 0;
 
   // If `file` is SharedFile (for SharedSymbol or copy-relocated Defined), this
   // represents the Verdef index within the input DSO, which will be converted
@@ -369,7 +412,7 @@ public:
   }
   void allocateAux(Ctx &ctx) {
     assert(auxIdx == 0);
-    auxIdx = ctx.symAux.size();
+    auxIdx.store(ctx.symAux.size(), std::memory_order_relaxed);
     ctx.symAux.emplace_back();
   }
 
@@ -429,12 +472,16 @@ public:
     auto &s = static_cast<CommonSymbol &>(sym);
     s.alignment = alignment;
     s.size = size;
+    s.dsoSize = dsoSize;
   }
 
   static bool classof(const Symbol *s) { return s->isCommon(); }
 
   uint32_t alignment;
   uint64_t size;
+  // st_size of a shared definition, which may be larger. It is kept separate
+  // so that the largest common symbol can be picked in any order.
+  uint64_t dsoSize = 0;
 };
 
 class Undefined : public Symbol {
@@ -493,11 +540,18 @@ public:
     s.value = value;
     s.size = size;
     s.alignment = alignment;
+    s.lazyPriority = lazyPriority;
   }
 
   uint64_t value; // st_value
   uint64_t size;  // st_size
   uint32_t alignment;
+  // If nonzero, the lowest priority among the lazy files that define the
+  // symbol. A reference that the shared object cannot satisfy, or a non-weak
+  // reference that precedes the shared object like the lazy file does,
+  // extracts that file.
+  uint32_t lazyPriority = 0;
+  bool precededByLazy() const;
 };
 
 // LazySymbol symbols represent symbols in object files between --start-lib and
@@ -543,6 +597,9 @@ template <typename... T> Defined *makeDefined(T &&...args) {
 void reportDuplicate(Ctx &, const Symbol &sym, const InputFile *newFile,
                      InputSectionBase *errSec, uint64_t errOffset);
 void maybeWarnUnorderableSymbol(Ctx &, const Symbol *sym);
+// Record for --why-extract that `reference` extracts `extracted` through `sym`.
+void recordWhyExtract(Ctx &, const InputFile *reference,
+                      const InputFile &extracted, const Symbol &sym);
 bool computeIsPreemptible(Ctx &, const Symbol &sym);
 void parseVersionAndComputeIsPreemptible(Ctx &);
 
