@@ -34,6 +34,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Endian.h"
+#include "llvm/Support/PerThreadBumpPtrAllocator.h"
 #include "llvm/Support/Threading.h"
 
 namespace lld::elf {
@@ -1110,23 +1111,42 @@ public:
   void finalizeContents() override;
 
 private:
-  // We use the most significant bits of a hash as a shard ID.
-  // The reason why we don't want to use the least significant bits is
-  // because DenseMap also uses lower bits to determine a bucket ID.
-  // If we use lower bits, it significantly increases the probability of
-  // hash collisions.
+  // An entry of the hash table of unique pieces. Threads claim an empty slot
+  // by a compare-and-swap on key. rank orders the first occurrence by section
+  // and piece index, and after layout, it holds the offset within the shard.
+  struct Slot {
+    std::atomic<const char *> key;
+    uint32_t size;
+    uint32_t hash;
+    std::atomic<uint64_t> rank;
+  };
+
+  // We use the most significant bits of a hash as a shard ID. Each shard owns
+  // a contiguous region of slots, and probing stays within the region.
   size_t getShardId(uint32_t hash) {
     assert((hash >> 31) == 0);
-    return hash >> (31 - llvm::countr_zero(numShards));
+    return hash >> (31 - shardBits);
   }
+  // Return the index of the first slot to probe for hash.
+  size_t getHomeSlot(uint32_t hash) {
+    return (uint64_t(hash) * (numShards * slotsPerShard)) >> 31;
+  }
+  MutableArrayRef<Slot> getShard(size_t shardId) {
+    return {&slots[shardId * slotsPerShard], slotsPerShard};
+  }
+  size_t insert(llvm::CachedHashStringRef s, uint64_t rank);
 
   // Section size
   size_t size;
 
-  // String table contents
-  constexpr static size_t numShards = 32;
-  SmallVector<llvm::StringTableBuilder, 0> shards;
+  constexpr static unsigned shardBits = 5;
+  constexpr static size_t numShards = size_t(1) << shardBits;
+  std::unique_ptr<Slot[]> slots;
+  size_t slotsPerShard;
   size_t shardOffsets[numShards];
+  // Copies of the unique strings. Packed, they stay in the cache longer than
+  // the first occurrences scattered across input files.
+  llvm::parallel::PerThreadBumpPtrAllocator keyAlloc;
 };
 
 // Representation of the combined .ARM.Exidx input sections. We process these

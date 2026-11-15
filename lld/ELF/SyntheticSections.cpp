@@ -40,7 +40,10 @@
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/Parallel.h"
 #include "llvm/Support/TimeProfiler.h"
+#include <array>
+#include <atomic>
 #include <cinttypes>
+#include <cmath>
 #include <cstdlib>
 
 using namespace llvm;
@@ -3763,8 +3766,83 @@ void MergeTailSection::finalizeContents() {
 }
 
 void MergeNoTailSection::writeTo(uint8_t *buf) {
-  parallelFor(0, numShards,
-              [&](size_t i) { shards[i].write(buf + shardOffsets[i]); });
+  parallelFor(0, numShards, [&](size_t shardId) {
+    uint8_t *p = buf + shardOffsets[shardId];
+    for (Slot &slot : getShard(shardId))
+      if (const char *key = slot.key.load(std::memory_order_relaxed))
+        memcpy(p + slot.rank.load(std::memory_order_relaxed), key, slot.size);
+  });
+}
+
+// Estimate the number of distinct hashes of live pieces with HyperLogLog.
+static size_t estimateUniquePieces(Ctx &ctx,
+                                   ArrayRef<MergeInputSection *> sections) {
+  constexpr unsigned indexBits = 12;
+  constexpr size_t m = size_t(1) << indexBits;
+  SmallVector<std::array<uint8_t, m>, 0> regs(
+      std::min<size_t>(ctx.arg.threadCount, sections.size()));
+  parallelForSharded(regs.size(), sections.size(), [&](size_t w, size_t i) {
+    std::array<uint8_t, m> &r = regs[w];
+    for (const SectionPiece &piece : sections[i]->pieces) {
+      if (!piece.live)
+        continue;
+      // A sentinel bit above the 31-bit hash caps rho at 32 - indexBits.
+      uint32_t h = piece.hash;
+      uint8_t rho =
+          llvm::countr_zero((h >> indexBits) | (1u << (31 - indexBits))) + 1;
+      r[h & (m - 1)] = std::max(r[h & (m - 1)], rho);
+    }
+  });
+
+  double sum = 0;
+  size_t zeros = 0;
+  for (size_t j = 0; j != m; ++j) {
+    uint8_t v = 0;
+    for (const std::array<uint8_t, m> &r : regs)
+      v = std::max(v, r[j]);
+    sum += 1.0 / (uint32_t(1) << v);
+    zeros += v == 0;
+  }
+  double e = 0.7213 / (1 + 1.079 / m) * m * m / sum;
+  if (e <= 2.5 * m && zeros)
+    e = m * std::log(double(m) / zeros);
+  return e;
+}
+
+static const char *const busyKey = reinterpret_cast<const char *>(-1);
+
+// Return the index of the slot holding s, or SIZE_MAX if the shard is full.
+size_t MergeNoTailSection::insert(CachedHashStringRef s, uint64_t rank) {
+  uint32_t hash = s.hash();
+  size_t begin = getShardId(hash) * slotsPerShard;
+  size_t i = getHomeSlot(hash) - begin;
+  for (size_t n = 0; n != slotsPerShard; ++n) {
+    Slot &slot = slots[begin + i];
+    const char *key = slot.key.load(std::memory_order_acquire);
+    if (!key && slot.key.compare_exchange_strong(key, busyKey,
+                                                 std::memory_order_acquire)) {
+      slot.size = s.size();
+      slot.hash = hash;
+      slot.rank.store(rank, std::memory_order_relaxed);
+      char *copy = static_cast<char *>(keyAlloc.Allocate(s.size(), 1));
+      memcpy(copy, s.data(), s.size());
+      slot.key.store(copy, std::memory_order_release);
+      return begin + i;
+    }
+    while (key == busyKey)
+      key = slot.key.load(std::memory_order_acquire);
+    if (slot.hash == hash && slot.size == s.size() &&
+        memcmp(key, s.data(), s.size()) == 0) {
+      uint64_t r = slot.rank.load(std::memory_order_relaxed);
+      while (rank < r && !slot.rank.compare_exchange_weak(
+                             r, rank, std::memory_order_relaxed))
+        ;
+      return begin + i;
+    }
+    if (++i == slotsPerShard)
+      i = 0;
+  }
+  return SIZE_MAX;
 }
 
 // This function is very hot (i.e. it can take several seconds to finish)
@@ -3773,48 +3851,91 @@ void MergeNoTailSection::writeTo(uint8_t *buf) {
 //
 // For any strings S and T, we know S is not mergeable with T if S's hash
 // value is different from T's. If that's the case, we can safely put S and
-// T into different string builders without worrying about merge misses.
-// We do it in parallel.
+// T into different shards without worrying about merge misses.
 void MergeNoTailSection::finalizeContents() {
-  // Initializes string table builders.
-  for (size_t i = 0; i < numShards; ++i)
-    shards.emplace_back(StringTableBuilder::RAW, llvm::Align(addralign));
-
-  // Concurrency level. Must be a power of 2 to avoid expensive modulo
-  // operations in the following tight loop.
-  const size_t concurrency =
-      llvm::bit_floor(std::min<size_t>(ctx.arg.threadCount, numShards));
-
-  // Add section pieces to the builders.
-  parallelFor(0, concurrency, [&](size_t threadId) {
-    for (MergeInputSection *sec : sections) {
-      for (size_t i = 0, e = sec->pieces.size(); i != e; ++i) {
-        if (!sec->pieces[i].live)
+  // Insert the live pieces into a hash table sized for a load factor of 2/3,
+  // retrying with a larger table if a shard overflows. Each piece's outputOff
+  // temporarily holds its slot index.
+  slotsPerShard = std::max<size_t>(
+      estimateUniquePieces(ctx, sections) * 3 / 2 / numShards, 64);
+  for (;;) {
+    keyAlloc.Reset();
+    slots.reset(new Slot[numShards * slotsPerShard]);
+    parallelFor(0, numShards, [&](size_t shardId) {
+      for (Slot &slot : getShard(shardId))
+        slot.key.store(nullptr, std::memory_order_relaxed);
+    });
+    std::atomic<bool> full = false;
+    parallelForFineGrained(sections.size(), [&](size_t i) {
+      MergeInputSection *sec = sections[i];
+      for (size_t j = 0, e = sec->pieces.size(); j != e; ++j) {
+        // The table, the keys, and the input are much larger than the cache.
+        // Prefetch the home slot of a later piece, then the key that slot
+        // holds (likely the match), and the piece bytes to overlap the misses.
+        if (j + 24 < e)
+          LLVM_PREFETCH(&slots[getHomeSlot(sec->pieces[j + 24].hash)], 0, 3);
+        if (j + 12 < e)
+          LLVM_PREFETCH(slots[getHomeSlot(sec->pieces[j + 12].hash)].key.load(
+                            std::memory_order_relaxed),
+                        0, 3);
+        if (j + 8 < e)
+          LLVM_PREFETCH(sec->content().data() + sec->pieces[j + 8].inputOff, 0,
+                        3);
+        SectionPiece &piece = sec->pieces[j];
+        if (!piece.live)
           continue;
-        size_t shardId = getShardId(sec->pieces[i].hash);
-        if ((shardId & (concurrency - 1)) == threadId)
-          sec->pieces[i].outputOff = shards[shardId].add(sec->getData(i));
+        piece.outputOff = insert(sec->getData(j), uint64_t(i) << 32 | j);
+        if (piece.outputOff == SIZE_MAX)
+          full.store(true, std::memory_order_relaxed);
       }
+    });
+    if (!full)
+      break;
+    slotsPerShard *= 2;
+  }
+
+  // Within a shard, place strings in the order of their first occurrences.
+  // The layout does not depend on the thread count or the table size.
+  // The gather pass below reads a compact copy of the offsets, which fits in
+  // the cache better than the table.
+  std::unique_ptr<uint32_t[]> offsets(new uint32_t[numShards * slotsPerShard]);
+  size_t shardSizes[numShards];
+  parallelFor(0, numShards, [&](size_t shardId) {
+    SmallVector<std::pair<uint64_t, Slot *>, 0> order;
+    for (Slot &slot : getShard(shardId))
+      if (slot.key.load(std::memory_order_relaxed))
+        order.emplace_back(slot.rank.load(std::memory_order_relaxed), &slot);
+    llvm::sort(order, llvm::less_first());
+    size_t off = 0;
+    for (auto [rank, slot] : order) {
+      off = alignToPowerOf2(off, addralign);
+      slot->rank.store(off, std::memory_order_relaxed);
+      offsets[slot - slots.get()] = off;
+      off += slot->size;
     }
+    shardSizes[shardId] = off;
   });
 
   // Compute an in-section offset for each shard.
   size_t off = 0;
   for (size_t i = 0; i < numShards; ++i) {
-    shards[i].finalizeInOrder();
-    if (shards[i].getSize() > 0)
+    if (shardSizes[i] > 0)
       off = alignToPowerOf2(off, addralign);
     shardOffsets[i] = off;
-    off += shards[i].getSize();
+    off += shardSizes[i];
   }
   size = off;
 
-  // So far, section pieces have offsets from beginning of shards, but
-  // we want offsets from beginning of the whole section. Fix them.
+  bool compact =
+      llvm::all_of(shardSizes, [](size_t s) { return s <= UINT32_MAX; });
   parallelForEach(sections, [&](MergeInputSection *sec) {
     for (SectionPiece &piece : sec->pieces)
       if (piece.live)
-        piece.outputOff += shardOffsets[getShardId(piece.hash)];
+        piece.outputOff =
+            shardOffsets[getShardId(piece.hash)] +
+            (compact
+                 ? offsets[piece.outputOff]
+                 : slots[piece.outputOff].rank.load(std::memory_order_relaxed));
   });
 }
 
