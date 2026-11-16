@@ -1112,7 +1112,7 @@ public:
 private:
   // We use the most significant bits of a hash as a shard ID.
   // The reason why we don't want to use the least significant bits is
-  // because DenseMap also uses lower bits to determine a bucket ID.
+  // because the shard's hash table also uses lower bits to determine a slot.
   // If we use lower bits, it significantly increases the probability of
   // hash collisions.
   size_t getShardId(uint32_t hash) {
@@ -1123,9 +1123,17 @@ private:
   // Section size
   size_t size;
 
-  // String table contents
+  // An entry of a shard's open-addressing hash table: the first occurrence of
+  // a string and its offset within the shard. An empty slot has a null key.
+  struct Slot {
+    const char *key;
+    uint32_t size;
+    uint32_t hash;
+    uint64_t off;
+  };
+
   constexpr static size_t numShards = 32;
-  SmallVector<llvm::StringTableBuilder, 0> shards;
+  SmallVector<Slot, 0> shards[numShards];
   size_t shardOffsets[numShards];
 };
 
