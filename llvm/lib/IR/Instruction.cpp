@@ -342,6 +342,13 @@ bool Instruction::comesBefore(const Instruction *Other) const {
   return Order < Other->Order;
 }
 
+#if LLVM_ENABLE_ABI_BREAKING_CHECKS
+void Instruction::assertOrderValid() const {
+  assert(getParent() && getParent()->isInstrOrderValid() &&
+         "instruction order is not valid");
+}
+#endif
+
 std::optional<BasicBlock::iterator> Instruction::getInsertionPointAfterDef() {
   assert(!getType()->isVoidTy() && "Instruction must define result");
   BasicBlock *InsertBB;

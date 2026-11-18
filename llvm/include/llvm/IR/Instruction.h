@@ -18,6 +18,7 @@
 #include "llvm/ADT/Bitfields.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/Config/abi-breaking.h"
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/SymbolTableListTraits.h"
 #include "llvm/IR/User.h"
@@ -110,6 +111,9 @@ private:
   /// Relative order of this instruction in its parent basic block. Used for
   /// O(1) local dominance checks between instructions.
   mutable unsigned Order = 0;
+#if LLVM_ENABLE_ABI_BREAKING_CHECKS
+  LLVM_ABI void assertOrderValid() const;
+#endif
 
   /// Optional marker recording the position for debugging information that
   /// takes effect immediately before this instruction. Null unless there is
@@ -332,6 +336,16 @@ public:
   /// results are cached, so in common cases when the block remains unmodified,
   /// it takes constant time.
   LLVM_ABI bool comesBefore(const Instruction *Other) const;
+
+  /// Return the position of this instruction as numbered by
+  /// BasicBlock::renumberInstructions or Function::numberInstructions. The
+  /// order of the parent block must be valid.
+  unsigned getOrder() const {
+#if LLVM_ENABLE_ABI_BREAKING_CHECKS
+    assertOrderValid();
+#endif
+    return Order;
+  }
 
   /// Get the first insertion point at which the result of this instruction
   /// is defined. This is *not* the directly following instruction in a number

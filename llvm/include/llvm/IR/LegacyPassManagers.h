@@ -461,6 +461,11 @@ public:
   /// run - Execute all of the passes scheduled for execution.  Keep track of
   /// whether any of the passes modifies the module, and if so, return true.
   bool runOnFunction(Function &F);
+
+  /// Called by a contained pass from its runOnFunction: do not run the
+  /// passes after it on the current function.
+  void skipRemainingPasses() { SkipRemainingPasses = true; }
+
   bool runOnModule(Module &M) override;
 
   /// cleanup - After running all passes, clean up pass manager cache.
@@ -506,6 +511,9 @@ public:
   PassManagerType getPassManagerType() const override {
     return PMT_FunctionPassManager;
   }
+
+private:
+  bool SkipRemainingPasses = false;
 };
 }
 
