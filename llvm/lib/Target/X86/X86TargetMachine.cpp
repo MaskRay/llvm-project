@@ -373,6 +373,7 @@ public:
   }
 
   void addIRPasses() override;
+  void addOnePassCodeGen(const OnePassCodeGenOptions &Opts) override;
   bool addInstSelector() override;
   bool addIRTranslator() override;
   bool addLegalizeMachineIR() override;
@@ -405,6 +406,10 @@ MachineFunctionInfo *X86TargetMachine::createMachineFunctionInfo(
     const TargetSubtargetInfo *STI) const {
   return X86MachineFunctionInfo::create<X86MachineFunctionInfo>(Allocator, F,
                                                                 STI);
+}
+
+void X86PassConfig::addOnePassCodeGen(const OnePassCodeGenOptions &Opts) {
+  addPass(createX86OnePassCodeGenPass(getX86TargetMachine(), Opts));
 }
 
 void X86PassConfig::addIRPasses() {

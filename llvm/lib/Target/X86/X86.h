@@ -31,6 +31,7 @@ namespace llvm {
 class FunctionPass;
 class InstructionSelector;
 class MachineFunction;
+struct OnePassCodeGenOptions;
 class PassRegistry;
 class X86RegisterBankInfo;
 class X86Subtarget;
@@ -44,6 +45,10 @@ public:
 };
 
 FunctionPass *createX86ISelDag(X86TargetMachine &TM, CodeGenOptLevel OptLevel);
+
+/// Return the one-pass -O0 code generator, or null if it is disabled.
+FunctionPass *createX86OnePassCodeGenPass(X86TargetMachine &TM,
+                                          const OnePassCodeGenOptions &Opts);
 
 /// This pass initializes a global base register for PIC on x86-32.
 class X86GlobalBaseRegPass

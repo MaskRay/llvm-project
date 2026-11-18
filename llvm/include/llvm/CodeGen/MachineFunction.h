@@ -827,6 +827,15 @@ public:
   /// getAlignment - Return the alignment of the function.
   Align getAlignment() const { return Alignment; }
 
+  /// Return the initial alignment of a MachineFunction for \p F.
+  LLVM_ABI static Align getMinFunctionAlignment(const Function &F,
+                                                const TargetSubtargetInfo &STI);
+
+  /// Return the preferred alignment of \p F, before raising it to the
+  /// function's alignment.
+  LLVM_ABI static Align getPreferredAlignment(const Function &F,
+                                              const TargetSubtargetInfo &STI);
+
   /// setAlignment - Set the alignment of the function.
   void setAlignment(Align A) { Alignment = A; }
 

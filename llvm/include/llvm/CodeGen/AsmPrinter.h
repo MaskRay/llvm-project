@@ -69,7 +69,12 @@ class MachineLoopInfo;
 class MachineModuleInfo;
 class MachineOptimizationRemarkEmitter;
 class MCAsmInfo;
+class DIExpression;
+class DILabel;
+class DILocalVariable;
+class DILocation;
 class MCCFIInstruction;
+class MCFixup;
 class MCContext;
 class MCExpr;
 class MCInst;
@@ -496,9 +501,10 @@ public:
 
   void emitFrameAlloc(const MachineInstr &MI);
 
-  void emitStackSizeSection(const MachineFunction &MF);
+  void emitStackSizeSection(const MCSection &FnSec, uint64_t StackSize,
+                            bool Dynamic);
 
-  void emitStackUsage(const MachineFunction &MF);
+  void emitStackUsage(const Function &F, uint64_t StackSize, bool Dynamic);
 
   void emitBBAddrMapSection(const MachineFunction &MF);
 
@@ -676,6 +682,10 @@ public:
   virtual MCSymbol *GetCPISymbol(unsigned CPID) const;
 
   virtual void emitFunctionEntryLabel();
+
+  /// On ELF, emit the local alias of CurrentFnSym that getSymbolPreferLocal
+  /// returns for \p F, if any.
+  void emitLocalFunctionEntryLabel(const Function &F);
 
   virtual void emitFunctionDescriptor() {
     llvm_unreachable("Function descriptor is target-specific.");
@@ -878,6 +888,68 @@ public:
   /// Emit frame instruction to describe the layout of the frame.
   void emitCFIInstruction(const MCCFIInstruction &Inst) const;
 
+  /// Exception table contents for emitCompiledFunction. Offsets are relative
+  /// to the start of the function.
+  struct CompiledFunctionEH {
+    struct CallSite {
+      uint32_t Start;
+      uint32_t Length;
+      /// 0 if the call has no landing pad.
+      uint32_t LandingPad;
+      /// 1 + the offset of the first action record, or 0 for none.
+      uint32_t Action;
+    };
+    SmallVector<CallSite, 8> CallSites;
+    /// Encoded action table.
+    SmallVector<char, 16> Actions;
+    /// Type infos, indexed by type id - 1. A null entry is a catch-all.
+    SmallVector<const GlobalValue *, 4> TypeInfos;
+  };
+
+  /// Debug info for emitCompiledFunction. The existing debug handlers consume
+  /// MachineInstrs, so the function gets a skeleton MachineFunction with one
+  /// placeholder instruction per row.
+  struct CompiledFunctionDebug {
+    struct Row {
+      uint32_t Offset;
+      const DILocation *Loc;
+      /// Whether this row starts a new basic block.
+      bool NewBlock;
+      /// Whether this row starts the epilogue.
+      bool Epilogue;
+      /// If set, the row is a source label rather than code.
+      const DILabel *Label = nullptr;
+    };
+    struct Variable {
+      const DILocalVariable *Var;
+      const DIExpression *Expr;
+      const DILocation *Loc;
+      /// Offset of the variable as a fixed MachineFrameInfo object.
+      int64_t ObjectOffset;
+      uint64_t Size;
+    };
+    SmallVector<Row, 32> Rows;
+    SmallVector<Variable, 8> Variables;
+  };
+
+  /// Machine code produced without a MachineFunction. Fixup offsets are
+  /// relative to the start of Code. Each CFI entry is emitted at its byte
+  /// offset.
+  struct CompiledFunction {
+    ArrayRef<char> Code;
+    ArrayRef<MCFixup> Fixups;
+    ArrayRef<std::pair<unsigned, MCCFIInstruction>> CFI;
+    /// As MachineFrameInfo::getStackSize.
+    uint64_t StackSize = 0;
+    /// Non-null if the function has landing pads.
+    const CompiledFunctionEH *EH = nullptr;
+    /// Non-null if the module has debug info.
+    const CompiledFunctionDebug *Debug = nullptr;
+  };
+
+  /// Emit \p CF as the definition of \p F. Object streamers only.
+  void emitCompiledFunction(const Function &F, const CompiledFunction &CF);
+
   /// Emit Dwarf abbreviation table.
   template <typename T> void emitDwarfAbbrevs(const T &Abbrevs) const {
     // For each abbreviation.
@@ -1000,6 +1072,16 @@ private:
 
   /// This method emits the header for the current function.
   virtual void emitFunctionHeader();
+
+  /// Emit the alignment of the current function and the type of
+  /// CurrentFnSym. Return the end symbol if a .prefalign directive refers to
+  /// it.
+  MCSymbol *emitFunctionAlignmentAndType(const Function &F, Align MinAlign,
+                                         Align PrefAlign,
+                                         const MCSubtargetInfo &STI);
+
+  /// Emit CurrentFnEnd if needed, and the size of the current function.
+  void emitFunctionEndAndSize(bool NeedEndLabel);
 
   /// This method emits a comment next to header for the current function.
   virtual void emitFunctionHeaderComment();
