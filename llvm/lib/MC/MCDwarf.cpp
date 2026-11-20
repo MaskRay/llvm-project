@@ -102,6 +102,7 @@ void MCDwarfLineEntry::make(MCStreamer *MCOS, MCSection *Section) {
 
   // Create a (local) line entry with the symbol and the current .loc info.
   MCDwarfLineEntry LineEntry(LineSym, DwarfLoc);
+  LineEntry.Subsection = MCOS->getCurrentSection().second;
 
   // clear DwarfLocSeen saying the current .loc info is now used.
   MCOS->getContext().clearDwarfLocSeen();
@@ -110,7 +111,7 @@ void MCDwarfLineEntry::make(MCStreamer *MCOS, MCSection *Section) {
   MCOS->getContext()
       .getMCDwarfLineTable(MCOS->getContext().getDwarfCompileUnitID())
       .getMCLineSections()
-      .addLineEntry(LineEntry, Section, MCOS->getCurrentSection().second);
+      .addLineEntry(LineEntry, Section);
 }
 
 //
@@ -304,8 +305,8 @@ void MCDwarfLineTable::endCurrentSeqAndEmitLineStreamLabel(MCStreamer *MCOS,
   // won't actually emit any line information, it will reset the line table
   // sequence and emit a label at the start of the new line table sequence.
   MCDwarfLineEntry LineEntry(LineSym, DwarfLoc, LineStreamLabel, DefLoc);
-  getMCLineSections().addLineEntry(LineEntry, MCOS->getCurrentSectionOnly(),
-                                   MCOS->getCurrentSection().second);
+  LineEntry.Subsection = MCOS->getCurrentSection().second;
+  getMCLineSections().addLineEntry(LineEntry, MCOS->getCurrentSectionOnly());
 }
 
 //

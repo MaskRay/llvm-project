@@ -240,13 +240,9 @@ public:
 /// table for a section.
 class MCLineSection {
 public:
-  // Add an entry to this MCLineSection's line entries. Subsection is the
-  // subsection of Sec that the entry's label belongs to.
-  void addLineEntry(const MCDwarfLineEntry &LineEntry, MCSection *Sec,
-                    unsigned Subsection = 0) {
-    auto &Entries = MCLineDivisions[Sec];
-    Entries.push_back(LineEntry);
-    Entries.back().Subsection = Subsection;
+  // Add an entry to this MCLineSection's line entries.
+  void addLineEntry(const MCDwarfLineEntry &LineEntry, MCSection *Sec) {
+    MCLineDivisions[Sec].push_back(LineEntry);
   }
 
   // Add an end entry by cloning the last entry, if exists, for the section

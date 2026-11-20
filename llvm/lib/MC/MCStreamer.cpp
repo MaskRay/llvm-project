@@ -484,11 +484,11 @@ MCSymbol *MCStreamer::emitLineTableLabel() {
 
   MCSymbol *LineStreamLabel = getContext().createTempSymbol();
   MCDwarfLineEntry LabelLineEntry(nullptr, DwarfLoc, LineStreamLabel);
+  LabelLineEntry.Subsection = getCurrentSection().second;
   getContext()
       .getMCDwarfLineTable(getContext().getDwarfCompileUnitID())
       .getMCLineSections()
-      .addLineEntry(LabelLineEntry, getCurrentSectionOnly() /*Section*/,
-                    getCurrentSection().second);
+      .addLineEntry(LabelLineEntry, getCurrentSectionOnly() /*Section*/);
 
   return LineStreamLabel;
 }
