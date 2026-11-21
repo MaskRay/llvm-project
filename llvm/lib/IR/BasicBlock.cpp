@@ -611,8 +611,8 @@ std::optional<uint64_t> BasicBlock::getIrrLoopHeaderWeight() const {
   return std::nullopt;
 }
 
-void BasicBlock::renumberInstructions() {
-  unsigned Order = 0;
+unsigned BasicBlock::renumberInstructions(unsigned Start) {
+  unsigned Order = Start;
   for (Instruction &I : *this)
     I.Order = Order++;
 
@@ -620,6 +620,7 @@ void BasicBlock::renumberInstructions() {
   SubclassOptionalData |= InstrOrderValid;
 
   NumInstrRenumberings++;
+  return Order;
 }
 
 void BasicBlock::flushTerminatorDbgRecords() {

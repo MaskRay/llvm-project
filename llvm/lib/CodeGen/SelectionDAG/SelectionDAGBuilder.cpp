@@ -11962,11 +11962,9 @@ void SelectionDAGBuilder::CopyValueToVirtualRegister(const Value *V,
                    std::nullopt); // This is not an ABI copy.
   SDValue Chain = DAG.getEntryNode();
 
-  if (ExtendType == ISD::ANY_EXTEND) {
-    auto PreferredExtendIt = FuncInfo.PreferredExtendType.find(V);
-    if (PreferredExtendIt != FuncInfo.PreferredExtendType.end())
-      ExtendType = PreferredExtendIt->second;
-  }
+  if (ExtendType == ISD::ANY_EXTEND && !FuncInfo.PreferredExtendType.empty())
+    if (auto *I = dyn_cast<Instruction>(V))
+      ExtendType = FuncInfo.PreferredExtendType[I->getOrder()];
   RFV.getCopyToRegs(Op, DAG, getCurSDLoc(), Chain, nullptr, V, ExtendType);
   PendingExports.push_back(Chain);
 }

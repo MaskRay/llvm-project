@@ -597,11 +597,21 @@ void SelectionDAGISel::initializeAnalysisResults(MachineFunctionPass &MFP) {
   HwMode = Subtarget.getHwMode();
 }
 
+static void preserveFakeUses(BasicBlock::iterator Begin,
+                             BasicBlock::iterator End);
+
 bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
   SwiftError->setFunction(mf);
   const Function &Fn = mf.getFunction();
 
   bool InstrRef = mf.useDebugInstrRef();
+
+  // Fake uses that follow tail calls are dropped. To avoid this, move such
+  // fake uses in front of the tail call, provided they don't use anything
+  // def'd by or after the tail call. Do this before FuncInfo->set numbers the
+  // instructions.
+  for (BasicBlock &BB : MF->getFunction())
+    preserveFakeUses(BB.getFirstNonPHIIt(), BB.end());
 
   FuncInfo->set(MF->getFunction(), *MF, CurDAG);
 
@@ -1734,16 +1744,6 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
       }
 
       FuncInfo->VisitedBBs[LLVMBB->getNumber()] = true;
-    }
-
-    // Fake uses that follow tail calls are dropped. To avoid this, move
-    // such fake uses in front of the tail call, provided they don't
-    // use anything def'd by or after the tail call.
-    {
-      BasicBlock::iterator BBStart =
-          const_cast<BasicBlock *>(LLVMBB)->getFirstNonPHIIt();
-      BasicBlock::iterator BBEnd = const_cast<BasicBlock *>(LLVMBB)->end();
-      preserveFakeUses(BBStart, BBEnd);
     }
 
     BasicBlock::const_iterator const Begin = LLVMBB->getFirstNonPHIIt();

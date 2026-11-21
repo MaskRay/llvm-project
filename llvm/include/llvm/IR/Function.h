@@ -826,6 +826,12 @@ public:
   /// on the value numbers and need to be updated or invalidated.
   void renumberBlocks();
 
+  /// Number all instructions from 0 in layout order, making
+  /// Instruction::getOrder() a dense index into the function. Inserting or
+  /// moving an instruction invalidates the numbers of its block. Return the
+  /// number of instructions.
+  LLVM_ABI unsigned numberInstructions() const;
+
   /// Return the "epoch" of current block numbers. This will return a different
   /// value after every renumbering. The intention is: if something (e.g., an
   /// analysis) uses block numbers, it also stores the number epoch and then

@@ -195,7 +195,7 @@ public:
 
   /// Record the preferred extend type (ISD::SIGN_EXTEND or ISD::ZERO_EXTEND)
   /// for a value.
-  DenseMap<const Value *, ISD::NodeType> PreferredExtendType;
+  SmallVector<ISD::NodeType, 0> PreferredExtendType;
 
   /// The set of basic blocks visited thus far by instruction selection. Indexed
   /// by basic block number.

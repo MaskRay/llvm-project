@@ -130,6 +130,10 @@ void FunctionLoweringInfo::set(const Function &fn, MachineFunction &mf,
     }
   }
 
+  // PreferredExtendType is indexed by Instruction::getOrder().
+  if (DAG->getOptLevel() != CodeGenOptLevel::None)
+    Fn->numberInstructions();
+
   // Initialize the mapping of values to registers.  This is only set up for
   // instruction values that are used outside of the block that defines
   // them.
@@ -240,7 +244,7 @@ void FunctionLoweringInfo::set(const Function &fn, MachineFunction &mf,
       // Decide the preferred extend type for a value. This iterates over all
       // users and therefore isn't cheap, so don't do this at O0.
       if (DAG->getOptLevel() != CodeGenOptLevel::None)
-        PreferredExtendType[&I] = getPreferredExtendForValue(&I);
+        PreferredExtendType.push_back(getPreferredExtendForValue(&I));
     }
   }
 

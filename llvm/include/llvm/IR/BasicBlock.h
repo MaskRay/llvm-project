@@ -715,8 +715,9 @@ public:
     SubclassOptionalData &= ~InstrOrderValid;
   }
 
-  /// Renumber instructions and mark the ordering as valid.
-  LLVM_ABI void renumberInstructions();
+  /// Renumber instructions from \p Start and mark the ordering as valid.
+  /// Return the number following the last instruction.
+  LLVM_ABI unsigned renumberInstructions(unsigned Start = 0);
 
   /// Asserts that instruction order numbers are marked invalid, or that they
   /// are in ascending order. This is constant time if the ordering is invalid,
