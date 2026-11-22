@@ -648,7 +648,6 @@ void DbgMarker::removeMarker() {
   Instruction *Owner = MarkedInstr;
   if (StoredDbgRecords.empty()) {
     eraseFromParent();
-    Owner->DebugMarker = nullptr;
     return;
   }
 
@@ -668,15 +667,15 @@ void DbgMarker::removeMarker() {
       getParent()->setTrailingDbgRecords(this);
       MarkedInstr = nullptr;
     } else {
-      NextIt->DebugMarker = this;
+      NextIt->takeDbgMarker(*Owner);
       MarkedInstr = &*NextIt;
     }
   }
-  Owner->DebugMarker = nullptr;
+  Owner->setDbgMarker(nullptr);
 }
 
 void DbgMarker::removeFromParent() {
-  MarkedInstr->DebugMarker = nullptr;
+  MarkedInstr->setDbgMarker(nullptr);
   MarkedInstr = nullptr;
 }
 

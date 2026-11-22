@@ -35,7 +35,7 @@ DbgMarker *BasicBlock::createMarker(Instruction *I) {
     return Marker;
   DbgMarker *Marker = new DbgMarker();
   Marker->MarkedInstr = I;
-  I->DebugMarker = Marker;
+  I->setDbgMarker(Marker);
   return Marker;
 }
 
@@ -1049,14 +1049,17 @@ void BasicBlock::validateInstrOrdering() const {
 }
 #endif
 
-void BasicBlock::setTrailingDbgRecords(DbgMarker *foo) {
-  getContext().pImpl->setTrailingDbgRecords(this, foo);
-}
-
-DbgMarker *BasicBlock::getTrailingDbgRecords() {
-  return getContext().pImpl->getTrailingDbgRecords(this);
+void BasicBlock::setTrailingDbgRecords(DbgMarker *M) {
+  assert(!TrailingDbgMarkerIndex);
+  LLVMContext &Ctx = getContext();
+  TrailingDbgMarkerIndex = Ctx.pImpl->addDbgMarker(Ctx, M);
+  ++Ctx.pImpl->NumTrailingDbgMarkers;
 }
 
 void BasicBlock::deleteTrailingDbgRecords() {
-  getContext().pImpl->deleteTrailingDbgRecords(this);
+  if (!TrailingDbgMarkerIndex)
+    return;
+  LLVMContextImpl &C = *getContext().pImpl;
+  C.removeDbgMarker(std::exchange(TrailingDbgMarkerIndex, 0));
+  --C.NumTrailingDbgMarkers;
 }

@@ -69,6 +69,9 @@ private:
   friend class Function;
   /// Per-function unique number.
   unsigned Number = ~0u;
+  /// Index of the trailing marker in the context's table, see
+  /// setTrailingDbgRecords. 0 if none.
+  unsigned TrailingDbgMarkerIndex = 0;
 
   friend class BlockAddress;
   friend class SymbolTableListTraits<BasicBlock>;
@@ -106,7 +109,11 @@ public:
   /// Fetch the collection of DbgRecords that "trail" after the last instruction
   /// of this block, see \ref setTrailingDbgRecords. If there are none, returns
   /// nullptr.
-  LLVM_ABI DbgMarker *getTrailingDbgRecords();
+  DbgMarker *getTrailingDbgRecords() {
+    return TrailingDbgMarkerIndex
+               ? getType()->getContext().DbgMarkerTable[TrailingDbgMarkerIndex]
+               : nullptr;
+  }
 
   /// Delete any trailing DbgRecords at the end of this block, see
   /// \ref setTrailingDbgRecords.

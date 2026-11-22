@@ -1817,6 +1817,32 @@ public:
   /// CustomMDKindNames - Map to hold the metadata string to ID mapping.
   StringMap<unsigned> CustomMDKindNames;
 
+  /// Markers of instructions and trailing markers of blocks, indexed by
+  /// Instruction::DbgMarkerIndex and BasicBlock::TrailingDbgMarkerIndex. Entry
+  /// 0 is unused.
+  SmallVector<DbgMarker *, 0> DbgMarkers;
+  /// Indices of free DbgMarkers entries.
+  SmallVector<unsigned, 0> FreeDbgMarkers;
+  /// Number of trailing markers, to check that they are cleaned up.
+  unsigned NumTrailingDbgMarkers = 0;
+
+  unsigned addDbgMarker(LLVMContext &Ctx, DbgMarker *M) {
+    if (!FreeDbgMarkers.empty()) {
+      unsigned Idx = FreeDbgMarkers.pop_back_val();
+      DbgMarkers[Idx] = M;
+      return Idx;
+    }
+    if (DbgMarkers.empty())
+      DbgMarkers.push_back(nullptr);
+    DbgMarkers.push_back(M);
+    Ctx.DbgMarkerTable = DbgMarkers.data();
+    return DbgMarkers.size() - 1;
+  }
+  void removeDbgMarker(unsigned Idx) {
+    DbgMarkers[Idx] = nullptr;
+    FreeDbgMarkers.push_back(Idx);
+  }
+
   /// Collection of metadata attachments in this context.
   SmallVector<MDAttachment, 0> Metadatas;
   /// Index of first free Metadatas entry, linked list via MDAttachment::Next.
@@ -1889,33 +1915,6 @@ public:
   /// LLVMContext is used by compilation.
   void setOptPassGate(OptPassGate &);
 
-  /// Mapping of blocks to collections of "trailing" DbgVariableRecords. As part
-  /// of the "RemoveDIs" project, debug-info variable location records are going
-  /// to cease being instructions... which raises the problem of where should
-  /// they be recorded when we remove the terminator of a blocks, such as:
-  ///
-  ///    %foo = add i32 0, 0
-  ///    br label %bar
-  ///
-  /// If the branch is removed, a legitimate transient state while editing a
-  /// block, any debug-records between those two instructions will not have a
-  /// location. Each block thus records any DbgVariableRecord records that
-  /// "trail" in such a way. These are stored in LLVMContext because typically
-  /// LLVM only edits a small number of blocks at a time, so there's no need to
-  /// bloat BasicBlock with such a data structure.
-  SmallDenseMap<BasicBlock *, DbgMarker *> TrailingDbgRecords;
-
-  // Set, get and delete operations for TrailingDbgRecords.
-  void setTrailingDbgRecords(BasicBlock *B, DbgMarker *M) {
-    assert(!TrailingDbgRecords.count(B));
-    TrailingDbgRecords[B] = M;
-  }
-
-  DbgMarker *getTrailingDbgRecords(BasicBlock *B) {
-    return TrailingDbgRecords.lookup(B);
-  }
-
-  void deleteTrailingDbgRecords(BasicBlock *B) { TrailingDbgRecords.erase(B); }
 
   std::string DefaultTargetCPU;
   std::string DefaultTargetFeatures;

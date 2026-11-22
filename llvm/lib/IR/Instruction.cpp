@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/IR/Instruction.h"
+#include "LLVMContextImpl.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/AttributeMask.h"
@@ -100,10 +101,8 @@ void Instruction::removeFromParent() {
 }
 
 void Instruction::handleMarkerRemoval() {
-  if (!DebugMarker)
-    return;
-
-  DebugMarker->removeMarker();
+  if (DbgMarker *Marker = getDbgMarker())
+    Marker->removeMarker();
 }
 
 BasicBlock::iterator Instruction::eraseFromParent() {
@@ -142,7 +141,7 @@ BasicBlock::iterator Instruction::insertInto(BasicBlock *ParentBB,
 
 void Instruction::insertBefore(BasicBlock &BB,
                                InstListType::iterator InsertPos) {
-  assert(!DebugMarker);
+  assert(!DbgMarkerIndex);
 
   BB.getInstList().insert(InsertPos, this);
 
@@ -225,7 +224,7 @@ void Instruction::moveBeforeImpl(BasicBlock &BB, InstListType::iterator I,
 
   // If we've been given the "Preserve" flag, then just move the DbgRecords with
   // the instruction, no more special handling needed.
-  if (DebugMarker && !Preserve) {
+  if (DbgMarkerIndex && !Preserve) {
     if (I != this->getIterator() || InsertAtHead) {
       // "this" is definitely moving in the list, or it's moving ahead of its
       // attached DbgVariableRecords. Detach any existing DbgRecords.
@@ -254,14 +253,12 @@ void Instruction::moveBeforeImpl(BasicBlock &BB, InstListType::iterator I,
 iterator_range<DbgRecord::self_iterator> Instruction::cloneDebugInfoFrom(
     const Instruction *From, std::optional<DbgRecord::self_iterator> FromHere,
     bool InsertAtHead) {
-  if (!From->DebugMarker)
+  DbgMarker *FromMarker = From->getDbgMarker();
+  if (!FromMarker)
     return DbgMarker::getEmptyDbgRecordRange();
 
-  if (!DebugMarker)
-    getParent()->createMarker(this);
-
-  return DebugMarker->cloneDebugInfoFrom(From->DebugMarker, FromHere,
-                                         InsertAtHead);
+  return getParent()->createMarker(this)->cloneDebugInfoFrom(
+      FromMarker, FromHere, InsertAtHead);
 }
 
 std::optional<DbgRecord::self_iterator>
@@ -298,10 +295,10 @@ void Instruction::adoptDbgRecords(BasicBlock *BB, BasicBlock::iterator It,
   // If we have DbgMarkers attached to this instruction, we have to honour the
   // ordering of DbgRecords between this and the other marker. Fall back to just
   // absorbing from the source.
-  if (DebugMarker || It == BB->end()) {
+  if (DbgMarkerIndex || It == BB->end()) {
     // Ensure we _do_ have a marker.
-    getParent()->createMarker(this);
-    DebugMarker->absorbDebugValues(*SrcMarker, InsertAtHead);
+    getParent()->createMarker(this)->absorbDebugValues(*SrcMarker,
+                                                       InsertAtHead);
 
     // Having transferred everything out of SrcMarker, we _could_ clean it up
     // and free the marker now. However, that's a lot of heap-accounting for a
@@ -317,19 +314,30 @@ void Instruction::adoptDbgRecords(BasicBlock *BB, BasicBlock::iterator It,
     // Optimisation: we're transferring all the DbgRecords from the source
     // marker onto this empty location: just adopt the other instructions
     // marker.
-    DebugMarker = SrcMarker;
-    DebugMarker->MarkedInstr = this;
-    It->DebugMarker = nullptr;
+    takeDbgMarker(*It);
+    SrcMarker->MarkedInstr = this;
   }
 }
 
 void Instruction::dropDbgRecords() {
-  if (DebugMarker)
-    DebugMarker->dropDbgRecords();
+  if (DbgMarker *Marker = getDbgMarker())
+    Marker->dropDbgRecords();
 }
 
 void Instruction::dropOneDbgRecord(DbgRecord *DVR) {
-  DebugMarker->dropOneDbgRecord(DVR);
+  getDbgMarker()->dropOneDbgRecord(DVR);
+}
+
+void Instruction::setDbgMarker(DbgMarker *M) {
+  LLVMContext &Ctx = getContext();
+  if (!M) {
+    if (DbgMarkerIndex)
+      Ctx.pImpl->removeDbgMarker(std::exchange(DbgMarkerIndex, 0));
+  } else if (DbgMarkerIndex) {
+    Ctx.pImpl->DbgMarkers[DbgMarkerIndex] = M;
+  } else {
+    DbgMarkerIndex = Ctx.pImpl->addDbgMarker(Ctx, M);
+  }
 }
 
 bool Instruction::comesBefore(const Instruction *Other) const {

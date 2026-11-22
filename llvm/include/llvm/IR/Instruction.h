@@ -19,7 +19,9 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/IR/DebugLoc.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/SymbolTableListTraits.h"
+#include "llvm/IR/Type.h"
 #include "llvm/IR/User.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/AtomicOrdering.h"
@@ -111,13 +113,23 @@ private:
   /// O(1) local dominance checks between instructions.
   mutable unsigned Order = 0;
 
-  /// Optional marker recording the position for debugging information that
-  /// takes effect immediately before this instruction. Null unless there is
-  /// debugging information present.
-  DbgMarker *DebugMarker = nullptr;
+  /// Index into the context's table of the optional marker recording the
+  /// position for debugging information that takes effect immediately before
+  /// this instruction. 0 unless there is debugging information present.
+  unsigned DbgMarkerIndex = 0;
+
+  LLVM_ABI void setDbgMarker(DbgMarker *M);
+  // Move the marker of From to this instruction, which has none.
+  void takeDbgMarker(Instruction &From) {
+    DbgMarkerIndex = std::exchange(From.DbgMarkerIndex, 0);
+  }
 
 public:
-  DbgMarker *getDbgMarker() const { return DebugMarker; }
+  DbgMarker *getDbgMarker() const {
+    return DbgMarkerIndex
+               ? getType()->getContext().DbgMarkerTable[DbgMarkerIndex]
+               : nullptr;
+  }
 
   /// Clone any debug-info attached to \p From onto this instruction. Used to
   /// copy debugging information from one block to another, when copying entire
@@ -138,7 +150,7 @@ public:
 
   /// Return a range over the DbgRecords attached to this instruction.
   iterator_range<simple_ilist<DbgRecord>::iterator> getDbgRecordRange() const {
-    return llvm::getDbgRecordRange(DebugMarker);
+    return llvm::getDbgRecordRange(getDbgMarker());
   }
 
   /// Return an iterator to the position of the "Next" DbgRecord after this

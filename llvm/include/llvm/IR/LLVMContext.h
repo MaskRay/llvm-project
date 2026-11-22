@@ -26,6 +26,7 @@
 
 namespace llvm {
 
+class DbgMarker;
 class DiagnosticInfo;
 enum DiagnosticSeverity : char;
 class Function;
@@ -374,6 +375,12 @@ public:
 private:
   // Module needs access to the add/removeModule methods.
   friend class Module;
+  friend class BasicBlock;
+  friend class Instruction;
+  friend class LLVMContextImpl;
+
+  /// LLVMContextImpl::DbgMarkers.data(), for inline marker lookup.
+  DbgMarker **DbgMarkerTable = nullptr;
 
   /// addModule - Register a module as being instantiated in this context.  If
   /// the context is deleted, the module will be deleted as well.
