@@ -13,6 +13,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -24,7 +25,23 @@ namespace llvm {
 /// InstCombine and other simplification passes.
 class InstructionWorklist {
   SmallVector<Instruction *, 256> Worklist;
-  DenseMap<Instruction *, unsigned> WorklistMap;
+  // 1 + index into Worklist, indexed by Instruction::getOrder(); 0 if absent.
+  SmallVector<unsigned, 0> WorklistMap;
+  unsigned NumRebuilds = 0;
+
+  // An insertion invalidates the numbers of its block, and comesBefore may
+  // then renumber the block, losing the keys of entries. Renumber the function
+  // and rebuild the map from Worklist.
+  unsigned key(Instruction *I) {
+    if (!I->getParent()->isFunctionOrderValid()) {
+      ++NumRebuilds;
+      WorklistMap.assign(I->getFunction()->numberInstructions(), 0);
+      for (auto [Idx, W] : enumerate(Worklist))
+        if (W)
+          WorklistMap[W->getOrder()] = Idx + 1;
+    }
+    return I->getOrder();
+  }
   /// These instructions will be added in reverse order after the current
   /// combine has finished. This means that these instructions will be visited
   /// in the order they have been added.
@@ -35,6 +52,8 @@ public:
 
   InstructionWorklist(InstructionWorklist &&) = default;
   InstructionWorklist &operator=(InstructionWorklist &&) = default;
+
+  unsigned takeNumRebuilds() { return std::exchange(NumRebuilds, 0); }
 
   bool isEmpty() const { return Worklist.empty() && Deferred.empty(); }
 
@@ -59,9 +78,13 @@ public:
     assert(I);
     assert(I->getParent() && "Instruction not inserted yet?");
 
-    if (WorklistMap.insert(std::make_pair(I, Worklist.size())).second) {
+    unsigned N = key(I);
+    if (N >= WorklistMap.size())
+      WorklistMap.resize(N + 1);
+    if (!WorklistMap[N]) {
       LLVM_DEBUG(dbgs() << "ADD: " << *I << '\n');
       Worklist.push_back(I);
+      WorklistMap[N] = Worklist.size();
     }
   }
 
@@ -83,11 +106,11 @@ public:
 
   /// Remove I from the worklist if it exists.
   void remove(Instruction *I) {
-    auto It = WorklistMap.find(I);
-    if (It != WorklistMap.end()) {
+    unsigned N = key(I);
+    if (N < WorklistMap.size() && WorklistMap[N]) {
       // Don't bother moving everything down, just null out the slot.
-      Worklist[It->second] = nullptr;
-      WorklistMap.erase(It);
+      Worklist[WorklistMap[N] - 1] = nullptr;
+      WorklistMap[N] = 0;
     }
 
     Deferred.remove(I);
@@ -97,7 +120,11 @@ public:
     if (Worklist.empty())
       return nullptr;
     Instruction *I = Worklist.pop_back_val();
-    WorklistMap.erase(I);
+    if (I) {
+      unsigned N = key(I);
+      if (N < WorklistMap.size())
+        WorklistMap[N] = 0;
+    }
     return I;
   }
 
@@ -121,7 +148,7 @@ public:
 
   /// Check that the worklist is empty and nuke the backing store for the map.
   void zap() {
-    assert(WorklistMap.empty() && "Worklist empty, but map not?");
+    assert(Worklist.empty() && "Worklist not empty?");
     assert(Deferred.empty() && "Deferred instructions left over");
 
     // Do an explicit clear, this shrinks the map if needed.

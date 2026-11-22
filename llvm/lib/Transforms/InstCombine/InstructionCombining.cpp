@@ -119,6 +119,7 @@ using namespace llvm::PatternMatch;
 STATISTIC(NumWorklistIterations,
           "Number of instruction combining iterations performed");
 STATISTIC(NumOneIteration, "Number of functions with one iteration");
+STATISTIC(NumWorklistRebuilds, "Number of worklist map rebuilds");
 STATISTIC(NumTwoIterations, "Number of functions with two iterations");
 STATISTIC(NumThreeIterations, "Number of functions with three iterations");
 STATISTIC(NumFourOrMoreIterations,
@@ -5990,6 +5991,7 @@ bool InstCombinerImpl::run() {
     }
   }
 
+  NumWorklistRebuilds += Worklist.takeNumRebuilds();
   Worklist.zap();
   return MadeIRChange;
 }
