@@ -61,6 +61,17 @@ using namespace llvm;
 // are not in the public header file...
 template class LLVM_EXPORT_TEMPLATE llvm::SymbolTableListTraits<BasicBlock>;
 
+unsigned Function::numberInstructions() const {
+  unsigned Num = 0;
+  for (const BasicBlock &BB : *this) {
+    auto &B = const_cast<BasicBlock &>(BB);
+    Num = B.renumberInstructions(Num);
+    B.SubclassOptionalData |= BasicBlock::FunctionOrderValid;
+  }
+  ++InstNumEpoch;
+  return Num;
+}
+
 void Function::renumberBlocks() {
   validateBlockNumbers();
 
