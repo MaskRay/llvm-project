@@ -84,10 +84,14 @@ private:
   unsigned NextBlockNum = 0;
   /// Epoch of block numbers. (Could be shrinked to uint8_t if required.)
   unsigned BlockNumEpoch = 0;
+  // Instructions get their number when added to a function.
+  friend class SymbolTableListTraits<Instruction, ilist_iterator_bits<true>,
+                                     ilist_parent<BasicBlock>>;
 
   mutable Argument *Arguments = nullptr;  ///< The formal arguments
   uint32_t NumArgs;
   MaybeAlign PreferredAlign;
+  uint16_t InstNumEpoch = 0;
   std::unique_ptr<ValueSymbolTable>
       SymTab;                             ///< Symbol table of args/instructions
   AttributeList AttributeSets;            ///< Parameter attributes
@@ -137,6 +141,7 @@ private:
   /// UnknownLibFunc if uninitialized. NotLibFunc if definitely not lib func.
   /// Otherwise may be libfunc if prototype validation passes.
   mutable LibFunc LibFuncCache = UnknownLibFunc;
+  unsigned NextInstNum = 0;
 
   void CheckLazyArguments() const {
     if (hasLazyArguments())
@@ -834,6 +839,17 @@ public:
   /// assigned new numbers and previous uses of the numbers needs to be
   /// invalidated. This is solely intended as a debugging feature.
   unsigned getBlockNumberEpoch() const { return BlockNumEpoch; }
+
+  /// Return a value larger than the number of every instruction in this
+  /// function. Instructions get their number when added to the function and
+  /// keep it when moved within the function.
+  unsigned getMaxInstructionNumber() const { return NextInstNum; }
+
+  /// Renumber instructions into a dense range starting from 0 in layout order.
+  LLVM_ABI void renumberInstructions();
+
+  /// Like getBlockNumberEpoch, for instruction numbers.
+  unsigned getInstructionNumberEpoch() const { return InstNumEpoch; }
 
 private:
   /// Assert that all blocks have unique numbers within 0..NextBlockNum. This

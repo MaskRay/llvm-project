@@ -24,7 +24,8 @@ namespace llvm {
 /// InstCombine and other simplification passes.
 class InstructionWorklist {
   SmallVector<Instruction *, 256> Worklist;
-  DenseMap<Instruction *, unsigned> WorklistMap;
+  // 1 + index into Worklist, indexed by Instruction::getNumber(); 0 if absent.
+  SmallVector<unsigned, 0> WorklistMap;
   /// These instructions will be added in reverse order after the current
   /// combine has finished. This means that these instructions will be visited
   /// in the order they have been added.
@@ -59,9 +60,13 @@ public:
     assert(I);
     assert(I->getParent() && "Instruction not inserted yet?");
 
-    if (WorklistMap.insert(std::make_pair(I, Worklist.size())).second) {
+    unsigned N = I->getNumber();
+    if (N >= WorklistMap.size())
+      WorklistMap.resize(std::max<size_t>(N + 1, WorklistMap.size() * 2));
+    if (!WorklistMap[N]) {
       LLVM_DEBUG(dbgs() << "ADD: " << *I << '\n');
       Worklist.push_back(I);
+      WorklistMap[N] = Worklist.size();
     }
   }
 
@@ -83,11 +88,11 @@ public:
 
   /// Remove I from the worklist if it exists.
   void remove(Instruction *I) {
-    auto It = WorklistMap.find(I);
-    if (It != WorklistMap.end()) {
+    unsigned N = I->getNumber();
+    if (N < WorklistMap.size() && WorklistMap[N]) {
       // Don't bother moving everything down, just null out the slot.
-      Worklist[It->second] = nullptr;
-      WorklistMap.erase(It);
+      Worklist[WorklistMap[N] - 1] = nullptr;
+      WorklistMap[N] = 0;
     }
 
     Deferred.remove(I);
@@ -97,7 +102,8 @@ public:
     if (Worklist.empty())
       return nullptr;
     Instruction *I = Worklist.pop_back_val();
-    WorklistMap.erase(I);
+    if (I)
+      WorklistMap[I->getNumber()] = 0;
     return I;
   }
 
@@ -121,7 +127,7 @@ public:
 
   /// Check that the worklist is empty and nuke the backing store for the map.
   void zap() {
-    assert(WorklistMap.empty() && "Worklist empty, but map not?");
+    assert(Worklist.empty() && "Worklist not empty?");
     assert(Deferred.empty() && "Deferred instructions left over");
 
     // Do an explicit clear, this shrinks the map if needed.

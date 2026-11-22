@@ -332,6 +332,10 @@ void Instruction::dropOneDbgRecord(DbgRecord *DVR) {
   DebugMarker->dropOneDbgRecord(DVR);
 }
 
+bool Instruction::hasValidNumber() const {
+  return getParent() && getParent()->getParent();
+}
+
 bool Instruction::comesBefore(const Instruction *Other) const {
   assert(getParent() && Other->getParent() &&
          "instructions without BB parents have no order");

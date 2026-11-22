@@ -197,8 +197,13 @@ BasicBlock::~BasicBlock() {
 
 void BasicBlock::setParent(Function *parent) {
   // Set Parent=parent, updating instruction symtab entries as appropriate.
-  if (Parent != parent)
-    Number = parent ? parent->NextBlockNum++ : -1u;
+  if (Parent != parent && parent) {
+    Number = parent->NextBlockNum++;
+    for (Instruction &I : *this)
+      I.Number = parent->NextInstNum++;
+  } else if (Parent != parent) {
+    Number = -1u;
+  }
   InstList.setSymTabObject(&Parent, parent);
 }
 

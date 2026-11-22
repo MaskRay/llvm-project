@@ -1547,10 +1547,10 @@ static bool processIfEntryValueDbgDeclare(FunctionLoweringInfo &FuncInfo,
   if (!Expr->isEntryValue() || !isa<Argument>(Arg))
     return false;
 
-  auto ArgIt = FuncInfo.ValueMap.find(Arg);
-  if (ArgIt == FuncInfo.ValueMap.end())
+  const Register *ArgIt = FuncInfo.ValueMap.find(Arg);
+  if (!ArgIt)
     return false;
-  Register ArgVReg = ArgIt->getSecond();
+  Register ArgVReg = *ArgIt;
 
   // Find the corresponding livein physical register to this argument.
   for (auto [PhysReg, VirtReg] : FuncInfo.RegInfo->liveins())
