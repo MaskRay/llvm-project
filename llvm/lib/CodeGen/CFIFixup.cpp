@@ -196,8 +196,9 @@ static BlockFlagsVector
 computeBlockInfo(const MachineFunction &MF,
                  const MachineBasicBlock *PrologueBlock) {
   BlockFlagsVector BlockInfo(MF.getNumBlockIDs());
-  BlockInfo[0].Reachable = true;
-  BlockInfo[0].StrongNoFrameOnEntry = true;
+  BlockFlags &EntryInfo = BlockInfo[MF.front().getNumber()];
+  EntryInfo.Reachable = true;
+  EntryInfo.StrongNoFrameOnEntry = true;
 
   // Compute the presence/absence of frame at each basic block.
   ReversePostOrderTraversal<const MachineBasicBlock *> RPOT(&*MF.begin());
