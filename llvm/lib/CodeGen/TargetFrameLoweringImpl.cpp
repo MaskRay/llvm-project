@@ -191,15 +191,6 @@ bool TargetFrameLowering::isSafeForNoCSROpt(const Function &F) {
   return true;
 }
 
-int TargetFrameLowering::getInitialCFAOffset(const MachineFunction &MF) const {
-  llvm_unreachable("getInitialCFAOffset() not implemented!");
-}
-
-Register
-TargetFrameLowering::getInitialCFARegister(const MachineFunction &MF) const {
-  llvm_unreachable("getInitialCFARegister() not implemented!");
-}
-
 TargetFrameLowering::DwarfFrameBase
 TargetFrameLowering::getDwarfFrameBase(const MachineFunction &MF) const {
   const TargetRegisterInfo *RI = MF.getSubtarget().getRegisterInfo();

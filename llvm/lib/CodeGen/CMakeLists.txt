@@ -60,7 +60,6 @@ add_llvm_component_library(LLVMCodeGen
   CallingConvLower.cpp
   CFGuardLongjmp.cpp
   CFIFixup.cpp
-  CFIInstrInserter.cpp
   CodeGen.cpp
   CodeGenCommonISel.cpp
   CodeGenOptions.cpp

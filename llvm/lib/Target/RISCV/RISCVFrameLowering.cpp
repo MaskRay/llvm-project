@@ -3004,15 +3004,6 @@ void RISCVFrameLowering::inlineStackProbe(MachineFunction &MF,
   }
 }
 
-int RISCVFrameLowering::getInitialCFAOffset(const MachineFunction &MF) const {
-  return 0;
-}
-
-Register
-RISCVFrameLowering::getInitialCFARegister(const MachineFunction &MF) const {
-  return RISCV::X2;
-}
-
 // On 64-bit systems the fixed stack can hold INT64_MAX bytes, since
 // stack-offset calculation is done in 2s-complement.
 // NOTE: In theory a register can hold any 64-bit number, so this constraint

@@ -4337,15 +4337,6 @@ MachineBasicBlock::iterator X86FrameLowering::restoreWin32EHStackPointers(
   return MBBI;
 }
 
-int X86FrameLowering::getInitialCFAOffset(const MachineFunction &MF) const {
-  return TRI->getSlotSize();
-}
-
-Register
-X86FrameLowering::getInitialCFARegister(const MachineFunction &MF) const {
-  return StackPtr;
-}
-
 void X86FrameLowering::resetCFIToInitialState(MachineBasicBlock &MBB) const {
   MachineFunction &MF = *MBB.getParent();
   MachineBasicBlock::iterator MBBI = MBB.begin();
@@ -4373,12 +4364,11 @@ TargetFrameLowering::DwarfFrameBase
 X86FrameLowering::getDwarfFrameBase(const MachineFunction &MF) const {
   const TargetRegisterInfo *RI = MF.getSubtarget().getRegisterInfo();
   Register FrameRegister = RI->getFrameRegister(MF);
-  if (getInitialCFARegister(MF) == FrameRegister &&
+  if (StackPtr == FrameRegister &&
       MF.getInfo<X86MachineFunctionInfo>()->hasCFIAdjustCfa()) {
     DwarfFrameBase FrameBase;
     FrameBase.Kind = DwarfFrameBase::CFA;
-    FrameBase.Location.Offset =
-        -MF.getFrameInfo().getStackSize() - getInitialCFAOffset(MF);
+    FrameBase.Location.Offset = -MF.getFrameInfo().getStackSize() - SlotSize;
     return FrameBase;
   }
 

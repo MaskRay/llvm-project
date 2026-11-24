@@ -495,14 +495,6 @@ public:
     return true;
   }
 
-  /// Return initial CFA offset value i.e. the one valid at the beginning of the
-  /// function (before any stack operations).
-  virtual int getInitialCFAOffset(const MachineFunction &MF) const;
-
-  /// Return initial CFA register value i.e. the one valid at the beginning of
-  /// the function (before any stack operations).
-  virtual Register getInitialCFARegister(const MachineFunction &MF) const;
-
   /// Return the frame base information to be encoded in the DWARF subprogram
   /// debug info.
   virtual DwarfFrameBase getDwarfFrameBase(const MachineFunction &MF) const;

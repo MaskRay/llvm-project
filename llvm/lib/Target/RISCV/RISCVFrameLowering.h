@@ -23,9 +23,6 @@ class RISCVFrameLowering : public TargetFrameLowering {
 public:
   explicit RISCVFrameLowering(const RISCVSubtarget &STI);
 
-  int getInitialCFAOffset(const MachineFunction &MF) const override;
-  Register getInitialCFARegister(const MachineFunction &MF) const override;
-
   void emitPrologue(MachineFunction &MF, MachineBasicBlock &MBB) const override;
   void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const override;
 

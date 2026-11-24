@@ -228,10 +228,6 @@ public:
 
   void restoreWinEHStackPointersInParent(MachineFunction &MF) const;
 
-  int getInitialCFAOffset(const MachineFunction &MF) const override;
-
-  Register getInitialCFARegister(const MachineFunction &MF) const override;
-
   void resetCFIToInitialState(MachineBasicBlock &MBB) const override;
 
   DwarfFrameBase getDwarfFrameBase(const MachineFunction &MF) const override;
