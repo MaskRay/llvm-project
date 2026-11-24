@@ -37,6 +37,7 @@ struct AArch64PostLegalizerLoweringImplRuleConfig;
 struct SLSHardeningInserter;
 
 namespace llvm {
+struct OnePassCodeGenOptions;
 
 class AArch64RegisterBankInfo;
 struct AArch64Options;
@@ -47,6 +48,11 @@ class FunctionPass;
 class InstructionSelector;
 class ModulePass;
 
+// Return the one-pass -O0 code generator.
+FunctionPass *
+createAArch64OnePassCodeGenPass(AArch64TargetMachine &TM,
+                                const OnePassCodeGenOptions &Opts);
+extern char &AArch64AsmPrinterID;
 FunctionPass *createAArch64DeadRegisterDefinitions();
 FunctionPass *createAArch64RedundantCopyEliminationPass();
 FunctionPass *createAArch64RedundantCondBranchPass();

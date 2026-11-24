@@ -160,22 +160,40 @@ static bool isHandledMetadata(unsigned Kind) {
   }
 }
 
-bool OnePassCompiler::ModuleState::handled(DenseMap<const void *, bool> &Cache,
-                                           AttributeList AL, bool ParamsOnly) {
-  auto [It, Inserted] = Cache.try_emplace(AL.getRawPointer(), true);
+bool OnePassCompiler::ModuleState::attrsHandled(AttributeList AL) {
+  auto [It, Inserted] = AttrVerdicts.try_emplace(AL.getRawPointer(), true);
   if (Inserted)
-    for (unsigned Idx : AL.indexes())
-      if (!ParamsOnly || Idx != AttributeList::FunctionIndex)
-        for (Attribute A : AL.getAttributes(Idx))
-          It->second &= Pass->isHandledAttr(A);
+    for (AttributeSet AS : AL)
+      for (Attribute A : AS)
+        It->second &= Pass->isHandledAttr(A);
   return It->second;
+}
+
+OnePassCompiler::ModuleState::CalleeVerdict
+OnePassCompiler::ModuleState::calleeVerdict(AttributeList AL) {
+  auto [It, Inserted] =
+      CalleeVerdicts.try_emplace(AL.getRawPointer(), CalleeOK);
+  if (!Inserted)
+    return It->second;
+  CalleeVerdict &V = It->second;
+  if (AL.hasFnAttr("dontcall-error") || AL.hasFnAttr("dontcall-warn"))
+    V = CalleeDontCall;
+  for (Attribute A : AL.getFnAttrs())
+    if (Pass->changesCalls(A))
+      V = CalleeFnAttr;
+  for (unsigned Idx : AL.indexes())
+    if (Idx != AttributeList::FunctionIndex)
+      for (Attribute A : AL.getAttributes(Idx))
+        if (!Pass->isHandledAttr(A))
+          V = CalleeParamAttr;
+  return V;
 }
 
 void OnePassCompiler::ModuleState::reset(const OnePassCodeGen &P,
                                          const Module &M) {
   Pass = &P;
   AttrVerdicts.clear();
-  ParamVerdicts.clear();
+  CalleeVerdicts.clear();
   Encodings.clear();
   Syms[0].clear();
   Syms[1].clear();
@@ -569,7 +587,7 @@ void OnePassCompiler::edge(const BasicBlock *Pred, const BasicBlock *Succ) {
   }
 }
 
-void OnePassCompiler::compileAlloca(const AllocaInst &I) {
+void OnePassCompiler::compileAlloca(const AllocaInst &I, bool Guarded) {
   if (!I.isStaticAlloca() || I.getAlign() > Align(16))
     return fail("dynamic or over-aligned alloca");
   std::optional<TypeSize> Size = I.getAllocationSize(DL);
@@ -580,8 +598,10 @@ void OnePassCompiler::compileAlloca(const AllocaInst &I) {
   if (VI.Kind == ValInfo::Alloca)
     return;
   VI.Kind = ValInfo::Alloca;
-  VI.Slot = allocFrame(std::max<uint64_t>(Size->getFixedValue(), 1),
-                       std::max<uint64_t>(I.getAlign().value(), 8));
+  uint64_t Bytes = std::max<uint64_t>(Size->getFixedValue(), 1);
+  uint64_t Alignment = std::max<uint64_t>(I.getAlign().value(), 8);
+  VI.Slot = Guarded || GuardAllAllocas ? allocGuardedFrame(Bytes, Alignment)
+                                       : allocFrame(Bytes, Alignment);
 }
 
 void OnePassCompiler::compileExtractValue(const ExtractValueInst &I) {
@@ -666,16 +686,20 @@ bool OnePassCompiler::checkCall(const CallBase &CB) {
       dyn_cast<Function>(CB.getCalledOperand()->stripPointerCasts());
   if (!CalleeF)
     return true;
-  if (!G.paramAttrsHandled(CalleeF->getAttributes())) {
+  switch (G.calleeVerdict(CalleeF->getAttributes())) {
+  case ModuleState::CalleeOK:
+    return true;
+  case ModuleState::CalleeParamAttr:
     failAttrs("call attribute", CalleeF->getAttributes());
-    return false;
-  }
-  if (CalleeF->hasFnAttribute("dontcall-error") ||
-      CalleeF->hasFnAttribute("dontcall-warn")) {
+    break;
+  case ModuleState::CalleeFnAttr:
+    fail("callee attribute");
+    break;
+  case ModuleState::CalleeDontCall:
     fail("dontcall callee");
-    return false;
+    break;
   }
-  return true;
+  return false;
 }
 
 void OnePassCompiler::compileCall(const CallInst &I) {
@@ -1036,14 +1060,18 @@ bool OnePassCompiler::run() {
     DenseMap<const AllocaInst *, MachineFrameInfo::SSPLayoutKind> Layout;
     if (SSPLayoutAnalysis::requiresStackProtector(const_cast<Function *>(&F),
                                                   &Layout)) {
-      StackGuardSlot = allocFrame(8, 8);
+      StackGuardSlot = allocGuardedFrame(8, 8);
+      // "ssp" singles out only large character arrays, but an overflow of
+      // any other object must not get past the guard either. The stronger
+      // levels single out every array and every object whose address escapes.
+      GuardAllAllocas = F.hasFnAttribute(Attribute::StackProtect);
       for (auto Kind :
            {MachineFrameInfo::SSPLK_LargeArray,
             MachineFrameInfo::SSPLK_SmallArray, MachineFrameInfo::SSPLK_AddrOf})
         for (const Instruction &I : F.getEntryBlock())
           if (auto *AI = dyn_cast<AllocaInst>(&I);
               AI && AI->isStaticAlloca() && Layout.lookup(AI) == Kind)
-            compileAlloca(*AI);
+            compileAlloca(*AI, /*Guarded=*/true);
       if (FailReason)
         return false;
     }

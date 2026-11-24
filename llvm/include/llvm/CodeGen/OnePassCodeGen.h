@@ -155,16 +155,19 @@ public:
     const OnePassCodeGen *Pass = nullptr;
     // Kind id of !heapallocsite, which only CodeView emission consumes.
     unsigned HeapAllocSiteKind = 0;
-    // Whether every attribute of a list, or every return and parameter
-    // attribute, is handled. Lists are uniqued, so the verdict is cached by
-    // pointer.
-    DenseMap<const void *, bool> AttrVerdicts, ParamVerdicts;
-    bool attrsHandled(AttributeList AL) {
-      return handled(AttrVerdicts, AL, /*ParamsOnly=*/false);
-    }
-    bool paramAttrsHandled(AttributeList AL) {
-      return handled(ParamVerdicts, AL, /*ParamsOnly=*/true);
-    }
+    // Whether every attribute of a list is handled. Lists are uniqued, so the
+    // verdict is cached by pointer.
+    DenseMap<const void *, bool> AttrVerdicts;
+    LLVM_ABI bool attrsHandled(AttributeList AL);
+    // Why a call to a function with these attributes is not handled.
+    enum CalleeVerdict : uint8_t {
+      CalleeOK,
+      CalleeParamAttr,
+      CalleeFnAttr,
+      CalleeDontCall
+    };
+    DenseMap<const void *, CalleeVerdict> CalleeVerdicts;
+    LLVM_ABI CalleeVerdict calleeVerdict(AttributeList AL);
 
     // Symbols of globals, without and with a preferred local alias, and of
     // library functions.
@@ -180,10 +183,6 @@ public:
     SmallVector<uint32_t, 0> BlockOff;
 
     void reset(const OnePassCodeGen &P, const Module &M);
-
-  private:
-    LLVM_ABI bool handled(DenseMap<const void *, bool> &Cache, AttributeList AL,
-                          bool ParamsOnly);
   };
 
   virtual ~OnePassCompiler();
@@ -379,11 +378,20 @@ protected:
   // Frame offset of the stack protector guard, or 0 if the function has none.
   // It is allocated before any other frame object.
   int32_t StackGuardSlot = 0;
+  // Whether every static alloca is guarded, not only those the stack
+  // protector analysis singles out.
+  bool GuardAllAllocas = false;
 
   // Target hooks.
 
   // Allocate Size bytes in the frame and return their frame offset.
   virtual int32_t allocFrame(uint64_t Size, uint64_t Alignment) = 0;
+  // As allocFrame, for the stack protector guard and then the objects it
+  // guards: an overflow of one must reach the guard before the return address
+  // or any other frame object.
+  virtual int32_t allocGuardedFrame(uint64_t Size, uint64_t Alignment) {
+    return allocFrame(Size, Alignment);
+  }
   // Slots hold the whole general-purpose register so reloads of any width
   // work.
   virtual void storeSlot(int32_t Slot, ValTy VT, uint8_t R) = 0;
@@ -473,7 +481,7 @@ private:
   uint32_t actionFor(const LandingPadInst &LPI);
   void recordDebugRecords(const Instruction &I, bool &BlockStart);
   void compileInst(const Instruction &I);
-  void compileAlloca(const AllocaInst &I);
+  void compileAlloca(const AllocaInst &I, bool Guarded = false);
   void compileExtractValue(const ExtractValueInst &I);
   void compileInsertValue(const InsertValueInst &I);
   void compileCall(const CallInst &I);
@@ -496,6 +504,9 @@ public:
 
   // Attributes that either do not affect code generation or are handled.
   virtual bool isHandledAttr(Attribute A) const;
+  // Whether a function attribute of a callee changes the code of a call to
+  // it, in a way that is not handled.
+  virtual bool changesCalls(Attribute A) const { return false; }
 
 protected:
   // \p AsmPrinterID is the pass ID of the target's AsmPrinter.

@@ -4441,6 +4441,7 @@ const MCExpr *AArch64AsmPrinter::lowerConstant(const Constant *CV,
 }
 
 char AArch64AsmPrinter::ID = 0;
+char &llvm::AArch64AsmPrinterID = AArch64AsmPrinter::ID;
 
 INITIALIZE_PASS(AArch64AsmPrinter, "aarch64-asm-printer",
                 "AArch64 Assembly Printer", false, false)

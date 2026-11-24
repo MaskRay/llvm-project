@@ -931,6 +931,9 @@ public:
     };
     SmallVector<Row, 32> Rows;
     SmallVector<Variable, 8> Variables;
+    /// If set, called on the skeleton MachineFunction to set up the target
+    /// state that resolving a fixed object needs.
+    void (*SetupFrame)(MachineFunction &) = nullptr;
   };
 
   /// Machine code produced without a MachineFunction. Fixup offsets are

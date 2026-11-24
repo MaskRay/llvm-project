@@ -4083,6 +4083,10 @@ void AsmPrinter::emitCompiledFunction(const Function &F,
     DbgMF.front().front().setFlag(MachineInstr::FrameSetup);
     // The code always has a frame pointer, whatever "frame-pointer" says.
     DbgMF.getFrameInfo().setFrameAddressIsTaken(true);
+    // No callee-saved register is used.
+    DbgMF.getFrameInfo().setCalleeSavedInfoValid(true);
+    if (Debug->SetupFrame)
+      Debug->SetupFrame(DbgMF);
     for (const CompiledFunctionDebug::Variable &V : Debug->Variables) {
       int FI = DbgMF.getFrameInfo().CreateFixedObject(
           std::max<uint64_t>(V.Size, 1), V.ObjectOffset, /*IsImmutable=*/false);
