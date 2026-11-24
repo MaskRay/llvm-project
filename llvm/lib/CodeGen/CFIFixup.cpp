@@ -161,6 +161,9 @@ struct BlockFlags {
   // The CFA offset change by call frame adjustments.
   int64_t CallFrameOnEntry = 0;
   int64_t CallFrameOnExit = 0;
+  // The number of prologue CFI instructions executed. It is less than the
+  // total inside a prologue that spans multiple blocks.
+  unsigned PrologueCFIOnEntry = 0;
   BlockFlags()
       : Reachable(false), StrongNoFrameOnEntry(false), HasFrameOnEntry(false),
         HasFrameOnExit(false) {}
@@ -216,10 +219,16 @@ computeBlockInfo(const MachineFunction &MF,
     // at the exit of the block, unless the block contains the epilogue.
     Info.HasFrameOnExit = (Info.HasFrameOnEntry || HasPrologue) && !HasEpilogue;
     Info.CallFrameOnExit = getCallFrameOnExit(*MBB, Info.CallFrameOnEntry);
+    unsigned PrologueCFIOnExit =
+        HasEpilogue ? 0
+                    : Info.PrologueCFIOnEntry +
+                          llvm::count_if(*MBB, isPrologueCFIInstruction);
 
     // Set the successors' state on entry.
     for (MachineBasicBlock *Succ : MBB->successors()) {
       BlockFlags &SuccInfo = BlockInfo[Succ->getNumber()];
+      if (!SuccInfo.Reachable)
+        SuccInfo.PrologueCFIOnEntry = PrologueCFIOnExit;
       SuccInfo.Reachable = true;
       SuccInfo.StrongNoFrameOnEntry |=
           Info.StrongNoFrameOnEntry && !HasPrologue;
@@ -353,6 +362,15 @@ fixupBlock(MachineBasicBlock &CurrBB, const BlockFlagsVector &BlockInfo,
     }
   }
 #endif
+
+  // The first block of a section inside a prologue that spans multiple blocks
+  // (e.g. the X86 inline stack probe loop) starts from the initial state.
+  if (CurrBB.isBeginSection() && !Info.HasFrameOnEntry &&
+      Info.PrologueCFIOnEntry) {
+    cloneCfiPrologue(Prologue.take_front(Info.PrologueCFIOnEntry),
+                     {&CurrBB, CurrBB.begin()});
+    return true;
+  }
 
   bool AfterPartialEpilogue = Info.StrongNoFrameOnEntry &&
                               !CurrBB.isBeginSection() &&
