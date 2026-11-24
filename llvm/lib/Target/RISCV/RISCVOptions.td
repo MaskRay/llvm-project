@@ -88,8 +88,6 @@ defm : BoolField<"riscv-use-aa", "true",
   "Enable the use of AA during codegen">;
 
 // RISCVTargetMachine.cpp
-defm : BoolField<"riscv-enable-cfi-instr-inserter", "false",
-  "Enable CFI Instruction Inserter for RISC-V">;
 defm : BoolField<"riscv-enable-copy-propagation", "true",
   "Enable the copy propagation with RISC-V copy instr">;
 defm : BoolField<"riscv-enable-copyelim", "true",

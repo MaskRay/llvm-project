@@ -14,7 +14,6 @@
 #include "RISCVTargetMachine.h"
 #include "llvm/CodeGen/AtomicExpand.h"
 #include "llvm/CodeGen/BranchRelaxation.h"
-#include "llvm/CodeGen/CFIInstrInserter.h"
 #include "llvm/CodeGen/GlobalISel/IRTranslator.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelect.h"
 #include "llvm/CodeGen/GlobalISel/Legalizer.h"
@@ -316,14 +315,6 @@ void RISCVCodeGenPassBuilder::addPreEmitPass2(PassManagerWrapper &PMW) {
         return MF.getFunction().getParent()->getModuleFlag("kcfi");
       }),
       PMW);
-
-  // RISCVTargetMachine's constructor sets Options.enable_cfi_instr_inserter to
-  // the inverse of -riscv-enable-cfi-instr-inserter (a flag private to
-  // RISCVTargetMachine.cpp), so checking it here is equivalent to checking
-  // that flag directly -- the two passes solve overlapping problems and
-  // this target picks exactly one.
-  if (getTM().getCLOpts().enable_cfi_instr_inserter)
-    addMachineFunctionPass(CFIInstrInserterPass(), PMW);
 }
 
 void RISCVCodeGenPassBuilder::addAsmPrinterBegin(PassManagerWrapper &PMW) {

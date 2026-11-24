@@ -125,7 +125,7 @@ RISCVTargetMachine::RISCVTargetMachine(const Target &T, const Triple &TT,
   if (TT.isOSFuchsia() && !TT.isArch64Bit())
     report_fatal_error("Fuchsia is only supported for 64-bit");
 
-  setCFIFixup(!CLOpts.enable_cfi_instr_inserter);
+  setCFIFixup(true);
 }
 
 const RISCVSubtarget *
@@ -549,9 +549,6 @@ void RISCVPassConfig::addPreEmitPass2() {
   addPass(createUnpackMachineBundlesLegacy([&](const MachineFunction &MF) {
     return MF.getFunction().getParent()->getModuleFlag("kcfi");
   }));
-
-  if (CLOpts.enable_cfi_instr_inserter)
-    addPass(createCFIInstrInserterLegacy());
 }
 
 void RISCVPassConfig::addMachineSSAOptimization() {
