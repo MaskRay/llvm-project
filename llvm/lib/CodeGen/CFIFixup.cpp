@@ -66,11 +66,9 @@
 //       .cfi_restore_state
 //       .cfi_remember_state
 //     In this case we also insert a `.cfi_remember_state` after the last CFI
-//     instruction in the function prologue.
-//
-// Known limitations:
-//  * the pass cannot handle an epilogue preceding the prologue in the basic
-//    block layout
+//     instruction in the function prologue. A block that needs the frame but
+//     precedes the prologue in the layout gets a copy of the prologue CFI
+//     instructions instead.
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/CFIFixup.h"
@@ -268,58 +266,53 @@ insertRememberRestorePair(const InsertionPoint &RememberInsertPt,
                         ->getIterator())};
 }
 
-// Copies all CFI instructions before PrologueEnd and inserts them before
-// DstInsertPt. Returns the iterator to the first instruction after the
-// inserted instructions.
-static InsertionPoint cloneCfiPrologue(const InsertionPoint &PrologueEnd,
-                                       const InsertionPoint &DstInsertPt) {
-  MachineFunction &MF = *DstInsertPt.MBB->getParent();
-
-  auto cloneCfiInstructions = [&](MachineBasicBlock::iterator Begin,
-                                  MachineBasicBlock::iterator End) {
-    auto ToClone = map_range(
-        make_filter_range(make_range(Begin, End), isPrologueCFIInstruction),
-        [&](const MachineInstr &MI) { return MF.CloneMachineInstr(&MI); });
-    DstInsertPt.MBB->insert(DstInsertPt.Iterator, ToClone.begin(),
-                            ToClone.end());
-  };
-
-  // Clone all CFI instructions from previous blocks.
-  for (auto &MBB : make_range(MF.begin(), PrologueEnd.MBB->getIterator()))
-    cloneCfiInstructions(MBB.begin(), MBB.end());
-  // Clone all CFI instructions from the final prologue block.
-  cloneCfiInstructions(PrologueEnd.MBB->begin(), PrologueEnd.Iterator);
-  return DstInsertPt;
-}
-
-// Returns the registers that the prologue CFI instructions give a rule.
-static SmallVector<unsigned, 8>
-getPrologueRegs(const InsertionPoint &PrologueEnd) {
+// Returns all CFI instructions of the prologue, i.e. those before PrologueEnd.
+static SmallVector<const MachineInstr *, 8>
+collectCfiPrologue(const InsertionPoint &PrologueEnd) {
   MachineFunction &MF = *PrologueEnd.MBB->getParent();
-  SmallVector<unsigned, 8> Regs;
+  SmallVector<const MachineInstr *, 8> CFIs;
   auto Collect = [&](MachineBasicBlock::const_iterator Begin,
                      MachineBasicBlock::const_iterator End) {
-    for (const MachineInstr &MI : make_range(Begin, End)) {
-      if (!isPrologueCFIInstruction(MI))
-        continue;
-      const MCCFIInstruction &CFI =
-          MF.getFrameInstructions()[MI.getOperand(0).getCFIIndex()];
-      switch (CFI.getOperation()) {
-      case MCCFIInstruction::OpOffset:
-      case MCCFIInstruction::OpRelOffset:
-      case MCCFIInstruction::OpValOffset:
-      case MCCFIInstruction::OpRegister:
-        Regs.push_back(CFI.getRegister());
-        break;
-      default:
-        break;
-      }
-    }
+    for (const MachineInstr &MI : make_range(Begin, End))
+      if (isPrologueCFIInstruction(MI))
+        CFIs.push_back(&MI);
   };
   for (const MachineBasicBlock &MBB :
        make_range(MF.begin(), PrologueEnd.MBB->getIterator()))
     Collect(MBB.begin(), MBB.end());
   Collect(PrologueEnd.MBB->begin(), PrologueEnd.Iterator);
+  return CFIs;
+}
+
+// Copies the prologue CFI instructions and inserts them before DstInsertPt.
+// Returns the iterator to the first instruction after the inserted
+// instructions.
+static InsertionPoint cloneCfiPrologue(ArrayRef<const MachineInstr *> Prologue,
+                                       const InsertionPoint &DstInsertPt) {
+  MachineFunction &MF = *DstInsertPt.MBB->getParent();
+  for (const MachineInstr *MI : Prologue)
+    DstInsertPt.MBB->insert(DstInsertPt.Iterator, MF.CloneMachineInstr(MI));
+  return DstInsertPt;
+}
+
+// Returns the registers that the prologue CFI instructions give a rule.
+static SmallVector<unsigned, 8>
+getPrologueRegs(ArrayRef<const MachineInstr *> Prologue) {
+  SmallVector<unsigned, 8> Regs;
+  for (const MachineInstr *MI : Prologue) {
+    const MCCFIInstruction &CFI = MI->getMF()->getFrameInstructions()
+                                      [MI->getOperand(0).getCFIIndex()];
+    switch (CFI.getOperation()) {
+    case MCCFIInstruction::OpOffset:
+    case MCCFIInstruction::OpRelOffset:
+    case MCCFIInstruction::OpValOffset:
+    case MCCFIInstruction::OpRegister:
+      Regs.push_back(CFI.getRegister());
+      break;
+    default:
+      break;
+    }
+  }
   return Regs;
 }
 
@@ -329,7 +322,8 @@ getPrologueRegs(const InsertionPoint &PrologueEnd) {
 static bool
 fixupBlock(MachineBasicBlock &CurrBB, const BlockFlagsVector &BlockInfo,
            SmallDenseMap<MBBSectionID, InsertionPoint> &InsertionPts,
-           const InsertionPoint &Prologue, ArrayRef<unsigned> PrologueRegs) {
+           ArrayRef<const MachineInstr *> Prologue,
+           ArrayRef<unsigned> PrologueRegs) {
   const MachineFunction &MF = *CurrBB.getParent();
   const TargetFrameLowering &TFL = *MF.getSubtarget().getFrameLowering();
   const BlockFlags &Info = BlockInfo[CurrBB.getNumber()];
@@ -454,26 +448,26 @@ static bool runImpl(MachineFunction &MF) {
   // we have to insert a `.cfi_remember_state`, in the case that the current
   // block needs a `.cfi_restore_state`.
   SmallDenseMap<MBBSectionID, InsertionPoint> InsertionPts;
-  SmallVector<unsigned, 8> PrologueRegs;
+  SmallVector<const MachineInstr *, 8> Prologue;
   if (PrologueBlock) {
-    InsertionPts[PrologueBlock->getSectionID()] = {PrologueBlock, PrologueEnd};
     assert(PrologueEnd != PrologueBlock->begin() &&
            "Inconsistent notion of \"prologue block\"");
-    PrologueRegs = getPrologueRegs({PrologueBlock, PrologueEnd});
+    Prologue = collectCfiPrologue({PrologueBlock, PrologueEnd});
   }
+  SmallVector<unsigned, 8> PrologueRegs = getPrologueRegs(Prologue);
 
-  // No point fixing the frame state before the prologue block.
-  // TODO: the unwind tables will still be incorrect if an epilogue physically
-  // preceeds the prologue.
-  bool AfterPrologue = PrologueBlock == &MF.front();
-  for (MachineBasicBlock &MBB : drop_begin(MF)) {
-    MachineBasicBlock::iterator Begin = MBB.begin();
-    bool Reset =
-        AfterPrologue && fixupBlock(MBB, BlockInfo, InsertionPts,
-                                    {PrologueBlock, PrologueEnd}, PrologueRegs);
-    Change |= Reset;
-    Change |= fixupCallFrame(MBB, Begin, BlockInfo, InsertionPts, Reset);
-    AfterPrologue |= &MBB == PrologueBlock;
+  for (MachineBasicBlock &MBB : MF) {
+    if (&MBB != &MF.front()) {
+      MachineBasicBlock::iterator Begin = MBB.begin();
+      bool Reset =
+          fixupBlock(MBB, BlockInfo, InsertionPts, Prologue, PrologueRegs);
+      Change |= Reset;
+      Change |= fixupCallFrame(MBB, Begin, BlockInfo, InsertionPts, Reset);
+    }
+    // A block laid out before the prologue block that needs the frame has no
+    // state to restore and gets a copy of the prologue CFI instead.
+    if (&MBB == PrologueBlock)
+      InsertionPts[MBB.getSectionID()] = {PrologueBlock, PrologueEnd};
   }
 
   return Change;
