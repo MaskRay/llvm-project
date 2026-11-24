@@ -189,6 +189,21 @@ void MachineFunction::handleChangeDesc(MachineInstr &MI,
     TheDelegate->MF_HandleChangeDesc(MI, TID);
 }
 
+Align MachineFunction::getMinFunctionAlignment(const Function &F,
+                                               const TargetSubtargetInfo &STI) {
+  // -fsanitize=function and -fsanitize=kcfi instrument indirect function calls
+  // to load a type hash before the function label. Ensure functions are aligned
+  // by a least 4 to avoid unaligned access, which is especially important for
+  // -mno-unaligned-access.
+  Align A = STI.getTargetLowering()->getMinFunctionAlignment();
+  if (F.hasMetadata(LLVMContext::MD_func_sanitize) ||
+      F.getMetadata(LLVMContext::MD_kcfi_type))
+    A = std::max(A, Align(4));
+  if (AlignAllFunctions)
+    A = Align::fromLog2(AlignAllFunctions);
+  return A;
+}
+
 void MachineFunction::init() {
   // Assume the function starts in SSA form with correct liveness.
   Properties.setIsSSA();
@@ -214,18 +229,7 @@ void MachineFunction::init() {
     FrameInfo->ensureMaxAlignment(*F.getFnStackAlign());
 
   ConstantPool = new (Allocator) MachineConstantPool(getDataLayout());
-  Alignment = STI.getTargetLowering()->getMinFunctionAlignment();
-
-  // -fsanitize=function and -fsanitize=kcfi instrument indirect function calls
-  // to load a type hash before the function label. Ensure functions are aligned
-  // by a least 4 to avoid unaligned access, which is especially important for
-  // -mno-unaligned-access.
-  if (F.hasMetadata(LLVMContext::MD_func_sanitize) ||
-      F.getMetadata(LLVMContext::MD_kcfi_type))
-    Alignment = std::max(Alignment, Align(4));
-
-  if (AlignAllFunctions)
-    Alignment = Align::fromLog2(AlignAllFunctions);
+  Alignment = getMinFunctionAlignment(F, STI);
 
   JumpTableInfo = nullptr;
 
@@ -344,16 +348,16 @@ bool MachineFunction::shouldSplitStack() const {
 }
 
 Align MachineFunction::getPreferredAlignment() const {
-  Align PrefAlignment;
+  return std::max(getPreferredAlignment(F, STI), getAlignment());
+}
 
+Align MachineFunction::getPreferredAlignment(const Function &F,
+                                             const TargetSubtargetInfo &STI) {
   if (MaybeAlign A = F.getPreferredAlignment())
-    PrefAlignment = *A;
-  else if (!F.hasOptSize())
-    PrefAlignment = STI.getTargetLowering()->getPrefFunctionAlignment();
-  else
-    PrefAlignment = Align(1);
-
-  return std::max(PrefAlignment, getAlignment());
+    return *A;
+  if (!F.hasOptSize())
+    return STI.getTargetLowering()->getPrefFunctionAlignment();
+  return Align(1);
 }
 
 [[nodiscard]] unsigned

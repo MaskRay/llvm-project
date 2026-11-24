@@ -1456,6 +1456,10 @@ bool FPPassManager::runOnFunction(Function &F) {
       removeNotPreservedAnalysis(FP);
     recordAvailableAnalysis(FP);
     removeDeadPasses(FP, Name, ON_FUNCTION_MSG);
+    if (SkipRemainingPasses) {
+      SkipRemainingPasses = false;
+      break;
+    }
   }
 
   return Changed;

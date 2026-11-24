@@ -21,6 +21,7 @@ add_llvm_component_library(LLVMAsmPrinter
   EHStreamer.cpp
   ErlangGCPrinter.cpp
   OcamlGCPrinter.cpp
+  OnePassCodeGen.cpp
   PseudoProbePrinter.cpp
   WinCFGuard.cpp
   WinException.cpp
@@ -46,4 +47,5 @@ add_llvm_component_library(LLVMAsmPrinter
   Support
   Target
   TargetParser
+  TransformUtils
   )

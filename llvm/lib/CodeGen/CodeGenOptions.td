@@ -642,6 +642,14 @@ defm : ValueField<"fs-remapping-file", "StringRef", "",
   "Flow Sensitive profile remapping file name">;
 defm : OptionalBoolField<"global-isel",
   "Enable the \"global\" instruction selector">;
+defm : OptionalBoolField<"onepass-codegen",
+  "At -O0, compile functions in a single pass where the target supports it">;
+defm : BoolField<"onepass-codegen-abort", "false",
+  "Fail if a function cannot be compiled in a single pass">;
+defm : ValueField<"onepass-codegen-limit", "unsigned", "UINT_MAX",
+  "Compile at most this many functions in a single pass">;
+defm : BoolField<"onepass-codegen-report", "false",
+  "Print why a function was not compiled in a single pass">;
 defm : EnumField<"global-isel-abort", "std::optional<GlobalISelAbortMode>", "std::nullopt",
   "0,1,2", ["GlobalISelAbortMode::Disable", "GlobalISelAbortMode::Enable",
             "GlobalISelAbortMode::DisableWithDiag"],

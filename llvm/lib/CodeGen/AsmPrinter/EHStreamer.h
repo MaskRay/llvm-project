@@ -20,6 +20,7 @@
 namespace llvm {
 
 class AsmPrinter;
+class GlobalValue;
 struct LandingPadInfo;
 class MachineInstr;
 class MachineModuleInfo;
@@ -147,12 +148,22 @@ protected:
   static bool isCatchEHSelector(int Selector) { return Selector > 0; }
 
 public:
+  /// Record a personality function used by a function that was not emitted
+  /// through beginFunction.
+  virtual void addPersonality(const GlobalValue *Personality) {}
+
   EHStreamer(AsmPrinter *A);
   ~EHStreamer() override;
 
   /// Return `true' if this is a call to a function marked `nounwind'. Return
   /// `false' otherwise.
   static bool callToNoUnwindFunction(const MachineInstr *MI);
+
+  /// Return the ULEB128 value of the @TType base offset and its size in bytes,
+  /// given the LSDA size from the call site encoding byte to the end of the
+  /// action table and the size of the type table.
+  static std::pair<uint64_t, unsigned>
+  getTTypeBaseOffset(uint64_t SizeBeforeAlign, uint64_t TypeInfoSize);
 };
 
 } // end namespace llvm
