@@ -17,7 +17,6 @@
 #include "llvm/CodeGen/AtomicExpand.h"
 #include "llvm/CodeGen/BreakFalseDeps.h"
 #include "llvm/CodeGen/CFGuardLongjmp.h"
-#include "llvm/CodeGen/CFIInstrInserter.h"
 #include "llvm/CodeGen/EHContGuardTargets.h"
 #include "llvm/CodeGen/EarlyIfConversion.h"
 #include "llvm/CodeGen/ExecutionDomainFix.h"
@@ -295,9 +294,6 @@ void X86CodeGenPassBuilder::addPreEmitPass2(PassManagerWrapper &PMW) {
   // issues in the unwinder.
   if (TT.isOSWindows() && TT.isX86_64())
     addMachineFunctionPass(X86AvoidTrailingCallPass(), PMW);
-
-  if (getTM().getCLOpts().enable_cfi_instr_inserter)
-    addMachineFunctionPass(CFIInstrInserterPass(), PMW);
 
   if (TT.isOSWindows()) {
     // Identify valid longjmp targets for Windows Control Flow Guard.

@@ -1,5 +1,5 @@
 --- |
-  ; RUN: llc %s -start-before=cfi-instr-inserter -filetype=obj -o - | llvm-dwarfdump - | FileCheck %s
+  ; RUN: llc %s -start-before=cfi-fixup -filetype=obj -o - | llvm-dwarfdump - | FileCheck %s
 
   ; Test that KILL instructions no longer terminate the instruction range of a
   ; Debug Intrinsic calculated by DbgEntityHistoryCalculator.

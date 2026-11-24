@@ -200,7 +200,7 @@ X86TargetMachine::X86TargetMachine(const Target &T, const Triple &TT,
 
   // x86 supports the debug entry values.
   setSupportsDebugEntryValues(true);
-  setCFIFixup(!TT.isOSDarwin() && !CLOpts.enable_cfi_instr_inserter);
+  setCFIFixup(!TT.isOSDarwin());
 
   initAsmInfo();
 }
@@ -596,9 +596,6 @@ void X86PassConfig::addPreEmitPass2() {
   // issues in the unwinder.
   if (TT.isOSWindows() && TT.isX86_64())
     addPass(createX86AvoidTrailingCallLegacyPass());
-
-  if (getX86TargetMachine().getCLOpts().enable_cfi_instr_inserter)
-    addPass(createCFIInstrInserterLegacy());
 
   if (TT.isOSWindows()) {
     // Identify valid longjmp targets for Windows Control Flow Guard.

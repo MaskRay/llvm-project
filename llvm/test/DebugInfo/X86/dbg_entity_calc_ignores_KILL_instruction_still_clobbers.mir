@@ -1,5 +1,5 @@
 --- |
-  ; RUN: llc %s -start-before=cfi-instr-inserter -filetype=obj -o - | llvm-dwarfdump - | FileCheck %s
+  ; RUN: llc %s -start-before=cfi-fixup -filetype=obj -o - | llvm-dwarfdump - | FileCheck %s
 
   ; Test that KILL instructions do not interfere with debug entity history
   ; liveness ranges. Check that a physical address clobber after KILL still
