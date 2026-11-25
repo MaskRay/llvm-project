@@ -15,6 +15,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DebugProgramInstruction.h"
+#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/EHPersonalities.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
@@ -63,71 +64,135 @@ bool OnePassCodeGen::isHandledAttr(Attribute A) const {
                                       "less-precise-fpmad",
                                       "disable-tail-calls",
                                       "no-jump-tables",
-                                      "no-inline-line-tables"};
+                                      "no-inline-line-tables",
+                                      "sample-profile-suffix-elision-policy",
+                                      "warn-stack-size"};
     return is_contained(Known, K) || K.starts_with("no-builtin-");
   }
+  // No default: a new attribute must be classified here.
   switch (A.getKindAsEnum()) {
-  // Function attributes.
+  // Hints for optimizations and markers for IR instrumentation, which do not
+  // change unoptimized code. Scalable types are rejected wherever they
+  // appear, so vscale_range is one of them.
+  case Attribute::Alignment:
+  case Attribute::AllocAlign:
+  case Attribute::AllocatedPointer:
   case Attribute::AllocKind:
   case Attribute::AllocSize:
   case Attribute::AlwaysInline:
   case Attribute::Builtin:
+  case Attribute::Captures:
   case Attribute::Cold:
+  case Attribute::CoroDestroyOnlyWhenComplete:
+  case Attribute::CoroElideSafe:
+  case Attribute::DeadOnReturn:
+  case Attribute::DeadOnUnwind:
+  case Attribute::Dereferenceable:
+  case Attribute::DereferenceableOrNull:
+  case Attribute::DisableSanitizerInstrumentation:
+  case Attribute::Flatten:
   case Attribute::Hot:
+  case Attribute::ImmArg:
+  case Attribute::Initializes:
   case Attribute::InlineHint:
   case Attribute::LikelyModuleLocal:
   case Attribute::Memory:
   case Attribute::MinSize:
   case Attribute::MustProgress:
+  case Attribute::NoAlias:
   case Attribute::NoBuiltin:
   case Attribute::NoCallback:
+  case Attribute::NoCreateUndefOrPoison:
+  case Attribute::NoDivergenceSource:
   case Attribute::NoDuplicate:
+  case Attribute::NoFPClass:
   case Attribute::NoFree:
+  case Attribute::NoFreeObj:
   case Attribute::NoInline:
+  case Attribute::NoIPA:
   case Attribute::NoMerge:
-  case Attribute::NonLazyBind:
+  case Attribute::NonNull:
+  case Attribute::NoOutline:
   case Attribute::NoProfile:
   case Attribute::NoRecurse:
-  case Attribute::NoRedZone:
-  case Attribute::NoReturn:
+  case Attribute::NoSanitizeBounds:
+  case Attribute::NoSanitizeCoverage:
   case Attribute::NoSync:
-  case Attribute::NoUnwind:
+  case Attribute::NoUndef:
+  case Attribute::NullPointerIsValid:
+  case Attribute::OptForFuzzing:
+  case Attribute::OptimizeForDebugging:
   case Attribute::OptimizeForSize:
   case Attribute::OptimizeNone:
-  case Attribute::ReturnsTwice:
-  case Attribute::Speculatable:
-  case Attribute::UWTable:
-  case Attribute::WillReturn:
-  // Parameter and return attributes.
-  case Attribute::AllocatedPointer:
-  case Attribute::Alignment:
-  case Attribute::ByVal:
-  case Attribute::Captures:
-  case Attribute::DeadOnReturn:
-  case Attribute::DeadOnUnwind:
-  case Attribute::Dereferenceable:
-  case Attribute::DereferenceableOrNull:
-  case Attribute::ImmArg:
-  case Attribute::Initializes:
-  case Attribute::NoAlias:
-  case Attribute::NoExt:
-  case Attribute::NoFPClass:
-  case Attribute::NoFreeObj:
-  case Attribute::NonNull:
-  case Attribute::NoUndef:
   case Attribute::Range:
   case Attribute::ReadNone:
   case Attribute::ReadOnly:
   case Attribute::Returned:
-  case Attribute::SExt:
-  case Attribute::StructRet:
+  case Attribute::SanitizeAddress:
+  case Attribute::SanitizeAllocToken:
+  case Attribute::SanitizeConcurrency:
+  case Attribute::SanitizeHWAddress:
+  case Attribute::SanitizeMemory:
+  case Attribute::SanitizeNumericalStability:
+  case Attribute::SanitizeRealtime:
+  case Attribute::SanitizeRealtimeBlocking:
+  case Attribute::SanitizeThread:
+  case Attribute::SanitizeType:
+  case Attribute::SkipProfile:
+  case Attribute::Speculatable:
+  case Attribute::VScaleRange:
+  case Attribute::WillReturn:
   case Attribute::Writable:
   case Attribute::WriteOnly:
+  // Implemented.
+  case Attribute::ByVal:
+  case Attribute::NoExt:
+  case Attribute::NonLazyBind:
+  case Attribute::NoRedZone:
+  case Attribute::NoReturn:
+  case Attribute::NoUnwind:
+  case Attribute::ReturnsTwice:
+  case Attribute::SExt:
+  case Attribute::StructRet:
+  case Attribute::UWTable:
   case Attribute::ZExt:
     return true;
-  default:
+  // Left to the regular pipeline, unless the target overrides this.
+  case Attribute::ByRef:
+  case Attribute::Convergent:
+  case Attribute::DenormalFPEnv:
+  case Attribute::ElementType:
+  case Attribute::FnRetThunkExtern:
+  case Attribute::HybridPatchable:
+  case Attribute::InAlloca:
+  case Attribute::InReg:
+  case Attribute::JumpTable:
+  case Attribute::Naked:
+  case Attribute::Nest:
+  case Attribute::NoCfCheck:
+  case Attribute::NoImplicitFloat:
+  case Attribute::Preallocated:
+  case Attribute::PresplitCoroutine:
+  case Attribute::SafeStack:
+  case Attribute::SanitizeMemTag:
+  case Attribute::ShadowCallStack:
+  case Attribute::SpeculativeLoadHardening:
+  case Attribute::StackAlignment:
+  case Attribute::StackProtect:
+  case Attribute::StackProtectReq:
+  case Attribute::StackProtectStrong:
+  case Attribute::StrictFP:
+  case Attribute::SwiftAsync:
+  case Attribute::SwiftError:
+  case Attribute::SwiftSelf:
+  // Not attributes.
+  case Attribute::None:
+  case Attribute::EndAttrKinds:
+  case Attribute::EmptyKey:
+  case Attribute::TombstoneKey:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 static bool isHandledMetadata(unsigned Kind) {
@@ -154,6 +219,7 @@ static bool isHandledMetadata(unsigned Kind) {
   case LLVMContext::MD_callees:
   case LLVMContext::MD_annotation:
   case LLVMContext::MD_nosanitize:
+  case LLVMContext::MD_func_sanitize:
     return true;
   default:
     return false;
@@ -1186,6 +1252,14 @@ bool OnePassCodeGen::finish(const Function &F, OnePassCompiler &C) {
     FailDetail = std::move(C.FailDetail);
     return false;
   }
+  // As PrologEpilogInserter.
+  if (Attribute A = F.getFnAttribute("warn-stack-size"); A.isValid()) {
+    uint64_t Threshold;
+    if (!A.getValueAsString().getAsInteger(10, Threshold) &&
+        C.StackSize > Threshold)
+      F.getContext().diagnose(
+          DiagnosticInfoStackSize(F, C.StackSize, Threshold, DS_Warning));
+  }
   AP->emitCompiledFunction(F, {C.Code, C.Fixups, C.CFI, C.StackSize,
                                C.HasLandingPads ? &C.EH : nullptr,
                                C.HasDebug ? &C.Debug : nullptr});
@@ -1225,7 +1299,9 @@ bool OnePassCodeGen::runOnFunction(Function &F) {
                                              "SemanticInterposition",
                                              "debug-info-assignment-tracking",
                                              "long-double-type",
-                                             "debugger-tuning"};
+                                             "debugger-tuning",
+                                             "EnableValueProfiling",
+                                             "MemProfProfileFilename"};
       SmallVector<Module::ModuleFlagEntry, 8> Flags;
       M.getModuleFlagsMetadata(Flags);
       if (O.EmitCallSiteInfo || O.EmitCallGraphSection || O.BBAddrMap ||
@@ -1246,7 +1322,10 @@ bool OnePassCodeGen::runOnFunction(Function &F) {
       else if (M.getNamedMetadata(PseudoProbeDescMetadataName))
         Reason = "pseudo probes";
       else if (any_of(Flags, [&](const Module::ModuleFlagEntry &Flag) {
-                 return !is_contained(KnownFlags, Flag.Key->getString()) &&
+                 StringRef Key = Flag.Key->getString();
+                 // "nosanitize_*" marks a module a sanitizer has instrumented.
+                 return !is_contained(KnownFlags, Key) &&
+                        !Key.starts_with("nosanitize_") &&
                         !isHandledModuleFlag(Flag);
                }))
         Reason = "module flag";

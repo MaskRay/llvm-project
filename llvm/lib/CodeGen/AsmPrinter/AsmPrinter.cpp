@@ -1010,10 +1010,9 @@ void AsmPrinter::emitDebugValue(const MCExpr *Value, unsigned Size) const {
 void AsmPrinter::emitFunctionHeaderComment() {}
 
 void AsmPrinter::emitFunctionPrefix(ArrayRef<const Constant *> Prefix) {
-  const Function &F = MF->getFunction();
   if (!MAI.hasSubsectionsViaSymbols()) {
     for (auto &C : Prefix)
-      emitGlobalConstant(F.getDataLayout(), C);
+      emitGlobalConstant(getDataLayout(), C);
     return;
   }
   // Preserving prefix-like data on platforms which use subsections-via-symbols
@@ -1023,7 +1022,7 @@ void AsmPrinter::emitFunctionPrefix(ArrayRef<const Constant *> Prefix) {
   OutStreamer->emitLabel(OutContext.createLinkerPrivateTempSymbol());
 
   for (auto &C : Prefix) {
-    emitGlobalConstant(F.getDataLayout(), C);
+    emitGlobalConstant(getDataLayout(), C);
   }
 
   // Emit an .alt_entry directive for the actual function symbol.
@@ -4035,6 +4034,9 @@ void AsmPrinter::emitCompiledFunction(const Function &F,
   CurrentFnEnd = emitFunctionAlignmentAndType(
       F, MinAlign,
       std::max(MinAlign, MachineFunction::getPreferredAlignment(F, STI)), STI);
+  if (const MDNode *MD = F.getMetadata(LLVMContext::MD_func_sanitize))
+    emitFunctionPrefix({mdconst::extract<Constant>(MD->getOperand(0)),
+                        mdconst::extract<Constant>(MD->getOperand(1))});
   CurrentFnSym->redefineIfPossible();
   OS.emitLabel(CurrentFnSym);
   emitLocalFunctionEntryLabel(F);
