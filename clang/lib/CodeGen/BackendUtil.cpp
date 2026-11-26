@@ -433,6 +433,7 @@ static bool initTargetOptions(const CompilerInstance &CI,
   Options.EnableTLSDESC = CodeGenOpts.EnableTLSDESC;
   Options.EmulatedTLS = CodeGenOpts.EmulatedTLS;
   Options.EmitStackSizeSection = CodeGenOpts.StackSizeSection;
+  Options.EnableDirectCodeGen = CodeGenOpts.OptimizationLevel == 0;
   Options.StackUsageFile = CodeGenOpts.StackUsageFile;
   Options.EmitAddrsig = CodeGenOpts.Addrsig;
   Options.ForceDwarfFrameSection = CodeGenOpts.ForceDwarfFrameSection;

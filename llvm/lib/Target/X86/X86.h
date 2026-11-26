@@ -28,6 +28,7 @@ struct LVIThunkInserter;
 
 namespace llvm {
 
+struct DirectCodeGenOptions;
 class FunctionPass;
 class InstructionSelector;
 class MachineFunction;
@@ -44,6 +45,10 @@ public:
 };
 
 FunctionPass *createX86ISelDag(X86TargetMachine &TM, CodeGenOptLevel OptLevel);
+
+/// Return the direct -O0 code generator, or null if it is disabled.
+FunctionPass *createX86DirectCodeGenPass(X86TargetMachine &TM,
+                                         const DirectCodeGenOptions &Opts);
 
 /// This pass initializes a global base register for PIC on x86-32.
 class X86GlobalBaseRegPass

@@ -642,6 +642,14 @@ defm : ValueField<"fs-remapping-file", "StringRef", "",
   "Flow Sensitive profile remapping file name">;
 defm : OptionalBoolField<"global-isel",
   "Enable the \"global\" instruction selector">;
+defm : OptionalBoolField<"direct-codegen",
+  "At -O0, compile functions directly to machine code where the target supports it">;
+defm : BoolField<"direct-codegen-abort", "false",
+  "Fail if a function cannot be compiled directly">;
+defm : ValueField<"direct-codegen-limit", "unsigned", "UINT_MAX",
+  "Compile at most this many functions directly">;
+defm : BoolField<"direct-codegen-report", "false",
+  "Print why a function was not compiled directly">;
 defm : EnumField<"global-isel-abort", "std::optional<GlobalISelAbortMode>", "std::nullopt",
   "0,1,2", ["GlobalISelAbortMode::Disable", "GlobalISelAbortMode::Enable",
             "GlobalISelAbortMode::DisableWithDiag"],

@@ -959,6 +959,10 @@ bool TargetPassConfig::addISelPasses() {
   if (getOptLevel() != CodeGenOptLevel::None)
     addPass(createObjCARCContractPass());
   addPass(createPreISelIntrinsicLoweringPass());
+  if (getOptLevel() == CodeGenOptLevel::None &&
+      valueOr(Opts.direct_codegen, TM->Options.EnableDirectCodeGen))
+    addDirectCodeGen({Opts.direct_codegen_report, Opts.direct_codegen_abort,
+                      Opts.direct_codegen_limit});
   addPass(createExpandIRInstsPass(getOptLevel()));
   addIRPasses();
 

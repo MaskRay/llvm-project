@@ -153,6 +153,29 @@ void EHStreamer::computeActionsTable(
 
 /// Return `true' if this is a call to a function marked `nounwind'. Return
 /// `false' otherwise.
+std::pair<uint64_t, unsigned>
+EHStreamer::getTTypeBaseOffset(uint64_t LSDASizeBeforeAlign,
+                               uint64_t TypeInfoSize) {
+  const uint64_t LSDASizeWithoutAlign = LSDASizeBeforeAlign + TypeInfoSize;
+  const unsigned ByteSizeOfLSDAWithoutAlign =
+      getULEB128Size(LSDASizeWithoutAlign);
+  const uint64_t DisplacementBeforeAlign =
+      2 // LPStartEncoding and TypeTableEncoding.
+      + ByteSizeOfLSDAWithoutAlign + LSDASizeBeforeAlign;
+
+  // The type info area starts with 4 byte alignment.
+  const unsigned NeedAlignVal = (4 - DisplacementBeforeAlign % 4) % 4;
+  uint64_t LSDASizeWithAlign = LSDASizeWithoutAlign + NeedAlignVal;
+  const unsigned ByteSizeOfLSDAWithAlign = getULEB128Size(LSDASizeWithAlign);
+
+  // The LSDASizeWithAlign could use 1 byte less padding for alignment
+  // when the data we use to represent the LSDA Size "needs" to be 1 byte
+  // larger than the one previously calculated without alignment.
+  if (ByteSizeOfLSDAWithAlign > ByteSizeOfLSDAWithoutAlign)
+    LSDASizeWithAlign -= 1;
+  return {LSDASizeWithAlign, ByteSizeOfLSDAWithAlign};
+}
+
 bool EHStreamer::callToNoUnwindFunction(const MachineInstr *MI) {
   assert(MI->isCall() && "This should be a call instruction!");
 
@@ -562,27 +585,9 @@ MCSymbol *EHStreamer::emitExceptionTable() {
           + CallSiteTableSize        // Call site table content.
           + ActionTableSize;         // Action table content.
 
-      const uint64_t LSDASizeWithoutAlign = LSDASizeBeforeAlign + TypeInfoSize;
-      const unsigned ByteSizeOfLSDAWithoutAlign =
-          getULEB128Size(LSDASizeWithoutAlign);
-      const uint64_t DisplacementBeforeAlign =
-          2 // LPStartEncoding and TypeTableEncoding.
-          + ByteSizeOfLSDAWithoutAlign + LSDASizeBeforeAlign;
-
-      // The type info area starts with 4 byte alignment.
-      const unsigned NeedAlignVal = (4 - DisplacementBeforeAlign % 4) % 4;
-      uint64_t LSDASizeWithAlign = LSDASizeWithoutAlign + NeedAlignVal;
-      const unsigned ByteSizeOfLSDAWithAlign =
-          getULEB128Size(LSDASizeWithAlign);
-
-      // The LSDASizeWithAlign could use 1 byte less padding for alignment
-      // when the data we use to represent the LSDA Size "needs" to be 1 byte
-      // larger than the one previously calculated without alignment.
-      if (ByteSizeOfLSDAWithAlign > ByteSizeOfLSDAWithoutAlign)
-        LSDASizeWithAlign -= 1;
-
-      Asm->OutStreamer->emitULEB128IntValue(LSDASizeWithAlign,
-                                            ByteSizeOfLSDAWithAlign);
+      auto [Offset, Bytes] =
+          getTTypeBaseOffset(LSDASizeBeforeAlign, TypeInfoSize);
+      Asm->OutStreamer->emitULEB128IntValue(Offset, Bytes);
     }
 
     Asm->emitEncodingByte(CallSiteEncoding, "Call site");

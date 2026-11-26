@@ -18,6 +18,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Error.h"
 #include <cassert>
+#include <climits>
 #include <string>
 
 namespace llvm {
@@ -77,6 +78,15 @@ public:
   }
 };
 
+/// Options of a direct code generator; see addDirectCodeGen.
+struct DirectCodeGenOptions {
+  /// Print why a function falls back to the regular pipeline.
+  bool Report = false;
+  /// Fail if a function falls back.
+  bool Abort = false;
+  /// Compile at most this many functions.
+  unsigned Limit = UINT_MAX;
+};
 
 /// Target-Independent Code Generator Pass Configuration Options.
 ///
@@ -271,6 +281,10 @@ public:
   /// Add common target configurable passes that perform LLVM IR to IR
   /// transforms following machine independent optimization.
   virtual void addIRPasses();
+
+  /// At -O0, add a pass that emits functions directly, ahead of all other
+  /// per-function codegen passes, if the target has one.
+  virtual void addDirectCodeGen(const DirectCodeGenOptions &Opts) {}
 
   /// Add passes to lower exception handling for the code generator.
   virtual void addPassesToHandleExceptions();

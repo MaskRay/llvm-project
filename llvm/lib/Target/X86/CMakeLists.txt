@@ -42,6 +42,7 @@ set(sources
   X86CleanupLocalDynamicTLS.cpp
   X86CmovConversion.cpp
   X86CodeGenPassBuilder.cpp
+  X86DirectCodeGen.cpp
   X86DomainReassignment.cpp
   X86GlobalBaseReg.cpp
   X86LowerTileCopy.cpp

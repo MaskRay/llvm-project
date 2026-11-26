@@ -135,6 +135,12 @@ public:
   void emitWeakReference(MCSymbol *Alias, const MCSymbol *Target) override;
   void changeSection(MCSection *Section, uint32_t Subsection = 0) override;
   void emitInstruction(const MCInst &Inst, const MCSubtargetInfo &STI) override;
+  /// Append instructions that are already encoded, with their fixups. The
+  /// offset of a fixup is relative to \p Code minus \p FixupBase.
+  virtual void emitEncodedInstructions(ArrayRef<char> Code,
+                                       ArrayRef<MCFixup> Fixups,
+                                       size_t FixupBase,
+                                       const MCSubtargetInfo &STI);
 
   /// Emit an instruction to a special fragment, because this instruction
   /// can change its size during relaxation.

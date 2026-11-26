@@ -40,9 +40,9 @@ class LLVM_LIBRARY_VISIBILITY DwarfCFIException : public EHStreamer {
   /// Vector of all personality functions seen so far in the module.
   std::vector<const GlobalValue *> Personalities;
 
-  void addPersonality(const GlobalValue *Personality);
-
 public:
+  void addPersonality(const GlobalValue *Personality) override;
+
   //===--------------------------------------------------------------------===//
   // Main entry points.
   //

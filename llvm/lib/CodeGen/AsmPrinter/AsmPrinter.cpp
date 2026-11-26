@@ -95,8 +95,10 @@
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCDirectives.h"
+#include "llvm/MC/MCDwarf.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCSchedule.h"
 #include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCSectionCOFF.h"
@@ -120,6 +122,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/LEB128.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VCSRevision.h"
@@ -1007,10 +1010,9 @@ void AsmPrinter::emitDebugValue(const MCExpr *Value, unsigned Size) const {
 void AsmPrinter::emitFunctionHeaderComment() {}
 
 void AsmPrinter::emitFunctionPrefix(ArrayRef<const Constant *> Prefix) {
-  const Function &F = MF->getFunction();
   if (!MAI.hasSubsectionsViaSymbols()) {
     for (auto &C : Prefix)
-      emitGlobalConstant(F.getDataLayout(), C);
+      emitGlobalConstant(getDataLayout(), C);
     return;
   }
   // Preserving prefix-like data on platforms which use subsections-via-symbols
@@ -1020,7 +1022,7 @@ void AsmPrinter::emitFunctionPrefix(ArrayRef<const Constant *> Prefix) {
   OutStreamer->emitLabel(OutContext.createLinkerPrivateTempSymbol());
 
   for (auto &C : Prefix) {
-    emitGlobalConstant(F.getDataLayout(), C);
+    emitGlobalConstant(getDataLayout(), C);
   }
 
   // Emit an .alt_entry directive for the actual function symbol.
@@ -1055,32 +1057,10 @@ void AsmPrinter::emitFunctionHeader() {
     emitVisibility(CurrentFnSym, F.getVisibility());
 
   emitLinkage(&F, CurrentFnSym);
-  if (MAI.hasFunctionAlignment()) {
-    Align PrefAlign = MF->getPreferredAlignment();
-    if (MAI.useIntegratedAssembler() && MAI.hasPreferredAlignment()) {
-      // Emit .p2align for the effective minimum alignment (which accounts for
-      // F's own align attribute via getGVAlignment), then emit .prefalign only
-      // when the preferred alignment is greater. The end symbol must be
-      // created here, before the function body, so that .prefalign can
-      // reference it; emitFunctionBody will emit the label at the function
-      // end.
-      Align MinAlign = emitAlignment(MF->getAlignment(), &F);
-      if (MinAlign < PrefAlign) {
-        CurrentFnEnd = createTempSymbol("func_end");
-        OutStreamer->emitPrefAlign(PrefAlign, *CurrentFnEnd,
-                                   /*EmitNops=*/true, /*Fill=*/0,
-                                   getSubtargetInfo());
-      }
-    } else {
-      emitAlignment(PrefAlign, &F);
-    }
-  }
-
-  if (MAI.hasDotTypeDotSizeDirective())
-    OutStreamer->emitSymbolAttribute(CurrentFnSym, MCSA_ELF_TypeFunction);
-
-  if (F.hasFnAttribute(Attribute::Cold))
-    OutStreamer->emitSymbolAttribute(CurrentFnSym, MCSA_Cold);
+  if (MCSymbol *End = emitFunctionAlignmentAndType(F, MF->getAlignment(),
+                                                   MF->getPreferredAlignment(),
+                                                   getSubtargetInfo()))
+    CurrentFnEnd = End;
 
   // Emit the prefix data.
   if (F.hasPrefixData())
@@ -1169,19 +1149,54 @@ void AsmPrinter::emitFunctionHeader() {
     emitGlobalConstant(F.getDataLayout(), F.getPrologueData());
 }
 
+MCSymbol *AsmPrinter::emitFunctionAlignmentAndType(const Function &F,
+                                                   Align MinAlign,
+                                                   Align PrefAlign,
+                                                   const MCSubtargetInfo &STI) {
+  MCSymbol *End = nullptr;
+  if (MAI.hasFunctionAlignment()) {
+    if (MAI.useIntegratedAssembler() && MAI.hasPreferredAlignment()) {
+      // Emit .p2align for the effective minimum alignment (which accounts for
+      // F's own align attribute via getGVAlignment), then emit .prefalign only
+      // when the preferred alignment is greater. The end symbol must be
+      // created here, before the function body, so that .prefalign can
+      // reference it; emitFunctionBody will emit the label at the function
+      // end.
+      MinAlign = emitAlignment(MinAlign, &F);
+      if (MinAlign < PrefAlign) {
+        End = createTempSymbol("func_end");
+        OutStreamer->emitPrefAlign(PrefAlign, *End, /*EmitNops=*/true,
+                                   /*Fill=*/0, STI);
+      }
+    } else {
+      emitAlignment(PrefAlign, &F);
+    }
+  }
+
+  if (MAI.hasDotTypeDotSizeDirective())
+    OutStreamer->emitSymbolAttribute(CurrentFnSym, MCSA_ELF_TypeFunction);
+
+  if (F.hasFnAttribute(Attribute::Cold))
+    OutStreamer->emitSymbolAttribute(CurrentFnSym, MCSA_Cold);
+  return End;
+}
+
 /// EmitFunctionEntryLabel - Emit the label that is the entrypoint for the
 /// function.  This can be overridden by targets as required to do custom stuff.
 void AsmPrinter::emitFunctionEntryLabel() {
   CurrentFnSym->redefineIfPossible();
   OutStreamer->emitLabel(CurrentFnSym);
 
-  if (TM.getTargetTriple().isOSBinFormatELF()) {
-    MCSymbol *Sym = getSymbolPreferLocal(MF->getFunction());
-    if (Sym != CurrentFnSym) {
-      CurrentFnBeginLocal = Sym;
-      OutStreamer->emitLabel(Sym);
-      OutStreamer->emitSymbolAttribute(Sym, MCSA_ELF_TypeFunction);
-    }
+  if (TM.getTargetTriple().isOSBinFormatELF())
+    emitLocalFunctionEntryLabel(MF->getFunction());
+}
+
+void AsmPrinter::emitLocalFunctionEntryLabel(const Function &F) {
+  MCSymbol *Sym = getSymbolPreferLocal(F);
+  if (Sym != CurrentFnSym) {
+    CurrentFnBeginLocal = Sym;
+    OutStreamer->emitLabel(Sym);
+    OutStreamer->emitSymbolAttribute(Sym, MCSA_ELF_TypeFunction);
   }
 }
 
@@ -1724,26 +1739,24 @@ void AsmPrinter::emitPseudoProbe(const MachineInstr &MI) {
   }
 }
 
-void AsmPrinter::emitStackSizeSection(const MachineFunction &MF) {
-  if (!MF.getTarget().Options.EmitStackSizeSection)
+void AsmPrinter::emitStackSizeSection(const MCSection &FnSec,
+                                      uint64_t StackSize, bool Dynamic) {
+  if (!TM.Options.EmitStackSizeSection)
     return;
 
   MCSection *StackSizeSection =
-      getObjFileLowering().getStackSizesSection(*MF.getSection());
+      getObjFileLowering().getStackSizesSection(FnSec);
   if (!StackSizeSection)
     return;
 
-  const MachineFrameInfo &FrameInfo = MF.getFrameInfo();
   // Don't emit functions with dynamic stack allocations.
-  if (FrameInfo.hasVarSizedObjects())
+  if (Dynamic)
     return;
 
   OutStreamer->pushSection();
   OutStreamer->switchSection(StackSizeSection);
 
   const MCSymbol *FunctionSymbol = getFunctionBegin();
-  uint64_t StackSize =
-      FrameInfo.getStackSize() + FrameInfo.getUnsafeStackSize();
   const DataLayout &DL = getDataLayout();
   OutStreamer->emitSymbolValue(FunctionSymbol,
                                DL.getPointerSize(DL.getProgramAddressSpace()));
@@ -1752,18 +1765,14 @@ void AsmPrinter::emitStackSizeSection(const MachineFunction &MF) {
   OutStreamer->popSection();
 }
 
-void AsmPrinter::emitStackUsage(const MachineFunction &MF) {
+void AsmPrinter::emitStackUsage(const Function &F, uint64_t StackSize,
+                                bool Dynamic) {
   const std::string OutputFilename =
-      !StackUsageFile.empty() ? StackUsageFile
-                              : MF.getTarget().Options.StackUsageFile;
+      !StackUsageFile.empty() ? StackUsageFile : TM.Options.StackUsageFile;
 
   // OutputFilename empty implies -fstack-usage is not passed.
   if (OutputFilename.empty())
     return;
-
-  const MachineFrameInfo &FrameInfo = MF.getFrameInfo();
-  uint64_t StackSize =
-      FrameInfo.getStackSize() + FrameInfo.getUnsafeStackSize();
 
   if (StackUsageStream == nullptr) {
     std::error_code EC;
@@ -1775,13 +1784,13 @@ void AsmPrinter::emitStackUsage(const MachineFunction &MF) {
     }
   }
 
-  if (const DISubprogram *DSP = MF.getFunction().getSubprogram())
+  if (const DISubprogram *DSP = F.getSubprogram())
     *StackUsageStream << DSP->getFilename() << ':' << DSP->getLine();
   else
-    *StackUsageStream << MF.getFunction().getParent()->getName();
+    *StackUsageStream << F.getParent()->getName();
 
-  *StackUsageStream << ':' << MF.getName() << '\t' << StackSize << '\t';
-  if (FrameInfo.hasVarSizedObjects())
+  *StackUsageStream << ':' << F.getName() << '\t' << StackSize << '\t';
+  if (Dynamic)
     *StackUsageStream << "dynamic\n";
   else
     *StackUsageStream << "static\n";
@@ -2100,6 +2109,37 @@ void AsmPrinter::emitDanglingPrefetchTargets() {
       continue;
     for (unsigned CallsiteIndex : CallsiteIndexes)
       emitPrefetchTargetSymbol(BBID, CallsiteIndex);
+  }
+}
+
+void AsmPrinter::emitFunctionEndAndSize(bool NeedEndLabel) {
+  const Triple &TT = TM.getTargetTriple();
+  // Even though wasm supports .type and .size in general, function symbols
+  // are automatically sized.
+  bool EmitFunctionSize = MAI.hasDotTypeDotSizeDirective() && !TT.isWasm();
+
+  // SPIR-V supports label instructions only inside a block, not after the
+  // function body.
+  if (TT.getObjectFormat() != Triple::SPIRV &&
+      (EmitFunctionSize || NeedEndLabel || CurrentFnEnd)) {
+    // Create a symbol for the end of function, if not already pre-created
+    // (e.g. for .prefalign directive).
+    if (!CurrentFnEnd)
+      CurrentFnEnd = createTempSymbol("func_end");
+    OutStreamer->emitLabel(CurrentFnEnd);
+  }
+
+  // If the target wants a .size directive for the size of the function, emit
+  // it.
+  if (EmitFunctionSize) {
+    // We can get the size as difference between the function label and the
+    // temp label.
+    const MCExpr *SizeExp = MCBinaryExpr::createSub(
+        MCSymbolRefExpr::create(CurrentFnEnd, OutContext),
+        MCSymbolRefExpr::create(CurrentFnSymForSize, OutContext), OutContext);
+    OutStreamer->emitELFSize(CurrentFnSym, SizeExp);
+    if (CurrentFnBeginLocal)
+      OutStreamer->emitELFSize(CurrentFnBeginLocal, SizeExp);
   }
 }
 
@@ -2551,33 +2591,7 @@ void AsmPrinter::emitFunctionBody() {
     OutStreamer->emitFill(*FillExpr, FillValue);
   }
 
-  // Even though wasm supports .type and .size in general, function symbols
-  // are automatically sized.
-  bool EmitFunctionSize = MAI.hasDotTypeDotSizeDirective() && !TT.isWasm();
-
-  // SPIR-V supports label instructions only inside a block, not after the
-  // function body.
-  if (TT.getObjectFormat() != Triple::SPIRV &&
-      (EmitFunctionSize || needFuncLabels(*MF, *this) || CurrentFnEnd)) {
-    // Create a symbol for the end of function, if not already pre-created
-    // (e.g. for .prefalign directive).
-    if (!CurrentFnEnd)
-      CurrentFnEnd = createTempSymbol("func_end");
-    OutStreamer->emitLabel(CurrentFnEnd);
-  }
-
-  // If the target wants a .size directive for the size of the function, emit
-  // it.
-  if (EmitFunctionSize) {
-    // We can get the size as difference between the function label and the
-    // temp label.
-    const MCExpr *SizeExp = MCBinaryExpr::createSub(
-        MCSymbolRefExpr::create(CurrentFnEnd, OutContext),
-        MCSymbolRefExpr::create(CurrentFnSymForSize, OutContext), OutContext);
-    OutStreamer->emitELFSize(CurrentFnSym, SizeExp);
-    if (CurrentFnBeginLocal)
-      OutStreamer->emitELFSize(CurrentFnBeginLocal, SizeExp);
-  }
+  emitFunctionEndAndSize(needFuncLabels(*MF, *this));
 
   // Call endBasicBlockSection on the last block now, if it wasn't already
   // called.
@@ -2618,13 +2632,15 @@ void AsmPrinter::emitFunctionBody() {
   emitPCSections(*MF);
 
   // Emit section containing stack size metadata.
-  emitStackSizeSection(*MF);
+  const MachineFrameInfo &MFI = MF->getFrameInfo();
+  uint64_t StackSize = MFI.getStackSize() + MFI.getUnsafeStackSize();
+  emitStackSizeSection(*MF->getSection(), StackSize, MFI.hasVarSizedObjects());
 
   // Emit section containing call graph metadata.
   emitCallGraphSection(*MF, FuncCGInfo);
 
   // Emit .su file containing function stack size information.
-  emitStackUsage(*MF);
+  emitStackUsage(MF->getFunction(), StackSize, MFI.hasVarSizedObjects());
 
   emitPatchableFunctionEntries();
 
@@ -3989,6 +4005,222 @@ Align AsmPrinter::emitAlignment(Align Alignment, const GlobalObject *GV,
   } else
     OutStreamer->emitValueToAlignment(Alignment, 0, 1, MaxBytesToEmit);
   return Alignment;
+}
+
+void AsmPrinter::emitCompiledFunction(const Function &F,
+                                      const CompiledFunction &CF) {
+  assert(!OutStreamer->hasRawTextSupport() && "requires an object streamer");
+  auto &OS = static_cast<MCObjectStreamer &>(*OutStreamer);
+  ArrayRef<char> Code = CF.Code;
+  const CompiledFunctionEH *EH = CF.EH;
+  const CompiledFunctionDebug *Debug = CF.Debug;
+  const TargetSubtargetInfo &STI = *TM.getSubtargetImpl(F);
+  // As SetupMachineFunction for a function that does not split the stack. The
+  // MachineFunction of the previous function may have been freed.
+  MF = nullptr;
+  HasNoSplitStack = true;
+  CurrentFnSym = CurrentFnSymForSize = getSymbol(&F);
+  CurrentFnBegin = CurrentFnBeginLocal = CurrentFnEnd = nullptr;
+  MBBSectionRanges.clear();
+  if (!PgoAnalysisMapFeatures.empty())
+    OutContext.reportWarning(SMLoc(),
+                             "pgo-analysis-map is enabled for function " +
+                                 F.getName() + " but it does not have labels");
+  MCSection *Sec = getObjFileLowering().SectionForGlobal(&F, TM);
+  OS.switchSection(Sec);
+  emitVisibility(CurrentFnSym, F.getVisibility());
+  emitLinkage(&F, CurrentFnSym);
+  Align MinAlign = MachineFunction::getMinFunctionAlignment(F, STI);
+  CurrentFnEnd = emitFunctionAlignmentAndType(
+      F, MinAlign,
+      std::max(MinAlign, MachineFunction::getPreferredAlignment(F, STI)), STI);
+  if (const MDNode *MD = F.getMetadata(LLVMContext::MD_func_sanitize))
+    emitFunctionPrefix({mdconst::extract<Constant>(MD->getOperand(0)),
+                        mdconst::extract<Constant>(MD->getOperand(1))});
+  CurrentFnSym->redefineIfPossible();
+  OS.emitLabel(CurrentFnSym);
+  emitLocalFunctionEntryLabel(F);
+  if (Debug || TM.Options.EmitStackSizeSection) {
+    CurrentFnBegin = createTempSymbol("func_begin");
+    OS.emitLabel(CurrentFnBegin);
+  }
+
+  // Build the skeleton MachineFunction the debug handlers work on. It bypasses
+  // MachineModuleInfo so that debug info does not shift the function numbers,
+  // which name constant pool labels, of later functions.
+  SmallVector<MachineInstr *, 32> RowMIs;
+  std::unique_ptr<MachineFunction> SkeletonMF;
+  if (Debug) {
+    SkeletonMF = std::make_unique<MachineFunction>(
+        const_cast<Function &>(F), TM, STI, OutContext,
+        std::numeric_limits<unsigned>::max());
+    MachineFunction &DbgMF = *SkeletonMF;
+    DbgMF.initTargetMachineFunctionInfo(DbgMF.getSubtarget());
+    DbgMF.setSection(Sec);
+    const TargetInstrInfo &TII = *DbgMF.getSubtarget().getInstrInfo();
+    MachineBasicBlock *MBB = nullptr;
+    auto NewBlock = [&] {
+      MBB = DbgMF.CreateMachineBasicBlock();
+      DbgMF.push_back(MBB);
+    };
+    for (const CompiledFunctionDebug::Row &Row : Debug->Rows) {
+      if (!MBB || Row.NewBlock)
+        NewBlock();
+      if (Row.Label)
+        BuildMI(*MBB, MBB->end(), DebugLoc(Row.Loc),
+                TII.get(TargetOpcode::DBG_LABEL))
+            .addMetadata(Row.Label);
+      else
+        TII.insertNoop(*MBB, MBB->end());
+      MBB->back().setDebugLoc(DebugLoc(Row.Loc));
+      if (Row.Epilogue)
+        MBB->back().setFlag(MachineInstr::FrameDestroy);
+      RowMIs.push_back(&MBB->back());
+    }
+    if (!MBB)
+      NewBlock();
+    // The code always begins with a frame setup, so that DwarfDebug emits the
+    // scope line at the function start.
+    TII.insertNoop(DbgMF.front(), DbgMF.front().begin());
+    DbgMF.front().front().setFlag(MachineInstr::FrameSetup);
+    // The code always has a frame pointer, whatever "frame-pointer" says.
+    DbgMF.getFrameInfo().setFrameAddressIsTaken(true);
+    // No callee-saved register is used.
+    DbgMF.getFrameInfo().setCalleeSavedInfoValid(true);
+    if (Debug->SetupFrame)
+      Debug->SetupFrame(DbgMF);
+    for (const CompiledFunctionDebug::Variable &V : Debug->Variables) {
+      int FI = DbgMF.getFrameInfo().CreateFixedObject(
+          std::max<uint64_t>(V.Size, 1), V.ObjectOffset, /*IsImmutable=*/false);
+      DbgMF.setVariableDbgInfo(V.Var, V.Expr, FI, V.Loc);
+    }
+    MF = &DbgMF;
+    if (!CurrentFnEnd)
+      CurrentFnEnd = createTempSymbol("func_end");
+    for (auto &Handler : Handlers) {
+      Handler->beginFunction(MF);
+      Handler->beginBasicBlockSection(MF->front());
+    }
+  }
+
+  bool NeedsCFI = getFunctionCFISectionType(F) != CFISection::None;
+  if (NeedsCFI) {
+    // As DwarfCFIException::beginBasicBlockSection; repeating it is harmless.
+    if (getModuleCFISectionType() == CFISection::Debug)
+      OS.emitCFISections(/*EH=*/false, /*Debug=*/true, /*SFrame=*/false);
+    OS.emitCFIStartProc(/*IsSimple=*/false);
+  }
+  const TargetLoweringObjectFile &TLOF = getObjFileLowering();
+  MCSymbol *LSDASym = nullptr;
+  if (EH) {
+    assert(NeedsCFI && "landing pads need unwind info");
+    auto *Per = cast<GlobalValue>(F.getPersonalityFn()->stripPointerCasts());
+    for (auto &Handler : EHHandlers)
+      static_cast<EHStreamer &>(*Handler).addPersonality(Per);
+    OS.emitCFIPersonality(TLOF.getCFIPersonalitySymbol(Per, TM, MMI),
+                          TLOF.getPersonalityEncoding());
+    LSDASym = createTempSymbol("exception");
+    OS.emitCFILsda(LSDASym, TLOF.getLSDAEncoding());
+  }
+  // Append the code in chunks so that each CFI directive binds to the right
+  // position.
+  size_t Pos = 0;
+  ArrayRef<MCFixup> Fixups = CF.Fixups;
+  auto Append = [&](size_t End) {
+    if (End == Pos)
+      return;
+    size_t NumFixups = 0;
+    while (NumFixups != Fixups.size() && Fixups[NumFixups].getOffset() < End)
+      ++NumFixups;
+    OS.emitEncodedInstructions(Code.slice(Pos, End - Pos),
+                               Fixups.take_front(NumFixups), Pos, STI);
+    Fixups = Fixups.drop_front(NumFixups);
+    Pos = End;
+  };
+  // Begin the placeholder instruction of each row at its offset; it ends
+  // where the next row begins.
+  size_t RowIdx = 0;
+  auto EmitRowsUpTo = [&](size_t Limit) {
+    for (; RowIdx != RowMIs.size() && Debug->Rows[RowIdx].Offset <= Limit;
+         ++RowIdx) {
+      Append(Debug->Rows[RowIdx].Offset);
+      for (auto &Handler : Handlers) {
+        if (RowIdx)
+          Handler->endInstruction();
+        Handler->beginInstruction(RowMIs[RowIdx]);
+      }
+    }
+  };
+  for (const auto &[Offset, Inst] : CF.CFI) {
+    EmitRowsUpTo(Offset);
+    Append(Offset);
+    if (NeedsCFI)
+      emitCFIInstruction(Inst);
+  }
+  EmitRowsUpTo(Code.size());
+  Append(Code.size());
+  if (RowIdx)
+    for (auto &Handler : Handlers)
+      Handler->endInstruction();
+  if (NeedsCFI)
+    OS.emitCFIEndProc();
+
+  emitFunctionEndAndSize(/*NeedEndLabel=*/Debug || EH);
+  if (Debug) {
+    MBBSectionRanges[MF->front().getSectionID()] =
+        MBBSectionRange{CurrentFnBegin, CurrentFnEnd};
+    for (auto &Handler : Handlers) {
+      Handler->endBasicBlockSection(MF->back());
+      Handler->markFunctionEnd();
+    }
+    for (auto &Handler : Handlers)
+      Handler->endFunction(MF);
+    MF = nullptr;
+    SkeletonMF.reset();
+  }
+  emitStackSizeSection(*Sec, CF.StackSize, /*Dynamic=*/false);
+  emitStackUsage(F, CF.StackSize, /*Dynamic=*/false);
+  if (!EH)
+    return;
+
+  // Emit the exception table. All offsets are known, so the layout mirrors
+  // EHStreamer::emitExceptionTable without label differences. @LPStart is
+  // omitted: landing pads are relative to the function start.
+  OS.switchSection(TLOF.getSectionForLSDA(F, *CurrentFnSym, TM));
+  emitAlignment(Align(4));
+  OS.emitLabel(LSDASym);
+  unsigned TTypeEncoding = EH->TypeInfos.empty()
+                               ? unsigned(dwarf::DW_EH_PE_omit)
+                               : TLOF.getTTypeEncoding();
+  uint64_t CallSiteTableSize = 0;
+  for (const CompiledFunctionEH::CallSite &CS : EH->CallSites)
+    CallSiteTableSize += getULEB128Size(CS.Start) + getULEB128Size(CS.Length) +
+                         getULEB128Size(CS.LandingPad) +
+                         getULEB128Size(CS.Action);
+  emitEncodingByte(dwarf::DW_EH_PE_omit, "@LPStart");
+  emitEncodingByte(TTypeEncoding, "@TType");
+  if (!EH->TypeInfos.empty()) {
+    auto [Offset, Bytes] = EHStreamer::getTTypeBaseOffset(
+        1 + getULEB128Size(CallSiteTableSize) + CallSiteTableSize +
+            EH->Actions.size(),
+        GetSizeOfEncodedValue(TTypeEncoding) * EH->TypeInfos.size());
+    OS.emitULEB128IntValue(Offset, Bytes);
+  }
+  emitEncodingByte(dwarf::DW_EH_PE_uleb128, "Call site");
+  OS.emitULEB128IntValue(CallSiteTableSize);
+  for (const CompiledFunctionEH::CallSite &CS : EH->CallSites) {
+    OS.emitULEB128IntValue(CS.Start);
+    OS.emitULEB128IntValue(CS.Length);
+    OS.emitULEB128IntValue(CS.LandingPad);
+    OS.emitULEB128IntValue(CS.Action);
+  }
+  OS.emitBytes(StringRef(EH->Actions.data(), EH->Actions.size()));
+  if (!EH->TypeInfos.empty()) {
+    emitAlignment(Align(4));
+    for (const GlobalValue *GV : reverse(EH->TypeInfos))
+      emitTTypeReference(GV, TTypeEncoding);
+  }
+  emitAlignment(Align(4));
 }
 
 //===----------------------------------------------------------------------===//

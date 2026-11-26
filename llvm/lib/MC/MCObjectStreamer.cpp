@@ -399,6 +399,24 @@ bool MCObjectStreamer::mayHaveInstructions(MCSection &Sec) const {
   return Sec.hasInstructions();
 }
 
+void MCObjectStreamer::emitEncodedInstructions(ArrayRef<char> Code,
+                                               ArrayRef<MCFixup> Fixups,
+                                               size_t FixupBase,
+                                               const MCSubtargetInfo &STI) {
+  getCurrentSectionOnly()->setHasInstructions(true);
+  MCDwarfLineEntry::make(this, getCurrentSectionOnly());
+  ensureHeadroom(Code.size());
+  MCFragment *Frag = getCurrentFragment();
+  size_t Base = getCurFragSize();
+  appendContents(Code);
+  Frag->setHasInstructions(STI);
+  for (MCFixup Fixup : Fixups) {
+    visitUsedExpr(*Fixup.getValue());
+    Fixup.setOffset(Base + Fixup.getOffset() - FixupBase);
+    Frag->addFixup(Fixup);
+  }
+}
+
 void MCObjectStreamer::emitInstruction(const MCInst &Inst,
                                        const MCSubtargetInfo &STI) {
   if (LFIRewriter && LFIRewriter->rewriteInst(Inst, *this, STI))
