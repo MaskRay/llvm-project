@@ -3765,8 +3765,11 @@ void MergeTailSection::finalizeContents() {
 }
 
 void MergeNoTailSection::writeTo(uint8_t *buf) {
-  parallelFor(0, numShards,
-              [&](size_t i) { shards[i].write(buf + shardOffsets[i]); });
+  parallelFor(0, numShards, [&](size_t i) {
+    for (const Slot &slot : shards[i])
+      if (slot.key)
+        memcpy(buf + shardOffsets[i] + slot.off, slot.key, slot.size);
+  });
 }
 
 namespace {
@@ -3782,10 +3785,6 @@ struct MergeRefs {
 // deduplicated independently. A shard sees its pieces in input order, so the
 // layout does not depend on the thread count.
 void MergeNoTailSection::finalizeContents() {
-  // Initializes string table builders.
-  for (size_t i = 0; i < numShards; ++i)
-    shards.emplace_back(StringTableBuilder::RAW, llvm::Align(addralign));
-
   // Process the sections in waves of about waveSize pieces to bound the memory
   // used by MergeRefs (24 bytes per piece, ~100 MiB per wave). Cut each wave
   // into a few chunks per thread, but not so small that the per-chunk setup
@@ -3798,6 +3797,7 @@ void MergeNoTailSection::finalizeContents() {
       std::min(numPieces, waveSize) / (4 * parallel::getThreadCount()), 4096);
   SmallVector<size_t, 0> starts, pieceCounts;
   SmallVector<std::array<MergeRefs, numShards>, 0> refs;
+  size_t shardSizes[numShards] = {}, numStrings[numShards] = {};
   for (size_t next = 0, e = sections.size(); next != e;) {
     // Serial: cut the "next" wave into chunks of whole sections. A chunk takes
     // sections up to `chunkSize` pieces and the wave takes chunks up to
@@ -3847,13 +3847,56 @@ void MergeNoTailSection::finalizeContents() {
     // input order, so that the strings are placed in the order of their first
     // occurrences.
     parallelFor(0, numShards, [&](size_t shardId) {
-      StringTableBuilder &builder = shards[shardId];
+      SmallVector<Slot, 0> table = std::move(shards[shardId]);
+      if (table.empty())
+        table.resize(64);
+      size_t mask = table.size() - 1, n = numStrings[shardId],
+             shardSize = shardSizes[shardId];
       for (size_t c = 0; c != numChunks; ++c) {
-        MergeRefs &r = refs[c][shardId];
-        r.out.resize_for_overwrite(r.in.size());
-        for (size_t i = 0, e = r.in.size(); i != e; ++i)
-          r.out[i] = builder.add(r.in[i]);
+        ArrayRef<CachedHashStringRef> v = refs[c][shardId].in;
+        SmallVector<uint64_t, 0> &out = refs[c][shardId].out;
+        out.resize_for_overwrite(v.size());
+        for (size_t i = 0, e = v.size(); i != e; ++i) {
+          // Probes miss on scattered input strings and table slots.
+          if (i + 16 < e) {
+            LLVM_PREFETCH(v[i + 16].data(), 0, 3);
+            LLVM_PREFETCH(&table[v[i + 16].hash() & mask], 0, 3);
+          }
+          if (i + 8 < e)
+            LLVM_PREFETCH(table[v[i + 8].hash() & mask].key, 0, 3);
+          CachedHashStringRef r = v[i];
+          size_t k = r.hash() & mask;
+          while (table[k].key &&
+                 !(table[k].hash == r.hash() && table[k].size == r.size() &&
+                   memcmp(table[k].key, r.data(), r.size()) == 0))
+            k = (k + 1) & mask;
+          if (table[k].key) {
+            out[i] = table[k].off;
+            continue;
+          }
+
+          uint64_t off = alignToPowerOf2(shardSize, addralign);
+          shardSize = off + r.size();
+          table[k] = {r.data(), r.size(), r.hash(), off};
+          out[i] = off;
+          if (++n * 4 > table.size() * 3) {
+            SmallVector<Slot, 0> old = std::move(table);
+            table.resize(old.size() * 2);
+            mask = table.size() - 1;
+            for (const Slot &s : old) {
+              if (!s.key)
+                continue;
+              size_t j = s.hash & mask;
+              while (table[j].key)
+                j = (j + 1) & mask;
+              table[j] = s;
+            }
+          }
+        }
       }
+      shards[shardId] = std::move(table);
+      numStrings[shardId] = n;
+      shardSizes[shardId] = shardSize;
     });
 
     // Phase 3, parallel over chunks: gather the offsets within the shards,
@@ -3872,11 +3915,10 @@ void MergeNoTailSection::finalizeContents() {
   // Compute an in-section offset for each shard.
   size_t off = 0;
   for (size_t i = 0; i < numShards; ++i) {
-    shards[i].finalizeInOrder();
-    if (shards[i].getSize() > 0)
+    if (shardSizes[i] > 0)
       off = alignToPowerOf2(off, addralign);
     shardOffsets[i] = off;
-    off += shards[i].getSize();
+    off += shardSizes[i];
   }
   size = off;
 
