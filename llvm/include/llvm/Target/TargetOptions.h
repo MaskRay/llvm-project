@@ -113,7 +113,7 @@ public:
         ValueTrackingVariableLocations(false), ForceDwarfFrameSection(false),
         XRayFunctionIndex(true), DebugStrictDwarf(false), JMCInstrument(false),
         EnableCFIFixup(false), MisExpect(false), XCOFFReadOnlyPointers(false),
-        VerifyArgABICompliance(false) {}
+        VerifyArgABICompliance(false), EnableDirectCodeGen(false) {}
 
   /// NoZerosInBSS - By default some codegens place zero-initialized data to
   /// .bss section. This flag disables such behaviour (necessary, e.g. for
@@ -273,6 +273,10 @@ public:
   /// are verified in the target backend if it cares about them. This is off
   /// by default and enabled explicitly by each front-end separately.
   unsigned VerifyArgABICompliance : 1;
+
+  /// At -O0, compile functions directly to machine code where the target
+  /// supports it, falling back to the regular pipeline per function.
+  unsigned EnableDirectCodeGen : 1;
 
   /// Name of the stack usage file (i.e., .su file) if user passes
   /// -fstack-usage. If empty, it can be implied that -fstack-usage is not

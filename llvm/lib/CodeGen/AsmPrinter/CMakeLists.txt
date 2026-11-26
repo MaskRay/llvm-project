@@ -11,6 +11,7 @@ add_llvm_component_library(LLVMAsmPrinter
   DebugLocStream.cpp
   DIE.cpp
   DIEHash.cpp
+  DirectCodeGen.cpp
   DwarfCFIException.cpp
   DwarfCompileUnit.cpp
   DwarfDebug.cpp
@@ -46,4 +47,5 @@ add_llvm_component_library(LLVMAsmPrinter
   Support
   Target
   TargetParser
+  TransformUtils
   )

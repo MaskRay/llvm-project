@@ -435,6 +435,7 @@ public:
   }
 
   void addIRPasses()  override;
+  void addDirectCodeGen(const DirectCodeGenOptions &Opts) override;
   bool addPreISel() override;
   void addCodeGenPrepare() override;
   bool addInstSelector() override;
@@ -487,6 +488,10 @@ TargetPassConfig *AArch64TargetMachine::createPassConfig(PassManagerBase &PM) {
 
 std::unique_ptr<CSEConfigBase> AArch64PassConfig::getCSEConfig() const {
   return getStandardCSEConfigForOpt(TM->getOptLevel());
+}
+
+void AArch64PassConfig::addDirectCodeGen(const DirectCodeGenOptions &Opts) {
+  addPass(createAArch64DirectCodeGenPass(getAArch64TargetMachine(), Opts));
 }
 
 void AArch64PassConfig::addIRPasses() {

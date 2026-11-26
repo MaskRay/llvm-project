@@ -355,6 +355,13 @@ public:
     MCELFStreamer::emitInstruction(Inst, STI);
   }
 
+  void emitEncodedInstructions(ArrayRef<char> Code, ArrayRef<MCFixup> Fixups,
+                               size_t FixupBase,
+                               const MCSubtargetInfo &STI) override {
+    emitA64MappingSymbol();
+    MCELFStreamer::emitEncodedInstructions(Code, Fixups, FixupBase, STI);
+  }
+
   /// Emit a 32-bit value as an instruction. This is only used for the .inst
   /// directive, EmitInstruction should be used in other cases.
   void emitInst(uint32_t Inst) {

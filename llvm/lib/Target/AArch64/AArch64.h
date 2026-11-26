@@ -37,6 +37,7 @@ struct AArch64PostLegalizerLoweringImplRuleConfig;
 struct SLSHardeningInserter;
 
 namespace llvm {
+struct DirectCodeGenOptions;
 
 class AArch64RegisterBankInfo;
 struct AArch64Options;
@@ -47,6 +48,10 @@ class FunctionPass;
 class InstructionSelector;
 class ModulePass;
 
+// Return the direct -O0 code generator.
+FunctionPass *createAArch64DirectCodeGenPass(AArch64TargetMachine &TM,
+                                             const DirectCodeGenOptions &Opts);
+extern char &AArch64AsmPrinterID;
 FunctionPass *createAArch64DeadRegisterDefinitions();
 FunctionPass *createAArch64RedundantCopyEliminationPass();
 FunctionPass *createAArch64RedundantCondBranchPass();
